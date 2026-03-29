@@ -198,6 +198,97 @@
     }
     .delete-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
     .empty { color: #555; font-size: 13px; padding: 20px 0; }
+
+    /* ── 탭 ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #222;
+      padding-bottom: 0;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: #666;
+      font-size: 13px;
+      padding: 8px 14px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab-btn.active { color: #c8a96e; border-bottom-color: #c8a96e; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── 통계 ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #1a1a1a;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .stat-num  { font-size: 24px; font-weight: 700; color: #c8a96e; }
+    .stat-label { font-size: 11px; color: #888; margin-top: 4px; }
+
+    .section-label {
+      font-size: 11px;
+      color: #888;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .top-song {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+    .top-song img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+    .top-song .track-title { font-size: 12px; }
+    .top-song .count { font-size: 12px; color: #c8a96e; font-weight: 700; flex-shrink: 0; margin-left: auto; }
+
+    .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 60px; margin-bottom: 6px; }
+    .bar {
+      flex: 1;
+      background: #c8a96e44;
+      border-radius: 2px 2px 0 0;
+      min-height: 2px;
+      transition: background 0.2s;
+    }
+    .bar:hover { background: #c8a96e; }
+    .bar-labels { display: flex; gap: 3px; }
+    .bar-label { flex: 1; text-align: center; font-size: 9px; color: #555; }
+
+    /* ── 이력 ── */
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .history-item img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+    .history-item .track-title { font-size: 12px; }
+    .history-time { font-size: 10px; color: #555; margin-top: 2px; }
+    .skipped-badge {
+      font-size: 10px;
+      background: #3a1a1a;
+      color: #ff6b6b;
+      border-radius: 4px;
+      padding: 2px 6px;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
   </style>
 </head>
 <body>
@@ -236,10 +327,39 @@
 
 </div>
 
-<!-- 오른쪽: 큐 -->
+<!-- 오른쪽: 탭 패널 -->
 <div id="queue-panel">
-  <h2>신청 목록</h2>
-  <div id="queue-list"><div class="empty">신청된 곡이 없습니다</div></div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="queue">신청 목록</button>
+    <button class="tab-btn" data-tab="history">이력</button>
+    <button class="tab-btn" data-tab="stats">통계</button>
+  </div>
+
+  <!-- 큐 탭 -->
+  <div id="tab-queue" class="tab-content active">
+    <div id="queue-list"><div class="empty">신청된 곡이 없습니다</div></div>
+  </div>
+
+  <!-- 이력 탭 -->
+  <div id="tab-history" class="tab-content">
+    <div id="history-list"><div class="empty">이력이 없습니다</div></div>
+  </div>
+
+  <!-- 통계 탭 -->
+  <div id="tab-stats" class="tab-content">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-total">-</div><div class="stat-label">전체 신청</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-played">-</div><div class="stat-label">재생 완료</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-skip">-</div><div class="stat-label">스킵률</div></div>
+    </div>
+
+    <div class="section-label" style="margin-bottom:8px">시간대별 재생</div>
+    <div class="bar-chart" id="bar-chart"></div>
+    <div class="bar-labels" id="bar-labels"></div>
+
+    <div class="section-label" style="margin-top:20px;margin-bottom:10px">TOP 10 신청곡</div>
+    <div id="top-songs"></div>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -337,6 +457,72 @@
 
   function escHtml(str) {
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── 탭 전환 ───────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'history') loadHistory();
+      if (btn.dataset.tab === 'stats')   loadStats();
+    });
+  });
+
+  // ── 이력 로드 ─────────────────────────────────────────────
+  async function loadHistory() {
+    const res  = await fetch(`/api/history?token=${TOKEN}&limit=100`);
+    const data = await res.json();
+    const el   = document.getElementById('history-list');
+
+    if (!data.length) { el.innerHTML = '<div class="empty">이력이 없습니다</div>'; return; }
+
+    el.innerHTML = data.map((item) => `
+      <div class="history-item">
+        <img src="${item.thumbnail}" alt="" />
+        <div style="flex:1;overflow:hidden">
+          <div class="track-title">${escHtml(item.title)}</div>
+          <div class="history-time">${new Date(item.playedAt).toLocaleString('ko-KR')}</div>
+        </div>
+        ${item.skipped ? '<span class="skipped-badge">스킵</span>' : ''}
+      </div>
+    `).join('');
+  }
+
+  // ── 통계 로드 ─────────────────────────────────────────────
+  async function loadStats() {
+    const res  = await fetch(`/api/stats?token=${TOKEN}`);
+    const data = await res.json();
+
+    document.getElementById('stat-total').textContent  = data.total;
+    document.getElementById('stat-played').textContent = data.played;
+    document.getElementById('stat-skip').textContent   = data.skipRate + '%';
+
+    // 시간대별 바 차트
+    const max = Math.max(...data.byHour, 1);
+    document.getElementById('bar-chart').innerHTML = data.byHour
+      .map((v) => `<div class="bar" style="height:${Math.round((v / max) * 100)}%" title="${v}회"></div>`)
+      .join('');
+    document.getElementById('bar-labels').innerHTML = data.byHour
+      .map((_, i) => `<div class="bar-label">${i % 4 === 0 ? i : ''}</div>`)
+      .join('');
+
+    // TOP 10
+    const topEl = document.getElementById('top-songs');
+    if (!data.topSongs.length) { topEl.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
+    topEl.innerHTML = data.topSongs.map((s, i) => `
+      <div class="top-song">
+        <span style="color:#555;font-size:12px;width:16px">${i + 1}</span>
+        <img src="${s.thumbnail}" alt="" />
+        <div style="flex:1;overflow:hidden">
+          <div class="track-title">${escHtml(s.title)}</div>
+          <div class="track-channel">${escHtml(s.channelTitle)}</div>
+        </div>
+        <span class="count">${s.count}회</span>
+      </div>
+    `).join('');
   }
 </script>
 </body>
