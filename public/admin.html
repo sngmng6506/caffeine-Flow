@@ -69,10 +69,22 @@
     #now-channel { font-size: 12px; color: #888; }
 
     /* YouTube 플레이어 */
+    #yt-wrap { position: relative; width: 352px; height: 198px; }
     #yt-player {
       width: 352px; height: 198px;
       border-radius: 10px; border: none; background: #000;
     }
+    #play-overlay {
+      position: absolute; inset: 0;
+      background: #000a;
+      border-radius: 10px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 8px; cursor: pointer;
+      font-size: 13px; color: #f0f0f0;
+    }
+    #play-overlay span { font-size: 32px; }
+    #play-overlay.hidden { display: none; }
 
     /* 컨트롤 */
     .controls { display: flex; gap: 10px; width: 100%; }
@@ -218,7 +230,13 @@
   <div id="now-title">재생 대기 중</div>
   <div id="now-channel"></div>
 
-  <iframe id="yt-player" allow="autoplay"></iframe>
+  <div id="yt-wrap">
+    <iframe id="yt-player" allow="autoplay"></iframe>
+    <div id="play-overlay">
+      <span>▶</span>
+      클릭하여 재생 시작
+    </div>
+  </div>
 
   <div class="controls">
     <button class="btn btn-skip" id="skip-btn">⏭ 스킵</button>
@@ -292,20 +310,30 @@
     throw new Error('No token');
   }
 
-  const socket = io();
+  const socket    = io();
   let ytPlayer    = null;
   let isPlaying   = false;
-  let pendingSong = null; // ytPlayer 준비 전 도착한 곡 보관
+  let pendingSong = null;
+  let userActivated = false; // 사용자 클릭 여부 (자동재생 정책)
+
+  const overlay = document.getElementById('play-overlay');
+
+  // 오버레이 클릭 → 재생 활성화
+  overlay.addEventListener('click', () => {
+    userActivated = true;
+    overlay.classList.add('hidden');
+    if (pendingSong) { playSong(pendingSong); pendingSong = null; }
+    else if (ytPlayer && typeof ytPlayer.playVideo === 'function') ytPlayer.playVideo();
+  });
 
   // ── YouTube IFrame API ────────────────────────────────────
   window.onYouTubeIframeAPIReady = function () {
     ytPlayer = new YT.Player('yt-player', {
       height: '198', width: '352',
-      playerVars: { autoplay: 1, controls: 1 },
+      playerVars: { autoplay: 0, controls: 1 },
       events: {
         onReady: () => {
-          // 플레이어 준비 완료 후 대기 중이던 곡 재생
-          if (pendingSong) { playSong(pendingSong); pendingSong = null; }
+          if (pendingSong && userActivated) { playSong(pendingSong); pendingSong = null; }
         },
         onStateChange: onPlayerStateChange,
       },
@@ -341,11 +369,13 @@
     document.getElementById('now-channel').textContent = song.channelTitle;
     document.getElementById('lp-label').innerHTML = `<img src="${song.thumbnail}" alt="" />`;
 
-    if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') {
-      // 플레이어 아직 준비 안 됨 → 대기
+    if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function' || !userActivated) {
       pendingSong = song;
+      // 아직 클릭 안 했으면 오버레이 표시
+      if (!userActivated) overlay.classList.remove('hidden');
       return;
     }
+    overlay.classList.add('hidden');
     ytPlayer.loadVideoById(song.videoId);
   }
 
