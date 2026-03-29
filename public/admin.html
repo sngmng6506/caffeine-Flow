@@ -3,64 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Admin - Music Player</title>
+  <title>Admin - Caffeine Flow</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #0f0f0f;
       color: #f0f0f0;
       display: flex;
-      gap: 0;
       height: 100vh;
       overflow: hidden;
     }
 
-    /* ── 왼쪽: 플레이어 ── */
-    #player-panel {
-      width: 420px;
+    /* ── 왼쪽 패널 ── */
+    #left-panel {
+      width: 380px;
       flex-shrink: 0;
       background: #111;
+      border-right: 1px solid #222;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 32px 24px;
-      border-right: 1px solid #222;
+      gap: 20px;
     }
+
+    /* 익스텐션 상태 */
+    #ext-status {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #1a1a1a;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+    }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #555;
+    }
+    .status-dot.connected { background: #4caf50; box-shadow: 0 0 6px #4caf5088; }
+    .status-dot.disconnected { background: #ff6b6b; }
+    #ext-status-text { color: #aaa; }
 
     /* LP 애니메이션 */
     .lp-wrapper {
       position: relative;
-      width: 220px;
-      height: 220px;
-      margin-bottom: 24px;
+      width: 200px; height: 200px;
     }
     .lp-disc {
-      width: 220px;
-      height: 220px;
+      width: 200px; height: 200px;
       border-radius: 50%;
       background: conic-gradient(
         #1a1a1a 0deg, #2a2a2a 5deg, #1a1a1a 10deg,
         #2a2a2a 15deg, #1a1a1a 20deg, #2a2a2a 25deg,
         #1a1a1a 30deg, #2a2a2a 35deg, #1a1a1a 40deg,
-        #2a2a2a 45deg, #1a1a1a 50deg, #2a2a2a 55deg,
-        #1a1a1a 0deg
+        #2a2a2a 45deg, #1a1a1a 50deg, #2a2a2a 55deg, #1a1a1a 0deg
       );
-      box-shadow: 0 0 40px #0008, inset 0 0 20px #0006;
+      box-shadow: 0 0 40px #0008;
       animation: spin 4s linear infinite;
       animation-play-state: paused;
     }
     .lp-disc.playing { animation-play-state: running; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
     .lp-label {
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 80px; height: 80px;
+      width: 76px; height: 76px;
       border-radius: 50%;
       background: #c8a96e;
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -68,13 +84,8 @@
       font-weight: 700;
       color: #1a1000;
       letter-spacing: 1px;
-      overflow: hidden;
     }
-    .lp-label img {
-      width: 80px; height: 80px;
-      object-fit: cover;
-      border-radius: 50%;
-    }
+    .lp-label img { width: 76px; height: 76px; object-fit: cover; border-radius: 50%; }
     .lp-hole {
       position: absolute;
       top: 50%; left: 50%;
@@ -87,46 +98,43 @@
 
     /* 현재 곡 정보 */
     #now-title {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       text-align: center;
-      max-width: 360px;
-      margin-bottom: 6px;
+      max-width: 320px;
       line-height: 1.4;
     }
-    #now-channel {
-      font-size: 13px;
-      color: #888;
-      margin-bottom: 24px;
-    }
+    #now-channel { font-size: 12px; color: #888; }
 
-    /* 컨트롤 버튼 */
-    .controls {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
+    /* 컨트롤 */
+    .controls { display: flex; gap: 10px; width: 100%; }
     .btn {
+      flex: 1;
       border: none;
       border-radius: 8px;
-      padding: 10px 20px;
+      padding: 11px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       transition: opacity 0.15s;
     }
     .btn:active { opacity: 0.7; }
-    .btn-skip   { background: #c8a96e; color: #0f0f0f; }
+    .btn-skip { background: #c8a96e; color: #0f0f0f; }
     .btn-toggle { background: #2a2a2a; color: #f0f0f0; border: 1px solid #444; }
     .btn-toggle.off { background: #3a1a1a; color: #ff6b6b; border-color: #ff6b6b44; }
 
-    /* 숨겨진 YouTube iframe */
-    #yt-player {
-      width: 360px;
-      height: 202px;
+    /* 익스텐션 미연결 안내 */
+    #ext-guide {
+      display: none;
+      width: 100%;
+      background: #1a1500;
+      border: 1px solid #c8a96e44;
       border-radius: 10px;
-      border: none;
-      background: #000;
+      padding: 14px;
+      font-size: 12px;
+      color: #c8a96e;
+      line-height: 1.7;
+      text-align: center;
     }
 
     /* ── 오른쪽: 큐 ── */
@@ -136,13 +144,12 @@
       padding: 24px;
     }
     #queue-panel h2 {
-      font-size: 13px;
+      font-size: 12px;
       color: #888;
       letter-spacing: 1px;
       text-transform: uppercase;
       margin-bottom: 16px;
     }
-
     .queue-item {
       display: flex;
       align-items: center;
@@ -165,8 +172,7 @@
       flex-shrink: 0;
     }
     .queue-item img {
-      width: 56px;
-      height: 42px;
+      width: 56px; height: 42px;
       object-fit: cover;
       border-radius: 6px;
       flex-shrink: 0;
@@ -182,7 +188,7 @@
     .track-channel { font-size: 11px; color: #888; margin-top: 2px; }
     .delete-btn {
       background: transparent;
-      border: 1px solid #444;
+      border: 1px solid #333;
       border-radius: 6px;
       color: #888;
       padding: 5px 10px;
@@ -191,24 +197,21 @@
       flex-shrink: 0;
     }
     .delete-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
-
     .empty { color: #555; font-size: 13px; padding: 20px 0; }
-
-    /* 상태 표시 */
-    #status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #4caf50;
-      display: inline-block;
-      margin-right: 6px;
-    }
-    #status-dot.off { background: #ff6b6b; }
   </style>
 </head>
 <body>
 
-<!-- 왼쪽: 플레이어 -->
-<div id="player-panel">
+<!-- 왼쪽 -->
+<div id="left-panel">
+
+  <!-- 익스텐션 연결 상태 -->
+  <div id="ext-status">
+    <div class="status-dot disconnected" id="ext-dot"></div>
+    <span id="ext-status-text">익스텐션 연결 대기 중...</span>
+  </div>
+
+  <!-- LP -->
   <div class="lp-wrapper">
     <div class="lp-disc" id="lp-disc">
       <div class="lp-label" id="lp-label">MUSIC</div>
@@ -219,17 +222,21 @@
   <div id="now-title">재생 대기 중</div>
   <div id="now-channel"></div>
 
+  <!-- 컨트롤 -->
   <div class="controls">
     <button class="btn btn-skip" id="skip-btn">⏭ 스킵</button>
-    <button class="btn btn-toggle" id="toggle-btn">
-      <span id="status-dot"></span>시스템 ON
-    </button>
+    <button class="btn btn-toggle" id="toggle-btn">시스템 ON</button>
   </div>
 
-  <iframe id="yt-player" allow="autoplay"></iframe>
+  <!-- 익스텐션 미연결 안내 -->
+  <div id="ext-guide">
+    크롬 익스텐션이 연결되지 않았습니다.<br/>
+    익스텐션을 설치하고 서버에 연결해주세요.
+  </div>
+
 </div>
 
-<!-- 오른쪽: 큐 목록 -->
+<!-- 오른쪽: 큐 -->
 <div id="queue-panel">
   <h2>신청 목록</h2>
   <div id="queue-list"><div class="empty">신청된 곡이 없습니다</div></div>
@@ -246,104 +253,60 @@
   }
 
   const socket = io();
-  let currentQueue  = [];
-  let isSystemOn    = true;
-  let isPlaying     = false;
+  let isSystemOn = true;
 
-  // ── YouTube IFrame Player API ────────────────────────────
-  let ytPlayer = null;
-
-  window.onYouTubeIframeAPIReady = function () {
-    ytPlayer = new YT.Player('yt-player', {
-      height: '202',
-      width: '360',
-      playerVars: { autoplay: 1, controls: 1 },
-      events: {
-        onStateChange: onPlayerStateChange,
-      },
-    });
-  };
-
-  function onPlayerStateChange(event) {
-    if (event.data === YT.PlayerState.ENDED) {
-      // 곡이 끝나면 자동 스킵
-      adminSkip();
-    }
-    const playing = event.data === YT.PlayerState.PLAYING;
-    document.getElementById('lp-disc').classList.toggle('playing', playing);
-    isPlaying = playing;
-  }
-
-  function loadVideo(videoId) {
-    if (!ytPlayer) return;
-    ytPlayer.loadVideoById(videoId);
-  }
-
-  // ── 소켓 이벤트 ──────────────────────────────────────────
-  socket.on('queue_update', ({ queue, isSystemOn: sysOn }) => {
-    isSystemOn   = sysOn;
-    currentQueue = queue;
+  socket.on('queue_update', ({ queue, isSystemOn: sysOn, isPlaying, extensionConnected }) => {
+    isSystemOn = sysOn;
+    updateExtStatus(extensionConnected);
+    updateToggleBtn(sysOn);
+    updateNowPlaying(queue, isPlaying);
     renderQueue(queue);
-    updateToggleBtn();
-
-    // 큐 첫 항목이 바뀌었거나 아무것도 안 재생 중이면 재생 시작
-    if (queue.length > 0 && !isPlaying) {
-      playFirst(queue[0]);
-    }
-    // 큐가 비면 플레이어 정보 초기화
-    if (queue.length === 0) {
-      resetPlayer();
-    }
   });
 
-  function playFirst(item) {
-    document.getElementById('now-title').textContent   = item.title;
-    document.getElementById('now-channel').textContent = item.channelTitle;
+  socket.on('extension_status', ({ connected }) => {
+    updateExtStatus(connected);
+  });
 
-    const labelEl = document.getElementById('lp-label');
-    labelEl.innerHTML = `<img src="${item.thumbnail}" alt="" />`;
-
-    loadVideo(item.videoId);
+  // ── 익스텐션 상태 표시 ────────────────────────────────────
+  function updateExtStatus(connected) {
+    const dot    = document.getElementById('ext-dot');
+    const text   = document.getElementById('ext-status-text');
+    const guide  = document.getElementById('ext-guide');
+    dot.className  = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+    text.textContent = connected ? '익스텐션 연결됨' : '익스텐션 연결 대기 중...';
+    guide.style.display = connected ? 'none' : 'block';
   }
 
-  function resetPlayer() {
-    document.getElementById('now-title').textContent   = '재생 대기 중';
-    document.getElementById('now-channel').textContent = '';
-    document.getElementById('lp-label').innerHTML      = 'MUSIC';
-    document.getElementById('lp-disc').classList.remove('playing');
-    isPlaying = false;
-    if (ytPlayer) ytPlayer.stopVideo();
-  }
-
-  // ── 관리자 액션 ──────────────────────────────────────────
-  function adminSkip() {
-    socket.emit('admin_skip', { token: TOKEN });
-    isPlaying = false; // 다음 queue_update에서 새 곡 재생
-  }
-
-  function adminDelete(id) {
-    socket.emit('admin_delete', { token: TOKEN, id });
-  }
-
-  function adminToggle() {
-    socket.emit('admin_toggle', { token: TOKEN });
-  }
-
-  document.getElementById('skip-btn').addEventListener('click', adminSkip);
-  document.getElementById('toggle-btn').addEventListener('click', adminToggle);
-
-  function updateToggleBtn() {
-    const btn = document.getElementById('toggle-btn');
-    const dot = document.getElementById('status-dot');
-    if (isSystemOn) {
-      btn.textContent = '';
-      dot.className = '';
-      btn.innerHTML = '<span id="status-dot"></span>시스템 ON';
-      btn.classList.remove('off');
+  // ── 현재 재생 곡 ──────────────────────────────────────────
+  function updateNowPlaying(queue, isPlaying) {
+    const disc = document.getElementById('lp-disc');
+    if (queue.length > 0 && isPlaying) {
+      const song = queue[0];
+      document.getElementById('now-title').textContent   = song.title;
+      document.getElementById('now-channel').textContent = song.channelTitle;
+      document.getElementById('lp-label').innerHTML = `<img src="${song.thumbnail}" alt="" />`;
+      disc.classList.add('playing');
     } else {
-      btn.innerHTML = '<span id="status-dot off"></span>시스템 OFF';
-      btn.classList.add('off');
+      document.getElementById('now-title').textContent   = '재생 대기 중';
+      document.getElementById('now-channel').textContent = '';
+      document.getElementById('lp-label').innerHTML = 'MUSIC';
+      disc.classList.remove('playing');
     }
+  }
+
+  // ── 컨트롤 ────────────────────────────────────────────────
+  document.getElementById('skip-btn').addEventListener('click', () => {
+    socket.emit('admin_skip', { token: TOKEN });
+  });
+
+  document.getElementById('toggle-btn').addEventListener('click', () => {
+    socket.emit('admin_toggle', { token: TOKEN });
+  });
+
+  function updateToggleBtn(on) {
+    const btn = document.getElementById('toggle-btn');
+    btn.textContent = on ? '시스템 ON' : '시스템 OFF';
+    btn.className   = 'btn btn-toggle' + (on ? '' : ' off');
   }
 
   // ── 큐 렌더링 ─────────────────────────────────────────────
@@ -365,8 +328,10 @@
       </div>
     `).join('');
 
-    el.querySelectorAll('.delete-btn').forEach((btn) => {
-      btn.addEventListener('click', () => adminDelete(btn.dataset.id));
+    el.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        socket.emit('admin_delete', { token: TOKEN, id: btn.dataset.id });
+      });
     });
   }
 
@@ -374,7 +339,5 @@
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 </script>
-<!-- YouTube IFrame API -->
-<script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
