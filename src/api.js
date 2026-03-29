@@ -1,10 +1,22 @@
-const express = require('express');
-const axios   = require('axios');
+const express   = require('express');
+const axios      = require('axios');
+const rateLimit  = require('express-rate-limit');
 const { CAFE_TOKEN } = require('./config');
-const state   = require('./state');
+const state      = require('./state');
 const { getHistory, getStats } = require('./history');
 
 const router = express.Router();
+
+// IP당 1분에 20요청 제한 (oEmbed 조회 + 큐 확인 등 일반 사용 포함)
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+});
+
+router.use(limiter);
 
 function validateToken(req, res, next) {
   const token = req.query.token || req.headers['x-cafe-token'];

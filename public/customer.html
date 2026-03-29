@@ -262,6 +262,8 @@
   let pendingSong = null;
 
   // ── 소켓 ─────────────────────────────────────────────────
+  socket.on('request_error', ({ error }) => showToast(error));
+
   socket.on('queue_update', ({ queue, isSystemOn: sysOn }) => {
     isSystemOn = sysOn;
     document.getElementById('offline-banner').style.display = sysOn ? 'none' : 'block';
