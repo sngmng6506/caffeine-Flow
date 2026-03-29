@@ -1,16 +1,17 @@
 const express   = require('express');
 const axios      = require('axios');
 const rateLimit  = require('express-rate-limit');
+const YouTube    = require('youtube-sr').default;
 const { CAFE_TOKEN } = require('./config');
 const state      = require('./state');
 const { getHistory, getStats } = require('./history');
 
 const router = express.Router();
 
-// IP당 1분에 20요청 제한 (oEmbed 조회 + 큐 확인 등 일반 사용 포함)
+// IP당 1분에 60요청 제한 (검색 + oEmbed + 큐 확인 등)
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
@@ -50,6 +51,31 @@ router.get('/oembed', validateToken, async (req, res) => {
     });
   } catch {
     res.status(400).json({ error: '영상 정보를 가져올 수 없습니다 (임베드 비활성화 or 잘못된 URL)' });
+  }
+});
+
+// YouTube 검색 (youtube-sr, API 키 불필요)
+router.get('/search', validateToken, async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: '검색어를 입력하세요' });
+
+  try {
+    const results = await YouTube.search(q, { limit: 20, type: 'video', safeSearch: false });
+    res.json(
+      results
+        .filter((v) => v.id)
+        .map((v) => ({
+          videoId:      v.id,
+          title:        v.title || '',
+          channelTitle: v.channel?.name || '',
+          thumbnail:    v.thumbnail?.url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`,
+          duration:     v.durationFormatted || '',
+          views:        v.views ?? 0,
+        }))
+    );
+  } catch (err) {
+    console.error('[search]', err.message);
+    res.status(500).json({ error: '검색에 실패했습니다' });
   }
 });
 

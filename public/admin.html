@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin - Caffeine Flow</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -74,18 +75,6 @@
       width: 352px; height: 198px;
       border-radius: 10px; border: none; background: #000;
     }
-    #play-overlay {
-      position: absolute; inset: 0;
-      background: #000a;
-      border-radius: 10px;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 8px; cursor: pointer;
-      font-size: 13px; color: #f0f0f0;
-    }
-    #play-overlay span { font-size: 32px; }
-    #play-overlay.hidden { display: none; }
-
     /* 컨트롤 */
     .controls { display: flex; gap: 10px; width: 100%; }
     .btn {
@@ -169,6 +158,88 @@
 
     .empty { color: #555; font-size: 13px; padding: 20px 0; }
 
+    /* ── 음악 재생 탭 ── */
+    #tab-player {
+      display: none; flex-direction: column;
+      flex: 1; overflow: hidden; padding: 0;
+    }
+    #tab-player.active { display: flex; }
+
+    /* 검색 바 */
+    #ps-search-bar {
+      display: flex; gap: 8px;
+      padding: 16px 20px 12px; flex-shrink: 0;
+      border-bottom: 1px solid #1e1e1e;
+      background: #111;
+    }
+    #ps-search-bar input {
+      flex: 1; background: #1e1e1e; border: 1px solid #333;
+      border-radius: 20px; padding: 10px 18px;
+      color: #f0f0f0; font-size: 14px; outline: none;
+    }
+    #ps-search-bar input:focus { border-color: #c8a96e; }
+    #ps-search-bar button {
+      background: #c8a96e; border: none; border-radius: 20px;
+      padding: 10px 20px; color: #0f0f0f;
+      font-weight: 600; font-size: 13px; cursor: pointer; flex-shrink: 0;
+    }
+
+    /* 메인: 왼쪽 플레이어 + 오른쪽 결과 */
+    #ps-body { display: flex; flex: 1; overflow: hidden; }
+
+    /* 플레이어 영역 */
+    #ps-player-col {
+      width: 440px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      border-right: 1px solid #1e1e1e;
+      background: #0f0f0f;
+    }
+    #ps-player-wrap {
+      position: relative; width: 100%; aspect-ratio: 16/9;
+      background: #000;
+    }
+    #ps-player-wrap iframe, #default-yt-player {
+      width: 100%; height: 100%; border: none;
+    }
+    #ps-now-info { padding: 14px 16px; }
+    #ps-now-title { font-size: 15px; font-weight: 600; line-height: 1.4; }
+    #ps-now-channel { font-size: 12px; color: #888; margin-top: 4px; }
+
+    /* 검색 결과 영역 */
+    #ps-results-col {
+      flex: 1; overflow-y: auto; padding: 12px 16px;
+    }
+    #ps-results-col .ps-empty {
+      color: #555; font-size: 14px; padding: 40px 0; text-align: center;
+    }
+    .ps-card {
+      display: flex; gap: 12px; padding: 8px 6px;
+      cursor: pointer; border-radius: 8px;
+      border: 1px solid transparent;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .ps-card:hover { background: #1a1a1a; }
+    .ps-card.active { border-color: #c8a96e; background: #1e1a10; }
+    .ps-card-thumb {
+      position: relative; width: 168px; height: 94px;
+      flex-shrink: 0; border-radius: 8px; overflow: hidden;
+      background: #1a1a1a;
+    }
+    .ps-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ps-card-dur {
+      position: absolute; bottom: 4px; right: 4px;
+      background: #000c; color: #fff; font-size: 11px;
+      padding: 1px 5px; border-radius: 3px; font-weight: 500;
+    }
+    .ps-card-info { flex: 1; overflow: hidden; padding-top: 2px; }
+    .ps-card-title {
+      font-size: 14px; font-weight: 500; line-height: 1.35;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .ps-card-channel { font-size: 12px; color: #888; margin-top: 4px; }
+    .ps-card-views { font-size: 11px; color: #666; margin-top: 2px; }
+
     /* ── QR ── */
     .qr-section { display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 8px; }
     .qr-url-box {
@@ -232,10 +303,6 @@
 
   <div id="yt-wrap">
     <div id="yt-player"></div>
-    <div id="play-overlay">
-      <span>🔊</span>
-      클릭하여 소리 켜기
-    </div>
   </div>
 
   <div class="controls">
@@ -247,10 +314,33 @@
 <!-- 오른쪽: 탭 패널 -->
 <div id="right-panel">
   <div class="tabs">
+    <button class="tab-btn" data-tab="player">음악 재생</button>
     <button class="tab-btn active" data-tab="queue">신청 목록</button>
     <button class="tab-btn" data-tab="history">이력</button>
     <button class="tab-btn" data-tab="stats">통계</button>
     <button class="tab-btn" data-tab="qr">QR 코드</button>
+  </div>
+
+  <!-- 음악 재생 탭: 유튜브 검색 + 임베드 플레이어 -->
+  <div id="tab-player" class="tab-content">
+    <div id="ps-search-bar">
+      <input id="ps-input" type="text" placeholder="유튜브 검색 — 곡명, 아티스트, 분위기..." />
+      <button id="ps-btn">검색</button>
+    </div>
+    <div id="ps-body">
+      <div id="ps-player-col">
+        <div id="ps-player-wrap">
+          <div id="default-yt-player"></div>
+        </div>
+        <div id="ps-now-info">
+          <div id="ps-now-title">검색 후 곡을 선택하세요</div>
+          <div id="ps-now-channel"></div>
+        </div>
+      </div>
+      <div id="ps-results-col">
+        <div class="ps-empty">곡명이나 아티스트를 검색하면 여기에 결과가 표시됩니다.</div>
+      </div>
+    </div>
   </div>
 
   <div id="tab-queue" class="tab-content active">
@@ -310,36 +400,31 @@
     throw new Error('No token');
   }
 
+  /** YouTube IFrame API: 부모 페이지 origin과 맞춰야 postMessage 경고가 줄어듦 */
+  const YT_PARENT_ORIGIN = window.location.origin;
+
   const socket    = io();
   let ytPlayer    = null;
-  let playerReady = false; // onReady 콜백 이후에만 true
+  let playerReady = false;
   let isPlaying   = false;
   let pendingSong = null;
-  let muted       = true;
-
-  const overlay = document.getElementById('play-overlay');
-
-  // 오버레이 클릭 → 음소거 해제 + 재생
-  overlay.addEventListener('click', () => {
-    muted = false;
-    overlay.classList.add('hidden');
-    if (ytPlayer) {
-      ytPlayer.unMute();
-      ytPlayer.setVolume(100);
-      ytPlayer.playVideo();
-    }
-    if (pendingSong) { loadAndPlay(pendingSong); pendingSong = null; }
-  });
 
   // ── YouTube IFrame API ────────────────────────────────────
   window.onYouTubeIframeAPIReady = function () {
     ytPlayer = new YT.Player('yt-player', {
       height: '198', width: '352',
-      playerVars: { autoplay: 1, mute: 1, controls: 1, playsinline: 1 },
+      playerVars: {
+        autoplay: 1,
+        controls: 1,
+        playsinline: 1,
+        enablejsapi: 1,
+        origin: YT_PARENT_ORIGIN,
+      },
       events: {
         onReady: (e) => {
           playerReady = true;
-          e.target.mute();
+          e.target.unMute();
+          e.target.setVolume(100);
           if (pendingSong) { loadAndPlay(pendingSong); pendingSong = null; }
         },
         onStateChange: onPlayerStateChange,
@@ -356,10 +441,32 @@
     }
   }
 
+  let currentVideoId = null;
+
   function loadAndPlay(song) {
     if (!playerReady) { pendingSong = song; return; }
+    if (currentVideoId === song.videoId) return;
+    currentVideoId = song.videoId;
     ytPlayer.loadVideoById(song.videoId);
-    if (muted) overlay.classList.remove('hidden');
+  }
+
+  // ── 매장음악 ↔ 신청곡 전환 ─────────────────────────────────
+  let queueActive = false;
+
+  function pauseDefaultPlayer() {
+    try {
+      if (defaultPlayer && typeof defaultPlayer.getPlayerState === 'function') {
+        defaultPlayer.pauseVideo();
+      }
+    } catch {}
+  }
+
+  function resumeDefaultPlayer() {
+    try {
+      if (defaultPlayer && typeof defaultPlayer.getPlayerState === 'function') {
+        defaultPlayer.playVideo();
+      }
+    } catch {}
   }
 
   // ── 소켓 ─────────────────────────────────────────────────
@@ -367,11 +474,18 @@
     updateToggleBtn(isSystemOn);
     renderQueue(queue);
 
-    if (queue.length > 0 && sysPlaying && !isPlaying) {
+    const hasQueue = queue.length > 0 && sysPlaying;
+
+    if (hasQueue) {
+      if (!queueActive) {
+        queueActive = true;
+        pauseDefaultPlayer();
+      }
       playSong(queue[0]);
-    }
-    if (queue.length === 0 || !sysPlaying) {
+    } else {
+      const wasActive = queueActive;
       resetPlayer();
+      if (wasActive) resumeDefaultPlayer();
     }
   });
 
@@ -384,8 +498,10 @@
   }
 
   function resetPlayer() {
-    isPlaying   = false;
-    pendingSong = null;
+    isPlaying      = false;
+    pendingSong    = null;
+    queueActive    = false;
+    currentVideoId = null;
     document.getElementById('now-title').textContent   = '재생 대기 중';
     document.getElementById('now-channel').textContent = '';
     document.getElementById('lp-label').innerHTML = 'MUSIC';
@@ -442,6 +558,7 @@
       if (btn.dataset.tab === 'history') loadHistory();
       if (btn.dataset.tab === 'stats')   loadStats();
       if (btn.dataset.tab === 'qr')      initQR();
+      if (btn.dataset.tab === 'player')  initDefaultPlayer();
     });
   });
 
@@ -495,6 +612,89 @@
   }
 
 
+  // ── 음악 재생 탭: 유튜브 검색 + 임베드 플레이어 ──────────
+  let defaultPlayer     = null;
+  let defaultReady      = false;
+  let defaultPlayerInit = false;
+
+  function formatViews(n) {
+    if (!n) return '';
+    if (n >= 100000000) return Math.floor(n / 100000000) + '억회';
+    if (n >= 10000) return Math.floor(n / 10000) + '만회';
+    if (n >= 1000) return Math.floor(n / 1000) + '천회';
+    return n + '회';
+  }
+
+  function initDefaultPlayer() {
+    if (defaultPlayerInit) return;
+    defaultPlayerInit = true;
+
+    defaultPlayer = new YT.Player('default-yt-player', {
+      height: '100%', width: '100%',
+      playerVars: {
+        autoplay: 0, controls: 1, playsinline: 1,
+        enablejsapi: 1, origin: YT_PARENT_ORIGIN,
+      },
+      events: {
+        onReady: (e) => {
+          defaultReady = true;
+          e.target.unMute();
+          e.target.setVolume(100);
+        },
+      },
+    });
+
+    const psInput = document.getElementById('ps-input');
+    const psBtn   = document.getElementById('ps-btn');
+    psBtn.addEventListener('click', psSearch);
+    psInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') psSearch(); });
+  }
+
+  function playInDefault(track) {
+    document.getElementById('ps-now-title').textContent   = track.title;
+    document.getElementById('ps-now-channel').textContent = track.channelTitle;
+    if (!defaultReady) return;
+    defaultPlayer.loadVideoById(track.videoId);
+  }
+
+  async function psSearch() {
+    const q = document.getElementById('ps-input').value.trim();
+    if (!q) return;
+    const col = document.getElementById('ps-results-col');
+    col.innerHTML = '<div class="ps-empty">검색 중...</div>';
+
+    try {
+      const res  = await fetch(`/api/search?token=${TOKEN}&q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (res.status === 429) { col.innerHTML = '<div class="ps-empty">요청이 너무 많습니다. 잠시 후 다시 시도해주세요.</div>'; return; }
+      if (!Array.isArray(data) || !data.length) { col.innerHTML = '<div class="ps-empty">결과 없음</div>'; return; }
+
+      col.innerHTML = '';
+      data.forEach((track) => {
+        const card = document.createElement('div');
+        card.className = 'ps-card';
+        card.innerHTML = `
+          <div class="ps-card-thumb">
+            <img src="${track.thumbnail}" alt="" />
+            ${track.duration ? `<span class="ps-card-dur">${escHtml(track.duration)}</span>` : ''}
+          </div>
+          <div class="ps-card-info">
+            <div class="ps-card-title">${escHtml(track.title)}</div>
+            <div class="ps-card-channel">${escHtml(track.channelTitle)}</div>
+            ${track.views ? `<div class="ps-card-views">${formatViews(track.views)}</div>` : ''}
+          </div>`;
+        card.addEventListener('click', () => {
+          col.querySelectorAll('.ps-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          playInDefault(track);
+        });
+        col.appendChild(card);
+      });
+    } catch {
+      col.innerHTML = '<div class="ps-empty">검색 실패 — 잠시 후 다시 시도해주세요.</div>';
+    }
+  }
+
   // ── QR 코드 ──────────────────────────────────────────────
   let qrInitialized = false;
 
@@ -540,6 +740,6 @@
 </script>
 <script src="/utils.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 </body>
 </html>

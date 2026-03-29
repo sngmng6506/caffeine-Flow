@@ -65,4 +65,4 @@ function toggleSystem() {
   broadcastQueue();
 }
 
-module.exports = { setBroadcast, broadcastQueue, playNext, addSong, skip, deleteSong, songEnded, toggleSystem };
+module.exports = { setBroadcast, addSong, skip, deleteSong, songEnded, toggleSystem };
