@@ -23,7 +23,6 @@
     header h1 { font-size: 18px; letter-spacing: 2px; color: #c8a96e; }
     header p  { font-size: 12px; color: #888; margin-top: 4px; }
 
-    /* 시스템 OFF 배너 */
     #offline-banner {
       display: none;
       background: #3a1a1a;
@@ -35,13 +34,21 @@
 
     .container { padding: 16px; max-width: 480px; margin: 0 auto; }
 
-    /* 검색 */
-    .search-box {
+    /* URL 입력 */
+    .url-section { margin-bottom: 20px; }
+    .url-section label {
+      display: block;
+      font-size: 12px;
+      color: #888;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .url-box {
       display: flex;
       gap: 8px;
-      margin-bottom: 16px;
     }
-    .search-box input {
+    .url-box input {
       flex: 1;
       background: #1e1e1e;
       border: 1px solid #333;
@@ -51,8 +58,9 @@
       font-size: 14px;
       outline: none;
     }
-    .search-box input:focus { border-color: #c8a96e; }
-    .search-box button {
+    .url-box input:focus { border-color: #c8a96e; }
+    .url-box input::placeholder { color: #555; }
+    .url-box button {
       background: #c8a96e;
       border: none;
       border-radius: 8px;
@@ -61,66 +69,80 @@
       font-weight: 600;
       cursor: pointer;
       font-size: 14px;
+      white-space: nowrap;
     }
-    .search-box button:active { opacity: 0.8; }
+    .url-box button:active { opacity: 0.8; }
 
-    /* 검색 결과 */
-    #search-results .section-title,
-    #queue-section .section-title {
+    /* 안내 텍스트 */
+    .hint {
+      font-size: 11px;
+      color: #555;
+      margin-top: 8px;
+      line-height: 1.6;
+    }
+    .hint a { color: #888; }
+
+    /* 미리보기 카드 */
+    #preview {
+      display: none;
+      background: #1a1a1a;
+      border: 1px solid #c8a96e44;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 20px;
+    }
+    #preview .preview-inner {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    #preview img {
+      width: 80px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+    #preview .preview-info { flex: 1; overflow: hidden; }
+    #preview .preview-title {
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    #preview .preview-channel { font-size: 12px; color: #888; }
+    #preview-btn {
+      width: 100%;
+      background: #c8a96e;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      color: #0f0f0f;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    #preview-btn:active { opacity: 0.8; }
+    #preview-btn:disabled { background: #444; color: #888; cursor: default; }
+
+    /* 에러 */
+    #url-error {
+      display: none;
+      font-size: 12px;
+      color: #ff6b6b;
+      margin-top: 8px;
+    }
+
+    /* 큐 */
+    .section-title {
       font-size: 12px;
       color: #888;
       letter-spacing: 1px;
       text-transform: uppercase;
       margin-bottom: 10px;
     }
-
-    .track-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: #1a1a1a;
-      border-radius: 10px;
-      padding: 10px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .track-item:active { background: #242424; }
-    .track-item img {
-      width: 56px;
-      height: 42px;
-      object-fit: cover;
-      border-radius: 6px;
-      flex-shrink: 0;
-    }
-    .track-info { flex: 1; overflow: hidden; }
-    .track-title {
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .track-channel { font-size: 11px; color: #888; margin-top: 2px; }
-    .request-btn {
-      background: #c8a96e;
-      color: #0f0f0f;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-    .request-btn:disabled {
-      background: #444;
-      color: #888;
-      cursor: default;
-    }
-
-    /* 큐 */
-    #queue-section { margin-top: 24px; }
     .queue-item {
       display: flex;
       align-items: center;
@@ -145,11 +167,15 @@
       border-radius: 4px;
       flex-shrink: 0;
     }
-    .queue-item .track-title { font-size: 13px; }
-    .now-playing {
-      background: #1e1a10 !important;
-      border: 1px solid #c8a96e44;
+    .track-title {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+    .track-channel { font-size: 11px; color: #888; margin-top: 2px; }
+    .now-playing { background: #1e1a10 !important; border: 1px solid #c8a96e44; }
     .now-playing .queue-num { color: #f0c040; }
 
     /* 토스트 */
@@ -168,13 +194,10 @@
       pointer-events: none;
       white-space: nowrap;
     }
-    #toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    .loading { text-align: center; padding: 20px; color: #555; font-size: 13px; }
-    .empty   { text-align: center; padding: 20px; color: #555; font-size: 13px; }
+    .empty { text-align: center; padding: 20px; color: #555; font-size: 13px; }
+    .loading { text-align: center; padding: 12px; color: #888; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -187,25 +210,47 @@
 <div id="offline-banner">신청이 일시적으로 중단되었습니다</div>
 
 <div class="container">
-  <div class="search-box">
-    <input id="search-input" type="text" placeholder="곡명, 아티스트 검색..." />
-    <button id="search-btn">검색</button>
+
+  <!-- URL 입력 -->
+  <div class="url-section">
+    <label>YouTube URL</label>
+    <div class="url-box">
+      <input id="url-input" type="text" placeholder="https://youtube.com/watch?v=..." />
+      <button id="fetch-btn">확인</button>
+    </div>
+    <div class="hint">
+      YouTube에서 곡을 찾은 후 공유 버튼 → URL 복사<br/>
+      youtu.be 링크도 사용 가능합니다
+    </div>
+    <div id="url-error"></div>
   </div>
 
-  <div id="search-results"></div>
+  <!-- 미리보기 + 신청 버튼 -->
+  <div id="preview">
+    <div class="preview-inner">
+      <img id="preview-thumb" src="" alt="" />
+      <div class="preview-info">
+        <div id="preview-title" class="preview-title"></div>
+        <div id="preview-channel" class="preview-channel"></div>
+      </div>
+    </div>
+    <button id="preview-btn">신청하기</button>
+  </div>
 
-  <div id="queue-section">
+  <!-- 큐 -->
+  <div>
     <div class="section-title">현재 신청 목록</div>
     <div id="queue-list"><div class="empty">신청된 곡이 없습니다</div></div>
   </div>
+
 </div>
 
 <div id="toast"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-  const params  = new URLSearchParams(location.search);
-  const TOKEN   = params.get('token') || '';
+  const params = new URLSearchParams(location.search);
+  const TOKEN  = params.get('token') || '';
 
   if (!TOKEN) {
     document.body.innerHTML = '<div style="text-align:center;padding:60px;color:#888">유효하지 않은 접근입니다.<br>QR 코드를 다시 스캔해주세요.</div>';
@@ -214,70 +259,81 @@
 
   const socket = io();
   let isSystemOn = true;
+  let pendingSong = null;
 
-  // ── 소켓 이벤트 ──────────────────────────────────────────
+  // ── 소켓 ─────────────────────────────────────────────────
   socket.on('queue_update', ({ queue, isSystemOn: sysOn }) => {
     isSystemOn = sysOn;
     document.getElementById('offline-banner').style.display = sysOn ? 'none' : 'block';
     renderQueue(queue);
   });
 
-  // ── 검색 ─────────────────────────────────────────────────
-  const searchInput = document.getElementById('search-input');
-  const searchBtn   = document.getElementById('search-btn');
+  // ── URL 입력 ──────────────────────────────────────────────
+  const urlInput  = document.getElementById('url-input');
+  const fetchBtn  = document.getElementById('fetch-btn');
+  const urlError  = document.getElementById('url-error');
+  const preview   = document.getElementById('preview');
+  const previewBtn = document.getElementById('preview-btn');
 
-  searchBtn.addEventListener('click', doSearch);
-  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+  fetchBtn.addEventListener('click', fetchInfo);
+  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') fetchInfo(); });
 
-  async function doSearch() {
-    const q = searchInput.value.trim();
-    if (!q) return;
+  // URL 붙여넣기 시 자동 조회
+  urlInput.addEventListener('paste', () => {
+    setTimeout(fetchInfo, 50);
+  });
 
-    const resultsEl = document.getElementById('search-results');
-    resultsEl.innerHTML = '<div class="loading">검색 중...</div>';
+  async function fetchInfo() {
+    const url = urlInput.value.trim();
+    if (!url) return;
+
+    urlError.style.display = 'none';
+    preview.style.display  = 'none';
+    pendingSong = null;
+    fetchBtn.textContent = '...';
+    fetchBtn.disabled = true;
 
     try {
-      const res  = await fetch(`/api/search?token=${TOKEN}&q=${encodeURIComponent(q)}`);
+      const res  = await fetch(`/api/oembed?token=${TOKEN}&url=${encodeURIComponent(url)}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error);
 
-      if (!data.length) {
-        resultsEl.innerHTML = '<div class="empty">검색 결과가 없습니다</div>';
-        return;
-      }
+      pendingSong = data;
+      document.getElementById('preview-thumb').src       = data.thumbnail;
+      document.getElementById('preview-title').textContent   = data.title;
+      document.getElementById('preview-channel').textContent = data.channelTitle;
+      previewBtn.disabled  = false;
+      previewBtn.textContent = '신청하기';
+      preview.style.display  = 'block';
 
-      resultsEl.innerHTML = `<div class="section-title">검색 결과</div>`;
-      data.forEach((track) => {
-        const el = document.createElement('div');
-        el.className = 'track-item';
-        el.innerHTML = `
-          <img src="${track.thumbnail}" alt="" />
-          <div class="track-info">
-            <div class="track-title">${escHtml(track.title)}</div>
-            <div class="track-channel">${escHtml(track.channelTitle)}</div>
-          </div>
-          <button class="request-btn">신청</button>
-        `;
-        el.querySelector('.request-btn').addEventListener('click', () => requestSong(track, el));
-        resultsEl.appendChild(el);
-      });
     } catch (err) {
-      resultsEl.innerHTML = `<div class="empty">오류: ${err.message}</div>`;
+      urlError.textContent   = err.message;
+      urlError.style.display = 'block';
+    } finally {
+      fetchBtn.textContent = '확인';
+      fetchBtn.disabled    = false;
     }
   }
 
-  // ── 곡 신청 ───────────────────────────────────────────────
-  function requestSong(track, itemEl) {
+  // ── 신청 ─────────────────────────────────────────────────
+  previewBtn.addEventListener('click', () => {
+    if (!pendingSong) return;
     if (!isSystemOn) { showToast('현재 신청이 중단되었습니다'); return; }
 
-    socket.emit('request_song', { token: TOKEN, song: track });
+    socket.emit('request_song', { token: TOKEN, song: pendingSong });
 
-    const btn = itemEl.querySelector('.request-btn');
-    btn.disabled = true;
-    btn.textContent = '신청됨';
-    showToast(`"${track.title.substring(0, 20)}..." 신청 완료!`);
-  }
+    previewBtn.disabled    = true;
+    previewBtn.textContent = '신청 완료!';
+    showToast(`"${pendingSong.title.substring(0, 20)}..." 신청 완료!`);
+
+    // 입력창 초기화
+    setTimeout(() => {
+      urlInput.value        = '';
+      preview.style.display = 'none';
+      pendingSong           = null;
+    }, 1500);
+  });
 
   // ── 큐 렌더링 ─────────────────────────────────────────────
   function renderQueue(queue) {
@@ -290,7 +346,7 @@
       <div class="queue-item ${i === 0 ? 'now-playing' : ''}">
         <div class="queue-num">${i === 0 ? '▶' : i + 1}</div>
         <img src="${item.thumbnail}" alt="" />
-        <div class="track-info">
+        <div style="flex:1;overflow:hidden">
           <div class="track-title">${escHtml(item.title)}</div>
           <div class="track-channel">${escHtml(item.channelTitle)}</div>
         </div>

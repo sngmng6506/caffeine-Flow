@@ -11,7 +11,6 @@ const io = new Server(server);
 // ── 환경 설정 ──────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 const CAFE_TOKEN = process.env.CAFE_TOKEN || 'cafe-secret-2024';
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'YOUR_YOUTUBE_API_KEY';
 
 // ── 상태 ───────────────────────────────────────────────────
 let queue = [];       // { id, title, thumbnail, channelTitle, videoId, requestedAt }
@@ -30,34 +29,37 @@ function validateToken(req, res, next) {
   next();
 }
 
-// ── API: YouTube 검색 (서버가 프록시 역할 → API 키 노출 방지) ──
-app.get('/api/search', validateToken, async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.status(400).json({ error: 'Query required' });
+// ── YouTube URL에서 videoId 추출 ──────────────────────────
+function extractVideoId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'youtu.be') return u.pathname.slice(1);
+    if (u.hostname.includes('youtube.com')) return u.searchParams.get('v');
+  } catch {}
+  return null;
+}
+
+// ── API: oEmbed로 YouTube 영상 정보 조회 (무료, API 키 불필요) ──
+app.get('/api/oembed', validateToken, async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+
+  const videoId = extractVideoId(url);
+  if (!videoId) return res.status(400).json({ error: '유효한 YouTube URL이 아닙니다' });
 
   try {
-    const response = await axios.get('https://www.googleapis.com/youtube/v3/search', {
-      params: {
-        key: YOUTUBE_API_KEY,
-        q,
-        part: 'snippet',
-        type: 'video',
-        maxResults: 8,
-        videoCategoryId: '10', // Music
-      },
+    const response = await axios.get('https://www.youtube.com/oembed', {
+      params: { url: `https://www.youtube.com/watch?v=${videoId}`, format: 'json' },
     });
 
-    const results = response.data.items.map((item) => ({
-      videoId: item.id.videoId,
-      title: item.snippet.title,
-      channelTitle: item.snippet.channelTitle,
-      thumbnail: item.snippet.thumbnails.medium.url,
-    }));
-
-    res.json(results);
+    res.json({
+      videoId,
+      title: response.data.title,
+      channelTitle: response.data.author_name,
+      thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+    });
   } catch (err) {
-    console.error('YouTube API error:', err.response?.data || err.message);
-    res.status(500).json({ error: 'Search failed' });
+    res.status(400).json({ error: '영상 정보를 가져올 수 없습니다 (임베드 비활성화 or 잘못된 URL)' });
   }
 });
 
