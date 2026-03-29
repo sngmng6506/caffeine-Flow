@@ -17,43 +17,20 @@
 
     /* ── 왼쪽 패널 ── */
     #left-panel {
-      width: 380px;
+      width: 400px;
       flex-shrink: 0;
       background: #111;
       border-right: 1px solid #222;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 32px 24px;
-      gap: 20px;
+      padding: 28px 24px;
+      gap: 18px;
+      overflow-y: auto;
     }
-
-    /* 익스텐션 상태 */
-    #ext-status {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #1a1a1a;
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 13px;
-    }
-    .status-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      background: #555;
-    }
-    .status-dot.connected { background: #4caf50; box-shadow: 0 0 6px #4caf5088; }
-    .status-dot.disconnected { background: #ff6b6b; }
-    #ext-status-text { color: #aaa; }
 
     /* LP 애니메이션 */
-    .lp-wrapper {
-      position: relative;
-      width: 200px; height: 200px;
-    }
+    .lp-wrapper { position: relative; width: 200px; height: 200px; }
     .lp-disc {
       width: 200px; height: 200px;
       border-radius: 50%;
@@ -70,239 +47,121 @@
     .lp-disc.playing { animation-play-state: running; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .lp-label {
-      position: absolute;
-      top: 50%; left: 50%;
+      position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 76px; height: 76px;
-      border-radius: 50%;
-      background: #c8a96e;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      font-weight: 700;
-      color: #1a1000;
-      letter-spacing: 1px;
+      width: 76px; height: 76px; border-radius: 50%;
+      background: #c8a96e; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: #1a1000; letter-spacing: 1px;
     }
     .lp-label img { width: 76px; height: 76px; object-fit: cover; border-radius: 50%; }
     .lp-hole {
-      position: absolute;
-      top: 50%; left: 50%;
+      position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: #0f0f0f;
-      z-index: 2;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #0f0f0f; z-index: 2;
     }
 
-    /* 현재 곡 정보 */
     #now-title {
-      font-size: 15px;
-      font-weight: 600;
-      text-align: center;
-      max-width: 320px;
-      line-height: 1.4;
+      font-size: 15px; font-weight: 600;
+      text-align: center; max-width: 340px; line-height: 1.4;
     }
     #now-channel { font-size: 12px; color: #888; }
+
+    /* YouTube 플레이어 */
+    #yt-player {
+      width: 352px; height: 198px;
+      border-radius: 10px; border: none; background: #000;
+    }
 
     /* 컨트롤 */
     .controls { display: flex; gap: 10px; width: 100%; }
     .btn {
-      flex: 1;
-      border: none;
-      border-radius: 8px;
-      padding: 11px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
+      flex: 1; border: none; border-radius: 8px;
+      padding: 11px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s;
     }
     .btn:active { opacity: 0.7; }
-    .btn-skip { background: #c8a96e; color: #0f0f0f; }
+    .btn-skip   { background: #c8a96e; color: #0f0f0f; }
     .btn-toggle { background: #2a2a2a; color: #f0f0f0; border: 1px solid #444; }
     .btn-toggle.off { background: #3a1a1a; color: #ff6b6b; border-color: #ff6b6b44; }
 
-    /* 익스텐션 미연결 안내 */
-    #ext-guide {
-      display: none;
-      width: 100%;
-      background: #1a1500;
-      border: 1px solid #c8a96e44;
-      border-radius: 10px;
-      padding: 14px;
-      font-size: 12px;
-      color: #c8a96e;
-      line-height: 1.7;
-      text-align: center;
-    }
+    /* ── 오른쪽 패널 ── */
+    #right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* ── 오른쪽: 큐 ── */
-    #queue-panel {
-      flex: 1;
-      overflow-y: auto;
-      padding: 24px;
-    }
-    #queue-panel h2 {
-      font-size: 12px;
-      color: #888;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 16px;
-    }
-    .queue-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: #1a1a1a;
-      border-radius: 10px;
-      padding: 10px;
-      margin-bottom: 8px;
-    }
-    .queue-item.now-playing {
-      background: #1e1a10;
-      border: 1px solid #c8a96e44;
-    }
-    .queue-num {
-      width: 28px;
-      text-align: center;
-      font-size: 13px;
-      color: #c8a96e;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-    .queue-item img {
-      width: 56px; height: 42px;
-      object-fit: cover;
-      border-radius: 6px;
-      flex-shrink: 0;
-    }
-    .track-info { flex: 1; overflow: hidden; }
-    .track-title {
-      font-size: 13px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .track-channel { font-size: 11px; color: #888; margin-top: 2px; }
-    .delete-btn {
-      background: transparent;
-      border: 1px solid #333;
-      border-radius: 6px;
-      color: #888;
-      padding: 5px 10px;
-      font-size: 12px;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-    .delete-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
-    .empty { color: #555; font-size: 13px; padding: 20px 0; }
-
-    /* ── 탭 ── */
+    /* 탭 */
     .tabs {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 16px;
+      display: flex; gap: 4px;
       border-bottom: 1px solid #222;
-      padding-bottom: 0;
+      padding: 0 24px;
+      flex-shrink: 0;
     }
     .tab-btn {
-      background: none;
-      border: none;
-      color: #666;
-      font-size: 13px;
-      padding: 8px 14px;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
+      background: none; border: none; color: #666;
+      font-size: 13px; padding: 14px 14px 12px;
+      cursor: pointer; border-bottom: 2px solid transparent;
     }
     .tab-btn.active { color: #c8a96e; border-bottom-color: #c8a96e; }
-    .tab-content { display: none; }
+    .tab-content { display: none; flex: 1; overflow-y: auto; padding: 20px 24px; }
     .tab-content.active { display: block; }
 
-    /* ── 통계 ── */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 20px;
+    /* 큐 */
+    .queue-item {
+      display: flex; align-items: center; gap: 12px;
+      background: #1a1a1a; border-radius: 10px;
+      padding: 10px; margin-bottom: 8px;
     }
-    .stat-card {
-      background: #1a1a1a;
-      border-radius: 10px;
-      padding: 14px;
-      text-align: center;
+    .queue-item.now-playing { background: #1e1a10; border: 1px solid #c8a96e44; }
+    .queue-num { width: 28px; text-align: center; font-size: 13px; color: #c8a96e; font-weight: 700; flex-shrink: 0; }
+    .queue-item img { width: 56px; height: 42px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+    .track-info { flex: 1; overflow: hidden; }
+    .track-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .track-channel { font-size: 11px; color: #888; margin-top: 2px; }
+    .delete-btn {
+      background: transparent; border: 1px solid #333;
+      border-radius: 6px; color: #888;
+      padding: 5px 10px; font-size: 12px; cursor: pointer; flex-shrink: 0;
     }
+    .delete-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+    /* 통계 */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .stat-card { background: #1a1a1a; border-radius: 10px; padding: 14px; text-align: center; }
     .stat-num  { font-size: 24px; font-weight: 700; color: #c8a96e; }
     .stat-label { font-size: 11px; color: #888; margin-top: 4px; }
-
-    .section-label {
-      font-size: 11px;
-      color: #888;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-    }
+    .section-label { font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
     .top-song {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: #1a1a1a;
-      border-radius: 8px;
-      padding: 8px 10px;
-      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 10px;
+      background: #1a1a1a; border-radius: 8px;
+      padding: 8px 10px; margin-bottom: 6px;
     }
     .top-song img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
-    .top-song .track-title { font-size: 12px; }
     .top-song .count { font-size: 12px; color: #c8a96e; font-weight: 700; flex-shrink: 0; margin-left: auto; }
-
     .bar-chart { display: flex; align-items: flex-end; gap: 3px; height: 60px; margin-bottom: 6px; }
-    .bar {
-      flex: 1;
-      background: #c8a96e44;
-      border-radius: 2px 2px 0 0;
-      min-height: 2px;
-      transition: background 0.2s;
-    }
+    .bar { flex: 1; background: #c8a96e44; border-radius: 2px 2px 0 0; min-height: 2px; }
     .bar:hover { background: #c8a96e; }
-    .bar-labels { display: flex; gap: 3px; }
+    .bar-labels { display: flex; gap: 3px; margin-bottom: 20px; }
     .bar-label { flex: 1; text-align: center; font-size: 9px; color: #555; }
 
-    /* ── 이력 ── */
+    /* 이력 */
     .history-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 0;
-      border-bottom: 1px solid #1e1e1e;
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid #1e1e1e;
     }
     .history-item img { width: 40px; height: 30px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
-    .history-item .track-title { font-size: 12px; }
     .history-time { font-size: 10px; color: #555; margin-top: 2px; }
     .skipped-badge {
-      font-size: 10px;
-      background: #3a1a1a;
-      color: #ff6b6b;
-      border-radius: 4px;
-      padding: 2px 6px;
-      flex-shrink: 0;
-      margin-left: auto;
+      font-size: 10px; background: #3a1a1a; color: #ff6b6b;
+      border-radius: 4px; padding: 2px 6px; flex-shrink: 0; margin-left: auto;
     }
+
+    .empty { color: #555; font-size: 13px; padding: 20px 0; }
   </style>
 </head>
 <body>
 
-<!-- 왼쪽 -->
+<!-- 왼쪽: 플레이어 -->
 <div id="left-panel">
-
-  <!-- 익스텐션 연결 상태 -->
-  <div id="ext-status">
-    <div class="status-dot disconnected" id="ext-dot"></div>
-    <span id="ext-status-text">익스텐션 연결 대기 중...</span>
-  </div>
-
-  <!-- LP -->
   <div class="lp-wrapper">
     <div class="lp-disc" id="lp-disc">
       <div class="lp-label" id="lp-label">MUSIC</div>
@@ -313,51 +172,40 @@
   <div id="now-title">재생 대기 중</div>
   <div id="now-channel"></div>
 
-  <!-- 컨트롤 -->
+  <iframe id="yt-player" allow="autoplay"></iframe>
+
   <div class="controls">
     <button class="btn btn-skip" id="skip-btn">⏭ 스킵</button>
     <button class="btn btn-toggle" id="toggle-btn">시스템 ON</button>
   </div>
-
-  <!-- 익스텐션 미연결 안내 -->
-  <div id="ext-guide">
-    크롬 익스텐션이 연결되지 않았습니다.<br/>
-    익스텐션을 설치하고 서버에 연결해주세요.
-  </div>
-
 </div>
 
 <!-- 오른쪽: 탭 패널 -->
-<div id="queue-panel">
+<div id="right-panel">
   <div class="tabs">
     <button class="tab-btn active" data-tab="queue">신청 목록</button>
     <button class="tab-btn" data-tab="history">이력</button>
     <button class="tab-btn" data-tab="stats">통계</button>
   </div>
 
-  <!-- 큐 탭 -->
   <div id="tab-queue" class="tab-content active">
     <div id="queue-list"><div class="empty">신청된 곡이 없습니다</div></div>
   </div>
 
-  <!-- 이력 탭 -->
   <div id="tab-history" class="tab-content">
     <div id="history-list"><div class="empty">이력이 없습니다</div></div>
   </div>
 
-  <!-- 통계 탭 -->
   <div id="tab-stats" class="tab-content">
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-num" id="stat-total">-</div><div class="stat-label">전체 신청</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-played">-</div><div class="stat-label">재생 완료</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-skip">-</div><div class="stat-label">스킵률</div></div>
     </div>
-
-    <div class="section-label" style="margin-bottom:8px">시간대별 재생</div>
+    <div class="section-label">시간대별 재생</div>
     <div class="bar-chart" id="bar-chart"></div>
     <div class="bar-labels" id="bar-labels"></div>
-
-    <div class="section-label" style="margin-top:20px;margin-bottom:10px">TOP 10 신청곡</div>
+    <div class="section-label">TOP 10 신청곡</div>
     <div id="top-songs"></div>
   </div>
 </div>
@@ -373,49 +221,61 @@
   }
 
   const socket = io();
-  let isSystemOn = true;
+  let ytPlayer  = null;
+  let isPlaying = false;
 
-  socket.on('queue_update', ({ queue, isSystemOn: sysOn, isPlaying, extensionConnected }) => {
-    isSystemOn = sysOn;
-    updateExtStatus(extensionConnected);
-    updateToggleBtn(sysOn);
-    updateNowPlaying(queue, isPlaying);
-    renderQueue(queue);
-  });
+  // ── YouTube IFrame API ────────────────────────────────────
+  window.onYouTubeIframeAPIReady = function () {
+    ytPlayer = new YT.Player('yt-player', {
+      height: '198', width: '352',
+      playerVars: { autoplay: 1, controls: 1 },
+      events: { onStateChange: onPlayerStateChange },
+    });
+  };
 
-  socket.on('extension_status', ({ connected }) => {
-    updateExtStatus(connected);
-  });
+  function onPlayerStateChange(event) {
+    const playing = event.data === YT.PlayerState.PLAYING;
+    document.getElementById('lp-disc').classList.toggle('playing', playing);
+    isPlaying = playing;
 
-  // ── 익스텐션 상태 표시 ────────────────────────────────────
-  function updateExtStatus(connected) {
-    const dot    = document.getElementById('ext-dot');
-    const text   = document.getElementById('ext-status-text');
-    const guide  = document.getElementById('ext-guide');
-    dot.className  = 'status-dot ' + (connected ? 'connected' : 'disconnected');
-    text.textContent = connected ? '익스텐션 연결됨' : '익스텐션 연결 대기 중...';
-    guide.style.display = connected ? 'none' : 'block';
+    if (event.data === YT.PlayerState.ENDED) {
+      socket.emit('song_ended', { token: TOKEN });
+    }
   }
 
-  // ── 현재 재생 곡 ──────────────────────────────────────────
-  function updateNowPlaying(queue, isPlaying) {
-    const disc = document.getElementById('lp-disc');
-    if (queue.length > 0 && isPlaying) {
-      const song = queue[0];
-      document.getElementById('now-title').textContent   = song.title;
-      document.getElementById('now-channel').textContent = song.channelTitle;
-      document.getElementById('lp-label').innerHTML = `<img src="${song.thumbnail}" alt="" />`;
-      disc.classList.add('playing');
-    } else {
-      document.getElementById('now-title').textContent   = '재생 대기 중';
-      document.getElementById('now-channel').textContent = '';
-      document.getElementById('lp-label').innerHTML = 'MUSIC';
-      disc.classList.remove('playing');
+  // ── 소켓 ─────────────────────────────────────────────────
+  socket.on('queue_update', ({ queue, isSystemOn, isPlaying: sysPlaying }) => {
+    updateToggleBtn(isSystemOn);
+    renderQueue(queue);
+
+    if (queue.length > 0 && sysPlaying && !isPlaying) {
+      playSong(queue[0]);
     }
+    if (queue.length === 0 || !sysPlaying) {
+      resetPlayer();
+    }
+  });
+
+  // ── 재생 ─────────────────────────────────────────────────
+  function playSong(song) {
+    document.getElementById('now-title').textContent   = song.title;
+    document.getElementById('now-channel').textContent = song.channelTitle;
+    document.getElementById('lp-label').innerHTML = `<img src="${song.thumbnail}" alt="" />`;
+    ytPlayer?.loadVideoById(song.videoId);
+  }
+
+  function resetPlayer() {
+    if (isPlaying) return; // 재생 중이면 초기화 안 함
+    document.getElementById('now-title').textContent   = '재생 대기 중';
+    document.getElementById('now-channel').textContent = '';
+    document.getElementById('lp-label').innerHTML = 'MUSIC';
+    document.getElementById('lp-disc').classList.remove('playing');
+    ytPlayer?.stopVideo();
   }
 
   // ── 컨트롤 ────────────────────────────────────────────────
   document.getElementById('skip-btn').addEventListener('click', () => {
+    isPlaying = false;
     socket.emit('admin_skip', { token: TOKEN });
   });
 
@@ -432,10 +292,7 @@
   // ── 큐 렌더링 ─────────────────────────────────────────────
   function renderQueue(queue) {
     const el = document.getElementById('queue-list');
-    if (!queue.length) {
-      el.innerHTML = '<div class="empty">신청된 곡이 없습니다</div>';
-      return;
-    }
+    if (!queue.length) { el.innerHTML = '<div class="empty">신청된 곡이 없습니다</div>'; return; }
     el.innerHTML = queue.map((item, i) => `
       <div class="queue-item ${i === 0 ? 'now-playing' : ''}">
         <div class="queue-num">${i === 0 ? '▶' : i + 1}</div>
@@ -447,20 +304,16 @@
         <button class="delete-btn" data-id="${item.id}">삭제</button>
       </div>
     `).join('');
-
     el.querySelectorAll('.delete-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        isPlaying = false;
         socket.emit('admin_delete', { token: TOKEN, id: btn.dataset.id });
       });
     });
   }
 
-  function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // ── 탭 전환 ───────────────────────────────────────────────
-  document.querySelectorAll('.tab-btn').forEach((btn) => {
+  // ── 탭 ────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -471,15 +324,13 @@
     });
   });
 
-  // ── 이력 로드 ─────────────────────────────────────────────
+  // ── 이력 ─────────────────────────────────────────────────
   async function loadHistory() {
     const res  = await fetch(`/api/history?token=${TOKEN}&limit=100`);
     const data = await res.json();
     const el   = document.getElementById('history-list');
-
     if (!data.length) { el.innerHTML = '<div class="empty">이력이 없습니다</div>'; return; }
-
-    el.innerHTML = data.map((item) => `
+    el.innerHTML = data.map(item => `
       <div class="history-item">
         <img src="${item.thumbnail}" alt="" />
         <div style="flex:1;overflow:hidden">
@@ -491,25 +342,22 @@
     `).join('');
   }
 
-  // ── 통계 로드 ─────────────────────────────────────────────
+  // ── 통계 ─────────────────────────────────────────────────
   async function loadStats() {
     const res  = await fetch(`/api/stats?token=${TOKEN}`);
     const data = await res.json();
-
     document.getElementById('stat-total').textContent  = data.total;
     document.getElementById('stat-played').textContent = data.played;
     document.getElementById('stat-skip').textContent   = data.skipRate + '%';
 
-    // 시간대별 바 차트
     const max = Math.max(...data.byHour, 1);
     document.getElementById('bar-chart').innerHTML = data.byHour
-      .map((v) => `<div class="bar" style="height:${Math.round((v / max) * 100)}%" title="${v}회"></div>`)
+      .map(v => `<div class="bar" style="height:${Math.round((v / max) * 100)}%" title="${v}회"></div>`)
       .join('');
     document.getElementById('bar-labels').innerHTML = data.byHour
       .map((_, i) => `<div class="bar-label">${i % 4 === 0 ? i : ''}</div>`)
       .join('');
 
-    // TOP 10
     const topEl = document.getElementById('top-songs');
     if (!data.topSongs.length) { topEl.innerHTML = '<div class="empty">데이터 없음</div>'; return; }
     topEl.innerHTML = data.topSongs.map((s, i) => `
@@ -518,12 +366,17 @@
         <img src="${s.thumbnail}" alt="" />
         <div style="flex:1;overflow:hidden">
           <div class="track-title">${escHtml(s.title)}</div>
-          <div class="track-channel">${escHtml(s.channelTitle)}</div>
+          <div class="track-channel" style="font-size:11px;color:#888">${escHtml(s.channelTitle)}</div>
         </div>
         <span class="count">${s.count}회</span>
       </div>
     `).join('');
   }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 </script>
+<script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

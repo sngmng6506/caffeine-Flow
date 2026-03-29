@@ -4,9 +4,8 @@ const { Server } = require('socket.io');
 const path    = require('path');
 
 const { PORT, CAFE_TOKEN } = require('./src/config');
-const apiRouter     = require('./src/api');
-const initSocket    = require('./src/socket');
-const initExtension = require('./src/extension');
+const apiRouter  = require('./src/api');
+const initSocket = require('./src/socket');
 
 const app    = express();
 const server = http.createServer(app);
@@ -17,7 +16,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api', apiRouter);
 
 initSocket(io);
-initExtension(server, io);
 
 server.listen(PORT, () => {
   console.log(`\n🎵 Caffeine Flow running on http://localhost:${PORT}`);

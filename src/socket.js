@@ -18,11 +18,13 @@ function initSocket(io) {
 
   io.on('connection', (socket) => {
     socket.emit('queue_update', {
-      queue:             state.queue,
-      isSystemOn:        state.isSystemOn,
-      isPlaying:         state.isPlaying,
-      extensionConnected: !!state.extensionWs,
+      queue:      state.queue,
+      isSystemOn: state.isSystemOn,
+      isPlaying:  state.isPlaying,
     });
+
+    // Admin: 곡 종료 알림 (IFrame에서 영상 끝났을 때)
+    socket.on('song_ended', ({ token }) => { if (token === CAFE_TOKEN) queue.songEnded(); });
 
     socket.on('request_song', ({ token, song }) => {
       if (token !== CAFE_TOKEN || !state.isSystemOn) return;

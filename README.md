@@ -1,6 +1,6 @@
 # ☕ Caffeine Flow
 
-> 카페 손님이 QR 코드를 스캔해 YouTube URL로 음악을 신청하면, 카페 PC의 YouTube가 자동으로 전환되는 뮤직 리퀘스트 시스템
+> 카페 손님이 QR 코드를 스캔해 YouTube URL로 음악을 신청하면, Admin 페이지에서 자동으로 재생되는 뮤직 리퀘스트 시스템
 
 ---
 
@@ -12,7 +12,6 @@
 - [기술 스택](#기술-스택)
 - [시작하기](#시작하기)
 - [Railway 배포](#railway-배포)
-- [크롬 익스텐션 설치](#크롬-익스텐션-설치)
 - [화면 구성](#화면-구성)
 - [보안](#보안)
 - [향후 계획](#향후-계획)
@@ -25,9 +24,9 @@
 |------|------|
 | 🔗 URL 신청 | YouTube URL 붙여넣기 → 곡 정보 자동 조회 후 신청 |
 | 📡 실시간 동기화 | Socket.io로 신청 즉시 모든 화면에 반영 |
-| 🎬 자동 탭 제어 | 신청곡 재생 시 기존 YouTube 탭 자동 음소거 |
-| 🔁 자동 재생 | 곡 종료 시 자동으로 다음 신청 곡 재생 후 원래 음악 복원 |
-| 💿 LP 애니메이션 | Admin 페이지에서 재생 중 회전하는 LP판 + 앨범아트 표시 |
+| 🎬 자동 재생 | Admin 페이지 IFrame에서 순서대로 자동 재생 |
+| 🔁 자동 다음 곡 | 곡 종료 시 자동으로 다음 신청 곡 재생 |
+| 💿 LP 애니메이션 | 재생 중 회전하는 LP판 + 앨범아트 표시 |
 | ⏭ 스킵 / 삭제 | 관리자가 곡을 강제 스킵하거나 큐에서 제거 |
 | 🔛 시스템 ON/OFF | 손님 신청 기능을 즉시 켜고 끄기 |
 | 🔒 토큰 + Rate Limit | 무작위 접근 및 스팸 신청 차단 |
@@ -43,29 +42,26 @@
 graph TD
     subgraph 손님["📱 손님 폰 (LTE / WiFi 무관)"]
         QR[QR 스캔]
-        WEB[모바일 웹]
+        WEB[customer.html]
     end
 
     subgraph 클라우드["☁️ Railway 클라우드"]
         SERVER[Node.js 서버]
         QUEUE[Queue 모듈]
-        HISTORY[History 모듈]
+        HISTORY[History 모듈<br/>data/history.json]
     end
 
-    subgraph 카페PC["🖥️ 카페 PC"]
-        EXT[크롬 익스텐션]
-        YT_기존[기존 YouTube 탭]
-        ADMIN[Admin 페이지]
+    subgraph 카페PC["🖥️ 카페 PC (카페 전용 구글 계정 로그인)"]
+        ADMIN[admin.html<br/>YouTube IFrame 플레이어]
     end
 
     QR --> WEB
-    WEB -->|"Socket.io (신청/큐 확인)"| SERVER
+    WEB -->|"Socket: request_song"| SERVER
     SERVER --> QUEUE --> HISTORY
-    QUEUE -->|"Socket.io (큐 동기화)"| WEB
-    QUEUE -->|"Socket.io (큐 동기화)"| ADMIN
-    QUEUE -->|"WS: play_song"| EXT
-    EXT -->|음소거 & 새 탭 열기| YT_기존
-    EXT -->|"WS: song_ended"| SERVER
+    QUEUE -->|"Socket: queue_update"| WEB
+    QUEUE -->|"Socket: queue_update"| ADMIN
+    ADMIN -->|"Socket: song_ended"| SERVER
+    ADMIN -->|YouTube IFrame API| ADMIN
 ```
 
 ---
@@ -77,8 +73,7 @@ sequenceDiagram
     actor 손님 as 📱 손님
     participant 서버 as ☁️ Railway 서버
     participant YT_OE as 🌐 YouTube oEmbed
-    participant 익스텐션 as 🔌 크롬 익스텐션
-    participant YT_기존 as 🎵 기존 YouTube 탭
+    actor Admin as 🖥️ Admin 페이지
 
     손님->>서버: GET /api/oembed?url=유튜브URL
     서버->>YT_OE: oEmbed 요청 (무료, API 키 없음)
@@ -86,17 +81,18 @@ sequenceDiagram
     서버-->>손님: 곡 정보 반환 (미리보기)
 
     손님->>서버: Socket → request_song
-    서버->>서버: Rate Limit 검사 (1분 3곡)
-    서버->>서버: 큐 추가 + 이력 기록
-    서버-->>익스텐션: WS → play_song { videoId }
+    서버->>서버: Rate Limit (1분 3곡) + 큐 추가
+    서버-->>손님: Socket → queue_update
+    서버-->>Admin: Socket → queue_update (isPlaying: true)
 
-    익스텐션->>YT_기존: 음소거
-    익스텐션->>익스텐션: 신청곡 새 탭으로 열기
-    Note over 익스텐션: 영상 종료 감지 (content.js)
+    Note over Admin: queue[0] 자동 재생 (YouTube IFrame)
+    Note over Admin: LP 애니메이션 시작
 
-    익스텐션->>서버: WS → song_ended
-    익스텐션->>YT_기존: 음소거 해제
-    서버->>서버: 큐에서 제거 → 다음 곡 or 대기
+    Note over Admin: 영상 종료 감지 (onStateChange)
+    Admin->>서버: Socket → song_ended
+    서버->>서버: 큐 제거 + 이력 저장
+    서버-->>Admin: Socket → queue_update (다음 곡)
+    Note over Admin: 다음 곡 자동 재생
 ```
 
 ---
@@ -107,7 +103,7 @@ sequenceDiagram
 flowchart LR
     REQ[요청]
     TOKEN{토큰 검증}
-    RATE{Rate Limit\n1분 20req / 3곡}
+    RATE{Rate Limit\nAPI: 1분 20req\n신청: 1분 3곡}
     OK[처리]
     BLOCK1[403 Forbidden]
     BLOCK2[429 Too Many Requests]
@@ -129,21 +125,14 @@ caffeine-Flow/
 ├── railway.json           # Railway 배포 설정
 ├── src/
 │   ├── config.js          # 환경변수
-│   ├── state.js           # 공유 상태
-│   ├── queue.js           # 큐 로직
+│   ├── state.js           # 공유 상태 (queue, isPlaying 등)
+│   ├── queue.js           # 큐 로직 (추가/스킵/삭제/재생)
 │   ├── history.js         # 이력 저장 & 통계
-│   ├── api.js             # REST API (Rate Limit 포함)
-│   ├── socket.js          # Socket.io (신청 Rate Limit 포함)
-│   └── extension.js       # 익스텐션 WebSocket 서버
+│   ├── api.js             # REST API 라우터 (Rate Limit 포함)
+│   └── socket.js          # Socket.io 핸들러 (신청 Rate Limit 포함)
 ├── public/
 │   ├── customer.html      # 손님 모바일 페이지
-│   └── admin.html         # 관리자 페이지 (큐/이력/통계)
-├── extension/
-│   ├── manifest.json
-│   ├── background.js      # YouTube 탭 제어
-│   ├── content.js         # 영상 종료 감지
-│   ├── popup.html
-│   └── popup.js
+│   └── admin.html         # 관리자 페이지 (플레이어 + 큐/이력/통계)
 ├── data/
 │   └── history.json       # 재생 이력 (자동 생성, git 제외)
 └── .env                   # 환경변수 (git 제외)
@@ -158,13 +147,11 @@ caffeine-Flow/
 | **런타임** | Node.js |
 | **서버 프레임워크** | Express |
 | **실시간 통신** | Socket.io |
-| **익스텐션 통신** | WebSocket (ws) |
 | **프론트엔드** | Vanilla HTML/CSS/JS |
 | **곡 정보 조회** | YouTube oEmbed API (무료, API 키 불필요) |
-| **음악 재생** | 카페 PC YouTube 탭 (Premium 유지) |
+| **음악 재생** | YouTube IFrame Player API |
 | **Rate Limiting** | express-rate-limit |
 | **이력 저장** | JSON 파일 (`data/history.json`) |
-| **브라우저 제어** | Chrome Extension (Manifest V3) |
 | **배포** | Railway |
 
 ---
@@ -190,7 +177,7 @@ npm install
 cp .env.example .env
 ```
 
-`.env` 파일 수정:
+`.env` 수정:
 
 ```env
 PORT=3000
@@ -214,55 +201,51 @@ npm run dev
 
 ## Railway 배포
 
-### 1. Railway 가입 & 프로젝트 생성
-1. [railway.app](https://railway.app) 접속 → GitHub 로그인
+### 1. 프로젝트 생성
+1. [railway.app](https://railway.app) → GitHub 로그인
 2. **New Project** → **Deploy from GitHub repo** → `caffeine-Flow` 선택
 
 ### 2. 환경변수 설정
-Railway 대시보드 → Variables 탭:
-
+Railway 대시보드 → Variables:
 ```
 CAFE_TOKEN = (랜덤 생성한 토큰)
 ```
 
 ### 3. 배포 완료
-- push할 때마다 자동 배포
+- `main` 브랜치에 push 할 때마다 자동 배포
 - 도메인 자동 발급: `https://caffeine-flow-xxxx.railway.app`
 
 ### 4. QR 코드 생성
-배포된 URL로 QR 생성:
 ```
 https://caffeine-flow-xxxx.railway.app/customer.html?token=토큰
 ```
 
-> 손님은 **LTE든 WiFi든** QR 스캔만 하면 됩니다.
+### 5. Admin 접속
+카페 PC에서 카페 전용 구글 계정으로 YouTube 로그인 후:
+```
+https://caffeine-flow-xxxx.railway.app/admin.html?token=토큰
+```
 
----
-
-## 크롬 익스텐션 설치
-
-1. 크롬 주소창에 `chrome://extensions` 입력
-2. 우측 상단 **개발자 모드** 활성화
-3. **압축 해제된 확장 프로그램 로드** → `extension/` 폴더 선택
-4. 익스텐션 아이콘 클릭 → **Server URL**에 Railway 주소 입력 → **저장 & 재연결**
-5. 배지에 `ON` 표시되면 연결 완료
+> **카페 전용 구글 계정 사용 권장**
+> 개인 계정 시청 기록 오염 방지 + 계정 피해 범위 분리
 
 ---
 
 ## 화면 구성
 
 ### 손님 화면 (Mobile)
-- YouTube URL 붙여넣기 → 곡 미리보기 확인 → 신청
+- YouTube URL 붙여넣기 → 곡 미리보기 → 신청
 - 현재 신청 목록 실시간 확인
 - 시스템 OFF / Rate Limit 초과 시 안내 메시지
 
 ### 관리자 화면 (PC)
 
-| 탭 | 내용 |
-|----|------|
-| 신청 목록 | 현재 큐, 스킵/삭제, 시스템 ON·OFF, 익스텐션 연결 상태 |
-| 이력 | 재생/스킵 곡 목록 + 시간 기록 |
-| 통계 | 전체 신청 수, 재생 완료, 스킵률, 시간대별 차트, TOP 10 |
+| 영역 | 내용 |
+|------|------|
+| 왼쪽 | LP 애니메이션, YouTube 플레이어, 스킵/시스템 ON·OFF |
+| 신청 목록 탭 | 현재 큐, 개별 삭제 |
+| 이력 탭 | 재생/스킵 곡 목록 + 시간 기록 |
+| 통계 탭 | 전체 신청 수, 재생 완료, 스킵률, 시간대별 차트, TOP 10 |
 
 ---
 
@@ -273,6 +256,7 @@ https://caffeine-flow-xxxx.railway.app/customer.html?token=토큰
 | **랜덤 토큰** | 추측 불가능한 토큰으로 무작위 접근 차단 |
 | **API Rate Limit** | IP당 1분 20요청 제한 |
 | **신청 Rate Limit** | IP당 1분 3곡 신청 제한 |
+| **카페 전용 계정** | 개인 구글 계정 분리 권장 |
 
 ---
 
@@ -280,4 +264,4 @@ https://caffeine-flow-xxxx.railway.app/customer.html?token=토큰
 
 - [ ] 테이블별 고유 QR 코드 생성
 - [ ] 좋아요 / 투표 기반 큐 정렬
-- [ ] Redis를 이용한 큐 영속성 (서버 재시작 후 복구)
+- [ ] Redis / PostgreSQL로 큐 & 이력 영속성 개선

@@ -3,7 +3,6 @@ const state = {
   queue: [],
   isSystemOn: true,
   isPlaying: false,
-  extensionWs: null,
 };
 
 module.exports = state;
