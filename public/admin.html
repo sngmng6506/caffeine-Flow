@@ -293,15 +293,22 @@
   }
 
   const socket = io();
-  let ytPlayer  = null;
-  let isPlaying = false;
+  let ytPlayer    = null;
+  let isPlaying   = false;
+  let pendingSong = null; // ytPlayer 준비 전 도착한 곡 보관
 
   // ── YouTube IFrame API ────────────────────────────────────
   window.onYouTubeIframeAPIReady = function () {
     ytPlayer = new YT.Player('yt-player', {
       height: '198', width: '352',
       playerVars: { autoplay: 1, controls: 1 },
-      events: { onStateChange: onPlayerStateChange },
+      events: {
+        onReady: () => {
+          // 플레이어 준비 완료 후 대기 중이던 곡 재생
+          if (pendingSong) { playSong(pendingSong); pendingSong = null; }
+        },
+        onStateChange: onPlayerStateChange,
+      },
     });
   };
 
@@ -333,16 +340,23 @@
     document.getElementById('now-title').textContent   = song.title;
     document.getElementById('now-channel').textContent = song.channelTitle;
     document.getElementById('lp-label').innerHTML = `<img src="${song.thumbnail}" alt="" />`;
-    ytPlayer?.loadVideoById(song.videoId);
+
+    if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') {
+      // 플레이어 아직 준비 안 됨 → 대기
+      pendingSong = song;
+      return;
+    }
+    ytPlayer.loadVideoById(song.videoId);
   }
 
   function resetPlayer() {
-    isPlaying = false;
+    isPlaying   = false;
+    pendingSong = null;
     document.getElementById('now-title').textContent   = '재생 대기 중';
     document.getElementById('now-channel').textContent = '';
     document.getElementById('lp-label').innerHTML = 'MUSIC';
     document.getElementById('lp-disc').classList.remove('playing');
-    ytPlayer?.stopVideo();
+    if (ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
   }
 
   // ── 컨트롤 ────────────────────────────────────────────────
