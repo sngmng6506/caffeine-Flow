@@ -466,6 +466,10 @@
 
   function initQR() {
     if (qrInitialized) return;
+    if (typeof QRCode === 'undefined') {
+      setTimeout(initQR, 200);
+      return;
+    }
     qrInitialized = true;
 
     const customerUrl = `${location.origin}/customer.html?token=${TOKEN}`;
@@ -501,7 +505,7 @@
   }
 </script>
 <script src="/utils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </body>
 </html>
