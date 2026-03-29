@@ -312,9 +312,10 @@
 
   const socket    = io();
   let ytPlayer    = null;
+  let playerReady = false; // onReady 콜백 이후에만 true
   let isPlaying   = false;
   let pendingSong = null;
-  let muted       = true; // 첫 클릭 전까지 음소거 상태
+  let muted       = true;
 
   const overlay = document.getElementById('play-overlay');
 
@@ -343,6 +344,7 @@
       events: {
         onReady: (e) => {
           console.log('[YT] 플레이어 onReady');
+          playerReady = true;
           e.target.mute();
           if (pendingSong) { loadAndPlay(pendingSong); pendingSong = null; }
         },
@@ -364,9 +366,9 @@
   }
 
   function loadAndPlay(song) {
-    console.log('[Player] loadAndPlay 호출:', song.videoId, '| ytPlayer:', !!ytPlayer, '| muted:', muted);
-    if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') {
-      console.log('[Player] 플레이어 미준비 → pendingSong 설정');
+    console.log('[Player] loadAndPlay:', song.videoId, '| playerReady:', playerReady, '| muted:', muted);
+    if (!playerReady) {
+      console.log('[Player] onReady 대기 중 → pendingSong 설정');
       pendingSong = song;
       return;
     }
