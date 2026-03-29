@@ -70,7 +70,7 @@
 
     /* YouTube 플레이어 */
     #yt-wrap { position: relative; width: 352px; height: 198px; }
-    #yt-player {
+    #yt-player, #yt-player iframe {
       width: 352px; height: 198px;
       border-radius: 10px; border: none; background: #000;
     }
@@ -231,7 +231,7 @@
   <div id="now-channel"></div>
 
   <div id="yt-wrap">
-    <iframe id="yt-player" allow="autoplay"></iframe>
+    <div id="yt-player"></div>
     <div id="play-overlay">
       <span>🔊</span>
       클릭하여 소리 켜기
