@@ -156,9 +156,55 @@
     }
 
     .empty { color: #555; font-size: 13px; padding: 20px 0; }
+
+    /* ── QR ── */
+    .qr-section { display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 8px; }
+    .qr-url-box {
+      background: #1a1a1a; border-radius: 8px;
+      padding: 10px 16px; width: 100%; text-align: center;
+    }
+    .qr-url-text { font-size: 11px; color: #888; word-break: break-all; }
+    #qr-canvas-wrap {
+      background: #fff; border-radius: 12px;
+      padding: 16px; display: inline-block;
+    }
+    .qr-actions { display: flex; gap: 10px; }
+    .qr-btn {
+      border: none; border-radius: 8px;
+      padding: 10px 24px; font-size: 13px;
+      font-weight: 600; cursor: pointer;
+      background: #c8a96e; color: #0f0f0f;
+    }
+    .qr-btn:active { opacity: 0.8; }
+    .qr-btn-secondary { background: #2a2a2a; color: #f0f0f0; border: 1px solid #444; }
+    .qr-hint { font-size: 12px; color: #555; text-align: center; line-height: 1.7; }
+
+    @media print {
+      body > * { display: none !important; }
+      #print-area { display: flex !important; }
+    }
+    #print-area {
+      display: none;
+      position: fixed; inset: 0;
+      background: #fff;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px; z-index: 9999;
+    }
+    #print-area h2 { font-size: 22px; color: #000; }
+    #print-area p  { font-size: 13px; color: #555; }
   </style>
 </head>
 <body>
+
+<!-- 인쇄용 오버레이 -->
+<div id="print-area">
+  <h2>☕ MUSIC REQUEST</h2>
+  <canvas id="print-canvas"></canvas>
+  <p id="print-url"></p>
+  <p style="font-size:12px;color:#aaa">YouTube URL을 붙여넣어 음악을 신청하세요</p>
+</div>
 
 <!-- 왼쪽: 플레이어 -->
 <div id="left-panel">
@@ -186,6 +232,7 @@
     <button class="tab-btn active" data-tab="queue">신청 목록</button>
     <button class="tab-btn" data-tab="history">이력</button>
     <button class="tab-btn" data-tab="stats">통계</button>
+    <button class="tab-btn" data-tab="qr">QR 코드</button>
   </div>
 
   <div id="tab-queue" class="tab-content active">
@@ -207,6 +254,31 @@
     <div class="bar-labels" id="bar-labels"></div>
     <div class="section-label">TOP 10 신청곡</div>
     <div id="top-songs"></div>
+  </div>
+
+  <!-- QR 탭 -->
+  <div id="tab-qr" class="tab-content">
+    <div class="qr-section">
+      <div class="section-label" style="margin-bottom:12px">손님용 QR 코드</div>
+
+      <div class="qr-url-box">
+        <span id="qr-url-text" class="qr-url-text"></span>
+      </div>
+
+      <div id="qr-canvas-wrap">
+        <canvas id="qr-canvas"></canvas>
+      </div>
+
+      <div class="qr-actions">
+        <button class="qr-btn" id="qr-print-btn">🖨 인쇄</button>
+        <button class="qr-btn qr-btn-secondary" id="qr-download-btn">⬇ 저장</button>
+      </div>
+
+      <div class="qr-hint">
+        카페 테이블에 부착하거나 인쇄해서 사용하세요.<br/>
+        손님은 카메라로 스캔 후 URL을 붙여넣어 신청합니다.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -321,6 +393,7 @@
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'history') loadHistory();
       if (btn.dataset.tab === 'stats')   loadStats();
+      if (btn.dataset.tab === 'qr')      initQR();
     });
   });
 
@@ -373,8 +446,48 @@
     `).join('');
   }
 
+
+  // ── QR 코드 ──────────────────────────────────────────────
+  let qrInitialized = false;
+
+  function initQR() {
+    if (qrInitialized) return;
+    qrInitialized = true;
+
+    const customerUrl = `${location.origin}/customer.html?token=${TOKEN}`;
+    document.getElementById('qr-url-text').textContent = customerUrl;
+
+    QRCode.toCanvas(
+      document.getElementById('qr-canvas'),
+      customerUrl,
+      { width: 220, margin: 2, color: { dark: '#000', light: '#fff' } }
+    );
+
+    // 인쇄용 캔버스도 생성
+    QRCode.toCanvas(
+      document.getElementById('print-canvas'),
+      customerUrl,
+      { width: 280, margin: 2, color: { dark: '#000', light: '#fff' } }
+    );
+    document.getElementById('print-url').textContent = customerUrl;
+
+    document.getElementById('qr-print-btn').addEventListener('click', () => {
+      document.getElementById('print-area').style.display = 'flex';
+      window.print();
+      document.getElementById('print-area').style.display = 'none';
+    });
+
+    document.getElementById('qr-download-btn').addEventListener('click', () => {
+      const canvas = document.getElementById('qr-canvas');
+      const a = document.createElement('a');
+      a.href     = canvas.toDataURL('image/png');
+      a.download = 'caffeine-flow-qr.png';
+      a.click();
+    });
+  }
 </script>
 <script src="/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
