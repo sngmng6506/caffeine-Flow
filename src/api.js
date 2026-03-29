@@ -56,10 +56,9 @@ router.get('/oembed', validateToken, async (req, res) => {
 // 현재 큐 상태
 router.get('/queue', validateToken, (req, res) => {
   res.json({
-    queue:             state.queue,
-    isSystemOn:        state.isSystemOn,
-    isPlaying:         state.isPlaying,
-    extensionConnected: !!state.extensionWs,
+    queue:      state.queue,
+    isSystemOn: state.isSystemOn,
+    isPlaying:  state.isPlaying,
   });
 });
 

@@ -265,7 +265,7 @@
   }
 
   function resetPlayer() {
-    if (isPlaying) return; // 재생 중이면 초기화 안 함
+    isPlaying = false;
     document.getElementById('now-title').textContent   = '재생 대기 중';
     document.getElementById('now-channel').textContent = '';
     document.getElementById('lp-label').innerHTML = 'MUSIC';
@@ -373,10 +373,8 @@
     `).join('');
   }
 
-  function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
 </script>
+<script src="/utils.js"></script>
 <script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>

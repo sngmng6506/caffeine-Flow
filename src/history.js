@@ -3,21 +3,26 @@ const path = require('path');
 
 const FILE = path.join(__dirname, '../data/history.json');
 
+// 인메모리 캐시 - 서버 실행 중 파일 I/O 최소화
+let cache = null;
+
 function load() {
-  try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); }
-  catch { return []; }
+  if (cache) return cache;
+  try { cache = JSON.parse(fs.readFileSync(FILE, 'utf8')); }
+  catch { cache = []; }
+  return cache;
 }
 
-function save(history) {
+function save() {
   fs.mkdirSync(path.dirname(FILE), { recursive: true });
-  fs.writeFileSync(FILE, JSON.stringify(history, null, 2));
+  fs.writeFileSync(FILE, JSON.stringify(cache, null, 2));
 }
 
 function addEntry(song, { skipped = false } = {}) {
-  const history = load();
-  history.unshift({ ...song, playedAt: new Date().toISOString(), skipped });
-  if (history.length > 1000) history.splice(1000); // 최대 1000개 보존
-  save(history);
+  load();
+  cache.unshift({ ...song, playedAt: new Date().toISOString(), skipped });
+  if (cache.length > 1000) cache.splice(1000);
+  save();
 }
 
 function getHistory(limit = 50) {
@@ -28,7 +33,6 @@ function getStats() {
   const history = load();
   const played  = history.filter((h) => !h.skipped);
 
-  // 가장 많이 신청된 곡 TOP 10
   const countMap = {};
   for (const item of played) {
     if (!countMap[item.videoId]) countMap[item.videoId] = { ...item, count: 0 };
@@ -38,7 +42,6 @@ function getStats() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  // 시간대별 재생 수
   const byHour = Array(24).fill(0);
   for (const item of played) {
     byHour[new Date(item.playedAt).getHours()]++;

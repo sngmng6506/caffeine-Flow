@@ -4,8 +4,17 @@ const queue = require('./queue');
 
 // IP당 1분에 3곡 신청 제한
 const requestCounts = new Map();
-function isRateLimited(ip) {
+
+// 1분마다 만료된 엔트리 정리 (메모리 누수 방지)
+setInterval(() => {
   const now = Date.now();
+  for (const [ip, entry] of requestCounts) {
+    if (now > entry.resetAt) requestCounts.delete(ip);
+  }
+}, 60000);
+
+function isRateLimited(ip) {
+  const now   = Date.now();
   const entry = requestCounts.get(ip) || { count: 0, resetAt: now + 60000 };
   if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + 60000; }
   entry.count++;
@@ -23,9 +32,6 @@ function initSocket(io) {
       isPlaying:  state.isPlaying,
     });
 
-    // Admin: 곡 종료 알림 (IFrame에서 영상 끝났을 때)
-    socket.on('song_ended', ({ token }) => { if (token === CAFE_TOKEN) queue.songEnded(); });
-
     socket.on('request_song', ({ token, song }) => {
       if (token !== CAFE_TOKEN || !state.isSystemOn) return;
       const ip = socket.handshake.headers['x-forwarded-for'] || socket.handshake.address;
@@ -36,6 +42,7 @@ function initSocket(io) {
       queue.addSong(song);
     });
 
+    socket.on('song_ended',   ({ token })     => { if (token === CAFE_TOKEN) queue.songEnded(); });
     socket.on('admin_skip',   ({ token })     => { if (token === CAFE_TOKEN) queue.skip(); });
     socket.on('admin_delete', ({ token, id }) => { if (token === CAFE_TOKEN) queue.deleteSong(id); });
     socket.on('admin_toggle', ({ token })     => { if (token === CAFE_TOKEN) queue.toggleSystem(); });
