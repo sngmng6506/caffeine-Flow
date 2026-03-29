@@ -318,15 +318,16 @@
 
   const overlay = document.getElementById('play-overlay');
 
-  // 오버레이 클릭 → 음소거 해제
+  // 오버레이 클릭 → 음소거 해제 + 재생
   overlay.addEventListener('click', () => {
     muted = false;
     overlay.classList.add('hidden');
     if (ytPlayer && typeof ytPlayer.unMute === 'function') {
       ytPlayer.unMute();
       ytPlayer.setVolume(100);
+      ytPlayer.playVideo();
+      console.log('[Player] 음소거 해제 + 재생 시작');
     }
-    // 대기 중인 곡이 있으면 재생
     if (pendingSong) {
       loadAndPlay(pendingSong);
       pendingSong = null;
@@ -335,20 +336,25 @@
 
   // ── YouTube IFrame API ────────────────────────────────────
   window.onYouTubeIframeAPIReady = function () {
+    console.log('[YT] IFrame API 준비 완료');
     ytPlayer = new YT.Player('yt-player', {
       height: '198', width: '352',
-      // mute:1 + autoplay:1 → 크롬 자동재생 정책 통과
-      playerVars: { autoplay: 1, mute: 1, controls: 1 },
+      playerVars: { autoplay: 1, mute: 1, controls: 1, playsinline: 1 },
       events: {
-        onReady: () => {
+        onReady: (e) => {
+          console.log('[YT] 플레이어 onReady');
+          e.target.mute();
           if (pendingSong) { loadAndPlay(pendingSong); pendingSong = null; }
         },
         onStateChange: onPlayerStateChange,
+        onError: (e) => console.error('[YT] 에러 코드:', e.data),
       },
     });
   };
 
   function onPlayerStateChange(event) {
+    const stateMap = { '-1': 'UNSTARTED', 0: 'ENDED', 1: 'PLAYING', 2: 'PAUSED', 3: 'BUFFERING', 5: 'CUED' };
+    console.log('[YT] 상태 변경:', stateMap[event.data] || event.data);
     const playing = event.data === YT.PlayerState.PLAYING;
     document.getElementById('lp-disc').classList.toggle('playing', playing);
     isPlaying = playing;
@@ -358,15 +364,15 @@
   }
 
   function loadAndPlay(song) {
+    console.log('[Player] loadAndPlay 호출:', song.videoId, '| ytPlayer:', !!ytPlayer, '| muted:', muted);
     if (!ytPlayer || typeof ytPlayer.loadVideoById !== 'function') {
+      console.log('[Player] 플레이어 미준비 → pendingSong 설정');
       pendingSong = song;
       return;
     }
     ytPlayer.loadVideoById(song.videoId);
-    // 음소거 상태면 오버레이 표시, 아니면 바로 소리 나옴
-    if (muted) {
-      overlay.classList.remove('hidden');
-    }
+    console.log('[Player] loadVideoById 호출됨:', song.videoId);
+    if (muted) overlay.classList.remove('hidden');
   }
 
   // ── 소켓 ─────────────────────────────────────────────────
