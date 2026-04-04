@@ -1,55 +1,28 @@
-# ☕ Caffeine Flow
+# ☕ Caffeine Flow v2
 
-> 카페 매장음악을 유튜브로 재생하면서, 손님이 QR 코드로 음악을 신청하면 매장음악이 자동 일시정지되고 신청곡이 재생되는 뮤직 리퀘스트 시스템
-
----
-
-## 주요 기능
-
-| 기능 | 설명 |
-|------|------|
-| 🎵 매장음악 재생 | Admin 페이지에서 유튜브 검색 → 클릭으로 바로 재생 |
-| 🔗 URL 신청 | 손님이 YouTube URL 붙여넣기 → 곡 정보 자동 조회 후 신청 |
-| ⏸ 자동 전환 | 신청곡 들어오면 매장음악 일시정지 → 신청 큐 소진 후 자동 재개 |
-| 📡 실시간 동기화 | Socket.io로 신청 즉시 모든 화면에 반영 |
-| 🎬 자동 재생 | Admin 페이지에서 순서대로 자동 재생 |
-| 💿 LP 애니메이션 | 신청곡 재생 중 회전하는 LP판 + 앨범아트 |
-| ⏭ 스킵 / 삭제 | 관리자가 곡을 강제 스킵하거나 큐에서 제거 |
-| 🔛 시스템 ON/OFF | 손님 신청 기능을 즉시 켜고 끄기 |
-| 🔒 토큰 + Rate Limit | 무작위 접근 및 스팸 신청 차단 |
-| 📊 이력 & 통계 | 재생 이력 저장, TOP 10 신청곡, 시간대별 통계 |
+> 카페 음악 추천 커뮤니티 플랫폼 — 손님이 QR코드로 음악을 추천하고, 사장님이 직접 재생을 결정합니다.
 
 ---
 
-## 시스템 아키텍처
+## 개요
+
+| 구분 | v1 (레거시) | v2 (현재) |
+|------|------------|----------|
+| 구조 | 단일 카페, 파일 저장 | 멀티테넌시, PostgreSQL |
+| 재생 | 자동 재생 | 사장님이 직접 결정 |
+| 프론트엔드 | Vanilla JS | React (Vite) |
+| 인증 | 토큰 1개 | JWT (사장님) / IP (손님) |
+
+---
+
+## 아키텍처
 
 ```
-손님 (모바일)                      카페 PC (Admin)
-     │                                  │
-     │  QR 스캔 → customer.html         │  admin.html
-     │  YouTube URL 붙여넣기            │  ┌─────────────────────────┐
-     │  → /api/oembed 조회              │  │ 왼쪽: 신청곡 LP 플레이어 │
-     │  → Socket: request_song          │  │ 오른쪽 탭:              │
-     │                                  │  │  - 음악 재생 (검색+재생) │
-     └──────────┐                       │  │  - 신청 목록            │
-                ▼                       │  │  - 이력 / 통계 / QR    │
-         ☁️ Node.js 서버               │  └─────────────────────────┘
-         (Express + Socket.io)          │
-         ├── queue.js (큐 관리)         │
-         ├── history.js (이력/통계)     │
-         └── youtube-sr (검색)          │
-                │                       │
-                └───── Socket ──────────┘
+손님 (React Web)          중앙 서버 (Node.js)         사장님 (React Web)
+  customer/ :5173   ◄──► server/ :3000            ◄──► owner/ :5174
+  QR → /:slug             Express + Socket.IO
+  추천/투표/코멘트          PostgreSQL (Supabase)
 ```
-
-### 신청 → 재생 흐름
-
-1. 손님이 YouTube URL을 붙여넣고 신청
-2. 서버가 큐에 추가 → 모든 클라이언트에 `queue_update` 전송
-3. Admin 페이지에서 매장음악(default 플레이어) **자동 일시정지**
-4. 신청곡이 LP 플레이어(왼쪽)에서 자동 재생
-5. 곡 종료 → 서버에 `song_ended` → 큐에서 제거 → 다음 곡 재생
-6. 큐가 비면 → 매장음악 **자동 재개**
 
 ---
 
@@ -57,142 +30,158 @@
 
 ```
 caffeine-flow/
-├── server.js              # 진입점: Express + Socket.io 조립
-├── src/
-│   ├── config.js          # 환경변수 (PORT, CAFE_TOKEN)
-│   ├── state.js           # 공유 상태 싱글톤 (queue, isPlaying, isSystemOn)
-│   ├── queue.js           # 큐 로직 (추가/스킵/삭제/종료/토글)
-│   ├── history.js         # 이력 저장 & 통계 (JSON 파일 + 인메모리 캐시)
-│   ├── api.js             # REST API (oEmbed, 검색, 큐, 이력, 통계)
-│   └── socket.js          # Socket.io 이벤트 핸들러 (신청 Rate Limit)
-├── public/
-│   ├── admin.html         # 관리자 페이지 (매장음악 + 신청곡 + 큐/이력/통계/QR)
-│   ├── customer.html      # 손님 모바일 페이지
-│   ├── utils.js           # 공통 유틸 (escHtml)
-│   └── favicon.svg        # 파비콘
-├── extension/             # Chrome 확장 프로그램 (선택)
-│   ├── manifest.json
-│   ├── background.js
-│   ├── content.js
-│   └── popup.js
-├── data/
-│   └── history.json       # 재생 이력 (자동 생성)
-├── railway.json           # Railway 배포 설정
-├── .env.example           # 환경변수 예시
-└── package.json
+├── server/                  # Node.js + Express + Socket.IO (v2)
+│   ├── server.js
+│   └── src/
+│       ├── config.js
+│       ├── db/
+│       │   ├── knex.js
+│       │   ├── knexfile.js
+│       │   └── migrations/
+│       │       └── 001_initial.js
+│       ├── middleware/
+│       │   └── auth.js          # JWT 검증
+│       ├── routes/
+│       │   ├── auth.js          # 회원가입/로그인/저작권 동의
+│       │   ├── cafes.js         # 카페 관리 + 통계
+│       │   ├── recommendations.js
+│       │   └── youtube.js       # oEmbed + 검색
+│       ├── services/
+│       │   ├── cafe.service.js
+│       │   ├── recommendation.service.js
+│       │   └── stats.service.js
+│       └── socket/
+│           └── index.js         # /cafe 네임스페이스
+│
+├── customer/                # 손님 React 앱 (Vite)
+│   └── src/
+│       ├── App.jsx          # /:slug 라우팅
+│       ├── api.js
+│       ├── socket.js
+│       └── pages/
+│           ├── CafePage.jsx
+│           ├── NowPlaying.jsx
+│           ├── RecommendForm.jsx
+│           └── SongCard.jsx
+│
+├── owner/                   # 사장님 React 앱 (Vite)
+│   └── src/
+│       ├── App.jsx          # 로그인 → 저작권 → 대시보드
+│       ├── api.js
+│       ├── socket.js
+│       └── pages/
+│           ├── LoginPage.jsx
+│           ├── DisclaimerPage.jsx
+│           ├── DashboardPage.jsx
+│           ├── RecommendCard.jsx
+│           └── StatsPanel.jsx
+│
+├── server.js                # v1 레거시 서버 (유지)
+└── src/                     # v1 레거시 소스 (유지)
 ```
+
+---
+
+## DB 스키마
+
+| 테이블 | 설명 |
+|--------|------|
+| `cafes` | 카페 (멀티테넌시 루트) |
+| `recommendations` | 추천곡 큐 + 이력 통합 |
+| `votes` | IP당 1회 투표 |
+| `comments` | 한줄 코멘트 |
+| `daily_stats` | 일별 집계 |
+
+추천곡 상태 흐름: `pending → accepted → playing → played`  
+거절/스킵: `pending/accepted → rejected/skipped`
+
+---
+
+## API
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/v1/auth/register` | 카페 등록 |
+| POST | `/api/v1/auth/login` | 로그인 (JWT 발급) |
+| POST | `/api/v1/auth/disclaimer` | 저작권 동의 |
+| GET | `/api/v1/cafes/me` | 내 카페 정보 |
+| PUT | `/api/v1/cafes/me/status` | 신청 ON/OFF |
+| GET | `/api/v1/cafes/:slug/recommendations` | 오늘 추천 목록 |
+| POST | `/api/v1/cafes/:slug/recommendations` | 곡 추천 (손님) |
+| PUT | `/api/v1/cafes/:slug/recommendations/:id` | 상태 변경 (사장님) |
+| POST | `/api/v1/cafes/:slug/recommendations/:id/vote` | 투표 |
+| POST | `/api/v1/cafes/:slug/recommendations/:id/comments` | 코멘트 |
+| GET | `/api/v1/youtube/oembed` | 영상 정보 조회 |
+| GET | `/api/v1/youtube/search` | 유튜브 검색 |
+| GET | `/api/v1/cafes/me/stats` | 전체 통계 |
+
+---
+
+## 시작하기
+
+### 사전 준비
+- Node.js 18+
+- Supabase 프로젝트 (PostgreSQL)
+- YouTube Data API v3 키 (검색 기능 사용 시)
+
+### 환경 변수 설정
+
+루트의 `.env` 파일:
+
+```env
+PORT=3000
+YOUTUBE_API_KEY=your-youtube-api-key
+
+DATABASE_URL=postgresql://postgres:[비밀번호]@[host]/postgres
+JWT_SECRET=your-jwt-secret
+```
+
+### DB 마이그레이션
+
+```bash
+cd server
+npm install
+npm run migrate
+```
+
+### 서버 실행
+
+```bash
+# 터미널 1 — 서버
+cd server && npm run dev
+
+# 터미널 2 — 손님 앱
+cd customer && npm install && npm run dev
+
+# 터미널 3 — 사장님 앱
+cd owner && npm install && npm run dev
+```
+
+| 앱 | URL |
+|----|-----|
+| 서버 | http://localhost:3000 |
+| 손님 | http://localhost:5173/:slug |
+| 사장님 | http://localhost:5174 |
+
+---
+
+## 구현 현황
+
+- [x] Phase 0 — 프로젝트 구조 + DB 마이그레이션
+- [x] Phase 1 — 서버 멀티테넌시 (JWT 인증, REST API, Socket.IO)
+- [x] Phase 2 — 손님 React 앱
+- [x] Phase 3 — 사장님 React 앱
+- [ ] Phase 4 — Electron 래퍼 (YouTube WebView)
+- [ ] Phase 5 — 크로스 카페 트렌드
 
 ---
 
 ## 기술 스택
 
-| 분류 | 기술 |
+| 구분 | 기술 |
 |------|------|
-| **런타임** | Node.js |
-| **서버** | Express |
-| **실시간 통신** | Socket.io |
-| **프론트엔드** | Vanilla HTML/CSS/JS |
-| **곡 정보 조회** | YouTube oEmbed API (무료) |
-| **유튜브 검색** | youtube-sr (무료, API 키 불필요) |
-| **음악 재생** | YouTube IFrame Player API |
-| **Rate Limiting** | express-rate-limit |
-| **이력 저장** | JSON 파일 + 인메모리 캐시 |
-| **배포** | Railway |
-
----
-
-## 실행 방법
-
-### 1. 의존성 설치
-
-```bash
-git clone https://github.com/sngmng6506/caffeine-Flow.git
-cd caffeine-Flow
-npm install
-```
-
-### 2. 환경변수 설정
-
-```bash
-cp .env.example .env
-```
-
-`.env` 수정:
-```env
-PORT=3000
-CAFE_TOKEN=your-random-token-here
-```
-
-토큰 랜덤 생성:
-```bash
-node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
-```
-
-### 3. 서버 실행
-
-```bash
-node server.js        # 일반 실행
-npm run dev           # 개발 모드 (파일 변경 시 자동 재시작)
-```
-
-### 4. 접속
-
-| 역할 | URL |
-|------|-----|
-| **관리자** | `http://localhost:3000/admin.html?token=토큰` |
-| **손님** | `http://localhost:3000/customer.html?token=토큰` |
-
----
-
-## 사용 흐름
-
-### 관리자 (카페 PC)
-1. Admin 페이지 접속
-2. **음악 재생 탭**에서 유튜브 검색 → 클릭하여 매장음악 재생
-3. 손님 신청이 들어오면 매장음악 자동 일시정지, 신청곡 자동 재생
-4. 신청곡 큐 소진 후 매장음악 자동 재개
-5. 필요 시 스킵 / 삭제 / 시스템 OFF
-
-### 손님
-1. QR 코드 스캔 (또는 URL 직접 접속)
-2. YouTube에서 원하는 곡 찾기 → 공유 → URL 복사
-3. 신청 페이지에 URL 붙여넣기 → 미리보기 확인 → 신청
-
----
-
-## Admin 화면 구성
-
-| 영역 | 내용 |
-|------|------|
-| **왼쪽 패널** | LP 애니메이션 + 신청곡 YouTube 플레이어 + 스킵/시스템 ON·OFF |
-| **음악 재생 탭** | 유튜브 검색 + 결과 리스트 + 임베드 플레이어 (매장음악용) |
-| **신청 목록 탭** | 현재 큐, 개별 삭제 |
-| **이력 탭** | 재생/스킵 곡 목록 + 시간 기록 |
-| **통계 탭** | 전체 신청 수, 재생 완료, 스킵률, 시간대별 차트, TOP 10 |
-| **QR 코드 탭** | 손님용 QR 생성 + 인쇄/다운로드 |
-
----
-
-## Railway 배포
-
-1. [railway.app](https://railway.app) → GitHub 로그인
-2. **New Project** → **Deploy from GitHub repo** → 저장소 선택
-3. **Variables** 탭에서 `CAFE_TOKEN` 설정
-4. `main` 브랜치 push 시 자동 배포
-5. 발급된 도메인으로 QR 코드 생성 후 카페 테이블에 부착
-
----
-
-## 보안
-
-| 방법 | 내용 |
-|------|------|
-| **랜덤 토큰** | 추측 불가능한 토큰으로 무작위 접근 차단 |
-| **API Rate Limit** | IP당 1분 60요청 제한 |
-| **신청 Rate Limit** | IP당 1분 3곡 신청 제한 (메모리 누수 방지 자동 정리) |
-
----
-
-## Chrome 확장 프로그램 (선택)
-
-`extension/` 폴더에 크롬 확장이 포함되어 있습니다. 서버와 WebSocket으로 연결하여 신청곡을 크롬 탭에서 직접 재생하고, 기존 YouTube 탭을 자동 음소거하는 방식입니다. Admin 페이지의 임베드 플레이어만으로 충분하다면 설치하지 않아도 됩니다.
+| 서버 | Node.js, Express, Socket.IO, Knex.js |
+| DB | PostgreSQL (Supabase) |
+| 프론트 | React, Vite |
+| 인증 | JWT (사장님) / IP 기반 (손님) |
+| 배포 | Railway (서버) + Supabase (DB) |
