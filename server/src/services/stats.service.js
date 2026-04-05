@@ -65,4 +65,42 @@ async function getGlobalTop10(limit = 10) {
     .limit(limit);
 }
 
-module.exports = { getStats, getDailyStats, getCafeTop10, getGlobalTop10 };
+function since30Days() {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return d;
+}
+
+async function getHourlyPattern(cafeId) {
+  const recs = await db('recommendations')
+    .where({ cafe_id: cafeId })
+    .where('requested_at', '>=', since30Days())
+    .select('requested_at');
+
+  const counts = Array(24).fill(0);
+  for (const r of recs) counts[new Date(r.requested_at).getHours()]++;
+  return counts.map((count, hour) => ({ hour, count }));
+}
+
+async function getDayOfWeekPattern(cafeId) {
+  const recs = await db('recommendations')
+    .where({ cafe_id: cafeId })
+    .where('requested_at', '>=', since30Days())
+    .select('requested_at');
+
+  const counts = Array(7).fill(0);
+  for (const r of recs) counts[new Date(r.requested_at).getDay()]++;
+  const labels = ['일', '월', '화', '수', '목', '금', '토'];
+  return counts.map((count, i) => ({ day: labels[i], count }));
+}
+
+async function getSongsByWeekday(cafeId, dayIndex) {
+  const recs = await db('recommendations')
+    .where({ cafe_id: cafeId })
+    .where('requested_at', '>=', since30Days())
+    .orderBy('requested_at', 'desc');
+
+  return recs.filter(r => new Date(r.requested_at).getDay() === dayIndex);
+}
+
+module.exports = { getStats, getDailyStats, getCafeTop10, getGlobalTop10, getHourlyPattern, getDayOfWeekPattern, getSongsByWeekday };

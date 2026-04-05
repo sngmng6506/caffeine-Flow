@@ -16,3 +16,10 @@ export function markVoted(slug, recId) {
     }
   } catch {}
 }
+
+export function removeVote(slug, recId) {
+  try {
+    const set = JSON.parse(localStorage.getItem(KEY(slug)) || '[]');
+    localStorage.setItem(KEY(slug), JSON.stringify(set.filter(id => id !== recId)));
+  } catch {}
+}

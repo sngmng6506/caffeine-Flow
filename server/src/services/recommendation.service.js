@@ -17,6 +17,17 @@ async function getRecommendations(cafeId) {
     .orderBy('requested_at', 'asc');
 }
 
+async function findById(id) {
+  return db('recommendations').where({ id }).first();
+}
+
+async function findActiveByVideoId(cafeId, videoId) {
+  return db('recommendations')
+    .where({ cafe_id: cafeId, video_id: videoId })
+    .whereIn('status', ['pending', 'accepted', 'playing'])
+    .first();
+}
+
 async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, requesterIp, requesterName }) {
   const [rec] = await db('recommendations')
     .insert({
@@ -54,6 +65,19 @@ async function vote(recommendationId, voterIp) {
   return rec;
 }
 
+async function unvote(recommendationId, voterIp) {
+  const deleted = await db('votes')
+    .where({ recommendation_id: recommendationId, voter_ip: voterIp })
+    .delete();
+  if (!deleted) throw Object.assign(new Error('투표 기록이 없습니다'), { status: 404 });
+  const [rec] = await db('recommendations')
+    .where({ id: recommendationId })
+    .where('vote_count', '>', 0)
+    .decrement('vote_count', 1)
+    .returning('*');
+  return rec;
+}
+
 async function addComment(recommendationId, { commenterIp, commenterName, body }) {
   const [comment] = await db('comments')
     .insert({ recommendation_id: recommendationId, commenter_ip: commenterIp, commenter_name: commenterName, body })
@@ -61,4 +85,4 @@ async function addComment(recommendationId, { commenterIp, commenterName, body }
   return comment;
 }
 
-module.exports = { getRecommendations, add, updateStatus, remove, vote, addComment };
+module.exports = { getRecommendations, findById, findActiveByVideoId, add, updateStatus, remove, vote, unvote, addComment };

@@ -16,6 +16,8 @@ const TABS = [
 export default function CafePage({ slug }) {
   const [recs, setRecs] = useState([]);
   const [isAccepting, setIsAccepting] = useState(true);
+  const [notice, setNotice] = useState(null);
+  const [cafeName, setCafeName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('queue');
@@ -23,17 +25,22 @@ export default function CafePage({ slug }) {
   const [globalTop, setGlobalTop] = useState(null);
   const [topLoading, setTopLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [successTimer, setSuccessTimer] = useState(null);
   const deviceName = getDeviceName();
 
   const nowPlaying = recs.find(r => r.status === 'playing') || null;
-  const queue = recs.filter(r => r.status === 'pending' || r.status === 'accepted');
+  const queue = recs
+    .filter(r => r.status === 'pending' || r.status === 'accepted')
+    .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
   const history = recs.filter(r => r.status === 'played' || r.status === 'skipped' || r.status === 'rejected');
 
   useEffect(() => {
     getRecommendations(slug)
-      .then(({ recommendations, is_accepting }) => {
+      .then(({ recommendations, is_accepting, notice, cafe_name }) => {
         setRecs(recommendations);
         setIsAccepting(is_accepting);
+        setNotice(notice);
+        setCafeName(cafe_name);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -42,12 +49,12 @@ export default function CafePage({ slug }) {
 
     socket.on('recommendations_update', ({ action, rec, id }) => {
       if (action === 'add')    setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
-      if (action === 'update') setRecs(prev => prev.map(r => r.id === rec.id ? rec : r));
+      if (action === 'update' || action === 'vote') setRecs(prev => prev.map(r => r.id === rec.id ? rec : r));
       if (action === 'delete') setRecs(prev => prev.filter(r => r.id !== id));
-      if (action === 'vote')   setRecs(prev => prev.map(r => r.id === rec.id ? rec : r));
     });
 
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
+    socket.on('notice_updated', ({ notice }) => setNotice(notice));
 
     return () => disconnectSocket();
   }, [slug]);
@@ -73,11 +80,16 @@ export default function CafePage({ slug }) {
     setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
   }
 
+  function handleDelete(id) {
+    setRecs(prev => prev.filter(r => r.id !== id));
+  }
+
   function handleAdded(rec) {
     setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
     const position = recs.filter(r => r.status === 'pending' || r.status === 'accepted').length + 1;
     setSuccessMsg(`${position}번째로 대기 중이에요!`);
-    setTimeout(() => setSuccessMsg(''), 4000);
+    if (successTimer) clearTimeout(successTimer);
+    setSuccessTimer(setTimeout(() => setSuccessMsg(''), 4000));
   }
 
   if (loading) return <div style={styles.center}>불러오는 중...</div>;
@@ -85,11 +97,21 @@ export default function CafePage({ slug }) {
 
   return (
     <div style={styles.page}>
+      {cafeName && <h2 style={styles.cafeName}>{cafeName}</h2>}
+      {notice && <div style={styles.notice}>📢 {notice}</div>}
       {!isAccepting && <div style={styles.closed}>현재 신청을 받지 않습니다</div>}
 
       <NowPlaying rec={nowPlaying} />
 
-      {isAccepting && tab === 'queue' && <RecommendForm slug={slug} onAdded={handleAdded} />}
+      {isAccepting && tab === 'queue' && (
+        <RecommendForm
+          slug={slug}
+          onAdded={handleAdded}
+          activeVideoIds={recs
+            .filter(r => ['pending', 'accepted', 'playing'].includes(r.status))
+            .map(r => r.video_id)}
+        />
+      )}
       {successMsg && <div style={styles.successMsg}>{successMsg}</div>}
 
       <div style={styles.tabBar}>
@@ -110,7 +132,7 @@ export default function CafePage({ slug }) {
             <section>
               <h3 style={styles.sectionTitle}>대기 중 ({queue.length})</h3>
               {queue.map((r, i) => (
-                <SongCard key={r.id} slug={slug} rec={r} onUpdate={handleUpdate} position={i + 1}
+                <SongCard key={r.id} slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={i + 1}
                   isMyRequest={r.requester_name === deviceName} />
               ))}
             </section>
@@ -242,7 +264,7 @@ function CommentSection({ videoId, slug, isGlobal }) {
         {error && <div style={styles.commentError}>{error}</div>}
         {body.trim() && (
           <div style={styles.commentActions}>
-            <button type="button" onClick={() => { setBody(''); setName(''); }} style={styles.cancelBtn}>취소</button>
+            <button type="button" onClick={() => setBody('')} style={styles.cancelBtn}>취소</button>
             <button type="submit" disabled={loading} style={styles.submitBtn}>
               {loading ? '등록 중...' : '댓글'}
             </button>
@@ -293,7 +315,7 @@ function CommentItem({ comment: c, videoId, slug, deviceName, isGlobal, onReplyA
     <div style={styles.commentItem}>
       <div style={styles.commentMeta}>
         <span style={styles.commenterName}>
-          {c.commenter_name || '익명'}{isGlobal && c.cafe_name ? <span style={styles.cafeName}> in {c.cafe_name}</span> : ''}
+          {c.commenter_name || '익명'}{isGlobal && c.cafe_name ? <span style={styles.cafeTag}> in {c.cafe_name}</span> : ''}
         </span>
         <span style={styles.commentDate}>{new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
       </div>
@@ -341,6 +363,8 @@ function CommentItem({ comment: c, videoId, slug, deviceName, isGlobal, onReplyA
 
 const styles = {
   page:        { maxWidth: 480, margin: '0 auto', padding: '16px', fontFamily: 'sans-serif' },
+  cafeName:    { margin: '0 0 12px 0', fontSize: 24, fontWeight: 800, color: '#1a1a2e' },
+  notice:      { marginBottom: 12, padding: '10px 14px', background: '#e3f2fd', borderRadius: 8, fontSize: 13, color: '#1565c0' },
   closed:      { marginBottom: 16, padding: '8px 12px', background: '#fff3cd', borderRadius: 8, fontSize: 13, color: '#856404' },
   successMsg:  { marginBottom: 12, padding: '10px 14px', background: '#e8f5e9', borderRadius: 8, fontSize: 13, color: '#2e7d32', fontWeight: 600 },
   tabBar:      { display: 'flex', gap: 4, margin: '16px 0', borderBottom: '1px solid #eee', paddingBottom: 0 },
@@ -376,7 +400,7 @@ const styles = {
   commentItem:    { marginTop: 12 },
   commentMeta:    { display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 2 },
   commenterName:  { fontSize: 13, fontWeight: 700 },
-  cafeName:       { fontSize: 12, fontWeight: 400, color: '#bbb' },
+  cafeTag:        { fontSize: 12, fontWeight: 400, color: '#bbb' },
   commentDate:    { fontSize: 11, color: '#aaa' },
   commentBody:    { fontSize: 13, lineHeight: 1.5 },
   replyBtn:       { fontSize: 12, fontWeight: 600, color: '#555', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', marginTop: 2 },

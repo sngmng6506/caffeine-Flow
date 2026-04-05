@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 
-export default function RecommendForm({ slug, onAdded }) {
+export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -16,6 +16,11 @@ export default function RecommendForm({ slug, onAdded }) {
     setError('');
     try {
       const data = await getOembed(url.trim());
+      if (activeVideoIds.includes(data.videoId)) {
+        setError('이미 대기 중인 곡입니다. 다른 곡을 신청해주세요.');
+        setUrl('');
+        return;
+      }
       setPreview(data);
       setStep('preview');
     } catch (e) {
@@ -42,6 +47,9 @@ export default function RecommendForm({ slug, onAdded }) {
       setStep('input');
     } catch (e) {
       setError(e.message);
+      setUrl('');
+      setPreview(null);
+      setStep('input');
     } finally {
       setLoading(false);
     }

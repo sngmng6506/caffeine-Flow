@@ -18,11 +18,14 @@ export const getRecommendations = (slug) =>
 export const postRecommendation = (slug, body) =>
   apiFetch('POST', `/cafes/${slug}/recommendations`, body);
 
-export const vote = (slug, id) =>
-  apiFetch('POST', `/cafes/${slug}/recommendations/${id}/vote`);
+export const vote   = (slug, id) =>
+  apiFetch('POST',   `/cafes/${slug}/recommendations/${id}/vote`);
 
-export const postComment = (slug, id, body) =>
-  apiFetch('POST', `/cafes/${slug}/recommendations/${id}/comments`, body);
+export const unvote = (slug, id) =>
+  apiFetch('DELETE', `/cafes/${slug}/recommendations/${id}/vote`);
+
+export const cancelRecommendation = (slug, id) =>
+  apiFetch('DELETE', `/cafes/${slug}/recommendations/${id}/cancel`);
 
 export const getOembed = (url) =>
   apiFetch('GET', `/youtube/oembed?url=${encodeURIComponent(url)}`);

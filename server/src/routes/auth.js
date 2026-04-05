@@ -1,44 +1,157 @@
-const router  = require('express').Router();
-const bcrypt  = require('bcryptjs');
-const jwt     = require('jsonwebtoken');
-const { JWT_SECRET }  = require('../config');
-const { requireAuth } = require('../middleware/auth');
-const cafeService     = require('../services/cafe.service');
+const router   = require('express').Router();
+const jwt      = require('jsonwebtoken');
+const axios    = require('axios');
+const { OAuth2Client } = require('google-auth-library');
+const { JWT_SECRET, GOOGLE_CLIENT_ID, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, APP_URL, SERVER_URL } = require('../config');
+const cafeService = require('../services/cafe.service');
 
-// POST /api/v1/auth/register
-router.post('/register', async (req, res) => {
-  const { name, slug, email, password } = req.body;
-  if (!name || !slug || !email || !password)
-    return res.status(400).json({ error: '모든 필드를 입력하세요' });
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-  if (!/^[a-z0-9-]+$/.test(slug))
-    return res.status(400).json({ error: 'slug는 영소문자, 숫자, 하이픈만 사용 가능합니다' });
+// JWT 발급 헬퍼
+function issueToken(cafe) {
+  return jwt.sign({ cafeId: cafe.id, slug: cafe.slug }, JWT_SECRET, { expiresIn: '30d' });
+}
 
-  if (await cafeService.findBySlug(slug))
-    return res.status(409).json({ error: '이미 사용 중인 slug입니다' });
+// 신규 가입 대기 토큰 (10분 유효)
+function issuePendingToken(payload) {
+  return jwt.sign({ ...payload, pending: true }, JWT_SECRET, { expiresIn: '10m' });
+}
 
-  const passwordHash = await bcrypt.hash(password, 10);
-  const cafe = await cafeService.create({ name, slug, ownerEmail: email, passwordHash });
+function safeCafe(cafe) {
+  const { password_hash, google_id, naver_id, ...rest } = cafe;
+  return { ...rest, provider: google_id ? 'google' : 'naver' };
+}
 
-  const token = jwt.sign({ cafeId: cafe.id, slug: cafe.slug }, JWT_SECRET, { expiresIn: '30d' });
-  res.status(201).json({ token, cafe: { id: cafe.id, name: cafe.name, slug: cafe.slug } });
+// ────────────────────────────────────────────
+// POST /api/v1/auth/google
+// body: { idToken }                         → 기존 회원: { token, cafe }
+// body: { idToken, cafeName, agreed: true } → 신규 가입: { token, cafe }
+// ────────────────────────────────────────────
+router.post('/google', async (req, res) => {
+  const { idToken, cafeName, agreed } = req.body;
+  if (!idToken) return res.status(400).json({ error: 'idToken 필수' });
+
+  let payload;
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken, audience: GOOGLE_CLIENT_ID });
+    payload = ticket.getPayload();
+  } catch {
+    return res.status(401).json({ error: '유효하지 않은 Google 토큰' });
+  }
+
+  const { sub: googleId, email, name } = payload;
+
+  // 기존 회원
+  const existing = await cafeService.findByGoogleId(googleId);
+  if (existing) {
+    await cafeService.update(existing.id, { last_login_at: new Date() });
+    return res.json({ token: issueToken(existing), cafe: safeCafe(existing) });
+  }
+
+  // 신규 가입 완료
+  if (cafeName && agreed) {
+    const cafe = await cafeService.create({
+      name: cafeName,
+      ownerEmail: email,
+      googleId,
+      disclaimerAcceptedAt: new Date(),
+    });
+    return res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe) });
+  }
+
+  // 신규 회원 → 가입 정보 입력 필요
+  return res.json({ needsSetup: true, pendingToken: issuePendingToken({ googleId, email, name }) });
 });
 
-// POST /api/v1/auth/login
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  const cafe = await cafeService.findByEmail(email);
-  if (!cafe || !(await bcrypt.compare(password, cafe.password_hash)))
-    return res.status(401).json({ error: '이메일 또는 비밀번호가 올바르지 않습니다' });
-
-  const token = jwt.sign({ cafeId: cafe.id, slug: cafe.slug }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, cafe: { id: cafe.id, name: cafe.name, slug: cafe.slug } });
+// ────────────────────────────────────────────
+// GET /api/v1/auth/naver  → 네이버 로그인 페이지로 리다이렉트
+// ────────────────────────────────────────────
+router.get('/naver', (req, res) => {
+  const state       = Math.random().toString(36).slice(2);
+  const redirectUri = `${SERVER_URL}/api/v1/auth/naver/callback`;
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id:     NAVER_CLIENT_ID,
+    redirect_uri:  redirectUri,
+    state,
+  });
+  const fullUrl = `https://nid.naver.com/oauth2.0/authorize?${params}`;
+  console.log('[naver] full URL:', fullUrl);
+  res.redirect(fullUrl);
 });
 
-// POST /api/v1/auth/disclaimer  (JWT 필요)
-router.post('/disclaimer', requireAuth, async (req, res) => {
-  await cafeService.update(req.owner.cafeId, { disclaimer_accepted_at: new Date() });
-  res.json({ ok: true });
+// ────────────────────────────────────────────
+// GET /api/v1/auth/naver/callback
+// ────────────────────────────────────────────
+router.get('/naver/callback', async (req, res) => {
+  const { code, state } = req.query;
+  if (!code) return res.redirect(`${APP_URL}?error=naver_cancelled`);
+
+  try {
+    // 토큰 교환
+    const { data: tokenData } = await axios.get('https://nid.naver.com/oauth2.0/token', {
+      params: {
+        grant_type:    'authorization_code',
+        client_id:     NAVER_CLIENT_ID,
+        client_secret: NAVER_CLIENT_SECRET,
+        code,
+        state,
+      },
+    });
+
+    // 사용자 정보 조회
+    const { data: profileData } = await axios.get('https://openapi.naver.com/v1/nid/me', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+
+    const { id: naverId, email, name } = profileData.response;
+
+    // 기존 회원
+    const existing = await cafeService.findByNaverId(naverId);
+    if (existing) {
+      await cafeService.update(existing.id, { last_login_at: new Date() });
+      const token = issueToken(existing);
+      const cafe  = encodeURIComponent(JSON.stringify(safeCafe(existing)));
+      return res.redirect(`${APP_URL}?token=${token}&cafe=${cafe}`);
+    }
+
+    // 신규 회원 → pending 토큰으로 클라이언트에 전달
+    const pendingToken = issuePendingToken({ naverId, email, name });
+    return res.redirect(`${APP_URL}?pending=${pendingToken}`);
+
+  } catch (err) {
+    console.error('[naver callback]', err.message);
+    res.redirect(`${APP_URL}?error=naver_failed`);
+  }
+});
+
+// ────────────────────────────────────────────
+// POST /api/v1/auth/complete  → 신규 가입 완료 (네이버/구글 공통)
+// body: { pendingToken, cafeName, agreed: true }
+// ────────────────────────────────────────────
+router.post('/complete', async (req, res) => {
+  const { pendingToken, cafeName, agreed } = req.body;
+  if (!pendingToken || !cafeName || !agreed)
+    return res.status(400).json({ error: '필수 항목 누락' });
+
+  let pending;
+  try {
+    pending = jwt.verify(pendingToken, JWT_SECRET);
+    if (!pending.pending) throw new Error();
+  } catch {
+    return res.status(401).json({ error: '만료되었거나 유효하지 않은 요청입니다. 다시 시도해주세요.' });
+  }
+
+  const cafe = await cafeService.create({
+    name:                 cafeName,
+    ownerEmail:           pending.email || null,
+    googleId:             pending.googleId || null,
+    naverId:              pending.naverId  || null,
+    disclaimerAcceptedAt: new Date(),
+    lastLoginAt:          new Date(),
+  });
+
+  res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe) });
 });
 
 module.exports = router;

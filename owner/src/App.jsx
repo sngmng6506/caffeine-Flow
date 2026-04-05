@@ -1,40 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import LoginPage from './pages/LoginPage';
-import DisclaimerPage from './pages/DisclaimerPage';
 import DashboardPage from './pages/DashboardPage';
 
-export default function App() {
-  const [cafe, setCafe]   = useState(null);
-  const [ready, setReady] = useState(false); // disclaimer 완료 여부
+function parseInitialState() {
+  const params = new URLSearchParams(window.location.search);
 
-  useEffect(() => {
-    const token     = localStorage.getItem('token');
-    const cafeRaw   = localStorage.getItem('cafe');
-    const disclaimer = localStorage.getItem('disclaimer');
-    if (token && cafeRaw) {
-      setCafe(JSON.parse(cafeRaw));
-      setReady(!!disclaimer);
-    }
-  }, []);
+  if (params.get('token') && params.get('cafe')) {
+    const token    = params.get('token');
+    const cafeData = JSON.parse(decodeURIComponent(params.get('cafe')));
+    localStorage.setItem('token', token);
+    localStorage.setItem('cafe', JSON.stringify(cafeData));
+    window.history.replaceState({}, '', window.location.pathname);
+    return { cafe: cafeData, pending: null, oauthError: '' };
+  }
+
+  if (params.get('pending')) {
+    const pending = params.get('pending');
+    window.history.replaceState({}, '', window.location.pathname);
+    return { cafe: null, pending, oauthError: '' };
+  }
+
+  if (params.get('error')) {
+    window.history.replaceState({}, '', window.location.pathname);
+    return { cafe: null, pending: null, oauthError: '소셜 로그인에 실패했습니다. 다시 시도해주세요.' };
+  }
+
+  const token   = localStorage.getItem('token');
+  const cafeRaw = localStorage.getItem('cafe');
+  return {
+    cafe:       token && cafeRaw ? JSON.parse(cafeRaw) : null,
+    pending:    null,
+    oauthError: '',
+  };
+}
+
+const initialState = parseInitialState();
+
+export default function App() {
+  const [cafe, setCafe]             = useState(initialState.cafe);
+  const [pending]                   = useState(initialState.pending);
+  const [oauthError]                = useState(initialState.oauthError);
 
   function handleLogin(cafeData) {
     setCafe(cafeData);
-    const disclaimer = localStorage.getItem('disclaimer');
-    setReady(!!disclaimer);
-  }
-
-  function handleDisclaimer() {
-    localStorage.setItem('disclaimer', '1');
-    setReady(true);
   }
 
   function handleLogout() {
     localStorage.clear();
     setCafe(null);
-    setReady(false);
   }
 
-  if (!cafe)  return <LoginPage onLogin={handleLogin} />;
-  if (!ready) return <DisclaimerPage onAccept={handleDisclaimer} />;
+  if (!cafe) return <LoginPage onLogin={handleLogin} initialPendingToken={pending} oauthError={oauthError} />;
   return <DashboardPage cafe={cafe} onLogout={handleLogout} />;
 }

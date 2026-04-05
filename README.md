@@ -11,7 +11,7 @@
 | 구조 | 단일 카페, 파일 저장 | 멀티테넌시, PostgreSQL |
 | 재생 | 자동 재생 | 사장님이 직접 결정 |
 | 프론트엔드 | Vanilla JS | React (Vite) |
-| 인증 | 토큰 1개 | JWT (사장님) / IP (손님) |
+| 인증 | 토큰 1개 | Google/Naver OAuth (사장님) |
 
 ---
 
@@ -37,10 +37,13 @@ caffeine-flow/
 │       │   └── migrations/
 │       │       ├── 001_initial.js
 │       │       ├── 002_song_comments.js
-│       │       └── 003_song_comments_replies.js
+│       │       ├── 003_song_comments_replies.js
+│       │       ├── 004_oauth.js
+│       │       ├── 005_cafe_notice.js
+│       │       └── 006_tracking.js
 │       ├── routes/
-│       │   ├── auth.js
-│       │   ├── cafes.js
+│       │   ├── auth.js              # Google/Naver OAuth
+│       │   ├── cafes.js             # 카페 관리 + 통계
 │       │   ├── recommendations.js
 │       │   ├── song_comments.js     # TOP 항목 댓글/대댓글
 │       │   └── youtube.js
@@ -64,6 +67,15 @@ caffeine-flow/
 │           └── SongCard.jsx
 │
 ├── owner/                   # 사장님 React 앱 (Vite)
+│   └── src/
+│       ├── App.jsx
+│       ├── api.js
+│       ├── socket.js
+│       └── pages/
+│           ├── LoginPage.jsx        # Google/Naver OAuth 로그인
+│           ├── DashboardPage.jsx
+│           ├── RecommendCard.jsx
+│           └── StatsPanel.jsx
 │
 ├── server.js                # v1 레거시 서버
 └── src/                     # v1 레거시 소스
@@ -75,37 +87,58 @@ caffeine-flow/
 
 | 테이블 | 설명 |
 |--------|------|
-| `cafes` | 카페 (멀티테넌시 루트) |
+| `cafes` | 카페 (google_id, naver_id, notice, last_login_at 포함) |
 | `recommendations` | 신청곡 큐 + 이력 통합 |
-| `votes` | IP당 1회 투표 |
+| `votes` | IP당 1회 투표 (취소 가능) |
 | `song_comments` | TOP 항목 댓글/대댓글 (video_id 기준, 전 카페 공유) |
-| `daily_stats` | 일별 집계 (스키마 예약, 미사용) |
+| `cafe_visits` | 손님 방문 기록 (IP 기준, 하루 1회) |
+| `daily_stats` | 일별 집계 (스키마 예약) |
 
-추천곡 상태 흐름: `pending → accepted → playing → played`  
+추천곡 상태 흐름: `pending → accepted → playing → played`
 거절/스킵: `pending/accepted → rejected/skipped`
 
 ---
 
 ## API
 
+### 인증
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/v1/auth/register` | 카페 등록 |
-| POST | `/api/v1/auth/login` | 로그인 (JWT 발급) |
-| POST | `/api/v1/auth/disclaimer` | 저작권 동의 |
+| POST | `/api/v1/auth/google` | Google OAuth 로그인/가입 |
+| GET | `/api/v1/auth/naver` | Naver OAuth 시작 |
+| GET | `/api/v1/auth/naver/callback` | Naver OAuth 콜백 |
+| POST | `/api/v1/auth/complete` | 신규 가입 완료 (카페명 + 약관) |
+
+### 카페 (사장님)
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
 | GET | `/api/v1/cafes/me` | 내 카페 정보 |
+| PUT | `/api/v1/cafes/me` | 카페 이름 변경 |
 | PUT | `/api/v1/cafes/me/status` | 신청 ON/OFF |
-| GET | `/api/v1/cafes/:slug/recommendations` | 최근 7일 추천 목록 |
-| POST | `/api/v1/cafes/:slug/recommendations` | 곡 신청 (손님) |
+| PUT | `/api/v1/cafes/me/notice` | 공지사항 설정 |
+| GET | `/api/v1/cafes/me/stats` | 누적 통계 |
+| GET | `/api/v1/cafes/me/stats/daily` | 일별 통계 |
+| GET | `/api/v1/cafes/me/stats/hourly` | 시간대별 패턴 (최근 30일) |
+| GET | `/api/v1/cafes/me/stats/weekday` | 요일별 패턴 (최근 30일) |
+| GET | `/api/v1/cafes/me/stats/weekday-songs` | 요일별 신청곡 목록 |
+
+### 신청곡 (손님)
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/api/v1/cafes/:slug/recommendations` | 최근 7일 목록 + 공지 + 카페명 |
+| POST | `/api/v1/cafes/:slug/recommendations` | 곡 신청 (중복 방지) |
+| DELETE | `/api/v1/cafes/:slug/recommendations/:id/cancel` | 내 신청 취소 (손님) |
 | PUT | `/api/v1/cafes/:slug/recommendations/:id` | 상태 변경 (사장님) |
-| POST | `/api/v1/cafes/:slug/recommendations/:id/vote` | 추천 투표 |
+| POST | `/api/v1/cafes/:slug/recommendations/:id/vote` | 투표 |
+| DELETE | `/api/v1/cafes/:slug/recommendations/:id/vote` | 투표 취소 |
 | GET | `/api/v1/cafes/:slug/recommendations/top10` | 카페 TOP 10 |
 | GET | `/api/v1/top10` | 전체 카페 통합 TOP 30 |
-| GET/POST | `/api/v1/cafes/:slug/songs/:videoId/comments` | 카페 TOP 댓글 |
-| GET/POST | `/api/v1/songs/:videoId/comments` | 전체 TOP 댓글 |
+
+### 댓글
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET/POST | `/api/v1/songs/:videoId/comments` | TOP 댓글 (전체 공유) |
 | POST | `/api/v1/songs/:videoId/comments/:id/replies` | 대댓글 |
-| GET | `/api/v1/youtube/oembed` | 영상 정보 조회 |
-| GET | `/api/v1/cafes/me/stats` | 전체 통계 |
 
 ---
 
@@ -113,15 +146,32 @@ caffeine-flow/
 
 | 기능 | 설명 |
 |------|------|
-| 곡 신청 | YouTube URL 붙여넣기 → 미리보기 → 신청 |
-| 신청 순번 | 신청 완료 시 "n번째로 대기 중" 안내 |
-| 신청곡 큐 | 순서 번호 표시, 내가 신청한 곡 강조 |
-| 투표 | 👍 추천 (기기별 1회, 중복 방지 UI) |
+| 카페 이름 + 공지 표시 | 페이지 상단에 실시간 표시 |
+| 곡 신청 | YouTube URL → 미리보기 → 신청 (중복 차단) |
+| 내 신청 취소 | 대기 중인 내 신청곡 직접 취소 |
+| 신청 순번 안내 | 신청 완료 시 "n번째로 대기 중" 표시 |
+| 신청곡 큐 | 투표순 정렬, 순서 번호, 내 신청곡 강조 |
+| 투표 토글 | 👍 추천/취소 (기기별 1회, localStorage 기반) |
 | 최근 7일 이력 | 재생/스킵/거절 이력 + 날짜 |
 | 이 카페 TOP 10 | 카페 인기곡 (신청순/추천순 정렬) |
 | 전체 TOP 30 | 전체 카페 통합 인기곡 (카페명 표시) |
 | 댓글 & 대댓글 | TOP 항목별 YouTube 스타일 댓글 |
-| 기기 닉네임 | 자동 생성, localStorage 영구 저장 |
+| 기기 닉네임 | 자동 생성 (한국 카페 감성), localStorage 영구 저장 |
+
+---
+
+## 사장님 기능
+
+| 기능 | 설명 |
+|------|------|
+| Google/Naver OAuth 로그인 | 소셜 로그인, 최초 가입 시 약관 동의 |
+| 카페 이름 변경 | 헤더에서 인라인 편집 |
+| 공지사항 설정 | 실시간으로 손님 화면에 반영 |
+| 신청 ON/OFF | 손님 신청 수락 여부 토글 |
+| 신청곡 관리 | 수락 / 거절 / 재생 / 스킵 / 삭제 |
+| 통계 탭 | 오늘 요약 (클릭 시 곡 목록), 시간대별·요일별 패턴 (클릭 시 곡 목록) |
+| QR 코드 | 손님 접속 QR 생성 및 다운로드 |
+| 문의 | Google/Naver 계정 기반 메일 연결 |
 
 ---
 
@@ -129,13 +179,23 @@ caffeine-flow/
 
 ### 환경 변수 설정
 
-루트 `.env`:
+루트 `.env` (`.env.example` 참고):
 
 ```env
 PORT=3000
-DATABASE_URL=postgresql://postgres:[비밀번호]@[host]/postgres
+DATABASE_URL=postgresql://...
 JWT_SECRET=your-jwt-secret
-YOUTUBE_API_KEY=   # 선택사항 (검색 기능 사용 시)
+GOOGLE_CLIENT_ID=...
+NAVER_CLIENT_ID=...
+NAVER_CLIENT_SECRET=...
+APP_URL=http://localhost:5174
+SERVER_URL=http://localhost:5174
+```
+
+`owner/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=...
+VITE_NAVER_ENABLED=true   # 네이버 준비 완료 시
 ```
 
 ### DB 마이그레이션
@@ -178,11 +238,11 @@ cd server && npm run dev       # 터미널에 카페별 QR 출력
 ## 구현 현황
 
 - [x] Phase 0 — 프로젝트 구조 + DB 마이그레이션
-- [x] Phase 1 — 서버 멀티테넌시 (JWT 인증, REST API, Socket.IO)
+- [x] Phase 1 — 서버 멀티테넌시 (REST API, Socket.IO)
 - [x] Phase 2 — 손님 React 앱
-- [x] Phase 3 — 사장님 React 앱
+- [x] Phase 3 — 사장님 React 앱 (OAuth, 통계, 공지, QR)
 - [ ] Phase 4 — Electron 래퍼 (YouTube WebView)
-- [ ] Phase 5 — 크로스 카페 트렌드
+- [ ] Phase 5 — 크로스 카페 트렌드 / 플랫폼 어드민
 
 ---
 
@@ -193,5 +253,5 @@ cd server && npm run dev       # 터미널에 카페별 QR 출력
 | 서버 | Node.js, Express, Socket.IO, Knex.js |
 | DB | PostgreSQL (Supabase) |
 | 프론트 | React 18, Vite |
-| 인증 | JWT (사장님) / IP + localStorage (손님) |
+| 인증 | Google OAuth 2.0, Naver OAuth 2.0 |
 | 배포 | Railway (서버) + Supabase (DB) |

@@ -20,7 +20,21 @@ router.get('/', async (req, res) => {
   const cafe = await cafeService.findBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   const recs = await recService.getRecommendations(cafe.id);
-  res.json({ recommendations: recs, is_accepting: cafe.is_accepting });
+
+  // 방문 기록 (같은 IP는 하루 1회만)
+  const ip    = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const db    = require('../db/knex');
+  db('cafe_visits')
+    .where({ cafe_id: cafe.id, visitor_ip: ip })
+    .where('visited_at', '>=', today)
+    .first()
+    .then(existing => {
+      if (!existing) db('cafe_visits').insert({ cafe_id: cafe.id, visitor_ip: ip }).catch(() => {});
+    })
+    .catch(() => {});
+
+  res.json({ recommendations: recs, is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name });
 });
 
 // POST /api/v1/cafes/:slug/recommendations  (손님 신청)
@@ -31,6 +45,9 @@ router.post('/', requestLimiter, async (req, res) => {
 
   const { videoId, title, channelTitle, thumbnail, duration, requesterName } = req.body;
   if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
+
+  const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
+  if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
 
   const ip  = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
   const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName });
@@ -44,6 +61,18 @@ router.get('/top10', async (req, res) => {
   const cafe = await cafeService.findBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   res.json(await statsService.getCafeTop10(cafe.id));
+});
+
+// DELETE /api/v1/cafes/:slug/recommendations/:id/cancel  (손님: 내 신청 취소)
+router.delete('/:id/cancel', async (req, res) => {
+  const rec = await recService.findById(req.params.id);
+  if (!rec) return res.status(404).json({ error: '신청곡을 찾을 수 없습니다' });
+  if (!['pending', 'accepted'].includes(rec.status))
+    return res.status(409).json({ error: '이미 처리된 신청곡은 취소할 수 없습니다' });
+
+  await recService.remove(rec.id);
+  broadcast(req, req.params.slug, 'recommendations_update', { action: 'delete', id: rec.id });
+  res.json({ ok: true });
 });
 
 // PUT /api/v1/cafes/:slug/recommendations/:id  (사장님: 상태 변경)
@@ -75,6 +104,14 @@ router.post('/:id/vote', async (req, res) => {
     if (err.code === '23505') return res.status(409).json({ error: '이미 투표했습니다' });
     throw err;
   }
+});
+
+// DELETE /api/v1/cafes/:slug/recommendations/:id/vote
+router.delete('/:id/vote', async (req, res) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  const rec = await recService.unvote(req.params.id, ip);
+  broadcast(req, req.params.slug, 'recommendations_update', { action: 'vote', rec });
+  res.json(rec);
 });
 
 // POST /api/v1/cafes/:slug/recommendations/:id/comments

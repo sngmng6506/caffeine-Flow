@@ -1,5 +1,16 @@
 const db = require('../db/knex');
 
+function generateSlug() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+async function uniqueSlug() {
+  let slug;
+  do { slug = generateSlug(); } while (await findBySlug(slug));
+  return slug;
+}
+
 async function findBySlug(slug) {
   return db('cafes').where({ slug }).first();
 }
@@ -8,9 +19,27 @@ async function findByEmail(email) {
   return db('cafes').where({ owner_email: email }).first();
 }
 
-async function create({ name, slug, ownerEmail, passwordHash }) {
+async function findByGoogleId(googleId) {
+  return db('cafes').where({ google_id: googleId }).first();
+}
+
+async function findByNaverId(naverId) {
+  return db('cafes').where({ naver_id: naverId }).first();
+}
+
+async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedAt, lastLoginAt }) {
+  const slug = await uniqueSlug();
   const [cafe] = await db('cafes')
-    .insert({ name, slug, owner_email: ownerEmail, password_hash: passwordHash })
+    .insert({
+      name,
+      slug,
+      owner_email:            ownerEmail            || null,
+      password_hash:          null,
+      google_id:              googleId              || null,
+      naver_id:               naverId               || null,
+      disclaimer_accepted_at: disclaimerAcceptedAt  || null,
+      last_login_at:          lastLoginAt           || null,
+    })
     .returning('*');
   return cafe;
 }
@@ -20,4 +49,4 @@ async function update(id, data) {
   return cafe;
 }
 
-module.exports = { findBySlug, findByEmail, create, update };
+module.exports = { findBySlug, findByEmail, findByGoogleId, findByNaverId, create, update };

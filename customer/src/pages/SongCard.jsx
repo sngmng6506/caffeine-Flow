@@ -1,21 +1,38 @@
 import { useState } from 'react';
-import { vote } from '../api';
-import { hasVoted, markVoted } from '../votedSongs';
+import { vote, unvote, cancelRecommendation } from '../api';
+import { hasVoted, markVoted, removeVote } from '../votedSongs';
 
-export default function SongCard({ slug, rec, onUpdate, showDate, position, isMyRequest }) {
+const statusLabel = { pending: '대기', accepted: '수락', playing: '재생 중', played: '완료', rejected: '거절', skipped: '스킵' };
+const statusColor = { pending: '#888', accepted: '#4caf50', playing: '#2196f3', played: '#9e9e9e', rejected: '#f44336', skipped: '#ff9800' };
+
+export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, position, isMyRequest }) {
   const [error, setError] = useState('');
   const voted = hasVoted(slug, rec.id);
+  const cancellable = isMyRequest && (rec.status === 'pending' || rec.status === 'accepted');
 
-  const statusLabel = { pending: '대기', accepted: '수락', playing: '재생 중', played: '완료', rejected: '거절', skipped: '스킵' };
-  const statusColor = { pending: '#888', accepted: '#4caf50', playing: '#2196f3', played: '#9e9e9e', rejected: '#f44336', skipped: '#ff9800' };
-
-  async function handleVote() {
-    if (voted) return;
+  async function handleCancel() {
+    if (!window.confirm('신청을 취소하시겠습니까?')) return;
     setError('');
     try {
-      const updated = await vote(slug, rec.id);
-      markVoted(slug, rec.id);
-      onUpdate(updated);
+      await cancelRecommendation(slug, rec.id);
+      onDelete?.(rec.id);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleVote() {
+    setError('');
+    try {
+      if (voted) {
+        const updated = await unvote(slug, rec.id);
+        removeVote(slug, rec.id);
+        onUpdate(updated);
+      } else {
+        const updated = await vote(slug, rec.id);
+        markVoted(slug, rec.id);
+        onUpdate(updated);
+      }
     } catch (e) {
       setError(e.message);
     }
@@ -42,9 +59,12 @@ export default function SongCard({ slug, rec, onUpdate, showDate, position, isMy
         }
 
         <div style={styles.actions}>
-          <button onClick={handleVote} disabled={voted} style={{ ...styles.voteBtn, ...(voted ? styles.votedBtn : {}) }}>
+          <button onClick={handleVote} style={{ ...styles.voteBtn, ...(voted ? styles.votedBtn : {}) }}>
             👍 {rec.vote_count}
           </button>
+          {cancellable && (
+            <button onClick={handleCancel} style={styles.cancelBtn}>신청 취소</button>
+          )}
         </div>
 
         {error && <div style={styles.error}>{error}</div>}
@@ -66,6 +86,7 @@ const styles = {
   requester:   { fontSize: 11, color: '#aaa', marginTop: 2 },
   actions:     { display: 'flex', gap: 8, marginTop: 8 },
   voteBtn:     { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' },
-  votedBtn:    { background: '#f0f0f0', color: '#aaa', cursor: 'default', border: '1px solid #eee' },
+  votedBtn:    { background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', fontWeight: 700 },
+  cancelBtn:   { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer' },
   error:       { fontSize: 12, color: '#e63946', marginTop: 4 },
 };
