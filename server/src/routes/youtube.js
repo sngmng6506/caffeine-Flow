@@ -1,6 +1,5 @@
 const router = require('express').Router();
 const axios  = require('axios');
-const { YOUTUBE_API_KEY } = require('../config');
 
 function extractVideoId(url) {
   try {
@@ -10,6 +9,7 @@ function extractVideoId(url) {
   } catch {}
   return null;
 }
+
 
 function formatDuration(iso) {
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -30,14 +30,6 @@ router.get('/oembed', async (req, res) => {
       params: { url: `https://www.youtube.com/watch?v=${videoId}`, format: 'json' },
     });
 
-    if (YOUTUBE_API_KEY) {
-      const { data: vData } = await axios.get('https://www.googleapis.com/youtube/v3/videos', {
-        params: { part: 'contentDetails', id: videoId, key: YOUTUBE_API_KEY },
-      });
-      const dur = vData.items?.[0]?.contentDetails?.duration;
-      if (!dur || dur === 'P0D')
-        return res.status(400).json({ error: '라이브 영상은 신청할 수 없습니다' });
-    }
 
     res.json({
       videoId,

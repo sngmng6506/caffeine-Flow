@@ -44,4 +44,25 @@ async function getDailyStats(cafeId, dateStr) {
   };
 }
 
-module.exports = { getStats, getDailyStats };
+async function getCafeTop10(cafeId, limit = 10) {
+  return db('recommendations')
+    .where({ cafe_id: cafeId })
+    .select('video_id', 'title', 'channel_title', 'thumbnail')
+    .count('id as count')
+    .sum('vote_count as total_votes')
+    .groupBy('video_id', 'title', 'channel_title', 'thumbnail')
+    .orderBy('count', 'desc')
+    .limit(limit);
+}
+
+async function getGlobalTop10(limit = 10) {
+  return db('recommendations')
+    .select('video_id', 'title', 'channel_title', 'thumbnail')
+    .count('id as count')
+    .sum('vote_count as total_votes')
+    .groupBy('video_id', 'title', 'channel_title', 'thumbnail')
+    .orderBy('count', 'desc')
+    .limit(limit);
+}
+
+module.exports = { getStats, getDailyStats, getCafeTop10, getGlobalTop10 };

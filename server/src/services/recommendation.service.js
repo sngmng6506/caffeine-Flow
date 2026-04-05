@@ -1,15 +1,18 @@
 const db = require('../db/knex');
 
-function todayRange() {
-  const start = new Date(); start.setHours(0, 0, 0, 0);
-  const end   = new Date(); end.setHours(23, 59, 59, 999);
+function lastSevenDaysRange() {
+  const end   = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
   return [start, end];
 }
 
 async function getRecommendations(cafeId) {
   return db('recommendations')
     .where({ cafe_id: cafeId })
-    .whereBetween('requested_at', todayRange())
+    .whereBetween('requested_at', lastSevenDaysRange())
     .orderBy('vote_count', 'desc')
     .orderBy('requested_at', 'asc');
 }

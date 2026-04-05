@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { getOembed, postRecommendation } from '../api';
+import { getDeviceName } from '../deviceName';
 
 export default function RecommendForm({ slug, onAdded }) {
   const [url, setUrl] = useState('');
-  const [name, setName] = useState('');
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -30,15 +30,14 @@ export default function RecommendForm({ slug, onAdded }) {
     setError('');
     try {
       const rec = await postRecommendation(slug, {
-        videoId:      preview.videoId,
-        title:        preview.title,
-        channelTitle: preview.channelTitle,
-        thumbnail:    preview.thumbnail,
-        requesterName: name || undefined,
+        videoId:       preview.videoId,
+        title:         preview.title,
+        channelTitle:  preview.channelTitle,
+        thumbnail:     preview.thumbnail,
+        requesterName: getDeviceName(),
       });
       onAdded(rec);
       setUrl('');
-      setName('');
       setPreview(null);
       setStep('input');
     } catch (e) {
@@ -58,13 +57,6 @@ export default function RecommendForm({ slug, onAdded }) {
             <div style={styles.channel}>{preview.channelTitle}</div>
           </div>
         </div>
-        <input
-          placeholder="닉네임 (선택)"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          style={styles.input}
-          maxLength={20}
-        />
         {error && <div style={styles.error}>{error}</div>}
         <div style={styles.btnRow}>
           <button onClick={() => setStep('input')} style={styles.cancelBtn}>취소</button>

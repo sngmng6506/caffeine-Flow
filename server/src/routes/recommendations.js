@@ -1,8 +1,9 @@
 const router    = require('express').Router({ mergeParams: true });
 const rateLimit = require('express-rate-limit');
 const { requireAuth, requireCafeOwner } = require('../middleware/auth');
-const cafeService = require('../services/cafe.service');
-const recService  = require('../services/recommendation.service');
+const cafeService   = require('../services/cafe.service');
+const recService    = require('../services/recommendation.service');
+const statsService  = require('../services/stats.service');
 
 const requestLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -36,6 +37,13 @@ router.post('/', requestLimiter, async (req, res) => {
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });
   res.status(201).json(rec);
+});
+
+// GET /api/v1/cafes/:slug/recommendations/top10
+router.get('/top10', async (req, res) => {
+  const cafe = await cafeService.findBySlug(req.params.slug);
+  if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
+  res.json(await statsService.getCafeTop10(cafe.id));
 });
 
 // PUT /api/v1/cafes/:slug/recommendations/:id  (사장님: 상태 변경)

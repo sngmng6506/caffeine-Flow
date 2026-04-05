@@ -26,3 +26,22 @@ export const postComment = (slug, id, body) =>
 
 export const getOembed = (url) =>
   apiFetch('GET', `/youtube/oembed?url=${encodeURIComponent(url)}`);
+
+export const getCafeTop10 = (slug) =>
+  apiFetch('GET', `/cafes/${slug}/recommendations/top10`);
+
+export const getGlobalTop10 = () =>
+  apiFetch('GET', `/top10`);
+
+export const getSongComments = (videoId) =>
+  apiFetch('GET', `/songs/${videoId}/comments`);
+
+export const postSongComment = (videoId, slug = null, body) =>
+  slug
+    ? apiFetch('POST', `/cafes/${slug}/songs/${videoId}/comments`, body)
+    : apiFetch('POST', `/songs/${videoId}/comments`, body);
+
+export const postSongReply = (videoId, commentId, slug = null, body) =>
+  slug
+    ? apiFetch('POST', `/cafes/${slug}/songs/${videoId}/comments/${commentId}/replies`, body)
+    : apiFetch('POST', `/songs/${videoId}/comments/${commentId}/replies`, body);
