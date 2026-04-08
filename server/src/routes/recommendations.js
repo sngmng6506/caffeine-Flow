@@ -8,8 +8,10 @@ const statsService  = require('../services/stats.service');
 const requestLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 3,
-  message: { error: '잠시 후 다시 신청해주세요 (1분에 3곡 제한)' },
+  message: { error: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' },
 });
+
+const MAX_QUEUE_SIZE = 30;
 
 function broadcast(req, slug, event, data) {
   req.app.get('io')?.of('/cafe').to(slug).emit(event, data);
@@ -41,13 +43,17 @@ router.get('/', async (req, res) => {
 router.post('/', requestLimiter, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
-  if (!cafe.is_accepting) return res.status(403).json({ error: '현재 신청을 받지 않습니다' });
+  if (!cafe.is_accepting) return res.status(403).json({ error: '현재 추천을 받지 않습니다' });
 
   const { videoId, title, channelTitle, thumbnail, duration, requesterName } = req.body;
   if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
 
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
   if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
+
+  const queueCount = await recService.countActive(cafe.id);
+  if (queueCount >= MAX_QUEUE_SIZE)
+    return res.status(429).json({ error: `대기열이 가득 찼습니다 (최대 ${MAX_QUEUE_SIZE}곡)` });
 
   const ip  = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
   const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName });
@@ -56,19 +62,20 @@ router.post('/', requestLimiter, async (req, res) => {
   res.status(201).json(rec);
 });
 
-// GET /api/v1/cafes/:slug/recommendations/top10
+// GET /api/v1/cafes/:slug/recommendations/top10?offset=0
 router.get('/top10', async (req, res) => {
-  const cafe = await cafeService.findBySlug(req.params.slug);
+  const cafe   = await cafeService.findBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
-  res.json(await statsService.getCafeTop10(cafe.id));
+  const offset = parseInt(req.query.offset) || 0;
+  res.json(await statsService.getCafeTop10(cafe.id, offset));
 });
 
 // DELETE /api/v1/cafes/:slug/recommendations/:id/cancel  (손님: 내 신청 취소)
 router.delete('/:id/cancel', async (req, res) => {
   const rec = await recService.findById(req.params.id);
-  if (!rec) return res.status(404).json({ error: '신청곡을 찾을 수 없습니다' });
+  if (!rec) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
   if (!['pending', 'accepted'].includes(rec.status))
-    return res.status(409).json({ error: '이미 처리된 신청곡은 취소할 수 없습니다' });
+    return res.status(409).json({ error: '이미 처리된 추천곡은 취소할 수 없습니다' });
 
   await recService.remove(rec.id);
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'delete', id: rec.id });

@@ -44,25 +44,33 @@ async function getDailyStats(cafeId, dateStr) {
   };
 }
 
-async function getCafeTop10(cafeId, limit = 10) {
-  return db('recommendations')
+const TOP_PAGE_SIZE = 10;
+
+async function getCafeTop10(cafeId, offset = 0) {
+  const items = await db('recommendations')
     .where({ cafe_id: cafeId })
     .select('video_id', 'title', 'channel_title', 'thumbnail')
     .count('id as count')
     .sum('vote_count as total_votes')
     .groupBy('video_id', 'title', 'channel_title', 'thumbnail')
     .orderBy('count', 'desc')
-    .limit(limit);
+    .limit(TOP_PAGE_SIZE + 1)
+    .offset(offset);
+
+  return { items: items.slice(0, TOP_PAGE_SIZE), hasMore: items.length > TOP_PAGE_SIZE };
 }
 
-async function getGlobalTop10(limit = 10) {
-  return db('recommendations')
+async function getGlobalTop10(offset = 0) {
+  const items = await db('recommendations')
     .select('video_id', 'title', 'channel_title', 'thumbnail')
     .count('id as count')
     .sum('vote_count as total_votes')
     .groupBy('video_id', 'title', 'channel_title', 'thumbnail')
     .orderBy('count', 'desc')
-    .limit(limit);
+    .limit(TOP_PAGE_SIZE + 1)
+    .offset(offset);
+
+  return { items: items.slice(0, TOP_PAGE_SIZE), hasMore: items.length > TOP_PAGE_SIZE };
 }
 
 function since30Days() {

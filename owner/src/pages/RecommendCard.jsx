@@ -24,7 +24,7 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete }) {
     }
   }
 
-  const isActive = rec.status === 'pending' || rec.status === 'accepted';
+  const isActive = rec.status === 'pending' || rec.status === 'accepted' || rec.status === 'playing';
 
   return (
     <div style={styles.card}>
@@ -33,7 +33,7 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete }) {
         <div style={styles.title}>{rec.title}</div>
         <div style={styles.meta}>
           {rec.channel_title}{rec.duration && ` · ${rec.duration}`}
-          {rec.requester_name && ` · 신청: ${rec.requester_name}`}
+          {rec.requester_name && ` · 추천: ${rec.requester_name}`}
           <span style={{ ...styles.status, color: STATUS_COLOR[rec.status] }}> · {STATUS_LABEL[rec.status]}</span>
         </div>
         <div style={styles.meta}>👍 {rec.vote_count}표</div>
@@ -46,9 +46,11 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete }) {
             {rec.status === 'accepted' && (
               <button onClick={() => handle('playing')} disabled={loading} style={{ ...styles.btn, background: '#2196f3' }}>재생</button>
             )}
-            <button onClick={() => handle('skipped')}  disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
-            <button onClick={() => handle('rejected')} disabled={loading} style={{ ...styles.btn, background: '#f44336' }}>거절</button>
-            <button onClick={() => handle('delete')}   disabled={loading} style={{ ...styles.btn, background: '#eee', color: '#333' }}>삭제</button>
+            {rec.status === 'playing' && (
+              <button onClick={() => handle('played')} disabled={loading} style={{ ...styles.btn, background: '#9e9e9e' }}>완료</button>
+            )}
+            <button onClick={() => handle('skipped')} disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
+            <button onClick={() => handle('delete')}  disabled={loading} style={{ ...styles.btn, background: '#eee', color: '#333' }}>삭제</button>
           </div>
         )}
       </div>

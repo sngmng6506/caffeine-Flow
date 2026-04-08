@@ -32,7 +32,8 @@ app.use('/api/v1/songs/:videoId/comments',             require('./src/routes/son
 
 // GET /api/v1/top10  (전체 카페 통합 TOP10, 인증 불필요)
 app.get('/api/v1/top10', async (req, res) => {
-  res.json(await require('./src/services/stats.service').getGlobalTop10(30));
+  const offset = parseInt(req.query.offset) || 0;
+  res.json(await require('./src/services/stats.service').getGlobalTop10(offset));
 });
 
 // Health check

@@ -32,6 +32,8 @@ export const getRecommendations = (slug) => apiFetch('GET',    `/cafes/${slug}/r
 export const updateRec          = (slug, id, status) => apiFetch('PUT', `/cafes/${slug}/recommendations/${id}`, { status });
 export const deleteRec          = (slug, id) => apiFetch('DELETE', `/cafes/${slug}/recommendations/${id}`);
 
+export const getHistory      = (offset = 0, date = null) =>
+  apiFetch('GET', `/cafes/me/history?offset=${offset}${date ? `&date=${date}` : ''}`);
 export const getStats        = () => apiFetch('GET', '/cafes/me/stats');
 export const getDailyStats   = (date) => apiFetch('GET', `/cafes/me/stats/daily?date=${date}`);
 export const getHourlyStats     = () => apiFetch('GET', '/cafes/me/stats/hourly');

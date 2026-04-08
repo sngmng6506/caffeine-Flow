@@ -19,6 +19,7 @@ router.get('/me', requireAuth, async (req, res) => {
 router.put('/me', requireAuth, async (req, res) => {
   const { name } = req.body;
   const cafe = await cafeService.update(req.owner.cafeId, { name });
+  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('cafe_updated', { cafe_name: cafe.name });
   res.json(safeCafe(cafe));
 });
 
@@ -34,7 +35,28 @@ router.put('/me/notice', requireAuth, async (req, res) => {
 router.put('/me/status', requireAuth, async (req, res) => {
   const { is_accepting } = req.body;
   const cafe = await cafeService.update(req.owner.cafeId, { is_accepting });
+  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('system_toggled', { is_accepting: cafe.is_accepting });
   res.json({ is_accepting: cafe.is_accepting });
+});
+
+// GET /api/v1/cafes/me/history?offset=0&date=YYYY-MM-DD
+router.get('/me/history', requireAuth, async (req, res) => {
+  const db     = require('../db/knex');
+  const offset = parseInt(req.query.offset) || 0;
+  const limit  = 20;
+  let query = db('recommendations')
+    .where({ cafe_id: req.owner.cafeId })
+    .whereIn('status', ['played', 'skipped', 'rejected'])
+    .orderBy('requested_at', 'desc');
+
+  if (req.query.date) {
+    const start = new Date(req.query.date + 'T00:00:00.000Z');
+    const end   = new Date(req.query.date + 'T23:59:59.999Z');
+    query = query.whereBetween('requested_at', [start, end]);
+  }
+
+  const items = await query.limit(limit + 1).offset(offset);
+  res.json({ items: items.slice(0, limit), hasMore: items.length > limit });
 });
 
 // GET /api/v1/cafes/me/stats

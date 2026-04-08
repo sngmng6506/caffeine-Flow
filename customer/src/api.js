@@ -30,11 +30,11 @@ export const cancelRecommendation = (slug, id) =>
 export const getOembed = (url) =>
   apiFetch('GET', `/youtube/oembed?url=${encodeURIComponent(url)}`);
 
-export const getCafeTop10 = (slug) =>
-  apiFetch('GET', `/cafes/${slug}/recommendations/top10`);
+export const getCafeTop10   = (slug, offset = 0) =>
+  apiFetch('GET', `/cafes/${slug}/recommendations/top10?offset=${offset}`);
 
-export const getGlobalTop10 = () =>
-  apiFetch('GET', `/top10`);
+export const getGlobalTop10 = (offset = 0) =>
+  apiFetch('GET', `/top10?offset=${offset}`);
 
 export const getSongComments = (videoId) =>
   apiFetch('GET', `/songs/${videoId}/comments`);

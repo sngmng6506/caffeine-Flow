@@ -11,7 +11,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
   const cancellable = isMyRequest && (rec.status === 'pending' || rec.status === 'accepted');
 
   async function handleCancel() {
-    if (!window.confirm('신청을 취소하시겠습니까?')) return;
+    if (!window.confirm('추천을 취소하시겠습니까?')) return;
     setError('');
     try {
       await cancelRecommendation(slug, rec.id);
@@ -54,8 +54,8 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
           </div>
         )}
         {isMyRequest
-          ? <div style={styles.myRequest}>내가 신청한 곡</div>
-          : rec.requester_name && <div style={styles.requester}>신청: {rec.requester_name}</div>
+          ? <div style={styles.myRequest}>내가 추천한 곡</div>
+          : rec.requester_name && <div style={styles.requester}>추천: {rec.requester_name}</div>
         }
 
         <div style={styles.actions}>
@@ -63,7 +63,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
             👍 {rec.vote_count}
           </button>
           {cancellable && (
-            <button onClick={handleCancel} style={styles.cancelBtn}>신청 취소</button>
+            <button onClick={handleCancel} style={styles.cancelBtn}>추천 취소</button>
           )}
         </div>
 

@@ -6,12 +6,14 @@ import NowPlaying from './NowPlaying';
 import RecommendForm from './RecommendForm';
 import SongCard from './SongCard';
 
-const TABS = [
-  { id: 'queue',     label: '신청곡' },
-  { id: 'history',  label: '최근 7일 이력' },
-  { id: 'cafeTop',  label: '이 카페 TOP 10' },
-  { id: 'globalTop', label: '전체 TOP 30' },
-];
+function getTabs(cafeName) {
+  return [
+    { id: 'queue',     label: '추천곡' },
+    { id: 'history',  label: '최근 7일 이력' },
+    { id: 'cafeTop',  label: cafeName ? `${cafeName} TOP` : '카페 TOP' },
+    { id: 'globalTop', label: '전체 TOP' },
+  ];
+}
 
 export default function CafePage({ slug }) {
   const [recs, setRecs] = useState([]);
@@ -21,11 +23,15 @@ export default function CafePage({ slug }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('queue');
-  const [cafeTop, setCafeTop] = useState(null);
-  const [globalTop, setGlobalTop] = useState(null);
+  const [cafeTop, setCafeTop]       = useState([]);
+  const [cafeTopHasMore, setCafeTopHasMore] = useState(false);
+  const [globalTop, setGlobalTop]   = useState([]);
+  const [globalTopHasMore, setGlobalTopHasMore] = useState(false);
   const [topLoading, setTopLoading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
+  const [topLoaded, setTopLoaded]   = useState({ cafeTop: false, globalTop: false });
+  const [successMsg, setSuccessMsg]     = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
+  const [historyLimit, setHistoryLimit] = useState(10);
   const deviceName = getDeviceName();
 
   const nowPlaying = recs.find(r => r.status === 'playing') || null;
@@ -47,6 +53,20 @@ export default function CafePage({ slug }) {
 
     const socket = getSocket(slug);
 
+    let connected = false;
+    socket.on('connect', () => {
+      if (!connected) { connected = true; return; }
+      // 재연결 시 놓친 업데이트 복구
+      getRecommendations(slug)
+        .then(({ recommendations, is_accepting, notice, cafe_name }) => {
+          setRecs(recommendations);
+          setIsAccepting(is_accepting);
+          setNotice(notice);
+          setCafeName(cafe_name);
+        })
+        .catch(() => {});
+    });
+
     socket.on('recommendations_update', ({ action, rec, id }) => {
       if (action === 'add')    setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
       if (action === 'update' || action === 'vote') setRecs(prev => prev.map(r => r.id === rec.id ? rec : r));
@@ -55,26 +75,43 @@ export default function CafePage({ slug }) {
 
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
     socket.on('notice_updated', ({ notice }) => setNotice(notice));
+    socket.on('cafe_updated',   ({ cafe_name }) => setCafeName(cafe_name));
 
     return () => disconnectSocket();
   }, [slug]);
 
   useEffect(() => {
-    if (tab === 'cafeTop' && cafeTop === null) {
+    if (tab === 'cafeTop' && !topLoaded.cafeTop) {
       setTopLoading(true);
-      getCafeTop10(slug)
-        .then(setCafeTop)
-        .catch(() => setCafeTop([]))
+      getCafeTop10(slug, 0)
+        .then(({ items, hasMore }) => { setCafeTop(items); setCafeTopHasMore(hasMore); setTopLoaded(p => ({ ...p, cafeTop: true })); })
+        .catch(() => {})
         .finally(() => setTopLoading(false));
     }
-    if (tab === 'globalTop' && globalTop === null) {
+    if (tab === 'globalTop' && !topLoaded.globalTop) {
       setTopLoading(true);
-      getGlobalTop10()
-        .then(setGlobalTop)
-        .catch(() => setGlobalTop([]))
+      getGlobalTop10(0)
+        .then(({ items, hasMore }) => { setGlobalTop(items); setGlobalTopHasMore(hasMore); setTopLoaded(p => ({ ...p, globalTop: true })); })
+        .catch(() => {})
         .finally(() => setTopLoading(false));
     }
   }, [tab]);
+
+  async function loadMoreTop() {
+    setTopLoading(true);
+    try {
+      if (tab === 'cafeTop') {
+        const { items, hasMore } = await getCafeTop10(slug, cafeTop.length);
+        setCafeTop(prev => [...prev, ...items]);
+        setCafeTopHasMore(hasMore);
+      } else {
+        const { items, hasMore } = await getGlobalTop10(globalTop.length);
+        setGlobalTop(prev => [...prev, ...items]);
+        setGlobalTopHasMore(hasMore);
+      }
+    } catch {}
+    setTopLoading(false);
+  }
 
   function handleUpdate(updated) {
     setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
@@ -99,7 +136,7 @@ export default function CafePage({ slug }) {
     <div style={styles.page}>
       {cafeName && <h2 style={styles.cafeName}>{cafeName}</h2>}
       {notice && <div style={styles.notice}>📢 {notice}</div>}
-      {!isAccepting && <div style={styles.closed}>현재 신청을 받지 않습니다</div>}
+      {!isAccepting && <div style={styles.closed}>현재 추천을 받지 않습니다</div>}
 
       <NowPlaying rec={nowPlaying} />
 
@@ -115,7 +152,7 @@ export default function CafePage({ slug }) {
       {successMsg && <div style={styles.successMsg}>{successMsg}</div>}
 
       <div style={styles.tabBar}>
-        {TABS.map(t => (
+        {getTabs(cafeName).map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -138,22 +175,27 @@ export default function CafePage({ slug }) {
             </section>
           )}
           {queue.length === 0 && (
-            <div style={styles.empty}>대기 중인 신청곡이 없습니다.<br />첫 번째 곡을 추천해보세요!</div>
+            <div style={styles.empty}>대기 중인 추천곡이 없습니다.<br />첫 번째 곡을 추천해보세요!</div>
           )}
         </>
       )}
 
       {tab === 'history' && (
         <>
+          {history.length === 0 && (
+            <div style={styles.empty}>최근 7일 재생 이력이 없습니다.</div>
+          )}
           {history.length > 0 && (
             <section>
-              {history.map(r => (
+              {history.slice(0, historyLimit).map(r => (
                 <SongCard key={r.id} slug={slug} rec={r} onUpdate={handleUpdate} showDate />
               ))}
+              {historyLimit < history.length && (
+                <button onClick={() => setHistoryLimit(p => p + 10)} style={styles.loadMoreBtn}>
+                  더 보기 ({history.length - historyLimit}개 남음)
+                </button>
+              )}
             </section>
-          )}
-          {history.length === 0 && (
-            <div style={styles.empty}>이번 주 재생 이력이 없습니다.</div>
           )}
         </>
       )}
@@ -161,20 +203,26 @@ export default function CafePage({ slug }) {
       {(tab === 'cafeTop' || tab === 'globalTop') && (
         <Top10List
           items={tab === 'cafeTop' ? cafeTop : globalTop}
+          hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}
           loading={topLoading}
           slug={tab === 'cafeTop' ? slug : null}
+          onLoadMore={loadMoreTop}
         />
       )}
+      <footer style={styles.footer}>
+        <span style={styles.footerLabel}>dev info</span>
+        <span style={styles.footerLink}>github.com/sngmng6506</span>
+      </footer>
     </div>
   );
 }
 
-function Top10List({ items, loading, slug }) {
+function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
   const [expanded, setExpanded] = useState(null);
   const [sortBy, setSortBy] = useState('count'); // 'count' | 'votes'
 
-  if (loading || items === null) return <div style={styles.center}>불러오는 중...</div>;
-  if (items.length === 0) return <div style={styles.empty}>아직 데이터가 없습니다.</div>;
+  if (loading && items.length === 0) return <div style={styles.center}>불러오는 중...</div>;
+  if (!loading && items.length === 0) return <div style={styles.empty}>아직 데이터가 없습니다.</div>;
 
   const sorted = [...items].sort((a, b) => {
     if (sortBy === 'votes') {
@@ -189,7 +237,7 @@ function Top10List({ items, loading, slug }) {
   return (
     <>
       <div style={styles.sortBar}>
-        <button onClick={() => setSortBy('count')} style={{ ...styles.sortBtn, ...(sortBy === 'count' ? styles.sortActive : {}) }}>신청순</button>
+        <button onClick={() => setSortBy('count')} style={{ ...styles.sortBtn, ...(sortBy === 'count' ? styles.sortActive : {}) }}>추천순</button>
         <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>추천순</button>
       </div>
     <ol style={styles.rankList}>
@@ -203,7 +251,7 @@ function Top10List({ items, loading, slug }) {
             <img src={item.thumbnail} alt="" style={styles.thumb} />
             <div style={styles.rankInfo}>
               <div style={styles.rankTitle}>{item.title}</div>
-              <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 신청 · 👍 {item.total_votes || 0}</div>
+              <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 추천 · 👍 {item.total_votes || 0}</div>
             </div>
             <span style={styles.chevron}>{expanded === item.video_id ? '▲' : '▼'}</span>
           </div>
@@ -213,6 +261,11 @@ function Top10List({ items, loading, slug }) {
         </li>
       ))}
     </ol>
+    {hasMore && (
+      <button onClick={onLoadMore} disabled={loading} style={styles.loadMoreBtn}>
+        {loading ? '불러오는 중...' : '더 보기'}
+      </button>
+    )}
     </>
   );
 }
@@ -373,6 +426,7 @@ const styles = {
   sectionTitle:{ fontSize: 15, fontWeight: 700, margin: '0 0 8px 0', color: '#333' },
   empty:       { textAlign: 'center', color: '#aaa', padding: '40px 0', lineHeight: 1.8 },
   center:      { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' },
+  loadMoreBtn:    { width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#555' },
   sortBar:        { display: 'flex', gap: 6, marginBottom: 12 },
   sortBtn:        { padding: '5px 14px', borderRadius: 18, border: '1px solid #ddd', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#888' },
   sortActive:     { background: '#1a1a2e', color: '#fff', border: '1px solid #1a1a2e', fontWeight: 600 },
@@ -406,5 +460,8 @@ const styles = {
   replyBtn:       { fontSize: 12, fontWeight: 600, color: '#555', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', marginTop: 2 },
   replyForm:      { marginTop: 8 },
   replies:        { marginTop: 8, paddingLeft: 16, borderLeft: '2px solid #eee' },
+  footer:         { marginTop: 40, paddingBottom: 24, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 },
+  footerLabel:    { fontSize: 10, color: '#ddd', fontFamily: 'monospace' },
+  footerLink:     { fontSize: 11, color: '#ccc', fontFamily: 'monospace' },
   replyItem:      { marginTop: 8 },
 };

@@ -28,6 +28,15 @@ async function findActiveByVideoId(cafeId, videoId) {
     .first();
 }
 
+async function countActive(cafeId) {
+  const row = await db('recommendations')
+    .where({ cafe_id: cafeId })
+    .whereIn('status', ['pending', 'accepted', 'playing'])
+    .count('id as n')
+    .first();
+  return parseInt(row.n);
+}
+
 async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, requesterIp, requesterName }) {
   const [rec] = await db('recommendations')
     .insert({
@@ -85,4 +94,4 @@ async function addComment(recommendationId, { commenterIp, commenterName, body }
   return comment;
 }
 
-module.exports = { getRecommendations, findById, findActiveByVideoId, add, updateStatus, remove, vote, unvote, addComment };
+module.exports = { getRecommendations, findById, findActiveByVideoId, countActive, add, updateStatus, remove, vote, unvote, addComment };

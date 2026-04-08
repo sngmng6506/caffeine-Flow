@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs } from '../api';
+import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getStats } from '../api';
 
 const STATUS_FILTER = {
-  신청: () => true,
   재생: r => r.status === 'played',
   스킵: r => r.status === 'skipped',
-  거절: r => r.status === 'rejected',
 };
 
 export default function StatsPanel() {
@@ -13,6 +11,7 @@ export default function StatsPanel() {
   const [todayRecs, setTodayRecs] = useState([]);
   const [hourly, setHourly]       = useState(null);
   const [weekday, setWeekday]     = useState(null);
+  const [topSongs, setTopSongs]   = useState(null);
   const [selected, setSelected]         = useState(null);
   const [selectedHour, setSelectedHour] = useState(null);
   const [selectedWeekday, setSelectedWeekday] = useState(null); // { index, label, recs, loading }
@@ -24,17 +23,17 @@ export default function StatsPanel() {
       getDailyStats(date),
       getHourlyStats(),
       getWeekdayStats(),
-    ]).then(([t, h, w]) => {
+      getStats(),
+    ]).then(([t, h, w, st]) => {
       setTodayRecs(t.byHour.flat());
       setToday(t);
       setHourly(h);
       setWeekday(w);
+      setTopSongs(st.topSongs || []);
     }).catch(console.error);
   }, []);
 
-  if (!today || !hourly || !weekday) return <div style={s.loading}>불러오는 중...</div>;
-
-  const rejected = today.total - today.played - today.skipped;
+  if (!today || !hourly || !weekday || !topSongs) return <div style={s.loading}>불러오는 중...</div>;
 
   function handleCardClick(label) {
     setSelected(prev => prev === label ? null : label);
@@ -48,10 +47,8 @@ export default function StatsPanel() {
       <Section title="오늘 요약">
         <div style={s.summaryGrid}>
           {[
-            { label: '신청', value: today.total,   color: '#2196f3' },
             { label: '재생', value: today.played,  color: '#2196f3' },
             { label: '스킵', value: today.skipped, color: '#2196f3' },
-            { label: '거절', value: rejected,      color: '#2196f3' },
           ].map(({ label, value, color }) => (
             <SummaryCard
               key={label}
@@ -69,8 +66,8 @@ export default function StatsPanel() {
         )}
       </Section>
 
-      {/* ── 시간대별 신청 패턴 ── */}
-      <Section title="시간대별 신청 패턴" sub="최근 30일 기준">
+      {/* ── 시간대별 추천 패턴 ── */}
+      <Section title="시간대별 추천 패턴" sub="최근 30일 기준">
         <BarChart
           data={hourly}
           labelKey="hour"
@@ -89,8 +86,8 @@ export default function StatsPanel() {
         )}
       </Section>
 
-      {/* ── 요일별 신청 패턴 ── */}
-      <Section title="요일별 신청 패턴" sub="최근 30일 기준">
+      {/* ── 요일별 추천 패턴 ── */}
+      <Section title="요일별 추천 패턴" sub="최근 30일 기준">
         <BarChart
           data={weekday}
           labelKey="day"
@@ -117,12 +114,33 @@ export default function StatsPanel() {
               />
         )}
       </Section>
+
+      {/* ── 인기곡 TOP 10 ── */}
+      <Section title="인기곡 TOP 10" sub="누적 재생 기준">
+        {topSongs.length === 0
+          ? <div style={s.listEmpty}>아직 재생된 곡이 없습니다.</div>
+          : (
+            <div style={s.songList}>
+              {topSongs.map((song, i) => (
+                <div key={song.video_id} style={s.songItem}>
+                  <span style={s.songIdx}>{i + 1}</span>
+                  <img src={song.thumbnail} alt="" style={s.songThumb} />
+                  <div style={s.songInfo}>
+                    <div style={s.songTitle}>{song.title}</div>
+                    <div style={s.songMeta}>{song.channel_title} · {song.count}회</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </Section>
     </div>
   );
 }
 
 function SongList({ recs, label }) {
-  if (recs.length === 0) return <div style={s.listEmpty}>{label} 신청된 곡이 없습니다.</div>;
+  if (recs.length === 0) return <div style={s.listEmpty}>{label} 추천된 곡이 없습니다.</div>;
 
   return (
     <div style={s.songList}>
