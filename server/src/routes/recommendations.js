@@ -45,7 +45,7 @@ router.post('/', requestLimiter, async (req, res) => {
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   if (!cafe.is_accepting) return res.status(403).json({ error: '현재 추천을 받지 않습니다' });
 
-  const { videoId, title, channelTitle, thumbnail, duration, requesterName } = req.body;
+  const { videoId, title, channelTitle, thumbnail, duration, requesterName, platform = 'youtube' } = req.body;
   if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
 
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
@@ -56,7 +56,7 @@ router.post('/', requestLimiter, async (req, res) => {
     return res.status(429).json({ error: `대기열이 가득 찼습니다 (최대 ${MAX_QUEUE_SIZE}곡)` });
 
   const ip  = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
-  const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName });
+  const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform });
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });
   res.status(201).json(rec);

@@ -28,7 +28,7 @@ export const cancelRecommendation = (slug, id) =>
   apiFetch('DELETE', `/cafes/${slug}/recommendations/${id}/cancel`);
 
 export const getOembed = (url) =>
-  apiFetch('GET', `/youtube/oembed?url=${encodeURIComponent(url)}`);
+  apiFetch('GET', `/tracks/oembed?url=${encodeURIComponent(url)}`);
 
 export const getCafeTop10   = (slug, offset = 0) =>
   apiFetch('GET', `/cafes/${slug}/recommendations/top10?offset=${offset}`);

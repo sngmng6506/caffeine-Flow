@@ -4,6 +4,7 @@ import { hasVoted, markVoted, removeVote } from '../votedSongs';
 
 const statusLabel = { pending: '대기', accepted: '수락', playing: '재생 중', played: '완료', rejected: '거절', skipped: '스킵' };
 const statusColor = { pending: '#888', accepted: '#4caf50', playing: '#2196f3', played: '#9e9e9e', rejected: '#f44336', skipped: '#ff9800' };
+const platformBadge = { youtube: { label: 'YT', bg: '#ff0000' }, soundcloud: { label: 'SC', bg: '#ff5500' } };
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, position, isMyRequest }) {
   const [error, setError] = useState('');
@@ -45,6 +46,10 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
       <div style={styles.body}>
         <div style={styles.title}>{rec.title}</div>
         <div style={styles.meta}>
+          {rec.platform && rec.platform !== 'youtube' && (() => {
+            const b = platformBadge[rec.platform];
+            return b ? <span style={{ ...styles.platformBadge, background: b.bg }}>{b.label}</span> : null;
+          })()}
           {rec.channel_title} {rec.duration && `· ${rec.duration}`}
           <span style={{ ...styles.status, color: statusColor[rec.status] }}> · {statusLabel[rec.status]}</span>
         </div>
@@ -92,5 +97,6 @@ const styles = {
   votedBtn:    { background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', fontWeight: 700 },
   cancelBtn:    { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer' },
   acceptedBadge:{ fontSize: 11, color: '#2e7d32', fontWeight: 600, marginTop: 2 },
+  platformBadge:{ fontSize: 10, fontWeight: 700, color: '#fff', padding: '1px 5px', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' },
   error:        { fontSize: 12, color: '#e63946', marginTop: 4 },
 };

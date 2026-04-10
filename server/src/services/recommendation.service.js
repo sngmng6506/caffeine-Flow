@@ -37,7 +37,7 @@ async function countActive(cafeId) {
   return parseInt(row.n);
 }
 
-async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, requesterIp, requesterName }) {
+async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, requesterIp, requesterName, platform = 'youtube' }) {
   const [rec] = await db('recommendations')
     .insert({
       cafe_id:        cafeId,
@@ -48,6 +48,7 @@ async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, 
       duration,
       requester_ip:   requesterIp,
       requester_name: requesterName,
+      platform,
     })
     .returning('*');
   return rec;
