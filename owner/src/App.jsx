@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 
@@ -40,16 +40,37 @@ export default function App() {
   const [cafe, setCafe]             = useState(initialState.cafe);
   const [pending]                   = useState(initialState.pending);
   const [oauthError]                = useState(initialState.oauthError);
+  const [youtubeVisible, setYoutubeVisible] = useState(false);
+
+  useEffect(() => {
+    window.electronAPI?.onYoutubeState(visible => setYoutubeVisible(visible));
+    // 앱 시작 시 이미 로그인 상태면 YouTube 패널 바로 열기
+    if (initialState.cafe) window.electronAPI?.showYoutube();
+  }, []);
 
   function handleLogin(cafeData) {
     setCafe(cafeData);
+    window.electronAPI?.showYoutube();
   }
 
   function handleLogout() {
     localStorage.clear();
     setCafe(null);
+    window.electronAPI?.hideYoutube();
   }
 
-  if (!cafe) return <LoginPage onLogin={handleLogin} initialPendingToken={pending} oauthError={oauthError} />;
-  return <DashboardPage cafe={cafe} onLogout={handleLogout} />;
+  const containerStyle = youtubeVisible
+    ? { width: '42vw', height: '100vh', overflowY: 'auto' }
+    : {};
+
+  if (!cafe) return (
+    <div style={containerStyle}>
+      <LoginPage onLogin={handleLogin} initialPendingToken={pending} oauthError={oauthError} />
+    </div>
+  );
+  return (
+    <div style={containerStyle}>
+      <DashboardPage cafe={cafe} onLogout={handleLogout} />
+    </div>
+  );
 }

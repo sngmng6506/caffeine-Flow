@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { updateRec, deleteRec } from '../api';
 
-const STATUS_LABEL = { pending: '대기', accepted: '수락', playing: '재생 중', played: '완료', rejected: '거절', skipped: '스킵' };
-const STATUS_COLOR = { pending: '#888', accepted: '#4caf50', playing: '#2196f3', played: '#9e9e9e', rejected: '#f44336', skipped: '#ff9800' };
-
-export default function RecommendCard({ slug, rec, onUpdate, onDelete }) {
+export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, hasPlaying }) {
   const [loading, setLoading] = useState(false);
 
   async function handle(action) {
@@ -16,6 +13,9 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete }) {
       } else {
         const updated = await updateRec(slug, rec.id, action);
         onUpdate(updated);
+        if (window.electronAPI && action === 'playing') {
+          window.electronAPI.playVideo(rec.video_id);
+        }
       }
     } catch (e) {
       console.error(e.message);
@@ -24,34 +24,59 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete }) {
     }
   }
 
-  const isActive = rec.status === 'pending' || rec.status === 'accepted' || rec.status === 'playing';
-
   return (
-    <div style={styles.card}>
+    <div
+      style={{ ...styles.card, cursor: context ? 'grab' : 'default' }}
+      draggable={!!context}
+      onDragStart={e => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ id: rec.id, status: rec.status }));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+    >
       <img src={rec.thumbnail} alt="" style={styles.thumb} />
       <div style={styles.body}>
         <div style={styles.title}>{rec.title}</div>
         <div style={styles.meta}>
           {rec.channel_title}{rec.duration && ` · ${rec.duration}`}
           {rec.requester_name && ` · 추천: ${rec.requester_name}`}
-          <span style={{ ...styles.status, color: STATUS_COLOR[rec.status] }}> · {STATUS_LABEL[rec.status]}</span>
         </div>
         <div style={styles.meta}>👍 {rec.vote_count}표</div>
 
-        {isActive && (
-          <div style={styles.actions}>
-            {rec.status === 'pending' && (
-              <button onClick={() => handle('accepted')} disabled={loading} style={{ ...styles.btn, background: '#4caf50' }}>수락</button>
-            )}
-            {rec.status === 'accepted' && (
-              <button onClick={() => handle('playing')} disabled={loading} style={{ ...styles.btn, background: '#2196f3' }}>재생</button>
-            )}
-            {rec.status === 'playing' && (
-              <button onClick={() => handle('played')} disabled={loading} style={{ ...styles.btn, background: '#9e9e9e' }}>완료</button>
-            )}
-            <button onClick={() => handle('skipped')} disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
-            <button onClick={() => handle('delete')}  disabled={loading} style={{ ...styles.btn, background: '#eee', color: '#333' }}>삭제</button>
+        {/* 추천 재생 중 섹션 */}
+        {context === 'playing' && (
+          <div style={styles.playingRow}>
+            <span style={styles.nowPlaying}>🎵 재생 중</span>
+            <button onClick={() => handle('skipped')} disabled={loading} style={styles.skipBtn}>스킵</button>
           </div>
+        )}
+
+        {/* 대기 곡 섹션 */}
+        {context === 'accepted' && (
+          <div style={styles.actions}>
+            <span style={styles.queuedLabel}>⏳ 대기 중</span>
+            <button onClick={() => handle('skipped')} disabled={loading} style={styles.skipBtn}>스킵</button>
+          </div>
+        )}
+
+        {/* 추천 곡 섹션 */}
+        {context === 'pending' && (
+          <div style={styles.actions}>
+            <button
+              onClick={() => handle(hasPlaying ? 'accepted' : 'playing')}
+              disabled={loading}
+              style={{ ...styles.btn, background: hasPlaying ? '#4caf50' : '#2196f3' }}
+            >
+              {hasPlaying ? '대기열 추가' : '재생'}
+            </button>
+            {hasPlaying && (
+              <button onClick={() => handle('skipped')} disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
+            )}
+          </div>
+        )}
+
+        {/* 이력 탭 등 context 없는 경우 */}
+        {!context && (
+          <div style={styles.meta} />
         )}
       </div>
     </div>
@@ -59,12 +84,15 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete }) {
 }
 
 const styles = {
-  card:    { display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #eee' },
-  thumb:   { width: 80, height: 60, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
-  body:    { flex: 1, minWidth: 0 },
-  title:   { fontWeight: 600, fontSize: 14, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  meta:    { fontSize: 12, color: '#888', marginBottom: 2 },
-  status:  { fontWeight: 600 },
-  actions: { display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' },
-  btn:     { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 },
+  card:       { display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #eee' },
+  thumb:      { width: 80, height: 60, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
+  body:       { flex: 1, minWidth: 0 },
+  title:      { fontWeight: 600, fontSize: 14, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  meta:       { fontSize: 12, color: '#888', marginBottom: 2 },
+  actions:    { display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', flexWrap: 'wrap' },
+  btn:        { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 600 },
+  playingRow: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 },
+  nowPlaying: { fontSize: 12, color: '#2196f3', fontWeight: 700 },
+  queuedLabel:{ fontSize: 12, color: '#4caf50', fontWeight: 600 },
+  skipBtn:    { fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', background: '#ff9800', color: '#fff', cursor: 'pointer', fontWeight: 600 },
 };

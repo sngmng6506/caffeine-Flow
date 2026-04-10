@@ -82,6 +82,24 @@ router.delete('/:id/cancel', async (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/v1/cafes/:slug/recommendations/owner  (사장님: 직접 추가)
+router.post('/owner', requireAuth, requireCafeOwner, async (req, res) => {
+  const cafe = await cafeService.findBySlug(req.params.slug);
+  if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
+
+  const { videoId, title, channelTitle, thumbnail, duration, status } = req.body;
+  if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
+
+  const validStatuses = ['pending', 'accepted', 'playing'];
+  const recStatus = validStatuses.includes(status) ? status : 'pending';
+
+  const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: '127.0.0.1', requesterName: null });
+  const updated = recStatus !== 'pending' ? await recService.updateStatus(rec.id, recStatus) : rec;
+
+  broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec: updated });
+  res.status(201).json(updated);
+});
+
 // PUT /api/v1/cafes/:slug/recommendations/:id  (사장님: 상태 변경)
 router.put('/:id', requireAuth, requireCafeOwner, async (req, res) => {
   const { status } = req.body;

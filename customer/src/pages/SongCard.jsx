@@ -53,6 +53,9 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
             {new Date(rec.requested_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </div>
         )}
+        {rec.status === 'accepted' && (
+          <div style={styles.acceptedBadge}>✅ 사장님이 수락했어요</div>
+        )}
         {isMyRequest
           ? <div style={styles.myRequest}>내가 추천한 곡</div>
           : rec.requester_name && <div style={styles.requester}>추천: {rec.requester_name}</div>
@@ -87,6 +90,7 @@ const styles = {
   actions:     { display: 'flex', gap: 8, marginTop: 8 },
   voteBtn:     { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' },
   votedBtn:    { background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', fontWeight: 700 },
-  cancelBtn:   { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer' },
-  error:       { fontSize: 12, color: '#e63946', marginTop: 4 },
+  cancelBtn:    { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer' },
+  acceptedBadge:{ fontSize: 11, color: '#2e7d32', fontWeight: 600, marginTop: 2 },
+  error:        { fontSize: 12, color: '#e63946', marginTop: 4 },
 };

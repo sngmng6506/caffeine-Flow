@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { getRecommendations, setStatus, updateMe, updateNotice, getHistory } from '../api';
+import { useEffect, useRef, useState } from 'react';
+import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory } from '../api';
 import { getSocket, disconnectSocket } from '../socket';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
@@ -7,7 +7,16 @@ import StatsPanel from './StatsPanel';
 export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [cafe, setCafe]         = useState(initialCafe);
   const [recs, setRecs]         = useState([]);
+  const recsRef = useRef([]);
   const [isAccepting, setIsAccepting] = useState(true);
+  const [dragOver, setDragOver]           = useState(null); // 'playing' | 'accepted' | 'pending' | null
+  const [restoreUrl, setRestoreUrl]       = useState(null);
+  const [nowPlaying, setNowPlaying]       = useState(null);
+  const [isDefaultPlaying, setIsDefaultPlaying] = useState(false);
+  const [defaultVideo, setDefaultVideo] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; }
+  });
+  const videoEndingRef = useRef(false);
   const [tab, setTab]           = useState('queue');
   const [loading, setLoading]   = useState(true);
   const [history, setHistory]           = useState([]);
@@ -21,14 +30,25 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [noticeInput, setNoticeInput]       = useState('');
   const [noticeLoading, setNoticeLoading]   = useState(false);
 
+  recsRef.current = recs;
   const queue = recs.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'playing');
 
-  const customerUrl = `${window.location.origin}/${cafe.slug}`;
+  const customerUrl = `${window.location.protocol}//${window.location.hostname}:3000/${cafe.slug}`;
 
   useEffect(() => {
     getRecommendations(cafe.slug)
-      .then(({ recommendations, is_accepting }) => {
-        setRecs(recommendations);
+      .then(async ({ recommendations, is_accepting }) => {
+        // 앱 재시작 시 playing 상태 곡들을 accepted(대기 중)로 리셋
+        const playingRecs = recommendations.filter(r => r.status === 'playing');
+        if (playingRecs.length > 0) {
+          const reset = await Promise.all(
+            playingRecs.map(r => updateRec(cafe.slug, r.id, 'accepted').catch(() => r))
+          );
+          const resetMap = Object.fromEntries(reset.map(r => [r.id, r]));
+          setRecs(recommendations.map(r => resetMap[r.id] ?? r));
+        } else {
+          setRecs(recommendations);
+        }
         setIsAccepting(is_accepting);
       })
       .catch(console.error)
@@ -53,6 +73,30 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       if (action === 'delete') setRecs(prev => prev.filter(r => r.id !== id));
     });
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
+
+    window.electronAPI?.onQueueRestore(url => setRestoreUrl(url));
+    window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
+    window.electronAPI?.onDefaultPlaying(v => setIsDefaultPlaying(v));
+
+    // 앱 재시작 시 localStorage에 저장된 기본 재생 곡 복원
+    const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
+    if (saved) window.electronAPI?.setDefaultVideo(saved.videoId);
+
+    // YouTube 영상 자동 종료 감지 → 현재 playing 곡을 played 처리 후 다음 곡
+    window.electronAPI?.onVideoEnded(() => {
+      if (videoEndingRef.current) return;  // 이중 발화 방지
+      videoEndingRef.current = true;
+      const playing = recsRef.current.find(r => r.status === 'playing');
+      if (!playing) { videoEndingRef.current = false; return; }
+      updateRec(cafe.slug, playing.id, 'played')
+        .then(updated => {
+          setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
+          const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
+          playNextOrStop(latest);
+        })
+        .catch(console.error)
+        .finally(() => { videoEndingRef.current = false; });
+    });
 
     return () => disconnectSocket();
   }, [cafe.slug]);
@@ -92,8 +136,95 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     }
   }
 
-  function handleUpdate(updated) { setRecs(prev => prev.map(r => r.id === updated.id ? updated : r)); }
-  function handleDelete(id)      { setRecs(prev => prev.filter(r => r.id !== id)); }
+  function handleSetDefault(info) {
+    setDefaultVideo(info);
+    localStorage.setItem('cf_default_video', JSON.stringify(info));
+    window.electronAPI?.setDefaultVideo(info.videoId);
+  }
+
+  function handleClearDefault() {
+    setDefaultVideo(null);
+    localStorage.removeItem('cf_default_video');
+    window.electronAPI?.clearDefaultVideo();
+  }
+
+  async function handleDrop(e, targetStatus) {
+    e.preventDefault();
+    setDragOver(null);
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+
+      // 추천 재생 중으로 이동 시 기존 playing 곡을 played로 처리
+      // (handleUpdate 대신 setRecs 직접 호출 — handleUpdate는 playNextOrStop을 트리거하므로 두 곡이 동시에 playing 되는 버그 방지)
+      if (targetStatus === 'playing') {
+        const currentPlaying = recsRef.current.find(r => r.status === 'playing');
+        if (currentPlaying && currentPlaying.id !== data.id) {
+          const ended = await updateRec(cafe.slug, currentPlaying.id, 'played');
+          setRecs(prev => prev.map(r => r.id === ended.id ? ended : r));
+        }
+      }
+
+      // 기본 카드 → rec으로 변환하여 해당 섹션에 추가
+      if (data.type === 'default') {
+        const rec = await createRec(cafe.slug, {
+          videoId: data.videoId, title: data.title,
+          thumbnail: data.thumbnail, status: targetStatus,
+        });
+        setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [...prev, rec]);
+        handleClearDefault();
+        if (targetStatus === 'playing') window.electronAPI?.playVideo(data.videoId);
+        return;
+      }
+
+      const { id, status: fromStatus } = data;
+      if (fromStatus === targetStatus) return;
+      const rec = recs.find(r => r.id === id);
+      if (!rec) return;
+      const updated = await updateRec(cafe.slug, id, targetStatus);
+      handleUpdate(updated);
+      if (targetStatus === 'playing') window.electronAPI?.playVideo(rec.video_id);
+    } catch (err) { console.error(err); }
+  }
+
+  function handleDropToDefault(e) {
+    e.preventDefault();
+    setDragOver(null);
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      if (data.type === 'default') return;
+      const rec = recs.find(r => r.id === data.id);
+      if (!rec) return;
+      handleSetDefault({ videoId: rec.video_id, title: rec.title, thumbnail: rec.thumbnail });
+    } catch (err) { console.error(err); }
+  }
+
+  function playNextOrStop(currentRecs) {
+    // accepted(명시적 대기열) 우선, 없으면 pending(득표순)
+    const accepted = currentRecs.filter(r => r.status === 'accepted')
+      .sort((a, b) => new Date(a.requested_at) - new Date(b.requested_at));
+    const pending  = currentRecs.filter(r => r.status === 'pending')
+      .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
+    const nextSong = accepted[0] || pending[0];
+    if (nextSong) {
+      updateRec(cafe.slug, nextSong.id, 'playing')
+        .then(played => {
+          setRecs(prev => prev.map(r => r.id === played.id ? played : r));
+          window.electronAPI?.playVideo(played.video_id);
+        })
+        .catch(console.error);
+    } else {
+      window.electronAPI?.stopVideo();
+    }
+  }
+
+  function handleUpdate(updated) {
+    setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
+    if (updated.status === 'played' || updated.status === 'skipped') {
+      const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
+      playNextOrStop(latest);
+    }
+  }
+  function handleDelete(id) { setRecs(prev => prev.filter(r => r.id !== id)); }
 
   function loadHistory(offset = 0, date = historyDate) {
     setHistoryLoading(true);
@@ -198,7 +329,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
       <div style={styles.tabs}>
         <button onClick={() => handleTabChange('queue')}   style={{ ...styles.tab, ...(tab === 'queue'   ? styles.tabActive : {}) }}>
-          추천 목록 {queue.length > 0 && <span style={styles.badge}>{queue.length}</span>}
+          추천 목록 {recs.filter(r => r.status === 'pending').length > 0 && <span style={styles.badge}>{recs.filter(r => r.status === 'pending').length}</span>}
         </button>
         <button onClick={() => handleTabChange('history')} style={{ ...styles.tab, ...(tab === 'history' ? styles.tabActive : {}) }}>이력</button>
         <button onClick={() => handleTabChange('stats')}   style={{ ...styles.tab, ...(tab === 'stats'   ? styles.tabActive : {}) }}>통계</button>
@@ -206,15 +337,90 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         <button onClick={() => handleTabChange('contact')} style={{ ...styles.tab, ...(tab === 'contact' ? styles.tabActive : {}) }}>문의</button>
       </div>
 
-      {tab === 'queue' && (
-        <div>
-          {loading && <div style={styles.empty}>불러오는 중...</div>}
-          {!loading && queue.length === 0 && <div style={styles.empty}>대기 중인 추천곡이 없습니다.</div>}
-          {queue.map(r => (
-            <RecommendCard key={r.id} slug={cafe.slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} />
-          ))}
-        </div>
-      )}
+      {tab === 'queue' && (() => {
+        const playing = recs.filter(r => r.status === 'playing');
+        const accepted = recs.filter(r => r.status === 'accepted');
+        const pending  = recs.filter(r => r.status === 'pending');
+        const hasPlaying = playing.length > 0;
+        return (
+          <div>
+            {/* 기본 */}
+            <div
+              style={{ ...styles.section, ...(dragOver === 'default' ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver('default'); }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={handleDropToDefault}
+            >
+              <div style={styles.sectionTitle}>기본</div>
+              <DefaultSection
+                defaultVideo={defaultVideo}
+                isPlaying={isDefaultPlaying}
+                onSet={handleSetDefault}
+                onClear={handleClearDefault}
+              />
+            </div>
+
+            {/* 추천 재생 중 */}
+            <div
+              style={{ ...styles.section, ...(dragOver === 'playing' ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver('playing'); }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={e => handleDrop(e, 'playing')}
+            >
+              <div style={styles.sectionTitle}>추천 재생 중</div>
+              {loading
+                ? <div style={styles.emptySlot}>불러오는 중...</div>
+                : playing.length > 0
+                  ? playing.map(r => (
+                      <RecommendCard key={r.id} slug={cafe.slug} rec={r}
+                        onUpdate={handleUpdate} onDelete={handleDelete} context="playing" />
+                    ))
+                  : <div style={styles.emptySlot}>재생 중인 추천곡 없음</div>
+              }
+            </div>
+
+            {/* 대기 곡 */}
+            <div
+              style={{ ...styles.section, ...(dragOver === 'accepted' ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver('accepted'); }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={e => handleDrop(e, 'accepted')}
+            >
+              <div style={styles.sectionTitle}>대기 곡</div>
+              {loading
+                ? <div style={styles.emptySlot}>불러오는 중...</div>
+                : accepted.length > 0
+                  ? accepted.map(r => (
+                      <RecommendCard key={r.id} slug={cafe.slug} rec={r}
+                        onUpdate={handleUpdate} onDelete={handleDelete} context="accepted" hasPlaying={hasPlaying} />
+                    ))
+                  : <div style={styles.emptySlot}>대기 중인 곡 없음</div>
+              }
+            </div>
+
+            {/* 추천 곡 */}
+            <div
+              style={{ ...styles.section, ...(dragOver === 'pending' ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver('pending'); }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={e => handleDrop(e, 'pending')}
+            >
+              <div style={styles.sectionTitle}>
+                추천 곡 {pending.length > 0 && <span style={styles.badge}>{pending.length}</span>}
+              </div>
+              {loading
+                ? <div style={styles.emptySlot}>불러오는 중...</div>
+                : pending.length > 0
+                  ? pending.map(r => (
+                      <RecommendCard key={r.id} slug={cafe.slug} rec={r}
+                        onUpdate={handleUpdate} onDelete={handleDelete} context="pending" hasPlaying={hasPlaying} />
+                    ))
+                  : <div style={styles.emptySlot}>추천된 곡 없음</div>
+              }
+            </div>
+          </div>
+        );
+      })()}
 
       {tab === 'history' && (
         <div>
@@ -249,6 +455,89 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     </div>
   );
 }
+
+
+function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
+  const [inputUrl, setInputUrl] = useState('');
+  const [setting, setSetting]   = useState(false);
+  const [error, setError]       = useState('');
+
+  async function handleSet() {
+    const match = inputUrl.match(/(?:[?&]v=|youtu\.be\/)([^&?]+)/);
+    if (!match) { setError('올바른 YouTube URL을 입력하세요'); return; }
+    const videoId = match[1];
+    setSetting(true); setError('');
+    try {
+      const res  = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      const data = await res.json();
+      onSet({ videoId, title: data.title, thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` });
+      setInputUrl('');
+    } catch {
+      setError('영상 정보를 불러오지 못했습니다');
+    } finally {
+      setSetting(false);
+    }
+  }
+
+  if (defaultVideo) {
+    return (
+      <div
+        style={{ ...dfStyles.card, cursor: 'grab' }}
+        draggable={true}
+        onDragStart={e => {
+          e.dataTransfer.setData('text/plain', JSON.stringify({
+            type: 'default', videoId: defaultVideo.videoId,
+            title: defaultVideo.title, thumbnail: defaultVideo.thumbnail,
+          }));
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+      >
+        <img src={defaultVideo.thumbnail} alt="" style={dfStyles.thumb} />
+        <div style={dfStyles.info}>
+          {isPlaying && <span style={dfStyles.playing}>▶ 재생 중</span>}
+          <div style={dfStyles.title}>{defaultVideo.title}</div>
+          <div style={dfStyles.hint}>추천곡이 없으면 이 영상이 반복 재생됩니다</div>
+        </div>
+        <button
+          onClick={onClear}
+          draggable={false}
+          onDragStart={e => e.stopPropagation()}
+          style={dfStyles.clearBtn}
+        >해제</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={dfStyles.inputRow}>
+      <input
+        value={inputUrl}
+        onChange={e => { setInputUrl(e.target.value); setError(''); }}
+        onKeyDown={e => e.key === 'Enter' && handleSet()}
+        placeholder=""
+        style={dfStyles.input}
+      />
+      <button onClick={handleSet} disabled={setting || !inputUrl.trim()} style={dfStyles.setBtn}>
+        {setting ? '...' : '설정'}
+      </button>
+      {error && <div style={dfStyles.error}>{error}</div>}
+    </div>
+  );
+}
+
+const dfStyles = {
+  card:     { display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: '1px solid #eee' },
+  thumb:    { width: 80, height: 56, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
+  info:     { flex: 1, minWidth: 0 },
+  playing:  { fontSize: 11, fontWeight: 700, color: '#2196f3', display: 'block', marginBottom: 2 },
+  title:    { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  hint:     { fontSize: 11, color: '#aaa', marginTop: 2 },
+  clearBtn: { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', flexShrink: 0 },
+  inputRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingTop: 8, borderTop: '1px solid #eee' },
+  input:    { flex: 1, fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', minWidth: 0 },
+  setBtn:   { fontSize: 12, padding: '6px 14px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
+  error:    { fontSize: 12, color: '#e63946', width: '100%' },
+};
 
 function QRTab({ url, cafeName }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=280x280&margin=10`;
@@ -311,7 +600,13 @@ function ContactTab({ provider }) {
       <h3 style={contactStyles.title}>개발자 문의</h3>
       <div style={contactStyles.box}>
         <p style={contactStyles.desc}>
-          사장님, 안녕하세요 <br />시스템 오류, 기능 요청, 기타 문의사항이 있으시면<br />아래 버튼을 눌러 메일을 보내주세요.
+          사장님, 안녕하세요. <br />
+        시스템 오류, 기능 요청, 기타 문의사항이 있으시면<br />
+        아래 버튼을 눌러 메일을 보내주세요. <br />
+        <br />
+        운영하시면서 불편한 점이나 개선 아이디어도 편하게 남겨주세요. <br />
+        기존 앱 개선은 물론, 새로운 앱으로 해결이 가능한 경우에도<br />
+        검토 후 반영해드리겠습니다. <br />
         </p>
         <a href={mailUrl} target="_blank" rel="noreferrer" style={contactStyles.btn}>
           메일 보내기
@@ -352,6 +647,14 @@ const styles = {
   badge:             { background: '#e63946', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 11 },
   sectionTitle:      { fontSize: 14, color: '#888', margin: '20px 0 8px', fontWeight: 600 },
   empty:             { textAlign: 'center', color: '#aaa', padding: '40px 0' },
+  section:           { marginBottom: 20, borderRadius: 8, transition: 'background 0.15s' },
+  sectionDragOver:   { background: '#f0f7ff', outline: '2px dashed #2196f3', outlineOffset: 2 },
+  sectionTitle:      { fontSize: 13, fontWeight: 700, color: '#555', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 },
+  emptySlot:         { fontSize: 13, color: '#ccc', padding: '12px 0', borderTop: '1px dashed #eee' },
+  nowPlayingYt:      { display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: '1px solid #eee' },
+  sectionThumb:      { width: 72, height: 50, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
+  ytBadge:           { fontSize: 11, fontWeight: 700, color: '#fff', background: '#ff9800', borderRadius: 4, padding: '2px 7px', display: 'inline-block', marginBottom: 4 },
+  sectionSongTitle:  { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 },
   moreBtn:           { display: 'block', width: '100%', padding: '10px', marginTop: 8, borderRadius: 8, border: '1px solid #eee', background: '#f8f8f8', color: '#888', cursor: 'pointer', fontSize: 13 },
   historyFilter:     { display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0' },
   dateInput:         { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' },

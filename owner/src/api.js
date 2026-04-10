@@ -29,6 +29,7 @@ export const updateNotice = (notice) => apiFetch('PUT', '/cafes/me/notice', { no
 export const setStatus  = (is_accepting) => apiFetch('PUT', '/cafes/me/status', { is_accepting });
 
 export const getRecommendations = (slug) => apiFetch('GET',    `/cafes/${slug}/recommendations`);
+export const createRec          = (slug, data) => apiFetch('POST', `/cafes/${slug}/recommendations/owner`, data);
 export const updateRec          = (slug, id, status) => apiFetch('PUT', `/cafes/${slug}/recommendations/${id}`, { status });
 export const deleteRec          = (slug, id) => apiFetch('DELETE', `/cafes/${slug}/recommendations/${id}`);
 
