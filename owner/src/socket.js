@@ -1,10 +1,12 @@
 import { io } from 'socket.io-client';
 
+const SERVER = import.meta.env.VITE_SERVER_URL || '';
+
 let socket = null;
 
 export function getSocket(slug) {
   if (!socket) {
-    socket = io('/cafe', { query: { slug } });
+    socket = io(`${SERVER}/cafe`, { query: { slug } });
   }
   return socket;
 }

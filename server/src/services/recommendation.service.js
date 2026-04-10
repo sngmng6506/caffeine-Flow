@@ -60,6 +60,13 @@ async function updateStatus(id, status) {
   return rec;
 }
 
+// playing으로 변경 전 기존 playing 곡을 played로 일괄 처리 (except 제외)
+async function clearPlaying(cafeId, exceptId) {
+  let query = db('recommendations').where({ cafe_id: cafeId, status: 'playing' });
+  if (exceptId) query = query.whereNot({ id: exceptId });
+  return query.update({ status: 'played', played_at: new Date() }).returning('*');
+}
+
 async function remove(id) {
   return db('recommendations').where({ id }).delete();
 }
@@ -94,4 +101,4 @@ async function addComment(recommendationId, { commenterIp, commenterName, body }
   return comment;
 }
 
-module.exports = { getRecommendations, findById, findActiveByVideoId, countActive, add, updateStatus, remove, vote, unvote, addComment };
+module.exports = { getRecommendations, findById, findActiveByVideoId, countActive, add, updateStatus, clearPlaying, remove, vote, unvote, addComment };

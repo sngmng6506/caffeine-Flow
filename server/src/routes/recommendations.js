@@ -90,8 +90,18 @@ router.post('/owner', requireAuth, requireCafeOwner, async (req, res) => {
   const { videoId, title, channelTitle, thumbnail, duration, status } = req.body;
   if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
 
+  const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
+  if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
+
   const validStatuses = ['pending', 'accepted', 'playing'];
   const recStatus = validStatuses.includes(status) ? status : 'pending';
+
+  if (recStatus === 'playing') {
+    const cleared = await recService.clearPlaying(cafe.id, null);
+    for (const r of cleared) {
+      broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
+    }
+  }
 
   const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: '127.0.0.1', requesterName: null });
   const updated = recStatus !== 'pending' ? await recService.updateStatus(rec.id, recStatus) : rec;
@@ -105,6 +115,14 @@ router.put('/:id', requireAuth, requireCafeOwner, async (req, res) => {
   const { status } = req.body;
   const valid = ['accepted', 'rejected', 'playing', 'played', 'skipped'];
   if (!valid.includes(status)) return res.status(400).json({ error: '유효하지 않은 status' });
+
+  // playing으로 바꿀 때 기존 playing 곡을 서버 단에서 played로 처리
+  if (status === 'playing') {
+    const cleared = await recService.clearPlaying(req.owner.cafeId, req.params.id);
+    for (const r of cleared) {
+      broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
+    }
+  }
 
   const rec = await recService.updateStatus(req.params.id, status);
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec });

@@ -33,7 +33,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   recsRef.current = recs;
   const queue = recs.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'playing');
 
-  const customerUrl = `${window.location.protocol}//${window.location.hostname}:3000/${cafe.slug}`;
+  const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3000`;
+  const customerUrl = `${SERVER_URL}/${cafe.slug}`;
 
   useEffect(() => {
     getRecommendations(cafe.slug)
@@ -98,7 +99,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         .finally(() => { videoEndingRef.current = false; });
     });
 
-    return () => disconnectSocket();
+    return () => {
+      disconnectSocket();
+      window.electronAPI?.removeAllListeners();
+    };
   }, [cafe.slug]);
 
   async function toggleAccepting() {
@@ -606,7 +610,7 @@ function ContactTab({ provider }) {
         <br />
         운영하시면서 불편한 점이나 개선 아이디어도 편하게 남겨주세요. <br />
         기존 앱 개선은 물론, 새로운 앱으로 해결이 가능한 경우에도<br />
-        검토 후 반영해드리겠습니다. <br />
+        검토 후 제작해드리겠습니다. <br />
         </p>
         <a href={mailUrl} target="_blank" rel="noreferrer" style={contactStyles.btn}>
           메일 보내기

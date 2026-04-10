@@ -1,3 +1,6 @@
 node_modules/
 data/history.json
 .env
+server/public/
+server/test-api.js
+server/test-db.js
