@@ -1,5 +1,18 @@
 const { ipcRenderer } = require('electron');
 
+// 자동재생 차단: main에서 block-next-play 수신 시 다음 play() 한 번만 막음
+let blockNextPlay = false;
+ipcRenderer.on('block-next-play', () => { blockNextPlay = true; });
+const origPlay = HTMLMediaElement.prototype.play;
+HTMLMediaElement.prototype.play = function() {
+  if (blockNextPlay && this.tagName === 'VIDEO') {
+    blockNextPlay = false;
+    this.pause();
+    return Promise.resolve();
+  }
+  return origPlay.apply(this, arguments);
+};
+
 let videoEndedSent = false;
 
 // YouTube SPA 이동 시 플래그 리셋 (새 영상 end 감지 가능하도록)
