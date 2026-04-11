@@ -129,12 +129,6 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
 
   return (
     <form onSubmit={handlePreview} style={styles.wrap}>
-      <input
-        placeholder="링크를 붙여넣으세요"
-        value={url}
-        onChange={e => setUrl(e.target.value)}
-        style={styles.input}
-      />
       <div style={styles.platformRow}>
         <div style={styles.platformIcons}>
           {PLATFORM_LINKS.map(({ icon, href }) => (
@@ -152,6 +146,12 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
         </div>
         <span style={styles.platformHint}>바로 가기</span>
       </div>
+      <input
+        placeholder="링크를 붙여넣으세요"
+        value={url}
+        onChange={e => setUrl(e.target.value)}
+        style={styles.input}
+      />
       {error && <div style={styles.error}>{error}</div>}
       <button type="submit" disabled={loading || !url.trim()} style={styles.submitBtn}>
         {loading ? '확인 중...' : '곡 확인'}
