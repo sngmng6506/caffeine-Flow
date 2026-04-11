@@ -33,6 +33,7 @@ export default function CafePage({ slug }) {
   const [successTimer, setSuccessTimer] = useState(null);
   const [historyLimit, setHistoryLimit] = useState(10);
   const [historyExpanded, setHistoryExpanded] = useState(null);
+  const [queueExpanded, setQueueExpanded]     = useState(null);
   const deviceName = getDeviceName();
 
   const nowPlaying = recs.find(r => r.status === 'playing') || null;
@@ -170,8 +171,18 @@ export default function CafePage({ slug }) {
             <section>
               <h3 style={styles.sectionTitle}>대기 중 ({queue.length})</h3>
               {queue.map((r, i) => (
-                <SongCard key={r.id} slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={i + 1}
-                  isMyRequest={r.requester_name === deviceName} />
+                <div key={r.id}>
+                  <div
+                    onClick={() => setQueueExpanded(v => v === r.video_id ? null : r.video_id)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={i + 1}
+                      isMyRequest={r.requester_name === deviceName} />
+                  </div>
+                  {queueExpanded === r.video_id && (
+                    <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
+                  )}
+                </div>
               ))}
             </section>
           )}
