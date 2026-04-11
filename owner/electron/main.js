@@ -136,10 +136,13 @@ ipcMain.on('hide-youtube', () => {
   mainWindow.webContents.send('youtube-state', false);
 });
 
-// 수락 시 해당 URL로 중개 (preload에서 첫 play() 차단)
+// 수락 시 해당 URL로 중개 (YouTube: video ID, SoundCloud: 전체 URL)
 ipcMain.on('navigate-video', (_e, videoId) => {
   if (!youtubeView) preloadYoutube();
-  youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}`);
+  const url = videoId.startsWith('http')
+    ? videoId
+    : `https://www.youtube.com/watch?v=${videoId}`;
+  youtubeView.webContents.loadURL(url);
   youtubeView.webContents.once('dom-ready', () => {
     youtubeView.webContents.send('block-next-play');
   });
