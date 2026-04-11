@@ -7,12 +7,44 @@ const PLATFORM_BADGE = {
   soundcloud: { label: 'SoundCloud',  bg: '#ff5500', color: '#fff' },
 };
 
+function YouTubeIcon() {
+  return (
+    <svg width="38" height="27" viewBox="0 0 38 27" fill="none">
+      <rect width="38" height="27" rx="7" fill="#FF0000"/>
+      <polygon points="15,7 15,20 26,13.5" fill="white"/>
+    </svg>
+  );
+}
+
+function SpotifyIcon() {
+  return (
+    <svg width="27" height="27" viewBox="0 0 27 27" fill="none">
+      <circle cx="13.5" cy="13.5" r="13.5" fill="#1DB954"/>
+      <path d="M7 10.5c4-2 9-2 13 0"   stroke="white" strokeWidth="2"   fill="none" strokeLinecap="round"/>
+      <path d="M7.5 14c3.5-1.5 8-1.5 12 0" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+      <path d="M8 17.5c3-1.2 6.5-1.2 11 0" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+function SoundCloudIcon() {
+  return (
+    <svg width="38" height="27" viewBox="0 0 38 27" fill="none">
+      <rect width="38" height="27" rx="7" fill="#FF5500"/>
+      <path d="M8 18.5 Q8 15 11 15 Q11 11 14.5 11 Q15 8 18 8 Q22 8 22 12.5 L22 18.5 Z" fill="white" opacity="0.9"/>
+      <rect x="24" y="12" width="2" height="7" rx="1" fill="white" opacity="0.7"/>
+      <rect x="27.5" y="10" width="2" height="9" rx="1" fill="white" opacity="0.7"/>
+      <rect x="31" y="13" width="2" height="6" rx="1" fill="white" opacity="0.7"/>
+    </svg>
+  );
+}
+
 export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [step, setStep] = useState('input'); // 'input' | 'preview'
+  const [step, setStep] = useState('input');
 
   async function handlePreview(e) {
     e.preventDefault();
@@ -92,13 +124,18 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
   return (
     <form onSubmit={handlePreview} style={styles.wrap}>
       <input
-        placeholder="YouTube 또는 SoundCloud 링크를 붙여넣으세요"
+        placeholder=""
         value={url}
         onChange={e => setUrl(e.target.value)}
         style={styles.input}
       />
+      <div style={styles.platformRow}>
+        <YouTubeIcon />
+        <SpotifyIcon />
+        <SoundCloudIcon />
+      </div>
       {error && <div style={styles.error}>{error}</div>}
-      <button type="submit" disabled={loading} style={styles.submitBtn}>
+      <button type="submit" disabled={loading || !url.trim()} style={styles.submitBtn}>
         {loading ? '확인 중...' : '곡 확인'}
       </button>
     </form>
@@ -115,6 +152,7 @@ const styles = {
   title:        { fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   channel:      { fontSize: 12, color: '#888', marginTop: 2 },
   input:        { fontSize: 14, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', outline: 'none' },
+  platformRow:  { display: 'flex', gap: 10, alignItems: 'center', padding: '2px 2px' },
   btnRow:       { display: 'flex', gap: 8 },
   submitBtn:    { flex: 1, padding: '10px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 },
   cancelBtn:    { padding: '10px 16px', borderRadius: 8, background: '#fff', border: '1px solid #ddd', cursor: 'pointer' },
