@@ -237,7 +237,7 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
   return (
     <>
       <div style={styles.sortBar}>
-        <button onClick={() => setSortBy('count')} style={{ ...styles.sortBtn, ...(sortBy === 'count' ? styles.sortActive : {}) }}>추천순</button>
+        <button onClick={() => setSortBy('count')} style={{ ...styles.sortBtn, ...(sortBy === 'count' ? styles.sortActive : {}) }}>신청순</button>
         <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>추천순</button>
       </div>
     <ol style={styles.rankList}>
