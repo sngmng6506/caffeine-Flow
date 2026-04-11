@@ -251,7 +251,7 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
             <img src={item.thumbnail} alt="" style={styles.thumb} />
             <div style={styles.rankInfo}>
               <div style={styles.rankTitle}>{item.title}</div>
-              <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 추천 · 👍 {item.total_votes || 0}</div>
+              <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 신청 · 👍 {item.total_votes || 0}</div>
             </div>
             <span style={styles.chevron}>{expanded === item.video_id ? '▲' : '▼'}</span>
           </div>
