@@ -4,7 +4,7 @@ import { hasVoted, markVoted, removeVote } from '../votedSongs';
 
 const statusLabel = { pending: '대기', accepted: '수락', playing: '재생 중', played: '완료', rejected: '거절', skipped: '스킵' };
 const statusColor = { pending: '#888', accepted: '#4caf50', playing: '#2196f3', played: '#9e9e9e', rejected: '#f44336', skipped: '#ff9800' };
-const platformBadge = { youtube: { label: 'YT', bg: '#ff0000' }, soundcloud: { label: 'SC', bg: '#ff5500' } };
+const platformBadge = { youtube: { label: 'YT', bg: '#ff0000' }, soundcloud: { label: 'SC', bg: '#ff5500' }, spotify: { label: 'SP', bg: '#1db954' } };
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, position, isMyRequest }) {
   const [error, setError] = useState('');

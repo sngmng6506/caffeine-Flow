@@ -6,6 +6,7 @@ function detectPlatform(url) {
     const u = new URL(url);
     if (u.hostname === 'youtu.be' || u.hostname.includes('youtube.com')) return 'youtube';
     if (u.hostname.includes('soundcloud.com')) return 'soundcloud';
+    if (u.hostname.includes('spotify.com') || u.hostname === 'spotify.link') return 'spotify';
   } catch {}
   return null;
 }
@@ -34,7 +35,7 @@ router.get('/oembed', async (req, res) => {
   const platform = detectPlatform(rawUrl);
 
   if (!platform) {
-    return res.status(400).json({ error: 'YouTube 또는 SoundCloud URL을 입력해주세요' });
+    return res.status(400).json({ error: 'YouTube, SoundCloud, Spotify URL을 입력해주세요' });
   }
 
   if (platform === 'youtube') {
@@ -72,6 +73,23 @@ router.get('/oembed', async (req, res) => {
       });
     } catch {
       return res.status(400).json({ error: '트랙 정보를 가져올 수 없습니다 (비공개 또는 잘못된 URL)' });
+    }
+  }
+
+  if (platform === 'spotify') {
+    try {
+      const { data } = await axios.get('https://open.spotify.com/oembed', {
+        params: { url: rawUrl },
+      });
+      return res.json({
+        platform,
+        videoId:      rawUrl,
+        title:        data.title,
+        channelTitle: data.provider_name || 'Spotify',
+        thumbnail:    data.thumbnail_url || null,
+      });
+    } catch {
+      return res.status(400).json({ error: '트랙 정보를 가져올 수 없습니다 (비공개 또는 잘못된 Spotify URL)' });
     }
   }
 });
