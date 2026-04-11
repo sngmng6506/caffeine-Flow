@@ -372,7 +372,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
               onDragLeave={() => setDragOver(null)}
               onDrop={e => handleDrop(e, 'playing')}
             >
-              <div style={styles.sectionTitle}>추천 재생 중</div>
+              <div style={styles.sectionTitle}>수락</div>
               {loading
                 ? <div style={styles.emptySlot}>불러오는 중...</div>
                 : playing.length > 0
@@ -489,6 +489,7 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
       <div
         style={{ ...dfStyles.card, cursor: 'grab' }}
         draggable={true}
+        onClick={() => window.electronAPI?.navigateVideo(defaultVideo.videoId)}
         onDragStart={e => {
           e.dataTransfer.setData('text/plain', JSON.stringify({
             type: 'default', videoId: defaultVideo.videoId,
@@ -501,10 +502,10 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
         <div style={dfStyles.info}>
           {isPlaying && <span style={dfStyles.playing}>▶ 재생 중</span>}
           <div style={dfStyles.title}>{defaultVideo.title}</div>
-          <div style={dfStyles.hint}>추천곡이 없으면 이 영상이 반복 재생됩니다</div>
+          <div style={dfStyles.hint}>누르면 이동 합니다.</div>
         </div>
         <button
-          onClick={onClear}
+          onClick={e => { e.stopPropagation(); onClear(); }}
           draggable={false}
           onDragStart={e => e.stopPropagation()}
           style={dfStyles.clearBtn}
