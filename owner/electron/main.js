@@ -136,10 +136,13 @@ ipcMain.on('hide-youtube', () => {
   mainWindow.webContents.send('youtube-state', false);
 });
 
-// 수락 시 해당 URL로 중개 (autoplay-policy 플래그로 자동재생 차단)
+// 수락 시 해당 URL로 중개 (preload에서 첫 play() 차단)
 ipcMain.on('navigate-video', (_e, videoId) => {
   if (!youtubeView) preloadYoutube();
   youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}`);
+  youtubeView.webContents.once('dom-ready', () => {
+    youtubeView.webContents.send('block-next-play');
+  });
 });
 
 // [자동재생 비활성화] 신청곡 재생 → 현재 URL 저장 후 해당 영상으로 이동
