@@ -58,9 +58,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
             {new Date(rec.requested_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </div>
         )}
-        {rec.status === 'accepted' && (
-          <div style={styles.acceptedBadge}>✅ 사장님이 수락했어요</div>
-        )}
+
         {isMyRequest
           ? <div style={styles.myRequest}>내가 추천한 곡</div>
           : rec.requester_name && <div style={styles.requester}>추천: {rec.requester_name}</div>
