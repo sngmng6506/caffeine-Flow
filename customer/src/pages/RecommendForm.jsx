@@ -121,18 +121,35 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
     );
   }
 
+  const PLATFORM_LINKS = [
+    { icon: <YouTubeIcon />,    href: 'https://www.youtube.com' },
+    { icon: <SpotifyIcon />,    href: 'https://open.spotify.com' },
+    { icon: <SoundCloudIcon />, href: 'https://soundcloud.com' },
+  ];
+
   return (
     <form onSubmit={handlePreview} style={styles.wrap}>
-      <input
-        placeholder=""
-        value={url}
-        onChange={e => setUrl(e.target.value)}
-        style={styles.input}
-      />
-      <div style={styles.platformRow}>
-        <YouTubeIcon />
-        <SpotifyIcon />
-        <SoundCloudIcon />
+      <div style={styles.inputRow}>
+        <div style={styles.platformIcons}>
+          {PLATFORM_LINKS.map(({ icon, href }) => (
+            <a
+              key={href}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              style={styles.iconLink}
+            >
+              {icon}
+            </a>
+          ))}
+        </div>
+        <input
+          placeholder=""
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          style={styles.input}
+        />
       </div>
       {error && <div style={styles.error}>{error}</div>}
       <button type="submit" disabled={loading || !url.trim()} style={styles.submitBtn}>
@@ -151,8 +168,10 @@ const styles = {
   badge:        { fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, marginBottom: 4, display: 'inline-block' },
   title:        { fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   channel:      { fontSize: 12, color: '#888', marginTop: 2 },
-  input:        { fontSize: 14, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', outline: 'none' },
-  platformRow:  { display: 'flex', gap: 10, alignItems: 'center', padding: '2px 2px' },
+  inputRow:      { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #ddd', borderRadius: 8, padding: '4px 8px' },
+  platformIcons: { display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 },
+  iconLink:      { display: 'flex', alignItems: 'center', opacity: 0.85, lineHeight: 0 },
+  input:         { flex: 1, fontSize: 14, padding: '6px 4px', border: 'none', outline: 'none', background: 'transparent', minWidth: 0 },
   btnRow:       { display: 'flex', gap: 8 },
   submitBtn:    { flex: 1, padding: '10px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 },
   cancelBtn:    { padding: '10px 16px', borderRadius: 8, background: '#fff', border: '1px solid #ddd', cursor: 'pointer' },
