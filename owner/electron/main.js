@@ -1,6 +1,9 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
 const path = require('path');
 
+// 유저 제스처 없이는 autoplay 차단 (Chromium 엔진 레벨)
+app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
+
 const isDev = !app.isPackaged;
 const OWNER_URL = isDev
   ? 'http://localhost:5174'
@@ -133,33 +136,10 @@ ipcMain.on('hide-youtube', () => {
   mainWindow.webContents.send('youtube-state', false);
 });
 
-// 수락 시 해당 URL로 중개 (autoplay 없음 — 첫 번째 play 이벤트만 차단)
+// 수락 시 해당 URL로 중개 (autoplay-policy 플래그로 자동재생 차단)
 ipcMain.on('navigate-video', (_e, videoId) => {
   if (!youtubeView) preloadYoutube();
   youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}`);
-  youtubeView.webContents.once('dom-ready', () => {
-    youtubeView.webContents.executeJavaScript(`
-      (() => {
-        const setup = () => {
-          const v = document.querySelector('video');
-          if (!v || v._noAutoplay) return;
-          v._noAutoplay = true;
-          let blocked = true;
-          v.addEventListener('play', function block() {
-            if (blocked) {
-              v.pause();
-              blocked = false;
-              v.removeEventListener('play', block);
-            }
-          });
-        };
-        const mo = new MutationObserver(setup);
-        mo.observe(document, { childList: true, subtree: true });
-        setTimeout(() => mo.disconnect(), 10000);
-        setup();
-      })();
-    `).catch(() => {});
-  });
 });
 
 // [자동재생 비활성화] 신청곡 재생 → 현재 URL 저장 후 해당 영상으로 이동
