@@ -2,6 +2,7 @@ export default function NowPlaying({ rec }) {
   if (!rec) return null;
   return (
     <div style={styles.wrap}>
+      <span style={styles.badge}>▶ 지금 재생 중</span>
       {rec.thumbnail
         ? <img src={rec.thumbnail} alt="" style={styles.thumb} />
         : <div style={styles.thumbFallback} />
@@ -16,6 +17,7 @@ export default function NowPlaying({ rec }) {
 
 const styles = {
   wrap:          { display: 'flex', alignItems: 'center', gap: 12, background: '#1a1a2e', color: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 16 },
+  badge:         { fontSize: 11, background: '#e63946', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', flexShrink: 0 },
   thumb:         { width: 56, height: 42, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
   thumbFallback: { width: 56, height: 42, borderRadius: 6, background: '#333', flexShrink: 0 },
   info:          { overflow: 'hidden', minWidth: 0 },
