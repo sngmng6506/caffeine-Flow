@@ -136,7 +136,6 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
         style={styles.input}
       />
       <div style={styles.platformRow}>
-        <span style={styles.platformHint}>앱에서 링크 복사</span>
         <div style={styles.platformIcons}>
           {PLATFORM_LINKS.map(({ icon, href }) => (
             <a
@@ -151,6 +150,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
             </a>
           ))}
         </div>
+        <span style={styles.platformHint}>바로 가기</span>
       </div>
       {error && <div style={styles.error}>{error}</div>}
       <button type="submit" disabled={loading || !url.trim()} style={styles.submitBtn}>
