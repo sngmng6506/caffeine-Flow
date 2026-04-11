@@ -129,7 +129,14 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
 
   return (
     <form onSubmit={handlePreview} style={styles.wrap}>
-      <div style={styles.inputRow}>
+      <input
+        placeholder="링크를 붙여넣으세요"
+        value={url}
+        onChange={e => setUrl(e.target.value)}
+        style={styles.input}
+      />
+      <div style={styles.platformRow}>
+        <span style={styles.platformHint}>앱에서 링크 복사</span>
         <div style={styles.platformIcons}>
           {PLATFORM_LINKS.map(({ icon, href }) => (
             <a
@@ -144,12 +151,6 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
             </a>
           ))}
         </div>
-        <input
-          placeholder=""
-          value={url}
-          onChange={e => setUrl(e.target.value)}
-          style={styles.input}
-        />
       </div>
       {error && <div style={styles.error}>{error}</div>}
       <button type="submit" disabled={loading || !url.trim()} style={styles.submitBtn}>
@@ -168,10 +169,11 @@ const styles = {
   badge:        { fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, marginBottom: 4, display: 'inline-block' },
   title:        { fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   channel:      { fontSize: 12, color: '#888', marginTop: 2 },
-  inputRow:      { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #ddd', borderRadius: 8, padding: '4px 8px' },
-  platformIcons: { display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 },
-  iconLink:      { display: 'flex', alignItems: 'center', opacity: 0.85, lineHeight: 0 },
-  input:         { flex: 1, fontSize: 14, padding: '6px 4px', border: 'none', outline: 'none', background: 'transparent', minWidth: 0 },
+  input:         { fontSize: 14, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', outline: 'none' },
+  platformRow:   { display: 'flex', alignItems: 'center', gap: 10 },
+  platformHint:  { fontSize: 11, color: '#aaa', whiteSpace: 'nowrap' },
+  platformIcons: { display: 'flex', gap: 8, alignItems: 'center' },
+  iconLink:      { display: 'flex', alignItems: 'center', lineHeight: 0 },
   btnRow:       { display: 'flex', gap: 8 },
   submitBtn:    { flex: 1, padding: '10px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 },
   cancelBtn:    { padding: '10px 16px', borderRadius: 8, background: '#fff', border: '1px solid #ddd', cursor: 'pointer' },
