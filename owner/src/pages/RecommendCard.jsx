@@ -41,6 +41,9 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context }
       <div style={styles.body}>
         <div style={styles.title}>{rec.title}</div>
         <div style={styles.meta}>
+          {rec.platform === 'soundcloud' && (
+            <span style={styles.scBadge}>SC</span>
+          )}
           {rec.channel_title}{rec.duration && ` · ${rec.duration}`}
           {rec.requester_name && ` · 추천: ${rec.requester_name}`}
         </div>
@@ -97,4 +100,5 @@ const styles = {
   nowPlaying: { fontSize: 12, color: '#2196f3', fontWeight: 700 },
   queuedLabel:{ fontSize: 12, color: '#4caf50', fontWeight: 600 },
   skipBtn:    { fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', background: '#ff9800', color: '#fff', cursor: 'pointer', fontWeight: 600 },
+  scBadge:    { fontSize: 10, fontWeight: 700, color: '#fff', background: '#ff5500', padding: '1px 5px', borderRadius: 3, marginRight: 4 },
 };
