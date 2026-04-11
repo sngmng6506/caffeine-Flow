@@ -63,7 +63,7 @@ function preloadYoutube() {
     }
   });
 
-  youtubeView.webContents.loadURL('https://www.youtube.com');
+  youtubeView.webContents.loadURL('https://www.google.com');
   // mainWindow에는 붙이지 않음 — 로그인 시 attachYoutube()에서 붙임
 }
 
@@ -159,7 +159,7 @@ ipcMain.on('stop-video', () => {
     currentVideoId = defaultVideoId;
     mainWindow.webContents.send('default-playing', true);
   } else {
-    youtubeView.webContents.loadURL('https://www.youtube.com');
+    youtubeView.webContents.loadURL('https://www.google.com');
   }
 });
 
