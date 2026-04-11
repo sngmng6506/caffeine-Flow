@@ -133,10 +133,20 @@ ipcMain.on('hide-youtube', () => {
   mainWindow.webContents.send('youtube-state', false);
 });
 
-// 수락 시 해당 URL로 중개 (autoplay 없음)
+// 수락 시 해당 URL로 중개 (autoplay 없음 — 로드 후 video.pause() 주입)
 ipcMain.on('navigate-video', (_e, videoId) => {
   if (!youtubeView) preloadYoutube();
   youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}`);
+  youtubeView.webContents.once('did-finish-load', () => {
+    youtubeView.webContents.executeJavaScript(`
+      const tryPause = (n = 0) => {
+        const v = document.querySelector('video');
+        if (v) { v.pause(); }
+        else if (n < 15) setTimeout(() => tryPause(n + 1), 300);
+      };
+      tryPause();
+    `).catch(() => {});
+  });
 });
 
 // [자동재생 비활성화] 신청곡 재생 → 현재 URL 저장 후 해당 영상으로 이동
