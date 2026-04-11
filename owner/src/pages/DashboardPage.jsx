@@ -176,7 +176,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         });
         setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [...prev, rec]);
         handleClearDefault();
-        // [자동재생 비활성화] if (targetStatus === 'playing') window.electronAPI?.playVideo(data.videoId);
+        if (targetStatus === 'playing') window.electronAPI?.navigateVideo(data.videoId);
         return;
       }
 
@@ -186,7 +186,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       if (!rec) return;
       const updated = await updateRec(cafe.slug, id, targetStatus);
       handleUpdate(updated);
-      // [자동재생 비활성화] if (targetStatus === 'playing') window.electronAPI?.playVideo(rec.video_id);
+      if (targetStatus === 'playing') window.electronAPI?.navigateVideo(rec.video_id);
     } catch (err) { console.error(err); }
   }
 
