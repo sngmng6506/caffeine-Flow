@@ -133,18 +133,31 @@ ipcMain.on('hide-youtube', () => {
   mainWindow.webContents.send('youtube-state', false);
 });
 
-// 수락 시 해당 URL로 중개 (autoplay 없음 — 로드 후 video.pause() 주입)
+// 수락 시 해당 URL로 중개 (autoplay 없음 — 첫 번째 play 이벤트만 차단)
 ipcMain.on('navigate-video', (_e, videoId) => {
   if (!youtubeView) preloadYoutube();
   youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}`);
-  youtubeView.webContents.once('did-finish-load', () => {
+  youtubeView.webContents.once('dom-ready', () => {
     youtubeView.webContents.executeJavaScript(`
-      const tryPause = (n = 0) => {
-        const v = document.querySelector('video');
-        if (v) { v.pause(); }
-        else if (n < 15) setTimeout(() => tryPause(n + 1), 300);
-      };
-      tryPause();
+      (() => {
+        const setup = () => {
+          const v = document.querySelector('video');
+          if (!v || v._noAutoplay) return;
+          v._noAutoplay = true;
+          let blocked = true;
+          v.addEventListener('play', function block() {
+            if (blocked) {
+              v.pause();
+              blocked = false;
+              v.removeEventListener('play', block);
+            }
+          });
+        };
+        const mo = new MutationObserver(setup);
+        mo.observe(document, { childList: true, subtree: true });
+        setTimeout(() => mo.disconnect(), 10000);
+        setup();
+      })();
     `).catch(() => {});
   });
 });
