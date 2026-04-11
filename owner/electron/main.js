@@ -30,22 +30,22 @@ function preloadYoutube() {
     },
   });
 
-  youtubeView.webContents.on('ipc-message', (_e, channel) => {
-    if (channel === 'youtube-video-ended') {
-      if (!currentVideoId) return;
-      // 기본 재생 곡이 끝나면 React에 알리지 않고 바로 루프
-      if (currentVideoId === defaultVideoId) {
-        currentVideoId = null;
-        mainWindow.webContents.send('default-playing', false);
-        youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${defaultVideoId}&autoplay=1`);
-        currentVideoId = defaultVideoId;
-        mainWindow.webContents.send('default-playing', true);
-        return;
-      }
-      currentVideoId = null;
-      mainWindow.webContents.send('video-ended');
-    }
-  });
+  // [자동재생 비활성화] 영상 종료 감지 → 큐 자동 진행
+  // youtubeView.webContents.on('ipc-message', (_e, channel) => {
+  //   if (channel === 'youtube-video-ended') {
+  //     if (!currentVideoId) return;
+  //     if (currentVideoId === defaultVideoId) {
+  //       currentVideoId = null;
+  //       mainWindow.webContents.send('default-playing', false);
+  //       youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${defaultVideoId}&autoplay=1`);
+  //       currentVideoId = defaultVideoId;
+  //       mainWindow.webContents.send('default-playing', true);
+  //       return;
+  //     }
+  //     currentVideoId = null;
+  //     mainWindow.webContents.send('video-ended');
+  //   }
+  // });
 
   // 현재 재생 영상 감지 → React에 전달
   youtubeView.webContents.on('page-title-updated', (_e, title) => {
@@ -133,35 +133,40 @@ ipcMain.on('hide-youtube', () => {
   mainWindow.webContents.send('youtube-state', false);
 });
 
-// 신청곡 재생 → 현재 URL 저장 후 해당 영상으로 이동
-ipcMain.on('play-video', (_e, videoId) => {
+// 수락 시 해당 URL로 중개 (autoplay 없음)
+ipcMain.on('navigate-video', (_e, videoId) => {
   if (!youtubeView) preloadYoutube();
-  const current = youtubeView.webContents.getURL();
-  // 큐 재생 중(prevYoutubeUrl 이미 있음)엔 덮어쓰지 않음 — 원래 보던 영상으로 복귀하기 위해
-  if (!prevYoutubeUrl) {
-    prevYoutubeUrl = (current && current !== 'about:blank') ? current : null;
-    mainWindow.webContents.send('queue-restore', prevYoutubeUrl);
-  }
-  currentVideoId = null;  // 네비게이션 중 오감지 방지
-  mainWindow.webContents.send('default-playing', false);
-  youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}&autoplay=1`);
-  currentVideoId = videoId;
+  youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}`);
 });
 
-// 추천곡 대기열 소진 → 기본 재생 곡 or 이전 URL 복원
-ipcMain.on('stop-video', () => {
-  currentVideoId = null;
-  prevYoutubeUrl = null;
-  mainWindow.webContents.send('queue-restore', null);
-  if (!youtubeView) return;
-  if (defaultVideoId) {
-    youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${defaultVideoId}&autoplay=1`);
-    currentVideoId = defaultVideoId;
-    mainWindow.webContents.send('default-playing', true);
-  } else {
-    youtubeView.webContents.loadURL('https://www.google.com');
-  }
-});
+// [자동재생 비활성화] 신청곡 재생 → 현재 URL 저장 후 해당 영상으로 이동
+// ipcMain.on('play-video', (_e, videoId) => {
+//   if (!youtubeView) preloadYoutube();
+//   const current = youtubeView.webContents.getURL();
+//   if (!prevYoutubeUrl) {
+//     prevYoutubeUrl = (current && current !== 'about:blank') ? current : null;
+//     mainWindow.webContents.send('queue-restore', prevYoutubeUrl);
+//   }
+//   currentVideoId = null;
+//   mainWindow.webContents.send('default-playing', false);
+//   youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${videoId}&autoplay=1`);
+//   currentVideoId = videoId;
+// });
+
+// [자동재생 비활성화] 추천곡 대기열 소진 → 기본 재생 곡 or 이전 URL 복원
+// ipcMain.on('stop-video', () => {
+//   currentVideoId = null;
+//   prevYoutubeUrl = null;
+//   mainWindow.webContents.send('queue-restore', null);
+//   if (!youtubeView) return;
+//   if (defaultVideoId) {
+//     youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${defaultVideoId}&autoplay=1`);
+//     currentVideoId = defaultVideoId;
+//     mainWindow.webContents.send('default-playing', true);
+//   } else {
+//     youtubeView.webContents.loadURL('https://www.google.com');
+//   }
+// });
 
 ipcMain.on('set-default-video', (_e, videoId) => { defaultVideoId = videoId; });
 ipcMain.on('clear-default-video', () => { defaultVideoId = null; });

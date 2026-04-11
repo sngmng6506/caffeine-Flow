@@ -83,21 +83,21 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
     if (saved) window.electronAPI?.setDefaultVideo(saved.videoId);
 
-    // YouTube 영상 자동 종료 감지 → 현재 playing 곡을 played 처리 후 다음 곡
-    window.electronAPI?.onVideoEnded(() => {
-      if (videoEndingRef.current) return;  // 이중 발화 방지
-      videoEndingRef.current = true;
-      const playing = recsRef.current.find(r => r.status === 'playing');
-      if (!playing) { videoEndingRef.current = false; return; }
-      updateRec(cafe.slug, playing.id, 'played')
-        .then(updated => {
-          setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
-          const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
-          playNextOrStop(latest);
-        })
-        .catch(console.error)
-        .finally(() => { videoEndingRef.current = false; });
-    });
+    // [자동재생 비활성화] YouTube 영상 자동 종료 감지 → 큐 자동 진행
+    // window.electronAPI?.onVideoEnded(() => {
+    //   if (videoEndingRef.current) return;
+    //   videoEndingRef.current = true;
+    //   const playing = recsRef.current.find(r => r.status === 'playing');
+    //   if (!playing) { videoEndingRef.current = false; return; }
+    //   updateRec(cafe.slug, playing.id, 'played')
+    //     .then(updated => {
+    //       setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
+    //       const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
+    //       playNextOrStop(latest);
+    //     })
+    //     .catch(console.error)
+    //     .finally(() => { videoEndingRef.current = false; });
+    // });
 
     return () => {
       disconnectSocket();
@@ -176,7 +176,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         });
         setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [...prev, rec]);
         handleClearDefault();
-        if (targetStatus === 'playing') window.electronAPI?.playVideo(data.videoId);
+        // [자동재생 비활성화] if (targetStatus === 'playing') window.electronAPI?.playVideo(data.videoId);
         return;
       }
 
@@ -186,7 +186,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       if (!rec) return;
       const updated = await updateRec(cafe.slug, id, targetStatus);
       handleUpdate(updated);
-      if (targetStatus === 'playing') window.electronAPI?.playVideo(rec.video_id);
+      // [자동재생 비활성화] if (targetStatus === 'playing') window.electronAPI?.playVideo(rec.video_id);
     } catch (err) { console.error(err); }
   }
 
@@ -202,31 +202,32 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     } catch (err) { console.error(err); }
   }
 
-  function playNextOrStop(currentRecs) {
-    // accepted(명시적 대기열) 우선, 없으면 pending(득표순)
-    const accepted = currentRecs.filter(r => r.status === 'accepted')
-      .sort((a, b) => new Date(a.requested_at) - new Date(b.requested_at));
-    const pending  = currentRecs.filter(r => r.status === 'pending')
-      .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-    const nextSong = accepted[0] || pending[0];
-    if (nextSong) {
-      updateRec(cafe.slug, nextSong.id, 'playing')
-        .then(played => {
-          setRecs(prev => prev.map(r => r.id === played.id ? played : r));
-          window.electronAPI?.playVideo(played.video_id);
-        })
-        .catch(console.error);
-    } else {
-      window.electronAPI?.stopVideo();
-    }
-  }
+  // [자동재생 비활성화] 큐 자동 진행 함수
+  // function playNextOrStop(currentRecs) {
+  //   const accepted = currentRecs.filter(r => r.status === 'accepted')
+  //     .sort((a, b) => new Date(a.requested_at) - new Date(b.requested_at));
+  //   const pending  = currentRecs.filter(r => r.status === 'pending')
+  //     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
+  //   const nextSong = accepted[0] || pending[0];
+  //   if (nextSong) {
+  //     updateRec(cafe.slug, nextSong.id, 'playing')
+  //       .then(played => {
+  //         setRecs(prev => prev.map(r => r.id === played.id ? played : r));
+  //         window.electronAPI?.playVideo(played.video_id);
+  //       })
+  //       .catch(console.error);
+  //   } else {
+  //     window.electronAPI?.stopVideo();
+  //   }
+  // }
 
   function handleUpdate(updated) {
     setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
-    if (updated.status === 'played' || updated.status === 'skipped') {
-      const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
-      playNextOrStop(latest);
-    }
+    // [자동재생 비활성화]
+    // if (updated.status === 'played' || updated.status === 'skipped') {
+    //   const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
+    //   playNextOrStop(latest);
+    // }
   }
   function handleDelete(id) { setRecs(prev => prev.filter(r => r.id !== id)); }
 
@@ -396,7 +397,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
                 : accepted.length > 0
                   ? accepted.map(r => (
                       <RecommendCard key={r.id} slug={cafe.slug} rec={r}
-                        onUpdate={handleUpdate} onDelete={handleDelete} context="accepted" hasPlaying={hasPlaying} />
+                        onUpdate={handleUpdate} onDelete={handleDelete} context="accepted" />
                     ))
                   : <div style={styles.emptySlot}>대기 중인 곡 없음</div>
               }

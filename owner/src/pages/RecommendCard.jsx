@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { updateRec, deleteRec } from '../api';
 
-export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, hasPlaying }) {
+export default function RecommendCard({ slug, rec, onUpdate, onDelete, context }) {
   const [loading, setLoading] = useState(false);
 
   async function handle(action) {
@@ -13,9 +13,13 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
       } else {
         const updated = await updateRec(slug, rec.id, action);
         onUpdate(updated);
-        if (window.electronAPI && action === 'playing') {
-          window.electronAPI.playVideo(rec.video_id);
+        if (window.electronAPI && action === 'accepted') {
+          window.electronAPI.navigateVideo(rec.video_id);
         }
+        // [자동재생 비활성화]
+        // if (window.electronAPI && action === 'playing') {
+        //   window.electronAPI.playVideo(rec.video_id);
+        // }
       }
     } catch (e) {
       console.error(e.message);
@@ -62,15 +66,13 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
         {context === 'pending' && (
           <div style={styles.actions}>
             <button
-              onClick={() => handle(hasPlaying ? 'accepted' : 'playing')}
+              onClick={() => handle('accepted')}
               disabled={loading}
-              style={{ ...styles.btn, background: hasPlaying ? '#4caf50' : '#2196f3' }}
+              style={{ ...styles.btn, background: '#4caf50' }}
             >
-              {hasPlaying ? '대기열 추가' : '재생'}
+              수락
             </button>
-            {hasPlaying && (
-              <button onClick={() => handle('skipped')} disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
-            )}
+            <button onClick={() => handle('skipped')} disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
           </div>
         )}
 
