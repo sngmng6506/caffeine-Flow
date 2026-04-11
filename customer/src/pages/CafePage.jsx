@@ -32,6 +32,7 @@ export default function CafePage({ slug }) {
   const [successMsg, setSuccessMsg]     = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
   const [historyLimit, setHistoryLimit] = useState(10);
+  const [historyExpanded, setHistoryExpanded] = useState(null);
   const deviceName = getDeviceName();
 
   const nowPlaying = recs.find(r => r.status === 'playing') || null;
@@ -188,7 +189,17 @@ export default function CafePage({ slug }) {
           {history.length > 0 && (
             <section>
               {history.slice(0, historyLimit).map(r => (
-                <SongCard key={r.id} slug={slug} rec={r} onUpdate={handleUpdate} showDate />
+                <div key={r.id}>
+                  <div
+                    onClick={() => setHistoryExpanded(v => v === r.video_id ? null : r.video_id)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} showDate />
+                  </div>
+                  {historyExpanded === r.video_id && (
+                    <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
+                  )}
+                </div>
               ))}
               {historyLimit < history.length && (
                 <button onClick={() => setHistoryLimit(p => p + 10)} style={styles.loadMoreBtn}>
