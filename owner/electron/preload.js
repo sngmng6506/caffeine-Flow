@@ -1,8 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  playVideo:        (videoId) => ipcRenderer.send('play-video', videoId),
-  stopVideo:        ()        => ipcRenderer.send('stop-video'),
+  navigateVideo:    (videoId) => ipcRenderer.send('navigate-video', videoId),
+  // [자동재생 비활성화]
+  // playVideo:     (videoId) => ipcRenderer.send('play-video', videoId),
+  // stopVideo:     ()        => ipcRenderer.send('stop-video'),
   showYoutube:      ()        => ipcRenderer.send('show-youtube'),
   hideYoutube:      ()        => ipcRenderer.send('hide-youtube'),
   setDefaultVideo:  (videoId) => ipcRenderer.send('set-default-video', videoId),
