@@ -224,7 +224,8 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
   if (loading && items.length === 0) return <div style={styles.center}>불러오는 중...</div>;
   if (!loading && items.length === 0) return <div style={styles.empty}>아직 데이터가 없습니다.</div>;
 
-  const sorted = [...items].sort((a, b) => {
+  const ranked = items.map((item, i) => ({ ...item, fixedRank: i + 1 }));
+  const sorted = [...ranked].sort((a, b) => {
     if (sortBy === 'votes') {
       const diff = (b.total_votes || 0) - (a.total_votes || 0);
       return diff !== 0 ? diff : b.count - a.count;
@@ -241,13 +242,13 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
         <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>추천순</button>
       </div>
     <ol style={styles.rankList}>
-      {sorted.map((item, i) => (
+      {sorted.map((item) => (
         <li key={item.video_id} style={styles.rankItem}>
           <div
             style={styles.rankRow}
             onClick={() => setExpanded(v => v === item.video_id ? null : item.video_id)}
           >
-            <span style={styles.rank}>{i + 1}</span>
+            <span style={styles.rank}>{item.fixedRank}</span>
             <img src={item.thumbnail} alt="" style={styles.thumb} />
             <div style={styles.rankInfo}>
               <div style={styles.rankTitle}>{item.title}</div>
