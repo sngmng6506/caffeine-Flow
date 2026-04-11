@@ -566,20 +566,10 @@ function QRTab({ url, cafeName }) {
         }
       `}</style>
 
-      {/* 포스터 카드 */}
+      {/* QR 카드 */}
       <div style={qrStyles.poster} className="print-poster">
-        <div style={qrStyles.posterHeader}>
-          <div style={qrStyles.brand}>☕ Caffeine Flow</div>
-          <div style={qrStyles.tagline}>카페 음악 추천 커뮤니티</div>
-        </div>
-        <div style={qrStyles.posterBody}>
-          <div style={qrStyles.cta}>지금 듣고 싶은 음악을<br />이야기해요</div>
-          <div style={qrStyles.qrWrap}>
-            <img src={qrUrl} alt="QR 코드" style={qrStyles.qrImg} />
-          </div>
-        </div>
-        <div style={qrStyles.posterFooter}>
-          {/* <span style={qrStyles.devInfo}>dev info. github.com/sngmng6506</span> */}
+        <div style={qrStyles.qrWrap}>
+          <img src={qrUrl} alt="QR 코드" style={qrStyles.qrImg} />
         </div>
       </div>
 
@@ -667,14 +657,13 @@ const styles = {
 
 const qrStyles = {
   outer:          { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, paddingTop: 16 },
-  poster:         { width: 320, borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.10)', border: '1px solid #eee', fontFamily: 'sans-serif' },
-  posterHeader:   { background: '#1a1a2e', padding: '20px 24px 16px', textAlign: 'center' },
+  poster:         { borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.10)', border: '1px solid #eee', display: 'inline-flex' },
   brand:          { fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.5px' },
   tagline:        { fontSize: 11, color: '#aaa', marginTop: 4, letterSpacing: 1 },
   posterBody:     { background: '#fff', padding: '24px 24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 },
   cta:            { fontSize: 15, fontWeight: 600, color: '#1a1a2e', textAlign: 'center', lineHeight: 1.6 },
-  qrWrap:         { background: '#f8f8f8', borderRadius: 12, padding: 12 },
-  qrImg:          { display: 'block', width: 200, height: 200 },
+  qrWrap:         { background: '#fff', padding: 20 },
+  qrImg:          { display: 'block', width: 240, height: 240 },
   posterCafeName: { fontSize: 14, fontWeight: 700, color: '#333' },
   urlText:        { fontSize: 10, color: '#bbb', wordBreak: 'break-all', textAlign: 'center' },
   posterFooter:   { background: '#f8f8f8', padding: '10px 24px', textAlign: 'center', borderTop: '1px solid #eee' },
