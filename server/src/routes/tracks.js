@@ -64,14 +64,10 @@ router.get('/oembed', async (req, res) => {
       const { data } = await axios.get('https://soundcloud.com/oembed', {
         params: { url: trackUrl, format: 'json' },
       });
-      // SoundCloud oEmbed title은 "Track by Artist" 형식 → " by Artist" 제거
-      const scTitle = data.author_name && data.title.endsWith(` by ${data.author_name}`)
-        ? data.title.slice(0, -` by ${data.author_name}`.length)
-        : data.title;
       return res.json({
         platform,
         videoId:      trackUrl,           // SoundCloud는 track URL을 ID로 사용
-        title:        scTitle,
+        title:        data.title,
         channelTitle: data.author_name,
         thumbnail:    data.thumbnail_url || null,
       });
