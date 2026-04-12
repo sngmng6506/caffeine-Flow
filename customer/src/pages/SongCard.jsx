@@ -6,7 +6,7 @@ const statusLabel = { pending: '대기', accepted: '수락', playing: '재생 �
 const statusColor = { pending: '#888', accepted: '#4caf50', playing: '#2196f3', played: '#9e9e9e', rejected: '#f44336', skipped: '#ff9800' };
 const platformBadge = { youtube: { label: 'YT', bg: '#ff0000' }, soundcloud: { label: 'SC', bg: '#ff5500' }, spotify: { label: 'SP', bg: '#1db954' } };
 
-export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, position, isMyRequest, hideStatus }) {
+export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, position, isMyRequest, hideStatus, expanded }) {
   const [error, setError] = useState('');
   const voted = hasVoted(slug, rec.id);
   const cancellable = isMyRequest && (rec.status === 'pending' || rec.status === 'accepted');
@@ -78,7 +78,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
 
         {error && <div style={styles.error}>{error}</div>}
       </div>
-      <span style={styles.commentHint}>▼</span>
+      <span style={styles.commentHint}>{expanded ? '▲' : '▼'}</span>
     </div>
   );
 }
