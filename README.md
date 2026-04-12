@@ -1,7 +1,28 @@
+# ☕ Caffeine Flow v2
 
+> 카페 음악 추천 커뮤니티 플랫폼 — 손님이 QR코드로 음악을 신청하고, 사장님이 직접 재생을 결정합니다.
+
+---
 
 ## 개요
 
+| 구분 | v1 (레거시) | v2 (현재) |
+|------|------------|----------|
+| 구조 | 단일 카페, 파일 저장 | 멀티테넌시, PostgreSQL |
+| 재생 | 자동 재생 | 사장님이 직접 결정 |
+| 프론트엔드 | Vanilla JS | React (Vite) + Electron |
+| 인증 | 토큰 1개 | Google/Naver OAuth (사장님) |
+
+---
+
+## 아키텍처
+
+```
+손님 (React Web)          중앙 서버 (Node.js)         사장님 (Electron + React)
+  customer/ :5173   ◄──► server/ :3000            ◄──► owner/ :5174
+  QR → /:slug             Express + Socket.IO            YouTube BrowserView
+  추천/투표/댓글           PostgreSQL (Supabase)          실시간 재생 제어
+```
 
 ---
 
@@ -65,6 +86,20 @@ caffeine-flow/
 ```
 
 ---
+
+## DB 스키마
+
+| 테이블 | 설명 |
+|--------|------|
+| `cafes` | 카페 (google_id, naver_id, notice, last_login_at 포함) |
+| `recommendations` | 신청곡 큐 + 이력 통합 |
+| `votes` | IP당 1회 투표 (취소 가능) |
+| `song_comments` | TOP 항목 댓글/대댓글 (video_id 기준, 전 카페 공유) |
+| `cafe_visits` | 손님 방문 기록 (IP 기준, 하루 1회) |
+| `daily_stats` | 일별 집계 (스키마 예약) |
+
+추천곡 상태 흐름: `pending → accepted → playing → played`  
+거절/스킵: `pending/accepted → rejected/skipped`
 
 ---
 
@@ -164,6 +199,198 @@ caffeine-flow/
 | `queue-restore` | Main → React | 큐 재생 완료 후 복귀 URL |
 
 ---
+
+## 시작하기
+
+### 환경 변수 설정
+
+루트 `.env` (`.env.example` 참고):
+
+```env
+PORT=3000
+DATABASE_URL=postgresql://...
+JWT_SECRET=your-jwt-secret
+GOOGLE_CLIENT_ID=...
+NAVER_CLIENT_ID=...
+NAVER_CLIENT_SECRET=...
+APP_URL=http://localhost:5174
+SERVER_URL=http://localhost:5174
+```
+
+`owner/.env`:
+```env
+VITE_GOOGLE_CLIENT_ID=...
+VITE_NAVER_ENABLED=true   # 네이버 준비 완료 시
+```
+
+### DB 마이그레이션
+
+```bash
+cd server
+npm install
+npm run migrate
+```
+
+### 실행
+
+```bash
+# 터미널 1 — 서버 (시작 시 카페별 QR코드 출력)
+cd server && npm run dev
+
+# 터미널 2 — 사장님 앱 (Electron + React)
+cd owner && npm install && npm run electron:dev
+
+# 터미널 3 — 손님 앱 개발 서버 (선택)
+cd customer && npm install && npm run dev
+```
+
+### 모바일 테스트 (빌드 후 QR 접속)
+
+```bash
+cd customer && npm run build   # server/public/ 에 빌드
+cd server && npm run dev       # 터미널에 카페별 QR 출력
+```
+
+| 앱 | URL |
+|----|-----|
+| 서버 | http://localhost:3000 |
+| 손님 (개발) | http://localhost:5173/:slug |
+| 손님 (빌드) | http://서버IP:3000/:slug |
+| 사장님 | Electron 앱 (http://localhost:5174 개발 시) |
+
+---
+
+## 배포 가이드
+
+### 전체 구조
+
+```
+[Railway — 클라우드]           [사장님 PC]
+  server/ (Node.js API)  ◄──►  owner/ (Electron 앱)
+  server/public/ (손님 React)
+  PostgreSQL DB
+        ↑
+  [손님 스마트폰]
+  브라우저로 QR 접속
+```
+
+- **서버 + 손님 앱** → Railway에 배포
+- **사장님 앱** → Electron이므로 PC에서 직접 실행
+- **손님 앱** → `customer/`를 빌드하면 `server/public/`에 포함되어 서버가 함께 서빙
+
+---
+
+### 1단계: Railway에 PostgreSQL DB 만들기
+
+1. [railway.app](https://railway.app) 가입 및 로그인
+2. **New Project → Add Service → Database → PostgreSQL** 클릭
+3. 생성 후 **Variables 탭** → `DATABASE_URL` 값 복사해두기
+
+---
+
+### 2단계: 손님 앱 빌드
+
+```bash
+cd customer
+npm install
+npm run build
+```
+
+`server/public/`에 빌드 결과물이 생성됩니다. 빌드 결과물도 git에 커밋해야 Railway에서 서빙됩니다.
+
+```bash
+git add server/public
+git commit -m "build: customer app"
+git push
+```
+
+---
+
+### 3단계: Railway에 서버 배포
+
+1. Railway 프로젝트에서 **Add Service → GitHub Repo** → 이 레포 선택
+2. 서비스 설정에서 **Root Directory를 `server`로 지정** (중요)
+3. **Variables 탭**에서 환경변수 입력:
+
+```env
+DATABASE_URL=<1단계에서 복사한 값>
+JWT_SECRET=<임의의 긴 랜덤 문자열>
+GOOGLE_CLIENT_ID=<Google OAuth 클라이언트 ID>
+NAVER_CLIENT_ID=<Naver OAuth 클라이언트 ID>
+NAVER_CLIENT_SECRET=<Naver OAuth 시크릿>
+PORT=3000
+```
+
+4. **Deploy** → 자동으로 `npm start` 실행
+
+배포 완료 후 Railway가 제공하는 도메인 확인 (예: `https://your-app.up.railway.app`)
+
+---
+
+### 4단계: DB 마이그레이션 실행
+
+Railway 서비스 페이지 → **Shell 탭** 열기:
+
+```bash
+npm run migrate
+```
+
+---
+
+### 5단계: Google OAuth 리디렉션 URI 등록
+
+[Google Cloud Console](https://console.cloud.google.com) → OAuth 클라이언트 → **승인된 리디렉션 URI** 추가:
+
+```
+https://your-app.up.railway.app/api/v1/auth/google/callback
+```
+
+---
+
+### 6단계: 사장님 Electron 앱 설정
+
+`owner/.env`에 Railway 서버 주소 추가:
+
+```env
+VITE_GOOGLE_CLIENT_ID=...
+VITE_NAVER_ENABLED=true
+VITE_SERVER_URL=https://your-app.up.railway.app
+```
+
+그 후 사장님 앱 재빌드:
+
+```bash
+cd owner
+npm install
+npm run electron:dev   # 개발 확인용
+# 또는 패키징:
+npm run build
+```
+
+---
+
+### 배포 후 확인
+
+| 항목 | 확인 방법 |
+|------|-----------|
+| 서버 정상 동작 | `https://your-app.up.railway.app/api/v1/cafes` 접속 |
+| 손님 앱 | `https://your-app.up.railway.app/<카페slug>` 접속 |
+| QR 코드 | 사장님 앱 → QR 코드 탭에서 올바른 URL 확인 |
+| DB 연결 | Railway 서버 로그에서 에러 없는지 확인 |
+
+---
+
+## 구현 현황
+
+- [x] Phase 0 — 프로젝트 구조 + DB 마이그레이션
+- [x] Phase 1 — 서버 멀티테넌시 (REST API, Socket.IO)
+- [x] Phase 2 — 손님 React 앱
+- [x] Phase 3 — 사장님 React 앱 (OAuth, 통계, 공지, QR)
+- [x] Phase 4 — Electron 래퍼 (YouTube BrowserView, IPC, 큐 자동 진행)
+- [ ] Phase 5 — 크로스 카페 트렌드 / 플랫폼 어드민
+
+---
+
 ## 기술 스택
 
 | 구분 | 기술 |
