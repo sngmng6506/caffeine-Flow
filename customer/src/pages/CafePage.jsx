@@ -9,7 +9,7 @@ import SongCard from './SongCard';
 function getTabs(cafeName) {
   return [
     { id: 'queue',     label: '추천곡' },
-    { id: 'history',  label: '최근 7일 이력' },
+    { id: 'history',  label: '최근 7일' },
     { id: 'cafeTop',  label: cafeName ? `${cafeName} TOP` : '카페 TOP' },
     { id: 'globalTop', label: '전체 TOP' },
   ];
@@ -177,7 +177,7 @@ export default function CafePage({ slug }) {
                     style={{ cursor: 'pointer' }}
                   >
                     <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={i + 1}
-                      isMyRequest={r.requester_name === deviceName} />
+                      isMyRequest={r.requester_name === deviceName} hideStatus />
                   </div>
                   {queueExpanded === r.video_id && (
                     <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
@@ -462,7 +462,7 @@ const styles = {
   rankMeta:       { fontSize: 12, color: '#888', marginTop: 2 },
   chevron:        { fontSize: 11, color: '#aaa', flexShrink: 0 },
 
-  commentSection: { padding: '12px 0 16px 36px', background: '#fafafa', borderRadius: 8, marginBottom: 4 },
+  commentSection: { padding: '12px 12px 16px 16px', background: '#fafafa', borderRadius: 8, marginBottom: 4 },
   commentForm:    { marginBottom: 12 },
   commentInputRow:{ display: 'flex', gap: 10, alignItems: 'flex-start' },
   deviceName:     { fontSize: 12, color: '#888', marginBottom: 8 },
