@@ -40,7 +40,7 @@ export default function CafePage({ slug }) {
   const queue = recs
     .filter(r => r.status === 'pending' || r.status === 'accepted')
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-  const history = recs.filter(r => r.status === 'played' || r.status === 'skipped' || r.status === 'rejected');
+  const history = recs.filter(r => r.status === 'played');
 
   useEffect(() => {
     getRecommendations(slug)
