@@ -177,7 +177,7 @@ export default function CafePage({ slug }) {
                     style={{ cursor: 'pointer' }}
                   >
                     <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={i + 1}
-                      isMyRequest={r.requester_name === deviceName} hideStatus />
+                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.video_id} />
                   </div>
                   {queueExpanded === r.video_id && (
                     <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
@@ -205,7 +205,7 @@ export default function CafePage({ slug }) {
                     onClick={() => setHistoryExpanded(v => v === r.video_id ? null : r.video_id)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} showDate />
+                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} showDate expanded={historyExpanded === r.video_id} />
                   </div>
                   {historyExpanded === r.video_id && (
                     <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
