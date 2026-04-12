@@ -40,7 +40,7 @@ function SoundCloudIcon() {
   );
 }
 
-export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
+export default function RecommendForm({ slug, onAdded, activeVideoIds = [], playingVideoId }) {
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -54,6 +54,11 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [] }) {
     setError('');
     try {
       const data = await getOembed(url.trim());
+      if (data.videoId === playingVideoId) {
+        setError('현재 재생 중인 곡입니다.');
+        setUrl('');
+        return;
+      }
       if (activeVideoIds.includes(data.videoId)) {
         setError('이미 대기 중인 곡입니다. 다른 곡을 추천해주세요.');
         setUrl('');
