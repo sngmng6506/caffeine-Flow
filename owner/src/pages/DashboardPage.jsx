@@ -641,7 +641,6 @@ const styles = {
   tab:               { padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#888', display: 'flex', alignItems: 'center', gap: 6 },
   tabActive:         { color: '#1a1a2e', fontWeight: 700, borderBottom: '2px solid #1a1a2e', marginBottom: -2 },
   badge:             { background: '#e63946', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 11 },
-  sectionTitle:      { fontSize: 14, color: '#888', margin: '20px 0 8px', fontWeight: 600 },
   empty:             { textAlign: 'center', color: '#aaa', padding: '40px 0' },
   section:           { marginBottom: 20, borderRadius: 8, transition: 'background 0.15s' },
   sectionDragOver:   { background: '#f0f7ff', outline: '2px dashed #2196f3', outlineOffset: 2 },
