@@ -5,6 +5,7 @@ import { getDeviceName } from '../deviceName';
 const PLATFORM_BADGE = {
   youtube:    { label: 'YouTube',     bg: '#ff0000', color: '#fff' },
   soundcloud: { label: 'SoundCloud',  bg: '#ff5500', color: '#fff' },
+  spotify:    { label: 'Spotify',     bg: '#1db954', color: '#fff' },
 };
 
 function YouTubeIcon() {
