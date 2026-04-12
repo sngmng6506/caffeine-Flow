@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getStats } from '../api';
+import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getHourlySongs, getStats } from '../api';
 
 const STATUS_FILTER = {
   재생: r => r.status === 'played',
@@ -13,8 +13,8 @@ export default function StatsPanel() {
   const [weekday, setWeekday]     = useState(null);
   const [topSongs, setTopSongs]   = useState(null);
   const [selected, setSelected]         = useState(null);
-  const [selectedHour, setSelectedHour] = useState(null);
-  const [selectedWeekday, setSelectedWeekday] = useState(null); // { index, label, recs, loading }
+  const [selectedHour, setSelectedHour] = useState(null); // { index, recs, hasMore, loading }
+  const [selectedWeekday, setSelectedWeekday] = useState(null); // { index, label, recs, hasMore, loading }
 
 
   useEffect(() => {
@@ -75,14 +75,29 @@ export default function StatsPanel() {
           formatLabel={h => `${h}시`}
           color="#2196f3"
           showEvery={3}
-          selectedIndex={selectedHour}
-          onBarClick={i => setSelectedHour(prev => prev === i ? null : i)}
+          selectedIndex={selectedHour?.index ?? null}
+          onBarClick={i => {
+            if (selectedHour?.index === i) { setSelectedHour(null); return; }
+            setSelectedHour({ index: i, recs: [], hasMore: false, loading: true });
+            getHourlySongs(i)
+              .then(({ items, hasMore }) => setSelectedHour({ index: i, recs: items, hasMore, loading: false }))
+              .catch(() => setSelectedHour({ index: i, recs: [], hasMore: false, loading: false }));
+          }}
         />
-        {selectedHour !== null && (
-          <SongList
-            recs={todayRecs.filter(r => new Date(r.requested_at).getHours() === selectedHour)}
-            label={`오늘 ${selectedHour}시`}
-          />
+        {selectedHour && (
+          selectedHour.loading
+            ? <div style={s.listEmpty}>불러오는 중...</div>
+            : <SongList
+                recs={selectedHour.recs}
+                label={`최근 30일간 ${selectedHour.index}시`}
+                hasMore={selectedHour.hasMore}
+                onMore={() => {
+                  const offset = selectedHour.recs.length;
+                  getHourlySongs(selectedHour.index, offset)
+                    .then(({ items, hasMore }) => setSelectedHour(prev => ({ ...prev, recs: [...prev.recs, ...items], hasMore })))
+                    .catch(() => {});
+                }}
+              />
         )}
       </Section>
 
@@ -99,10 +114,10 @@ export default function StatsPanel() {
           onBarClick={i => {
             if (selectedWeekday?.index === i) { setSelectedWeekday(null); return; }
             const label = ['일', '월', '화', '수', '목', '금', '토'][i];
-            setSelectedWeekday({ index: i, label, recs: null, loading: true });
+            setSelectedWeekday({ index: i, label, recs: [], hasMore: false, loading: true });
             getWeekdaySongs(i)
-              .then(recs => setSelectedWeekday({ index: i, label, recs, loading: false }))
-              .catch(() => setSelectedWeekday({ index: i, label, recs: [], loading: false }));
+              .then(({ items, hasMore }) => setSelectedWeekday({ index: i, label, recs: items, hasMore, loading: false }))
+              .catch(() => setSelectedWeekday({ index: i, label, recs: [], hasMore: false, loading: false }));
           }}
         />
         {selectedWeekday && (
@@ -111,6 +126,13 @@ export default function StatsPanel() {
             : <SongList
                 recs={selectedWeekday.recs}
                 label={`최근 30일간 ${selectedWeekday.label}요일`}
+                hasMore={selectedWeekday.hasMore}
+                onMore={() => {
+                  const offset = selectedWeekday.recs.length;
+                  getWeekdaySongs(selectedWeekday.index, offset)
+                    .then(({ items, hasMore }) => setSelectedWeekday(prev => ({ ...prev, recs: [...prev.recs, ...items], hasMore })))
+                    .catch(() => {});
+                }}
               />
         )}
       </Section>
@@ -139,21 +161,25 @@ export default function StatsPanel() {
   );
 }
 
-function SongList({ recs, label }) {
+function SongList({ recs, label, hasMore, onMore }) {
   if (recs.length === 0) return <div style={s.listEmpty}>{label} 추천된 곡이 없습니다.</div>;
 
   return (
     <div style={s.songList}>
       {recs.map((r, i) => (
-        <div key={r.id} style={s.songItem}>
+        <div key={r.id || `${r.video_id}-${i}`} style={s.songItem}>
           <span style={s.songIdx}>{i + 1}</span>
           <img src={r.thumbnail} alt="" style={s.songThumb} />
           <div style={s.songInfo}>
             <div style={s.songTitle}>{r.title}</div>
             <div style={s.songMeta}>{r.channel_title}</div>
           </div>
+          {r.count > 1 && <span style={s.songCount}>{r.count}건</span>}
         </div>
       ))}
+      {hasMore && (
+        <button onClick={onMore} style={s.moreBtn}>더보기</button>
+      )}
     </div>
   );
 }
@@ -237,7 +263,9 @@ const s = {
   songInfo:        { flex: 1, minWidth: 0 },
   songTitle:       { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   songMeta:        { fontSize: 11, color: '#aaa', marginTop: 2 },
+  songCount:       { fontSize: 12, fontWeight: 700, color: '#2196f3', flexShrink: 0, marginLeft: 'auto', paddingLeft: 8 },
   listEmpty:       { fontSize: 13, color: '#aaa', padding: '16px', textAlign: 'center', background: '#f8f8f8', borderRadius: 10 },
+  moreBtn:         { width: '100%', padding: '10px', background: '#f8f8f8', border: 'none', borderTop: '1px solid #eee', cursor: 'pointer', fontSize: 13, color: '#888' },
 
   chartWrap:       { background: '#f8f8f8', borderRadius: 10, padding: '16px 12px' },
   bars:            { display: 'flex', alignItems: 'flex-end', gap: 2, height: 120 },

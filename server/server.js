@@ -63,6 +63,7 @@ server.listen(PORT, async () => {
     }
   }
 
+  app.set('baseUrl', `http://${localIp}:${PORT}`);
   console.log(`\nCaffeine Flow v2 on http://${localIp}:${PORT}\n`);
 
   try {

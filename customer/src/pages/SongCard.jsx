@@ -62,10 +62,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
           </div>
         )}
 
-        {isMyRequest
-          ? <div style={styles.requesterTag}>나의 추천</div>
-          : rec.requester_name && <div style={styles.requesterTag}>추천: {rec.requester_name}</div>
-        }
+        {!isMyRequest && rec.requester_name && <div style={styles.requesterTag}>추천: {rec.requester_name}</div>}
 
         <div style={styles.actions} onClick={e => e.stopPropagation()}>
           <button onClick={handleVote} style={{ ...styles.voteBtn, ...(voted ? styles.votedBtn : {}) }}>

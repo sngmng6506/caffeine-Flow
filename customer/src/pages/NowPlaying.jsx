@@ -2,7 +2,7 @@ export default function NowPlaying({ rec }) {
   if (!rec) return null;
   return (
     <div style={styles.wrap}>
-      <span style={styles.badge}>▶ 지금 재생 중</span>
+      <span style={styles.badge}>▶ 재생 중</span>
       {rec.thumbnail
         ? <img src={rec.thumbnail} alt="" style={styles.thumb} />
         : <div style={styles.thumbFallback} />

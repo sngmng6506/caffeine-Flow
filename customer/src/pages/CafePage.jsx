@@ -29,6 +29,7 @@ export default function CafePage({ slug }) {
   const [globalTopHasMore, setGlobalTopHasMore] = useState(false);
   const [topLoading, setTopLoading] = useState(false);
   const [topLoaded, setTopLoaded]   = useState({ cafeTop: false, globalTop: false });
+  const [allowedPlatforms, setAllowedPlatforms] = useState(['youtube', 'soundcloud', 'spotify']);
   const [successMsg, setSuccessMsg]     = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
   const [historyLimit, setHistoryLimit] = useState(10);
@@ -44,11 +45,12 @@ export default function CafePage({ slug }) {
 
   useEffect(() => {
     getRecommendations(slug)
-      .then(({ recommendations, is_accepting, notice, cafe_name }) => {
+      .then(({ recommendations, is_accepting, notice, cafe_name, allowed_platforms }) => {
         setRecs(recommendations);
         setIsAccepting(is_accepting);
         setNotice(notice);
         setCafeName(cafe_name);
+        if (allowed_platforms) setAllowedPlatforms(allowed_platforms);
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
@@ -60,11 +62,12 @@ export default function CafePage({ slug }) {
       if (!connected) { connected = true; return; }
       // 재연결 시 놓친 업데이트 복구
       getRecommendations(slug)
-        .then(({ recommendations, is_accepting, notice, cafe_name }) => {
+        .then(({ recommendations, is_accepting, notice, cafe_name, allowed_platforms }) => {
           setRecs(recommendations);
           setIsAccepting(is_accepting);
           setNotice(notice);
           setCafeName(cafe_name);
+          if (allowed_platforms) setAllowedPlatforms(allowed_platforms);
         })
         .catch(() => {});
     });
@@ -78,6 +81,7 @@ export default function CafePage({ slug }) {
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
     socket.on('notice_updated', ({ notice }) => setNotice(notice));
     socket.on('cafe_updated',   ({ cafe_name }) => setCafeName(cafe_name));
+    socket.on('platforms_updated', ({ allowed_platforms }) => setAllowedPlatforms(allowed_platforms));
 
     return () => disconnectSocket();
   }, [slug]);
@@ -150,6 +154,7 @@ export default function CafePage({ slug }) {
           activeVideoIds={recs
             .filter(r => ['pending', 'accepted', 'playing'].includes(r.status))
             .map(r => r.video_id)}
+          allowedPlatforms={allowedPlatforms}
         />
       )}
       {successMsg && <div style={styles.successMsg}>{successMsg}</div>}

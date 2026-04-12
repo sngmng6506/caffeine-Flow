@@ -81,11 +81,26 @@ router.get('/oembed', async (req, res) => {
       const { data } = await axios.get('https://open.spotify.com/oembed', {
         params: { url: rawUrl },
       });
+      // oEmbed에 아티스트명이 없으므로 트랙 페이지 <title>에서 추출
+      let artist = 'Spotify';
+      try {
+        const page = await axios.get(rawUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+          maxRedirects: 5,
+          timeout: 5000,
+        });
+        const m = page.data.match(/<title>(.+?)<\/title>/);
+        if (m) {
+          // 패턴: "곡명 - song and lyrics by 아티스트 | Spotify"
+          const byMatch = m[1].match(/by\s+(.+?)\s*\|\s*Spotify/);
+          if (byMatch) artist = byMatch[1].trim();
+        }
+      } catch {}
       return res.json({
         platform,
         videoId:      rawUrl,
         title:        data.title,
-        channelTitle: data.provider_name || 'Spotify',
+        channelTitle: artist,
         thumbnail:    data.thumbnail_url || null,
       });
     } catch {

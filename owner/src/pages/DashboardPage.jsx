@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory } from '../api';
+import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe } from '../api';
 import { getSocket, disconnectSocket } from '../socket';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
@@ -29,12 +29,13 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [editingNotice, setEditingNotice]   = useState(false);
   const [noticeInput, setNoticeInput]       = useState('');
   const [noticeLoading, setNoticeLoading]   = useState(false);
+  const [allowedPlatforms, setAllowedPlatforms] = useState(['youtube', 'soundcloud', 'spotify']);
+  const [platformSaving, setPlatformSaving] = useState(false);
 
   recsRef.current = recs;
   const queue = recs.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'playing');
 
-  const SERVER_URL = import.meta.env.VITE_SERVER_URL || `${window.location.protocol}//${window.location.hostname}:3000`;
-  const customerUrl = `${SERVER_URL}/${cafe.slug}`;
+  const [customerUrl, setCustomerUrl] = useState('');
 
   useEffect(() => {
     getRecommendations(cafe.slug)
@@ -54,6 +55,16 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    // DB에서 최신 카페 정보 로드 (허용 플랫폼, 손님 URL 등)
+    getMe().then(latest => {
+      if (latest.allowed_platforms) {
+        setAllowedPlatforms(latest.allowed_platforms.split(','));
+      }
+      if (latest.customer_url) {
+        setCustomerUrl(latest.customer_url);
+      }
+    }).catch(() => {});
 
     const socket = getSocket(cafe.slug);
 
@@ -339,6 +350,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         <button onClick={() => handleTabChange('history')} style={{ ...styles.tab, ...(tab === 'history' ? styles.tabActive : {}) }}>이력</button>
         <button onClick={() => handleTabChange('stats')}   style={{ ...styles.tab, ...(tab === 'stats'   ? styles.tabActive : {}) }}>통계</button>
         <button onClick={() => handleTabChange('qr')}      style={{ ...styles.tab, ...(tab === 'qr'      ? styles.tabActive : {}) }}>QR 코드</button>
+        <button onClick={() => handleTabChange('settings')} style={{ ...styles.tab, ...(tab === 'settings' ? styles.tabActive : {}) }}>설정</button>
         <button onClick={() => handleTabChange('contact')} style={{ ...styles.tab, ...(tab === 'contact' ? styles.tabActive : {}) }}>문의</button>
       </div>
 
@@ -456,6 +468,14 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
       {tab === 'stats'   && <StatsPanel />}
       {tab === 'qr'      && <QRTab url={customerUrl} cafeName={cafe.name} />}
+      {tab === 'settings' && <SettingsTab allowedPlatforms={allowedPlatforms} saving={platformSaving} onSave={async (platforms) => {
+        setPlatformSaving(true);
+        try {
+          const { allowed_platforms } = await updatePlatforms(platforms);
+          setAllowedPlatforms(allowed_platforms);
+        } catch (e) { alert(e.message); }
+        finally { setPlatformSaving(false); }
+      }} />}
       {tab === 'contact' && <ContactTab provider={cafe.provider} />}
     </div>
   );
@@ -543,6 +563,77 @@ const dfStyles = {
   input:    { flex: 1, fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', minWidth: 0 },
   setBtn:   { fontSize: 12, padding: '6px 14px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
   error:    { fontSize: 12, color: '#e63946', width: '100%' },
+};
+
+const PLATFORMS = [
+  { id: 'youtube',    label: 'YouTube',    color: '#ff0000' },
+  { id: 'soundcloud', label: 'SoundCloud', color: '#ff5500' },
+  { id: 'spotify',    label: 'Spotify',    color: '#1db954' },
+];
+
+function SettingsTab({ allowedPlatforms, saving, onSave }) {
+  const [selected, setSelected] = useState(allowedPlatforms);
+
+  useEffect(() => { setSelected(allowedPlatforms); }, [allowedPlatforms]);
+
+  function toggle(id) {
+    setSelected(prev => {
+      if (prev.includes(id)) {
+        if (prev.length <= 1) return prev; // 최소 1개
+        return prev.filter(p => p !== id);
+      }
+      return [...prev, id];
+    });
+  }
+
+  const changed = JSON.stringify([...selected].sort()) !== JSON.stringify([...allowedPlatforms].sort());
+
+  return (
+    <div style={settingsStyles.wrap}>
+      <div style={settingsStyles.section}>
+        <div style={settingsStyles.title}>허용 플랫폼</div>
+        <div style={settingsStyles.desc}>손님이 신청할 수 있는 음악 플랫폼을 선택하세요.</div>
+        <div style={settingsStyles.platforms}>
+          {PLATFORMS.map(p => {
+            const active = selected.includes(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => toggle(p.id)}
+                style={{
+                  ...settingsStyles.platformBtn,
+                  ...(active
+                    ? { background: p.color, color: '#fff', borderColor: p.color }
+                    : { background: '#f0f0f0', color: '#aaa', borderColor: '#ddd' }),
+                }}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+        {selected.length === 1 && (
+          <div style={settingsStyles.hint}>최소 1개 플랫폼은 활성화해야 합니다.</div>
+        )}
+        {changed && (
+          <button onClick={() => onSave(selected)} disabled={saving} style={settingsStyles.saveBtn}>
+            {saving ? '저장 중...' : '저장'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const settingsStyles = {
+  wrap:        { paddingTop: 8 },
+  section:     { background: '#f8f8f8', borderRadius: 12, padding: 20 },
+  title:       { fontSize: 15, fontWeight: 700, marginBottom: 4 },
+  desc:        { fontSize: 13, color: '#888', marginBottom: 16 },
+  platforms:   { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
+  hint:        { fontSize: 12, color: '#ff9800', marginTop: 8 },
+  saveBtn:     { marginTop: 16, padding: '10px 28px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
 };
 
 function QRTab({ url, cafeName }) {

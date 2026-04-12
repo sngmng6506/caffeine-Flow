@@ -40,7 +40,7 @@ function SoundCloudIcon() {
   );
 }
 
-export default function RecommendForm({ slug, onAdded, activeVideoIds = [], playingVideoId }) {
+export default function RecommendForm({ slug, onAdded, activeVideoIds = [], playingVideoId, allowedPlatforms = ['youtube', 'soundcloud', 'spotify'] }) {
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -54,6 +54,12 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     setError('');
     try {
       const data = await getOembed(url.trim());
+      if (data.platform && !allowedPlatforms.includes(data.platform)) {
+        const names = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify' };
+        setError(`이 카페에서는 ${names[data.platform] || data.platform} 신청을 받지 않습니다.`);
+        setUrl('');
+        return;
+      }
       if (data.videoId === playingVideoId) {
         setError('현재 재생 중인 곡입니다.');
         setUrl('');
@@ -128,27 +134,34 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   }
 
   const PLATFORM_LINKS = [
-    { icon: <YouTubeIcon />,    href: 'https://www.youtube.com' },
-    { icon: <SpotifyIcon />,    href: 'https://open.spotify.com' },
-    { icon: <SoundCloudIcon />, href: 'https://soundcloud.com' },
+    { id: 'youtube',    icon: <YouTubeIcon />,    href: 'https://www.youtube.com' },
+    { id: 'spotify',    icon: <SpotifyIcon />,    href: 'https://open.spotify.com' },
+    { id: 'soundcloud', icon: <SoundCloudIcon />, href: 'https://soundcloud.com' },
   ];
 
   return (
     <form onSubmit={handlePreview} style={styles.wrap}>
       <div style={styles.platformRow}>
         <div style={styles.platformIcons}>
-          {PLATFORM_LINKS.map(({ icon, href }) => (
-            <a
-              key={href}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              style={styles.iconLink}
-            >
-              {icon}
-            </a>
-          ))}
+          {PLATFORM_LINKS.map(({ id, icon, href }) => {
+            const allowed = allowedPlatforms.includes(id);
+            return allowed ? (
+              <a
+                key={id}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                style={styles.iconLink}
+              >
+                {icon}
+              </a>
+            ) : (
+              <span key={id} style={{ ...styles.iconLink, opacity: 0.25, pointerEvents: 'none' }}>
+                {icon}
+              </span>
+            );
+          })}
         </div>
         <span style={styles.platformHint}>바로 가기</span>
       </div>
