@@ -260,6 +260,126 @@ cd server && npm run dev       # 터미널에 카페별 QR 출력
 
 ---
 
+## 배포 가이드
+
+### 전체 구조
+
+```
+[Railway — 클라우드]           [사장님 PC]
+  server/ (Node.js API)  ◄──►  owner/ (Electron 앱)
+  server/public/ (손님 React)
+  PostgreSQL DB
+        ↑
+  [손님 스마트폰]
+  브라우저로 QR 접속
+```
+
+- **서버 + 손님 앱** → Railway에 배포
+- **사장님 앱** → Electron이므로 PC에서 직접 실행
+- **손님 앱** → `customer/`를 빌드하면 `server/public/`에 포함되어 서버가 함께 서빙
+
+---
+
+### 1단계: Railway에 PostgreSQL DB 만들기
+
+1. [railway.app](https://railway.app) 가입 및 로그인
+2. **New Project → Add Service → Database → PostgreSQL** 클릭
+3. 생성 후 **Variables 탭** → `DATABASE_URL` 값 복사해두기
+
+---
+
+### 2단계: 손님 앱 빌드
+
+```bash
+cd customer
+npm install
+npm run build
+```
+
+`server/public/`에 빌드 결과물이 생성됩니다. 빌드 결과물도 git에 커밋해야 Railway에서 서빙됩니다.
+
+```bash
+git add server/public
+git commit -m "build: customer app"
+git push
+```
+
+---
+
+### 3단계: Railway에 서버 배포
+
+1. Railway 프로젝트에서 **Add Service → GitHub Repo** → 이 레포 선택
+2. 서비스 설정에서 **Root Directory를 `server`로 지정** (중요)
+3. **Variables 탭**에서 환경변수 입력:
+
+```env
+DATABASE_URL=<1단계에서 복사한 값>
+JWT_SECRET=<임의의 긴 랜덤 문자열>
+GOOGLE_CLIENT_ID=<Google OAuth 클라이언트 ID>
+NAVER_CLIENT_ID=<Naver OAuth 클라이언트 ID>
+NAVER_CLIENT_SECRET=<Naver OAuth 시크릿>
+PORT=3000
+```
+
+4. **Deploy** → 자동으로 `npm start` 실행
+
+배포 완료 후 Railway가 제공하는 도메인 확인 (예: `https://your-app.up.railway.app`)
+
+---
+
+### 4단계: DB 마이그레이션 실행
+
+Railway 서비스 페이지 → **Shell 탭** 열기:
+
+```bash
+npm run migrate
+```
+
+---
+
+### 5단계: Google OAuth 리디렉션 URI 등록
+
+[Google Cloud Console](https://console.cloud.google.com) → OAuth 클라이언트 → **승인된 리디렉션 URI** 추가:
+
+```
+https://your-app.up.railway.app/api/v1/auth/google/callback
+```
+
+---
+
+### 6단계: 사장님 Electron 앱 설정
+
+`owner/.env`에 Railway 서버 주소 추가:
+
+```env
+VITE_GOOGLE_CLIENT_ID=...
+VITE_NAVER_ENABLED=true
+VITE_SERVER_URL=https://your-app.up.railway.app
+```
+
+그 후 사장님 앱 재빌드:
+
+```bash
+cd owner
+npm install
+npm run electron:dev   # 개발 확인용
+# 또는 패키징:
+npm run build
+```
+
+---
+
+### 배포 후 확인
+
+| 항목 | 확인 방법 |
+|------|-----------|
+| 서버 정상 동작 | `https://your-app.up.railway.app/api/v1/cafes` 접속 |
+| 손님 앱 | `https://your-app.up.railway.app/<카페slug>` 접속 |
+| QR 코드 | 사장님 앱 → QR 코드 탭에서 올바른 URL 확인 |
+| DB 연결 | Railway 서버 로그에서 에러 없는지 확인 |
+
+---
+
 ## 구현 현황
 
 - [x] Phase 0 — 프로젝트 구조 + DB 마이그레이션
