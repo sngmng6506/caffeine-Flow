@@ -12,7 +12,8 @@ function safeCafe(cafe) {
 router.get('/me', requireAuth, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.owner.slug);
   if (!cafe) return res.status(404).json({ error: 'Not found' });
-  res.json(safeCafe(cafe));
+  const baseUrl = req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
+  res.json({ ...safeCafe(cafe), customer_url: `${baseUrl}/${cafe.slug}` });
 });
 
 // PUT /api/v1/cafes/me
@@ -29,6 +30,21 @@ router.put('/me/notice', requireAuth, async (req, res) => {
   const cafe = await cafeService.update(req.owner.cafeId, { notice: notice?.trim() || null });
   req.app.get('io')?.of('/cafe').to(cafe.slug).emit('notice_updated', { notice: cafe.notice });
   res.json({ notice: cafe.notice });
+});
+
+// PUT /api/v1/cafes/me/platforms  (허용 플랫폼 설정)
+router.put('/me/platforms', requireAuth, async (req, res) => {
+  const { allowed_platforms } = req.body;
+  if (!Array.isArray(allowed_platforms) || allowed_platforms.length === 0) {
+    return res.status(400).json({ error: '최소 1개 플랫폼을 선택해주세요' });
+  }
+  const valid = ['youtube', 'soundcloud', 'spotify'];
+  const filtered = allowed_platforms.filter(p => valid.includes(p));
+  if (filtered.length === 0) return res.status(400).json({ error: '유효한 플랫폼이 없습니다' });
+
+  const cafe = await cafeService.update(req.owner.cafeId, { allowed_platforms: filtered.join(',') });
+  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('platforms_updated', { allowed_platforms: filtered });
+  res.json({ allowed_platforms: filtered });
 });
 
 // PUT /api/v1/cafes/me/status  (신청 ON/OFF 토글)
@@ -80,11 +96,20 @@ router.get('/me/stats/weekday', requireAuth, async (req, res) => {
   res.json(await statsService.getDayOfWeekPattern(req.owner.cafeId));
 });
 
-// GET /api/v1/cafes/me/stats/weekday-songs?day=0  (해당 요일 신청곡)
+// GET /api/v1/cafes/me/stats/hourly-songs?hour=0&offset=0  (해당 시간대 신청곡, 최근 30일)
+router.get('/me/stats/hourly-songs', requireAuth, async (req, res) => {
+  const hour = parseInt(req.query.hour);
+  if (isNaN(hour) || hour < 0 || hour > 23) return res.status(400).json({ error: 'hour는 0~23' });
+  const offset = parseInt(req.query.offset) || 0;
+  res.json(await statsService.getSongsByHour(req.owner.cafeId, hour, offset));
+});
+
+// GET /api/v1/cafes/me/stats/weekday-songs?day=0&offset=0  (해당 요일 신청곡, 최근 30일)
 router.get('/me/stats/weekday-songs', requireAuth, async (req, res) => {
   const day = parseInt(req.query.day);
   if (isNaN(day) || day < 0 || day > 6) return res.status(400).json({ error: 'day는 0~6' });
-  res.json(await statsService.getSongsByWeekday(req.owner.cafeId, day));
+  const offset = parseInt(req.query.offset) || 0;
+  res.json(await statsService.getSongsByWeekday(req.owner.cafeId, day, offset));
 });
 
 module.exports = router;

@@ -36,7 +36,8 @@ router.get('/', async (req, res) => {
     })
     .catch(() => {});
 
-  res.json({ recommendations: recs, is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name });
+  const allowed_platforms = cafe.allowed_platforms ? cafe.allowed_platforms.split(',') : ['youtube', 'soundcloud', 'spotify'];
+  res.json({ recommendations: recs, is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name, allowed_platforms });
 });
 
 // POST /api/v1/cafes/:slug/recommendations  (손님 신청)
@@ -47,6 +48,12 @@ router.post('/', requestLimiter, async (req, res) => {
 
   const { videoId, title, channelTitle, thumbnail, duration, requesterName, platform = 'youtube' } = req.body;
   if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
+
+  const allowed = cafe.allowed_platforms ? cafe.allowed_platforms.split(',') : ['youtube', 'soundcloud', 'spotify'];
+  if (!allowed.includes(platform)) {
+    const platformNames = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify' };
+    return res.status(403).json({ error: `이 카페에서는 ${platformNames[platform] || platform} 신청을 받지 않습니다` });
+  }
 
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
   if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
