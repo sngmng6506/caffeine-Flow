@@ -78,7 +78,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
 
         {error && <div style={styles.error}>{error}</div>}
       </div>
-      <span style={styles.commentHint}>💬</span>
+      <span style={styles.commentHint}>▼</span>
     </div>
   );
 }
@@ -100,6 +100,6 @@ const styles = {
   cancelBtn:    { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer' },
   acceptedBadge:{ fontSize: 11, color: '#2e7d32', fontWeight: 600, marginTop: 2 },
   platformBadge:{ fontSize: 10, fontWeight: 700, color: '#fff', padding: '1px 5px', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' },
-  commentHint:  { fontSize: 14, color: '#ccc', flexShrink: 0, alignSelf: 'center' },
+  commentHint:  { fontSize: 11, color: '#aaa', flexShrink: 0, alignSelf: 'center' },
   error:        { fontSize: 12, color: '#e63946', marginTop: 4 },
 };
