@@ -146,6 +146,7 @@ export default function CafePage({ slug }) {
         <RecommendForm
           slug={slug}
           onAdded={handleAdded}
+          playingVideoId={nowPlaying?.video_id}
           activeVideoIds={recs
             .filter(r => ['pending', 'accepted', 'playing'].includes(r.status))
             .map(r => r.video_id)}
