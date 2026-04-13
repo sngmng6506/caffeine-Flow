@@ -21,7 +21,6 @@
       width: 400px;
       flex-shrink: 0;
       background: #111;
-      border-right: 1px solid #222;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -86,6 +85,55 @@
     .btn-skip   { background: #c8a96e; color: #0f0f0f; }
     .btn-toggle { background: #2a2a2a; color: #f0f0f0; border: 1px solid #444; }
     .btn-toggle.off { background: #3a1a1a; color: #ff6b6b; border-color: #ff6b6b44; }
+    .btn-clear {
+      background: #3a1a1a; color: #ff6b6b; border: 1px solid #ff6b6b44;
+      font-size: 12px; padding: 6px 14px; cursor: pointer; border-radius: 6px;
+    }
+    .btn-clear:hover { background: #4a1a1a; border-color: #ff6b6b88; }
+    /* 왼쪽 큐 리스트 */
+    #left-queue { width: 100%; }
+    .lq-header {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 11px; color: #666; letter-spacing: 1px; text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .lq-item {
+      display: flex; align-items: center; gap: 10px;
+      background: #1a1a1a; border-radius: 10px;
+      padding: 8px 10px; margin-bottom: 6px;
+    }
+    .lq-item.lq-now { background: #1e1a10; border: 1px solid #c8a96e66; }
+    .lq-item img { width: 52px; height: 39px; object-fit: cover; border-radius: 5px; flex-shrink: 0; }
+    .lq-info { flex: 1; overflow: hidden; }
+    .lq-title { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lq-channel { font-size: 10px; color: #888; margin-top: 2px; }
+    .lq-actions { display: flex; gap: 5px; flex-shrink: 0; }
+    .lq-play-btn {
+      background: #c8a96e; border: none; border-radius: 6px;
+      color: #0f0f0f; font-size: 11px; font-weight: 700;
+      padding: 5px 10px; cursor: pointer;
+    }
+    .lq-play-btn:active { opacity: 0.7; }
+    .lq-del-btn {
+      background: transparent; border: 1px solid #333; border-radius: 6px;
+      color: #666; font-size: 11px; padding: 5px 8px; cursor: pointer;
+    }
+    .lq-del-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+    .lq-empty { font-size: 12px; color: #555; text-align: center; padding: 16px 0; }
+
+    /* 리사이즈 핸들 */
+    .resize-handle {
+      width: 5px; flex-shrink: 0; cursor: col-resize;
+      background: #1a1a1a; position: relative; transition: background 0.15s;
+    }
+    .resize-handle:hover, .resize-handle.dragging { background: #c8a96e44; }
+    .resize-handle::after {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 3px; height: 32px; border-radius: 2px;
+      background: #333; transition: background 0.15s;
+    }
+    .resize-handle:hover::after, .resize-handle.dragging::after { background: #c8a96e; }
 
     /* ── 오른쪽 패널 ── */
     #right-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -103,7 +151,7 @@
       cursor: pointer; border-bottom: 2px solid transparent;
     }
     .tab-btn.active { color: #c8a96e; border-bottom-color: #c8a96e; }
-    .tab-content { display: none; flex: 1; overflow-y: auto; padding: 20px 24px; }
+    .tab-content { display: none; flex: 1; overflow-y: auto; padding: 20px 24px; min-height: 0; }
     .tab-content.active { display: block; }
 
     /* 큐 */
@@ -144,6 +192,39 @@
     .bar-labels { display: flex; gap: 3px; margin-bottom: 20px; }
     .bar-label { flex: 1; text-align: center; font-size: 9px; color: #555; }
 
+    /* 날짜별 통계 */
+    .date-picker-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    }
+    .date-picker-row select, .date-picker-row input[type="date"] {
+      background: #1e1e1e; border: 1px solid #333; border-radius: 8px;
+      padding: 8px 12px; color: #f0f0f0; font-size: 13px; outline: none;
+    }
+    .date-picker-row select:focus, .date-picker-row input[type="date"]:focus {
+      border-color: #c8a96e;
+    }
+    .timeline-hour {
+      margin-bottom: 6px;
+    }
+    .timeline-hour-label {
+      font-size: 11px; color: #666; font-weight: 600; padding: 6px 0 4px;
+      border-bottom: 1px solid #1a1a1a; margin-bottom: 4px;
+    }
+    .timeline-song {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 8px; border-radius: 6px;
+    }
+    .timeline-song:hover { background: #1a1a1a; }
+    .timeline-song img {
+      width: 36px; height: 27px; object-fit: cover; border-radius: 3px; flex-shrink: 0;
+    }
+    .timeline-song-title {
+      font-size: 12px; flex: 1; overflow: hidden;
+      white-space: nowrap; text-overflow: ellipsis;
+    }
+    .timeline-song-time { font-size: 10px; color: #555; flex-shrink: 0; }
+    .timeline-song .skipped-badge { margin-left: 0; }
+
     /* 이력 */
     .history-item {
       display: flex; align-items: center; gap: 10px;
@@ -161,7 +242,7 @@
     /* ── 음악 재생 탭 ── */
     #tab-player {
       display: none; flex-direction: column;
-      flex: 1; overflow: hidden; padding: 0;
+      flex: 1; overflow: hidden; padding: 0; min-height: 0;
     }
     #tab-player.active { display: flex; }
 
@@ -185,15 +266,18 @@
     }
 
     /* 메인: 왼쪽 플레이어 + 오른쪽 결과 */
-    #ps-body { display: flex; flex: 1; overflow: hidden; }
+    #ps-body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 
     /* 플레이어 영역 */
     #ps-player-col {
       width: 440px; flex-shrink: 0;
       display: flex; flex-direction: column;
-      border-right: 1px solid #1e1e1e;
-      background: #0f0f0f;
+      background: #0f0f0f; overflow-y: auto; min-height: 0;
     }
+    #ps-queue-section {
+      padding: 12px 16px; border-top: 1px solid #1e1e1e; flex: 1;
+    }
+    #ps-queue-section .lq-header { margin-bottom: 8px; }
     #ps-player-wrap {
       position: relative; width: 100%; aspect-ratio: 16/9;
       background: #000;
@@ -207,7 +291,7 @@
 
     /* 검색 결과 영역 */
     #ps-results-col {
-      flex: 1; overflow-y: auto; padding: 12px 16px;
+      flex: 1; overflow-y: auto; padding: 12px 16px; min-height: 0;
     }
     #ps-results-col .ps-empty {
       color: #555; font-size: 14px; padding: 40px 0; text-align: center;
@@ -283,7 +367,7 @@
 
 <!-- 인쇄용 오버레이 -->
 <div id="print-area">
-  <h2>☕ MUSIC REQUEST</h2>
+  <h2>☕ Caffeine Flow</h2>
   <canvas id="print-canvas"></canvas>
   <p id="print-url"></p>
   <p style="font-size:12px;color:#aaa">YouTube URL을 붙여넣어 음악을 신청하세요</p>
@@ -309,20 +393,23 @@
     <button class="btn btn-skip" id="skip-btn">⏭ 스킵</button>
     <button class="btn btn-toggle" id="toggle-btn">시스템 ON</button>
   </div>
+
 </div>
+
+<div class="resize-handle" id="main-divider"></div>
 
 <!-- 오른쪽: 탭 패널 -->
 <div id="right-panel">
   <div class="tabs">
-    <button class="tab-btn" data-tab="player">음악 재생</button>
-    <button class="tab-btn active" data-tab="queue">신청 목록</button>
+    <button class="tab-btn active" data-tab="player">음악 재생</button>
     <button class="tab-btn" data-tab="history">이력</button>
     <button class="tab-btn" data-tab="stats">통계</button>
     <button class="tab-btn" data-tab="qr">QR 코드</button>
+    <button class="tab-btn" data-tab="contact">문의</button>
   </div>
 
-  <!-- 음악 재생 탭: 유튜브 검색 + 임베드 플레이어 -->
-  <div id="tab-player" class="tab-content">
+  <!-- 음악 재생 탭: YouTube 검색 + 임베드 플레이어 -->
+  <div id="tab-player" class="tab-content active">
     <div id="ps-search-bar">
       <input id="ps-input" type="text" placeholder="유튜브 검색 — 곡명, 아티스트, 분위기..." />
       <button id="ps-btn">검색</button>
@@ -333,18 +420,22 @@
           <div id="default-yt-player"></div>
         </div>
         <div id="ps-now-info">
-          <div id="ps-now-title">검색 후 곡을 선택하세요</div>
+          <div id="ps-now-title"></div>
           <div id="ps-now-channel"></div>
         </div>
+        <div id="ps-queue-section">
+          <div class="lq-header">
+            <span>신청 목록</span>
+            <button class="btn-clear" id="clear-btn" style="display:none">🗑 전체 취소</button>
+          </div>
+          <div id="ps-queue-list"><div class="lq-empty">신청된 곡이 없습니다</div></div>
+        </div>
       </div>
+      <div class="resize-handle" id="player-divider"></div>
       <div id="ps-results-col">
         <div class="ps-empty">곡명이나 아티스트를 검색하면 여기에 결과가 표시됩니다.</div>
       </div>
     </div>
-  </div>
-
-  <div id="tab-queue" class="tab-content active">
-    <div id="queue-list"><div class="empty">신청된 곡이 없습니다</div></div>
   </div>
 
   <div id="tab-history" class="tab-content">
@@ -362,6 +453,13 @@
     <div class="bar-labels" id="bar-labels"></div>
     <div class="section-label">TOP 10 신청곡</div>
     <div id="top-songs"></div>
+
+    <div class="section-label" style="margin-top:24px">날짜별 신청 타임라인</div>
+    <div class="date-picker-row">
+      <select id="stat-date-select"></select>
+      <span id="stat-date-summary" style="font-size:12px;color:#888"></span>
+    </div>
+    <div id="date-timeline"></div>
   </div>
 
   <!-- QR 탭 -->
@@ -388,6 +486,32 @@
       </div>
     </div>
   </div>
+
+  <!-- 문의 탭 -->
+  <div id="tab-contact" class="tab-content">
+    <div style="max-width:420px;padding-top:8px">
+      <div class="section-label" style="margin-bottom:20px">개발자 문의</div>
+
+      <div style="background:#1a1a1a;border-radius:12px;padding:24px;margin-bottom:16px">
+        <div style="font-size:13px;color:#888;line-height:1.8;margin-bottom:20px">
+          시스템 오류, 기능 요청, 기타 문의사항이 있으시면<br/>아래 버튼을 눌러 메일을 보내주세요.
+        </div>
+        <a href="https://mail.google.com/mail/?view=cm&to=sngmng6506@gmail.com&su=Caffeine Flow 문의" target="_blank"
+           style="display:block;background:#c8a96e;color:#0f0f0f;text-align:center;
+                  border-radius:8px;padding:13px;font-size:14px;font-weight:700;
+                  text-decoration:none;letter-spacing:1px;">
+          Gmail로 보내기
+        </a>
+      </div>
+
+      <div style="background:#1a1a1a;border-radius:12px;padding:16px 20px">
+        <div style="font-size:11px;color:#555;line-height:1.9">
+          <span style="color:#888">수신</span> &nbsp; sngmng6506@gmail.com<br/>
+          <span style="color:#888">서비스</span> &nbsp; Caffeine Flow v1.0
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -411,6 +535,7 @@
 
   // ── YouTube IFrame API ────────────────────────────────────
   window.onYouTubeIframeAPIReady = function () {
+    initDefaultPlayer();
     ytPlayer = new YT.Player('yt-player', {
       height: '198', width: '352',
       playerVars: {
@@ -436,16 +561,27 @@
     const playing = event.data === YT.PlayerState.PLAYING;
     document.getElementById('lp-disc').classList.toggle('playing', playing);
     isPlaying = playing;
-    if (event.data === YT.PlayerState.ENDED) {
+    if (playing) {
+      pauseDefaultPlayer();
+      suppressSongEnded = false;
+    }
+    if (event.data === YT.PlayerState.ENDED && !suppressSongEnded) {
+      suppressSongEnded = true;
       socket.emit('song_ended', { token: TOKEN });
     }
   }
 
   let currentVideoId = null;
+  let suppressSongEnded = false;
 
   function loadAndPlay(song) {
     if (!playerReady) { pendingSong = song; return; }
-    if (currentVideoId === song.videoId) return;
+    if (currentVideoId === song.videoId) {
+      ytPlayer.seekTo(0);
+      ytPlayer.playVideo();
+      return;
+    }
+    suppressSongEnded = true;
     currentVideoId = song.videoId;
     ytPlayer.loadVideoById(song.videoId);
   }
@@ -454,35 +590,28 @@
   let queueActive = false;
 
   function pauseDefaultPlayer() {
-    try {
-      if (defaultPlayer && typeof defaultPlayer.getPlayerState === 'function') {
-        defaultPlayer.pauseVideo();
-      }
-    } catch {}
+    try { defaultPlayer?.stopVideo(); } catch {}
   }
 
   function resumeDefaultPlayer() {
-    try {
-      if (defaultPlayer && typeof defaultPlayer.getPlayerState === 'function') {
-        defaultPlayer.playVideo();
-      }
-    } catch {}
+    try { defaultPlayer?.playVideo(); } catch {}
+  }
+
+  function pauseQueuePlayer() {
+    try { ytPlayer?.pauseVideo(); } catch {}
+  }
+
+  function onDefaultPlayerStateChange(event) {
+    if (event.data === YT.PlayerState.PLAYING) {
+      pauseQueuePlayer();
+    }
   }
 
   // ── 소켓 ─────────────────────────────────────────────────
-  socket.on('queue_update', ({ queue, isSystemOn, isPlaying: sysPlaying }) => {
+  socket.on('queue_update', ({ queue, isSystemOn }) => {
     updateToggleBtn(isSystemOn);
     renderQueue(queue);
-
-    const hasQueue = queue.length > 0 && sysPlaying;
-
-    if (hasQueue) {
-      if (!queueActive) {
-        queueActive = true;
-        pauseDefaultPlayer();
-      }
-      playSong(queue[0]);
-    } else {
+    if (!queue.length) {
       const wasActive = queueActive;
       resetPlayer();
       if (wasActive) resumeDefaultPlayer();
@@ -491,6 +620,8 @@
 
   // ── 재생 ─────────────────────────────────────────────────
   function playSong(song) {
+    queueActive = true;
+    pauseDefaultPlayer();
     document.getElementById('now-title').textContent   = song.title;
     document.getElementById('now-channel').textContent = song.channelTitle;
     document.getElementById('lp-label').innerHTML = `<img src="${song.thumbnail}" alt="" />`;
@@ -506,7 +637,10 @@
     document.getElementById('now-channel').textContent = '';
     document.getElementById('lp-label').innerHTML = 'MUSIC';
     document.getElementById('lp-disc').classList.remove('playing');
-    if (ytPlayer && typeof ytPlayer.stopVideo === 'function') ytPlayer.stopVideo();
+    if (ytPlayer && typeof ytPlayer.stopVideo === 'function') {
+      suppressSongEnded = true;
+      ytPlayer.stopVideo();
+    }
   }
 
   // ── 컨트롤 ────────────────────────────────────────────────
@@ -521,32 +655,55 @@
 
   function updateToggleBtn(on) {
     const btn = document.getElementById('toggle-btn');
-    btn.textContent = on ? '시스템 ON' : '시스템 OFF';
+    btn.textContent = on ? '음악 신청 ON' : '음악 신청 OFF';
     btn.className   = 'btn btn-toggle' + (on ? '' : ' off');
   }
 
-  // ── 큐 렌더링 ─────────────────────────────────────────────
+  // ── 큐 렌더링 (왼쪽 패널) ────────────────────────────────
+  let currentQueue = [];
+
   function renderQueue(queue) {
-    const el = document.getElementById('queue-list');
-    if (!queue.length) { el.innerHTML = '<div class="empty">신청된 곡이 없습니다</div>'; return; }
+    currentQueue = queue;
+    document.getElementById('clear-btn').style.display = queue.length ? 'inline-block' : 'none';
+    renderQueueInto('ps-queue-list', queue);
+  }
+
+  function renderQueueInto(elId, queue) {
+    const el = document.getElementById(elId);
+    if (!queue.length) {
+      el.innerHTML = '<div class="lq-empty">신청된 곡이 없습니다</div>';
+      return;
+    }
     el.innerHTML = queue.map((item, i) => `
-      <div class="queue-item ${i === 0 ? 'now-playing' : ''}">
-        <div class="queue-num">${i === 0 ? '▶' : i + 1}</div>
+      <div class="lq-item ${i === 0 ? 'lq-now' : ''}">
         <img src="${item.thumbnail}" alt="" />
-        <div class="track-info">
-          <div class="track-title">${escHtml(item.title)}</div>
-          <div class="track-channel">${escHtml(item.channelTitle)}</div>
+        <div class="lq-info">
+          <div class="lq-title">${escHtml(item.title)}</div>
+          <div class="lq-channel">${escHtml(item.channelTitle)}</div>
         </div>
-        <button class="delete-btn" data-id="${item.id}">삭제</button>
+        <div class="lq-actions">
+          <button class="lq-play-btn" data-idx="${i}">▶ 재생</button>
+          <button class="lq-del-btn" data-id="${item.id}">✕</button>
+        </div>
       </div>
     `).join('');
-    el.querySelectorAll('.delete-btn').forEach(btn => {
+
+    el.querySelectorAll('.lq-play-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        isPlaying = false;
+        playSong(currentQueue[parseInt(btn.dataset.idx)]);
+      });
+    });
+    el.querySelectorAll('.lq-del-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
         socket.emit('admin_delete', { token: TOKEN, id: btn.dataset.id });
       });
     });
   }
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    if (!confirm('대기열의 모든 곡을 취소하시겠습니까?')) return;
+    socket.emit('admin_clear', { token: TOKEN });
+  });
 
   // ── 탭 ────────────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -609,6 +766,46 @@
         <span class="count">${s.count}회</span>
       </div>
     `).join('');
+
+    loadDateStats();
+  }
+
+  // ── 날짜별 통계 타임라인 ───────────────────────────────────
+  let dateStatsLoaded = false;
+  async function loadDateStats(dateStr) {
+    const qs = dateStr ? `&date=${dateStr}` : '';
+    const res  = await fetch(`/api/stats/date?token=${TOKEN}${qs}`);
+    const data = await res.json();
+
+    const sel = document.getElementById('stat-date-select');
+    if (!dateStatsLoaded && data.dates.length) {
+      sel.innerHTML = data.dates.map(d => `<option value="${d}"${d === data.date ? ' selected' : ''}>${d}</option>`).join('');
+      sel.onchange = () => loadDateStats(sel.value);
+      dateStatsLoaded = true;
+    }
+
+    document.getElementById('stat-date-summary').textContent =
+      `총 ${data.total}곡 (재생 ${data.played} / 스킵 ${data.skipped})`;
+
+    const el = document.getElementById('date-timeline');
+    const hours = data.byHour;
+    let html = '';
+    for (let h = 0; h < 24; h++) {
+      if (!hours[h] || !hours[h].length) continue;
+      html += `<div class="timeline-hour">`;
+      html += `<div class="timeline-hour-label">${String(h).padStart(2, '0')}:00 ~ ${String(h).padStart(2, '0')}:59 (${hours[h].length}곡)</div>`;
+      for (const s of hours[h]) {
+        const t = new Date(s.playedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+        html += `<div class="timeline-song">
+          <img src="${s.thumbnail}" alt="" />
+          <div class="timeline-song-title">${escHtml(s.title)}</div>
+          ${s.skipped ? '<span class="skipped-badge">스킵</span>' : ''}
+          <span class="timeline-song-time">${t}</span>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    el.innerHTML = html || '<div class="empty">해당 날짜에 신청곡이 없습니다</div>';
   }
 
 
@@ -616,14 +813,6 @@
   let defaultPlayer     = null;
   let defaultReady      = false;
   let defaultPlayerInit = false;
-
-  function formatViews(n) {
-    if (!n) return '';
-    if (n >= 100000000) return Math.floor(n / 100000000) + '억회';
-    if (n >= 10000) return Math.floor(n / 10000) + '만회';
-    if (n >= 1000) return Math.floor(n / 1000) + '천회';
-    return n + '회';
-  }
 
   function initDefaultPlayer() {
     if (defaultPlayerInit) return;
@@ -641,6 +830,7 @@
           e.target.unMute();
           e.target.setVolume(100);
         },
+        onStateChange: onDefaultPlayerStateChange,
       },
     });
 
@@ -651,26 +841,45 @@
   }
 
   function playInDefault(track) {
+    pauseQueuePlayer();
+    queueActive = false;
     document.getElementById('ps-now-title').textContent   = track.title;
     document.getElementById('ps-now-channel').textContent = track.channelTitle;
     if (!defaultReady) return;
     defaultPlayer.loadVideoById(track.videoId);
   }
 
+  let psQuery = '';
+  let psNextPageToken = null;
+  let psLoading = false;
+
   async function psSearch() {
     const q = document.getElementById('ps-input').value.trim();
     if (!q) return;
+    psQuery = q;
+    psNextPageToken = null;
     const col = document.getElementById('ps-results-col');
     col.innerHTML = '<div class="ps-empty">검색 중...</div>';
+    await psFetchPage(true);
+  }
+
+  async function psFetchPage(reset = false) {
+    if (psLoading) return;
+    psLoading = true;
+    const col = document.getElementById('ps-results-col');
 
     try {
-      const res  = await fetch(`/api/search?token=${TOKEN}&q=${encodeURIComponent(q)}`);
+      const qs = psNextPageToken ? `&pageToken=${encodeURIComponent(psNextPageToken)}` : '';
+      const res  = await fetch(`/api/search?token=${TOKEN}&q=${encodeURIComponent(psQuery)}${qs}`);
       const data = await res.json();
       if (res.status === 429) { col.innerHTML = '<div class="ps-empty">요청이 너무 많습니다. 잠시 후 다시 시도해주세요.</div>'; return; }
-      if (!Array.isArray(data) || !data.length) { col.innerHTML = '<div class="ps-empty">결과 없음</div>'; return; }
+      if (!res.ok) { col.innerHTML = `<div class="ps-empty">${escHtml(data.error || '검색 실패')}</div>`; return; }
+      if (reset) col.innerHTML = '';
+      if (!data.items?.length && reset) { col.innerHTML = '<div class="ps-empty">결과 없음</div>'; return; }
 
-      col.innerHTML = '';
-      data.forEach((track) => {
+      psNextPageToken = data.nextPageToken || null;
+
+      data.items.forEach((track) => {
         const card = document.createElement('div');
         card.className = 'ps-card';
         card.innerHTML = `
@@ -681,7 +890,6 @@
           <div class="ps-card-info">
             <div class="ps-card-title">${escHtml(track.title)}</div>
             <div class="ps-card-channel">${escHtml(track.channelTitle)}</div>
-            ${track.views ? `<div class="ps-card-views">${formatViews(track.views)}</div>` : ''}
           </div>`;
         card.addEventListener('click', () => {
           col.querySelectorAll('.ps-card').forEach(c => c.classList.remove('active'));
@@ -691,9 +899,51 @@
         col.appendChild(card);
       });
     } catch {
-      col.innerHTML = '<div class="ps-empty">검색 실패 — 잠시 후 다시 시도해주세요.</div>';
+      if (reset) col.innerHTML = '<div class="ps-empty">검색 실패 — 잠시 후 다시 시도해주세요.</div>';
+    } finally {
+      psLoading = false;
     }
   }
+
+  // 스크롤 끝 감지 → 추가 로드
+  document.getElementById('ps-results-col').addEventListener('scroll', function () {
+    if (!psNextPageToken || psLoading) return;
+    if (this.scrollTop + this.clientHeight >= this.scrollHeight - 100) {
+      psFetchPage();
+    }
+  });
+
+  // ── 리사이즈 핸들 ─────────────────────────────────────────
+  function makeResizable(handleId, targetId, minPx, maxPx) {
+    const handle = document.getElementById(handleId);
+    const target = document.getElementById(targetId);
+    let startX, startW;
+
+    handle.addEventListener('mousedown', (e) => {
+      startX = e.clientX;
+      startW = target.offsetWidth;
+      handle.classList.add('dragging');
+      document.body.style.cursor    = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      function onMove(e) {
+        const newW = Math.min(maxPx, Math.max(minPx, startW + (e.clientX - startX)));
+        target.style.width = newW + 'px';
+      }
+      function onUp() {
+        handle.classList.remove('dragging');
+        document.body.style.cursor    = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup',   onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup',   onUp);
+    });
+  }
+
+  makeResizable('main-divider',   'left-panel',     260, 600);
+  makeResizable('player-divider', 'ps-player-col',  240, 700);
 
   // ── QR 코드 ──────────────────────────────────────────────
   let qrInitialized = false;

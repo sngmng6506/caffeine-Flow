@@ -42,9 +42,17 @@ function initSocket(io) {
       queue.addSong(song);
     });
 
-    socket.on('song_ended',   ({ token })     => { if (token === CAFE_TOKEN) queue.songEnded(); });
+    socket.on('song_ended', ({ token }) => {
+      if (token !== CAFE_TOKEN) return;
+      const now = Date.now();
+      const elapsed = now - state.lastSongEndedAt;
+      if (elapsed < 2000) return;
+      state.lastSongEndedAt = now;
+      queue.songEnded();
+    });
     socket.on('admin_skip',   ({ token })     => { if (token === CAFE_TOKEN) queue.skip(); });
     socket.on('admin_delete', ({ token, id }) => { if (token === CAFE_TOKEN) queue.deleteSong(id); });
+    socket.on('admin_clear',  ({ token })     => { if (token === CAFE_TOKEN) queue.clearQueue(); });
     socket.on('admin_toggle', ({ token })     => { if (token === CAFE_TOKEN) queue.toggleSystem(); });
   });
 }

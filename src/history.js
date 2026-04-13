@@ -59,4 +59,34 @@ function getStats() {
   };
 }
 
-module.exports = { addEntry, getHistory, getStats };
+function getStatsByDate(dateStr) {
+  const history = load();
+  const filtered = history.filter((h) => h.playedAt && h.playedAt.startsWith(dateStr));
+  const played = filtered.filter((h) => !h.skipped);
+
+  const byHour = Array(24).fill(null).map(() => []);
+  for (const item of filtered) {
+    const hour = new Date(item.playedAt).getHours();
+    byHour[hour].push({
+      videoId:      item.videoId,
+      title:        item.title,
+      channelTitle: item.channelTitle,
+      thumbnail:    item.thumbnail,
+      playedAt:     item.playedAt,
+      skipped:      item.skipped,
+    });
+  }
+
+  const dates = [...new Set(history.map((h) => h.playedAt?.slice(0, 10)).filter(Boolean))].sort().reverse();
+
+  return {
+    date:    dateStr,
+    total:   filtered.length,
+    played:  played.length,
+    skipped: filtered.length - played.length,
+    byHour,
+    dates,
+  };
+}
+
+module.exports = { addEntry, getHistory, getStats, getStatsByDate };
