@@ -197,7 +197,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   return (
     <div style={styles.wrap}>
       <h1 style={styles.title}>☕ Caffeine Flow</h1>
-      <p style={styles.subtitle}>카페 사장님 로그인</p>
+      <p style={styles.subtitle}>사장님 로그인</p>
 
       <div style={styles.oauthBtns}>
         {/* Google 로그인 버튼 (GIS SDK가 렌더링) */}
