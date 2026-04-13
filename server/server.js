@@ -15,6 +15,7 @@ const io     = new Server(server, { cors: { origin: '*' } });
 // io를 라우트에서 참조할 수 있도록 등록
 app.set('io', io);
 
+app.set('trust proxy', 1); // Railway 등 리버스 프록시 뒤에서 실제 IP 인식
 app.use(express.json());
 app.use(rateLimit({ windowMs: 60_000, max: 120 })); // 전체 API 분당 120회
 
