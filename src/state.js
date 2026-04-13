@@ -3,6 +3,7 @@ const state = {
   queue: [],
   isSystemOn: true,
   isPlaying: false,
+  lastSongEndedAt: 0, // 중복 song_ended 방지용 전역 타임스탬프
 };
 
 module.exports = state;

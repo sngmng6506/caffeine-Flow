@@ -59,10 +59,20 @@ function songEnded() {
   else broadcastQueue();
 }
 
+function clearQueue() {
+  for (const song of state.queue) {
+    history.addEntry(song, { skipped: true });
+  }
+  state.queue = [];
+  state.isPlaying = false;
+  console.log(`[전체취소] 대기열 비움`);
+  broadcastQueue();
+}
+
 function toggleSystem() {
   state.isSystemOn = !state.isSystemOn;
   console.log(`[시스템] ${state.isSystemOn ? 'ON' : 'OFF'}`);
   broadcastQueue();
 }
 
-module.exports = { setBroadcast, addSong, skip, deleteSong, songEnded, toggleSystem };
+module.exports = { setBroadcast, addSong, skip, deleteSong, songEnded, clearQueue, toggleSystem };
