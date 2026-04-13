@@ -41,7 +41,13 @@ app.get('/api/v1/top10', async (req, res) => {
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: 'v2' }));
 
-// SPA fallback — API 아닌 모든 경로에서 index.html 반환
+// Owner SPA fallback
+app.get('/owner/*', (_req, res) => {
+  res.sendFile(require('path').join(staticPath, 'owner/index.html'));
+});
+app.get('/owner', (_req, res) => res.redirect('/owner/'));
+
+// Customer SPA fallback — API 아닌 모든 경로에서 index.html 반환
 app.get('*', (_req, res) => {
   res.sendFile(require('path').join(staticPath, 'index.html'));
 });

@@ -7,7 +7,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
 const isDev = !app.isPackaged;
 const OWNER_URL = isDev
   ? 'http://localhost:5174'
-  : `file://${path.join(__dirname, '../dist/index.html')}`;
+  : 'https://caffeine-flow-production.up.railway.app/owner/';
 
 const LEFT_RATIO = 0.42;
 
