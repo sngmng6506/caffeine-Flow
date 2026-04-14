@@ -28,7 +28,8 @@
     "productName": "Caffeine Flow",
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "public/**/*"
     ],
     "win": {
       "target": "nsis",
