@@ -109,9 +109,15 @@ function createWindow() {
     title: 'Caffeine Flow — owner',
   });
 
-  // Electron UA 제거 — Google OAuth 차단 방지
-  const ua = mainWindow.webContents.getUserAgent().replace(/Electron\/[\d.]+ /, '');
-  mainWindow.webContents.setUserAgent(ua);
+  // Google OAuth "embedded user agent" 차단 우회 —
+  // Electron/앱 이름 흔적을 모두 지우고 순수 Chrome UA로 위장
+  const origUa = mainWindow.webContents.getUserAgent();
+  const chromeMatch = origUa.match(/Chrome\/[\d.]+/);
+  const chromeVer = chromeMatch ? chromeMatch[0] : 'Chrome/128.0.0.0';
+  const fakeUa = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ${chromeVer} Safari/537.36`;
+  mainWindow.webContents.setUserAgent(fakeUa);
+  // 세션 전체에도 적용 (요청 헤더까지)
+  mainWindow.webContents.session.setUserAgent(fakeUa);
 
   mainWindow.loadURL(OWNER_URL);
 
