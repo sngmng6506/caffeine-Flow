@@ -85,7 +85,9 @@ router.get('/naver', (req, res) => {
 // ────────────────────────────────────────────
 router.get('/naver/callback', async (req, res) => {
   const { code, state } = req.query;
-  if (!code) return res.redirect(`${APP_URL}?error=naver_cancelled`);
+  // 사장님 앱은 /owner/ 경로에서 서빙됨 — 콜백 리다이렉트도 해당 경로로
+  const ownerUrl = `${APP_URL.replace(/\/$/, '')}/owner/`;
+  if (!code) return res.redirect(`${ownerUrl}?error=naver_cancelled`);
 
   try {
     // 토큰 교환
@@ -112,16 +114,16 @@ router.get('/naver/callback', async (req, res) => {
       await cafeService.update(existing.id, { last_login_at: new Date() });
       const token = issueToken(existing);
       const cafe  = encodeURIComponent(JSON.stringify(safeCafe(existing)));
-      return res.redirect(`${APP_URL}?token=${token}&cafe=${cafe}`);
+      return res.redirect(`${ownerUrl}?token=${token}&cafe=${cafe}`);
     }
 
     // 신규 회원 → pending 토큰으로 클라이언트에 전달
     const pendingToken = issuePendingToken({ naverId, email, name });
-    return res.redirect(`${APP_URL}?pending=${pendingToken}`);
+    return res.redirect(`${ownerUrl}?pending=${pendingToken}`);
 
   } catch (err) {
     console.error('[naver callback]', err.message);
-    res.redirect(`${APP_URL}?error=naver_failed`);
+    res.redirect(`${ownerUrl}?error=naver_failed`);
   }
 });
 
