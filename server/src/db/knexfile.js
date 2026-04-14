@@ -4,7 +4,7 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.e
 module.exports = {
   client: 'pg',
   connection: {
-    connectionString: process.env.DATABASE_URL,
+    connectionString: (process.env.DATABASE_URL || '').trim(),
     ssl: { rejectUnauthorized: false },
   },
   migrations: {
