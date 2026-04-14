@@ -72,21 +72,4 @@ server.listen(PORT, async () => {
 
   app.set('baseUrl', `http://${localIp}:${PORT}`);
   console.log(`\nCaffeine Flow v2 on http://${localIp}:${PORT}\n`);
-
-  try {
-    const qrcode = require('qrcode');
-    const db     = require('./src/db/knex');
-    const cafes  = await db('cafes').select('name', 'slug');
-
-    if (cafes.length === 0) {
-      console.log('등록된 카페가 없습니다.\n');
-    } else {
-      for (const cafe of cafes) {
-        const url = `http://${localIp}:${PORT}/${cafe.slug}`;
-        console.log(`[ ${cafe.name} ]  ${url}`);
-        const qr = await qrcode.toString(url, { type: 'terminal', small: true });
-        console.log(qr);
-      }
-    }
-  } catch {}
 });
