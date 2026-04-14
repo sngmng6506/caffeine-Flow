@@ -12,7 +12,8 @@ function safeCafe(cafe) {
 router.get('/me', requireAuth, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.owner.slug);
   if (!cafe) return res.status(404).json({ error: 'Not found' });
-  const baseUrl = req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
+  const { APP_URL } = require('../config');
+  const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
   res.json({ ...safeCafe(cafe), customer_url: `${baseUrl}/${cafe.slug}` });
 });
 
