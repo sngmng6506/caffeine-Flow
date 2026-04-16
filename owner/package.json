@@ -8,7 +8,7 @@
     "preview": "vite preview",
     "electron": "electron .",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5174 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-builder && node -e \"require('rcedit').rcedit('dist/win-unpacked/Caffeine Flow.exe',{icon:'public/icon.ico'}).then(()=>console.log('icon set')).catch(e=>console.error(e))\""
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -20,6 +20,7 @@
     "concurrently": "^9.2.1",
     "electron": "^41.2.0",
     "electron-builder": "^26.8.1",
+    "rcedit": "^5.0.2",
     "vite": "^5.1.0",
     "wait-on": "^8.0.5"
   },
@@ -32,7 +33,13 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico"
+      "icon": "public/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
+      "installerHeaderIcon": "public/icon.ico"
     },
     "mac": {
       "target": "dmg",
