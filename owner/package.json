@@ -27,7 +27,6 @@
     "appId": "com.caffeine-flow.owner",
     "productName": "Caffeine Flow",
     "files": [
-      "dist/**/*",
       "electron/**/*",
       "public/**/*"
     ],
