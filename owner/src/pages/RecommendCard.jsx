@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { updateRec, deleteRec } from '../api';
 
-export default function RecommendCard({ slug, rec, onUpdate, onDelete, context }) {
+export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, position }) {
   const [loading, setLoading] = useState(false);
 
   async function handle(action) {
@@ -30,6 +30,7 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context }
         e.dataTransfer.effectAllowed = 'move';
       }}
     >
+      {position && <span style={styles.position}>{position}</span>}
       <img src={rec.thumbnail} alt="" style={styles.thumb} />
       <div style={styles.body}>
         <div style={styles.title}>{rec.title}</div>
@@ -81,7 +82,8 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context }
 }
 
 const styles = {
-  card:       { display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid #eee' },
+  card:       { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid #eee' },
+  position:   { width: 24, textAlign: 'center', fontWeight: 800, fontSize: 15, color: '#1a1a2e', flexShrink: 0 },
   thumb:      { width: 80, height: 60, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
   body:       { flex: 1, minWidth: 0 },
   title:      { fontWeight: 600, fontSize: 14, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },

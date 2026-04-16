@@ -102,13 +102,17 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         .then(updated => {
           setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
           const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
+          // 이미 수락된 대기곡이 있으면 그대로 유지, 없으면 pending에서 승격
+          const hasAccepted = latest.some(r => r.status === 'accepted');
           const nextPending = latest
             .filter(r => r.status === 'pending')
             .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
-          if (nextPending) {
-            updateRec(cafe.slug, nextPending.id, 'accepted')
-              .then(acc => setRecs(prev => prev.map(r => r.id === acc.id ? acc : r)))
-              .catch(console.error);
+          if (hasAccepted || nextPending) {
+            if (nextPending) {
+              updateRec(cafe.slug, nextPending.id, 'accepted')
+                .then(acc => setRecs(prev => prev.map(r => r.id === acc.id ? acc : r)))
+                .catch(console.error);
+            }
           } else {
             // 대기 곡 없음 → 기본곡 있으면 기본곡, 없으면 google.com
             const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
@@ -368,8 +372,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
       {tab === 'queue' && (() => {
         const playing = recs.filter(r => r.status === 'playing');
-        const accepted = recs.filter(r => r.status === 'accepted');
-        const pending  = recs.filter(r => r.status === 'pending');
+        const accepted = recs.filter(r => r.status === 'accepted')
+          .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
+        const pending  = recs.filter(r => r.status === 'pending')
+          .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
         const hasPlaying = playing.length > 0;
         return (
           <div>
@@ -419,8 +425,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
               {loading
                 ? <div style={styles.emptySlot}>불러오는 중...</div>
                 : accepted.length > 0
-                  ? accepted.map(r => (
-                      <RecommendCard key={r.id} slug={cafe.slug} rec={r}
+                  ? accepted.map((r, i) => (
+                      <RecommendCard key={r.id} slug={cafe.slug} rec={r} position={i + 1}
                         onUpdate={handleUpdate} onDelete={handleDelete} context="accepted" />
                     ))
                   : <div style={styles.emptySlot}>대기 중인 곡 없음</div>
@@ -440,8 +446,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
               {loading
                 ? <div style={styles.emptySlot}>불러오는 중...</div>
                 : pending.length > 0
-                  ? pending.map(r => (
-                      <RecommendCard key={r.id} slug={cafe.slug} rec={r}
+                  ? pending.map((r, i) => (
+                      <RecommendCard key={r.id} slug={cafe.slug} rec={r} position={i + 1}
                         onUpdate={handleUpdate} onDelete={handleDelete} context="pending" hasPlaying={hasPlaying} />
                     ))
                   : <div style={styles.emptySlot}>추천된 곡 없음</div>
