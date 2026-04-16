@@ -56,8 +56,13 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    // DB에서 최신 카페 정보 로드 (허용 플랫폼, 손님 URL 등)
+    // DB에서 최신 카페 정보 로드 (공지, 허용 플랫폼, 손님 URL 등)
     getMe().then(latest => {
+      setCafe(prev => {
+        const updated = { ...prev, name: latest.name || prev.name, notice: latest.notice ?? prev.notice };
+        localStorage.setItem('cafe', JSON.stringify(updated));
+        return updated;
+      });
       if (latest.allowed_platforms) {
         setAllowedPlatforms(latest.allowed_platforms.split(','));
       }
