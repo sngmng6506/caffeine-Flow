@@ -94,7 +94,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
     if (saved) window.electronAPI?.setDefaultVideo(saved.videoId);
 
-    // 영상 종료 감지 → playing→played + 다음 pending→accepted 승격 + 대기 없으면 기본곡/구글
+    // 영상 종료 감지:
+    // 1) playing → played
+    // 2) 대기곡(accepted) 1순위 → playing으로 승격 + URL 이동 (일시멈춤 상태)
+    // 3) 대기곡 없으면 → 기본곡 URL 또는 google.com (추천곡 유무 무관)
     window.electronAPI?.onVideoEnded(() => {
       const playing = recsRef.current.find(r => r.status === 'playing');
       if (!playing) return;
@@ -102,19 +105,19 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         .then(updated => {
           setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
           const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
-          // 이미 수락된 대기곡이 있으면 그대로 유지, 없으면 pending에서 승격
-          const hasAccepted = latest.some(r => r.status === 'accepted');
-          const nextPending = latest
-            .filter(r => r.status === 'pending')
+          const nextAccepted = latest
+            .filter(r => r.status === 'accepted')
             .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
-          if (hasAccepted || nextPending) {
-            if (nextPending) {
-              updateRec(cafe.slug, nextPending.id, 'accepted')
-                .then(acc => setRecs(prev => prev.map(r => r.id === acc.id ? acc : r)))
-                .catch(console.error);
-            }
+          if (nextAccepted) {
+            // 대기곡 1순위 → 수락(playing)으로 승격 + URL 이동 (block-next-play로 일시멈춤)
+            updateRec(cafe.slug, nextAccepted.id, 'playing')
+              .then(acc => {
+                setRecs(prev => prev.map(r => r.id === acc.id ? acc : r));
+                window.electronAPI?.navigateVideo(acc.video_id);
+              })
+              .catch(console.error);
           } else {
-            // 대기 곡 없음 → 기본곡 있으면 기본곡, 없으면 google.com
+            // 대기곡 없음 → 기본곡 또는 google.com
             const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
             if (saved) {
               window.electronAPI?.navigateVideo(saved.videoId);
