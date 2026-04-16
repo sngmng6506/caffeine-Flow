@@ -94,21 +94,33 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
     if (saved) window.electronAPI?.setDefaultVideo(saved.videoId);
 
-    // [자동재생 비활성화] YouTube 영상 자동 종료 감지 → 큐 자동 진행
-    // window.electronAPI?.onVideoEnded(() => {
-    //   if (videoEndingRef.current) return;
-    //   videoEndingRef.current = true;
-    //   const playing = recsRef.current.find(r => r.status === 'playing');
-    //   if (!playing) { videoEndingRef.current = false; return; }
-    //   updateRec(cafe.slug, playing.id, 'played')
-    //     .then(updated => {
-    //       setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
-    //       const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
-    //       playNextOrStop(latest);
-    //     })
-    //     .catch(console.error)
-    //     .finally(() => { videoEndingRef.current = false; });
-    // });
+    // 영상 종료 감지 → playing→played + 다음 pending→accepted 승격 + 대기 없으면 기본곡/구글
+    window.electronAPI?.onVideoEnded(() => {
+      const playing = recsRef.current.find(r => r.status === 'playing');
+      if (!playing) return;
+      updateRec(cafe.slug, playing.id, 'played')
+        .then(updated => {
+          setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
+          const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
+          const nextPending = latest
+            .filter(r => r.status === 'pending')
+            .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
+          if (nextPending) {
+            updateRec(cafe.slug, nextPending.id, 'accepted')
+              .then(acc => setRecs(prev => prev.map(r => r.id === acc.id ? acc : r)))
+              .catch(console.error);
+          } else {
+            // 대기 곡 없음 → 기본곡 있으면 기본곡, 없으면 google.com
+            const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
+            if (saved) {
+              window.electronAPI?.navigateVideo(saved.videoId);
+            } else {
+              window.electronAPI?.navigateVideo('https://www.google.com');
+            }
+          }
+        })
+        .catch(console.error);
+    });
 
     return () => {
       disconnectSocket();

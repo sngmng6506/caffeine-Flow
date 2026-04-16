@@ -13,13 +13,6 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context }
       } else {
         const updated = await updateRec(slug, rec.id, action);
         onUpdate(updated);
-        if (window.electronAPI && action === 'accepted') {
-          window.electronAPI.navigateVideo(rec.video_id);
-        }
-        // [자동재생 비활성화]
-        // if (window.electronAPI && action === 'playing') {
-        //   window.electronAPI.playVideo(rec.video_id);
-        // }
       }
     } catch (e) {
       console.error(e.message);

@@ -38,10 +38,15 @@ export default function CafePage({ slug }) {
   const deviceName = getDeviceName();
 
   const nowPlaying = recs.find(r => r.status === 'playing') || null;
-  const queue = recs
-    .filter(r => r.status === 'pending' || r.status === 'accepted')
+  const waitingQueue = recs
+    .filter(r => r.status === 'accepted')
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-  const history = recs.filter(r => r.status === 'played');
+  const pendingQueue = recs
+    .filter(r => r.status === 'pending')
+    .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
+  const queue = [...waitingQueue, ...pendingQueue];
+  const history = recs.filter(r => r.status === 'played')
+    .sort((a, b) => new Date(b.played_at || b.requested_at) - new Date(a.played_at || a.requested_at));
 
   useEffect(() => {
     getRecommendations(slug)
@@ -173,10 +178,10 @@ export default function CafePage({ slug }) {
 
       {tab === 'queue' && (
         <>
-          {queue.length > 0 && (
+          {waitingQueue.length > 0 && (
             <section>
-              <h3 style={styles.sectionTitle}>대기 중 ({queue.length})</h3>
-              {queue.map((r, i) => (
+              <h3 style={styles.sectionTitle}>대기 중 ({waitingQueue.length})</h3>
+              {waitingQueue.map((r, i) => (
                 <div key={r.id}>
                   <div
                     onClick={() => setQueueExpanded(v => v === r.video_id ? null : r.video_id)}
@@ -192,7 +197,26 @@ export default function CafePage({ slug }) {
               ))}
             </section>
           )}
-          {queue.length === 0 && (
+          {pendingQueue.length > 0 && (
+            <section>
+              <h3 style={styles.sectionTitle}>신청 곡 ({pendingQueue.length})</h3>
+              {pendingQueue.map((r, i) => (
+                <div key={r.id}>
+                  <div
+                    onClick={() => setQueueExpanded(v => v === r.video_id ? null : r.video_id)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={waitingQueue.length + i + 1}
+                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.video_id} />
+                  </div>
+                  {queueExpanded === r.video_id && (
+                    <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
+                  )}
+                </div>
+              ))}
+            </section>
+          )}
+          {waitingQueue.length === 0 && pendingQueue.length === 0 && (
             <div style={styles.empty}>대기 중인 추천곡이 없습니다.<br />첫 번째 곡을 추천해보세요!</div>
           )}
         </>

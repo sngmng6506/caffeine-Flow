@@ -33,22 +33,12 @@ function preloadYoutube() {
     },
   });
 
-  // [자동재생 비활성화] 영상 종료 감지 → 큐 자동 진행
-  // youtubeView.webContents.on('ipc-message', (_e, channel) => {
-  //   if (channel === 'youtube-video-ended') {
-  //     if (!currentVideoId) return;
-  //     if (currentVideoId === defaultVideoId) {
-  //       currentVideoId = null;
-  //       mainWindow.webContents.send('default-playing', false);
-  //       youtubeView.webContents.loadURL(`https://www.youtube.com/watch?v=${defaultVideoId}&autoplay=1`);
-  //       currentVideoId = defaultVideoId;
-  //       mainWindow.webContents.send('default-playing', true);
-  //       return;
-  //     }
-  //     currentVideoId = null;
-  //     mainWindow.webContents.send('video-ended');
-  //   }
-  // });
+  // 영상 종료 감지 → React에 video-ended 전달 (playing → played 처리용)
+  youtubeView.webContents.on('ipc-message', (_e, channel) => {
+    if (channel === 'youtube-video-ended') {
+      mainWindow.webContents.send('video-ended');
+    }
+  });
 
   // 현재 재생 영상 감지 → React에 전달
   youtubeView.webContents.on('page-title-updated', (_e, title) => {
