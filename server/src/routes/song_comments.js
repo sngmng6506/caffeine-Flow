@@ -19,10 +19,12 @@ router.post('/', async (req, res) => {
   if (!body?.trim()) return res.status(400).json({ error: 'body 필수' });
 
   const cafeId = await resolveCafeId(req);
+  const visitorId = req.headers['x-visitor-id'] || null;
   const comment = await svc.addComment(req.params.videoId, cafeId, {
     commenterIp:   getIp(req),
     commenterName: commenterName || undefined,
     body:          body.trim(),
+    visitorId,
   });
   res.status(201).json(comment);
 });
@@ -34,10 +36,12 @@ router.post('/:commentId/replies', async (req, res) => {
   if (!body?.trim()) return res.status(400).json({ error: 'body 필수' });
 
   const cafeId = await resolveCafeId(req);
+  const visitorId = req.headers['x-visitor-id'] || null;
   const reply = await svc.addReply(req.params.commentId, cafeId, {
     commenterIp:   getIp(req),
     commenterName: commenterName || undefined,
     body:          body.trim(),
+    visitorId,
   });
   res.status(201).json(reply);
 });

@@ -1,9 +1,14 @@
+import { getVisitorId } from './deviceName';
+
 const BASE = '/api/v1';
 
 async function apiFetch(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Visitor-Id': getVisitorId(),
+    },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await res.text();

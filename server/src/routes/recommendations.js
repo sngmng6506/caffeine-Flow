@@ -24,7 +24,8 @@ router.get('/', async (req, res) => {
   const recs = await recService.getRecommendations(cafe.id);
 
   // 방문 기록 (같은 IP는 하루 1회만)
-  const ip    = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  const ip        = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  const visitorId = req.headers['x-visitor-id'] || null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const db    = require('../db/knex');
   db('cafe_visits')
@@ -32,7 +33,7 @@ router.get('/', async (req, res) => {
     .where('visited_at', '>=', today)
     .first()
     .then(existing => {
-      if (!existing) db('cafe_visits').insert({ cafe_id: cafe.id, visitor_ip: ip }).catch(() => {});
+      if (!existing) db('cafe_visits').insert({ cafe_id: cafe.id, visitor_ip: ip, visitor_id: visitorId }).catch(() => {});
     })
     .catch(() => {});
 
@@ -63,7 +64,8 @@ router.post('/', requestLimiter, async (req, res) => {
     return res.status(429).json({ error: `대기열이 가득 찼습니다 (최대 ${MAX_QUEUE_SIZE}곡)` });
 
   const ip  = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
-  const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform });
+  const visitorId = req.headers['x-visitor-id'] || null;
+  const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform, visitorId });
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });
   res.status(201).json(rec);
@@ -146,8 +148,9 @@ router.delete('/:id', requireAuth, requireCafeOwner, async (req, res) => {
 // POST /api/v1/cafes/:slug/recommendations/:id/vote
 router.post('/:id/vote', async (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  const visitorId = req.headers['x-visitor-id'] || null;
   try {
-    const rec = await recService.vote(req.params.id, ip);
+    const rec = await recService.vote(req.params.id, ip, visitorId);
     broadcast(req, req.params.slug, 'recommendations_update', { action: 'vote', rec });
     res.json(rec);
   } catch (err) {

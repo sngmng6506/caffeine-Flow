@@ -21,14 +21,14 @@ async function getComments(videoId) {
   })).reverse();
 }
 
-async function addComment(videoId, cafeId = null, { commenterIp, commenterName, body }) {
+async function addComment(videoId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {
   const [comment] = await db('song_comments')
-    .insert({ video_id: videoId, cafe_id: cafeId, commenter_ip: commenterIp, commenter_name: commenterName, body })
+    .insert({ video_id: videoId, cafe_id: cafeId, commenter_ip: commenterIp, commenter_name: commenterName, body, visitor_id: visitorId || null })
     .returning('*');
   return { ...comment, cafe_name: null, replies: [] };
 }
 
-async function addReply(parentId, cafeId = null, { commenterIp, commenterName, body }) {
+async function addReply(parentId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {
   const parent = await db('song_comments').where({ id: parentId }).first();
   if (!parent || parent.parent_id !== null) throw Object.assign(new Error('유효하지 않은 댓글'), { status: 400 });
 
@@ -40,6 +40,7 @@ async function addReply(parentId, cafeId = null, { commenterIp, commenterName, b
       commenter_ip:   commenterIp,
       commenter_name: commenterName,
       body,
+      visitor_id:     visitorId || null,
     })
     .returning('*');
   return { ...reply, cafe_name: null };

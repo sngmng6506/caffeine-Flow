@@ -29,3 +29,12 @@ export function getDeviceName() {
   }
   return name;
 }
+
+export function getVisitorId() {
+  let id = localStorage.getItem('cf_visitor_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('cf_visitor_id', id);
+  }
+  return id;
+}
