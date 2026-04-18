@@ -59,6 +59,21 @@ router.put('/me/marketing', requireAuth, async (req, res) => {
   res.json({ marketing_agreed: cafe.marketing_agreed });
 });
 
+// PUT /api/v1/cafes/me/address  (주소 변경)
+router.put('/me/address', requireAuth, async (req, res) => {
+  const { address, roadAddress, region, district, latitude, longitude } = req.body;
+  if (!address && !roadAddress) return res.status(400).json({ error: '주소를 입력해주세요' });
+  const cafe = await cafeService.update(req.owner.cafeId, {
+    address:      address      || null,
+    road_address: roadAddress  || null,
+    region:       region       || null,
+    district:     district     || null,
+    latitude:     latitude     || null,
+    longitude:    longitude    || null,
+  });
+  res.json({ address: cafe.address, road_address: cafe.road_address, region: cafe.region, district: cafe.district, latitude: cafe.latitude, longitude: cafe.longitude });
+});
+
 // PUT /api/v1/cafes/me/status  (신청 ON/OFF 토글)
 router.put('/me/status', requireAuth, async (req, res) => {
   const { is_accepting } = req.body;

@@ -132,7 +132,7 @@ router.get('/naver/callback', async (req, res) => {
 // body: { pendingToken, cafeName, agreed: true }
 // ────────────────────────────────────────────
 router.post('/complete', async (req, res) => {
-  const { pendingToken, cafeName, agreed, agreements } = req.body;
+  const { pendingToken, cafeName, agreed, agreements, location } = req.body;
   if (!pendingToken || !cafeName || !agreed)
     return res.status(400).json({ error: '필수 항목 누락' });
 
@@ -156,6 +156,7 @@ router.post('/complete', async (req, res) => {
     disclaimerAcceptedAt: new Date(),
     lastLoginAt:          new Date(),
     agreements,
+    location,
   });
 
   res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe) });

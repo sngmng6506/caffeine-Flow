@@ -83,6 +83,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   const [step, setStep] = useState(initialPendingToken ? 'setup' : 'login');
   const [pendingToken, setPendingToken] = useState(initialPendingToken || '');
   const [cafeName, setCafeName] = useState('');
+  const [location, setLocation] = useState(null);
   const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false, marketing: false });
   const [expanded, setExpanded] = useState({});
   const [loading, setLoading] = useState(false);
@@ -146,7 +147,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setLoading(true);
     setError('');
     try {
-      const res = await completeRegistration(pendingToken, cafeName.trim(), agreements);
+      const res = await completeRegistration(pendingToken, cafeName.trim(), agreements, location);
       localStorage.setItem('token', res.token);
       localStorage.setItem('cafe', JSON.stringify(res.cafe));
       onLogin(res.cafe);
@@ -160,10 +161,54 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   function handleCancel() {
     setPendingToken('');
     setCafeName('');
+    setLocation(null);
     setAgreements({ service: false, privacy: false, copyright: false, marketing: false });
     setExpanded({});
     setError('');
     setStep('login');
+  }
+
+  function openAddressSearch() {
+    if (!window.daum?.Postcode) {
+      const script = document.createElement('script');
+      script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      script.onload = () => runPostcode();
+      document.body.appendChild(script);
+    } else {
+      runPostcode();
+    }
+  }
+
+  function runPostcode() {
+    new window.daum.Postcode({
+      oncomplete(data) {
+        // 좌표 변환 (카카오 Geocoder)
+        if (window.kakao?.maps?.services) {
+          const geocoder = new window.kakao.maps.services.Geocoder();
+          geocoder.addressSearch(data.roadAddress || data.jibunAddress, (result, status) => {
+            const coords = status === 'OK' && result[0]
+              ? { latitude: parseFloat(result[0].y), longitude: parseFloat(result[0].x) }
+              : { latitude: null, longitude: null };
+            setLocation({
+              address: data.jibunAddress,
+              roadAddress: data.roadAddress,
+              region: data.sido,
+              district: data.sigungu,
+              ...coords,
+            });
+          });
+        } else {
+          setLocation({
+            address: data.jibunAddress,
+            roadAddress: data.roadAddress,
+            region: data.sido,
+            district: data.sigungu,
+            latitude: null,
+            longitude: null,
+          });
+        }
+      },
+    }).open();
   }
 
   function toggleAgreement(key) {
@@ -191,6 +236,21 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
             required
             autoFocus
           />
+
+          <div style={styles.addressBox}>
+            <div style={styles.addressLabel}>카페 위치 (선택)</div>
+            {location ? (
+              <div style={styles.addressResult}>
+                <div style={styles.addressText}>{location.roadAddress || location.address}</div>
+                <button type="button" onClick={openAddressSearch} style={styles.addressChangeBtn}>변경</button>
+                <button type="button" onClick={() => setLocation(null)} style={styles.addressClearBtn}>삭제</button>
+              </div>
+            ) : (
+              <button type="button" onClick={openAddressSearch} style={styles.addressSearchBtn}>
+                주소 검색
+              </button>
+            )}
+          </div>
 
           <div style={styles.agreementBox}>
             <label style={styles.allAgree}>
@@ -276,6 +336,13 @@ const styles = {
   optional:     { fontSize: 11, color: '#aaa', marginLeft: 2 },
   expandBtn:    { fontSize: 11, color: '#888', background: 'none', border: '1px solid #ddd', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' },
   termContent:  { fontSize: 12, color: '#666', background: '#f8f8f8', borderRadius: 6, padding: '10px 12px', whiteSpace: 'pre-line', lineHeight: 1.7, maxHeight: 150, overflowY: 'auto' },
+  addressBox:       { display: 'flex', flexDirection: 'column', gap: 6 },
+  addressLabel:     { fontSize: 13, color: '#888' },
+  addressResult:    { display: 'flex', alignItems: 'center', gap: 8 },
+  addressText:      { flex: 1, fontSize: 13, color: '#333', background: '#f8f8f8', padding: '8px 10px', borderRadius: 6 },
+  addressChangeBtn: { fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', flexShrink: 0 },
+  addressClearBtn:  { fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer', flexShrink: 0 },
+  addressSearchBtn: { padding: '10px 12px', borderRadius: 8, border: '1px dashed #ccc', background: '#fafafa', color: '#888', cursor: 'pointer', fontSize: 13 },
   btn:          { padding: '12px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15 },
   error:        { fontSize: 13, color: '#e63946', textAlign: 'center' },
   loading:      { fontSize: 13, color: '#888', textAlign: 'center' },

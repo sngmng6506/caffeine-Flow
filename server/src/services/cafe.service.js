@@ -27,7 +27,7 @@ async function findByNaverId(naverId) {
   return db('cafes').where({ naver_id: naverId }).first();
 }
 
-async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedAt, lastLoginAt, agreements }) {
+async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedAt, lastLoginAt, agreements, location }) {
   const slug = await uniqueSlug();
   const now = new Date();
   const [cafe] = await db('cafes')
@@ -44,6 +44,12 @@ async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedA
       copyright_agreed_at:    agreements?.copyright  ? now : null,
       marketing_agreed:       !!agreements?.marketing,
       marketing_agreed_at:    agreements?.marketing  ? now : null,
+      address:                location?.address      || null,
+      road_address:           location?.roadAddress  || null,
+      region:                 location?.region       || null,
+      district:               location?.district     || null,
+      latitude:               location?.latitude     || null,
+      longitude:              location?.longitude    || null,
     })
     .returning('*');
   return cafe;
