@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe } from '../api';
+import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe, getSongComments } from '../api';
 import { getSocket, disconnectSocket } from '../socket';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
@@ -31,6 +31,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [noticeLoading, setNoticeLoading]   = useState(false);
   const [allowedPlatforms, setAllowedPlatforms] = useState(['youtube', 'soundcloud', 'spotify']);
   const [platformSaving, setPlatformSaving] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(null);
 
   recsRef.current = recs;
   const queue = recs.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'playing');
@@ -482,7 +483,18 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
           {historyLoading && history.length === 0 && <div style={styles.empty}>불러오는 중...</div>}
           {!historyLoading && history.length === 0 && <div style={styles.empty}>이력이 없습니다.</div>}
           {history.map(r => (
-            <RecommendCard key={r.id} slug={cafe.slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} />
+            <div key={r.id}>
+              <div
+                onClick={() => setHistoryExpanded(v => v === r.video_id ? null : r.video_id)}
+                style={{ cursor: 'pointer' }}
+              >
+                <RecommendCard slug={cafe.slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete}
+                  expanded={historyExpanded === r.video_id} />
+              </div>
+              {historyExpanded === r.video_id && (
+                <OwnerCommentSection videoId={r.video_id} />
+              )}
+            </div>
           ))}
           {historyHasMore && (
             <button onClick={() => loadHistory(history.length)} disabled={historyLoading} style={styles.moreBtn}>
@@ -714,12 +726,13 @@ function ContactTab({ provider }) {
       <div style={contactStyles.box}>
         <p style={contactStyles.desc}>
           사장님, 안녕하세요. <br />
-        시스템 오류, 기능 요청, 기타 문의사항이 있으시면<br />
+        운영 중 불편한 점, 필요한 기능, 떠오른 아이디어가 있으시면 <br />
         아래 버튼을 눌러 메일을 보내주세요. <br />
         <br />
-        운영하시면서 불편한 점이나 개선 아이디어도 편하게 남겨주세요. <br />
-        기존 앱 개선은 물론, 새로운 앱으로 해결이 가능한 경우에도<br />
-        검토 후 제작해드리겠습니다. <br />
+        작은 기능 개선부터, <br />
+        “이런 것도 앱으로 가능할까?” 싶은 새로운 아이디어까지 모두 환영합니다.<br />
+
+         <br />
         </p>
         <a href={mailUrl} target="_blank" rel="noreferrer" style={contactStyles.btn}>
           메일 보내기
@@ -788,6 +801,57 @@ const qrStyles = {
   devInfo:        { fontSize: 10, color: '#bbb', fontFamily: 'monospace' },
   btnRow:         { display: 'flex', gap: 10 },
   btn:            { padding: '10px 24px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
+};
+
+function OwnerCommentSection({ videoId }) {
+  const [comments, setComments] = useState(null);
+
+  useEffect(() => {
+    getSongComments(videoId).then(setComments).catch(() => setComments([]));
+  }, [videoId]);
+
+  if (comments === null) return <div style={commentStyles.wrap}><div style={commentStyles.loading}>댓글 불러오는 중...</div></div>;
+  if (comments.length === 0) return <div style={commentStyles.wrap}><div style={commentStyles.empty}>댓글이 없습니다.</div></div>;
+
+  return (
+    <div style={commentStyles.wrap}>
+      {comments.map(c => (
+        <div key={c.id} style={commentStyles.item}>
+          <div style={commentStyles.meta}>
+            <span style={commentStyles.name}>{c.commenter_name || '익명'}</span>
+            <span style={commentStyles.date}>{new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
+          </div>
+          <div style={commentStyles.body}>{c.body}</div>
+          {c.replies?.length > 0 && (
+            <div style={commentStyles.replies}>
+              {c.replies.map(r => (
+                <div key={r.id} style={commentStyles.replyItem}>
+                  <div style={commentStyles.meta}>
+                    <span style={commentStyles.name}>{r.commenter_name || '익명'}</span>
+                    <span style={commentStyles.date}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
+                  </div>
+                  <div style={commentStyles.body}>{r.body}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const commentStyles = {
+  wrap:      { padding: '12px 12px 16px 16px', background: '#fafafa', borderRadius: 8, marginBottom: 4 },
+  loading:   { fontSize: 13, color: '#aaa', padding: '8px 0' },
+  empty:     { fontSize: 13, color: '#aaa', padding: '8px 0' },
+  item:      { marginTop: 12 },
+  meta:      { display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 2 },
+  name:      { fontSize: 13, fontWeight: 700 },
+  date:      { fontSize: 11, color: '#aaa' },
+  body:      { fontSize: 13, lineHeight: 1.5 },
+  replies:   { marginTop: 8, paddingLeft: 16, borderLeft: '2px solid #eee' },
+  replyItem: { marginTop: 8 },
 };
 
 const contactStyles = {

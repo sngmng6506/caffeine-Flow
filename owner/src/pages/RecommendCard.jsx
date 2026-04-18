@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { updateRec, deleteRec } from '../api';
 
-export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, position }) {
+export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, position, expanded }) {
   const [loading, setLoading] = useState(false);
 
   async function handle(action) {
@@ -77,6 +77,9 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
           <div style={styles.meta} />
         )}
       </div>
+      {expanded !== undefined && (
+        <span style={styles.commentHint}>{expanded ? '▲' : '▼'}</span>
+      )}
     </div>
   );
 }
@@ -95,4 +98,5 @@ const styles = {
   queuedLabel:{ fontSize: 12, color: '#4caf50', fontWeight: 600 },
   skipBtn:    { fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', background: '#ff9800', color: '#fff', cursor: 'pointer', fontWeight: 600 },
   platformBadge: { fontSize: 10, fontWeight: 700, color: '#fff', padding: '1px 5px', borderRadius: 3, marginRight: 4 },
+  commentHint:   { fontSize: 11, color: '#aaa', flexShrink: 0, alignSelf: 'center' },
 };

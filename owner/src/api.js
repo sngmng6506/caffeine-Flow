@@ -44,3 +44,5 @@ export const getHourlyStats     = () => apiFetch('GET', '/cafes/me/stats/hourly'
 export const getWeekdayStats    = () => apiFetch('GET', '/cafes/me/stats/weekday');
 export const getHourlySongs     = (hour, offset = 0) => apiFetch('GET', `/cafes/me/stats/hourly-songs?hour=${hour}&offset=${offset}`);
 export const getWeekdaySongs    = (day, offset = 0) => apiFetch('GET', `/cafes/me/stats/weekday-songs?day=${day}&offset=${offset}`);
+
+export const getSongComments    = (videoId) => apiFetch('GET', `/songs/${videoId}/comments`);

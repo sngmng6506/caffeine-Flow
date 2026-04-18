@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getHourlySongs, getStats } from '../api';
+import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getHourlySongs, getStats, getSongComments } from '../api';
 
 const STATUS_FILTER = {
   재생: r => r.status === 'played',
@@ -141,20 +141,7 @@ export default function StatsPanel() {
       <Section title="인기곡 TOP 10" sub="누적 재생 기준">
         {topSongs.length === 0
           ? <div style={s.listEmpty}>아직 재생된 곡이 없습니다.</div>
-          : (
-            <div style={s.songList}>
-              {topSongs.map((song, i) => (
-                <div key={song.video_id} style={s.songItem}>
-                  <span style={s.songIdx}>{i + 1}</span>
-                  <img src={song.thumbnail} alt="" style={s.songThumb} />
-                  <div style={s.songInfo}>
-                    <div style={s.songTitle}>{song.title}</div>
-                    <div style={s.songMeta}>{song.channel_title} · {song.count}회</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
+          : <TopSongsList songs={topSongs} />
         }
       </Section>
     </div>
@@ -162,19 +149,30 @@ export default function StatsPanel() {
 }
 
 function SongList({ recs, label, hasMore, onMore }) {
+  const [expanded, setExpanded] = useState(null);
+
   if (recs.length === 0) return <div style={s.listEmpty}>{label} 추천된 곡이 없습니다.</div>;
 
   return (
     <div style={s.songList}>
       {recs.map((r, i) => (
-        <div key={r.id || `${r.video_id}-${i}`} style={s.songItem}>
-          <span style={s.songIdx}>{i + 1}</span>
-          <img src={r.thumbnail} alt="" style={s.songThumb} />
-          <div style={s.songInfo}>
-            <div style={s.songTitle}>{r.title}</div>
-            <div style={s.songMeta}>{r.channel_title}</div>
+        <div key={r.id || `${r.video_id}-${i}`}>
+          <div
+            style={{ ...s.songItem, cursor: 'pointer' }}
+            onClick={() => setExpanded(v => v === r.video_id ? null : r.video_id)}
+          >
+            <span style={s.songIdx}>{i + 1}</span>
+            <img src={r.thumbnail} alt="" style={s.songThumb} />
+            <div style={s.songInfo}>
+              <div style={s.songTitle}>{r.title}</div>
+              <div style={s.songMeta}>{r.channel_title}</div>
+            </div>
+            {r.count > 1 && <span style={s.songCount}>{r.count}건</span>}
+            <span style={s.chevron}>{expanded === r.video_id ? '▲' : '▼'}</span>
           </div>
-          {r.count > 1 && <span style={s.songCount}>{r.count}건</span>}
+          {expanded === r.video_id && (
+            <CommentSection videoId={r.video_id} />
+          )}
         </div>
       ))}
       {hasMore && (
@@ -242,6 +240,72 @@ function BarChart({ data, labelKey, valueKey, formatLabel, color, showEvery, sel
   );
 }
 
+function TopSongsList({ songs }) {
+  const [expanded, setExpanded] = useState(null);
+
+  return (
+    <div style={s.songList}>
+      {songs.map((song, i) => (
+        <div key={song.video_id}>
+          <div
+            style={{ ...s.songItem, cursor: 'pointer' }}
+            onClick={() => setExpanded(v => v === song.video_id ? null : song.video_id)}
+          >
+            <span style={s.songIdx}>{i + 1}</span>
+            <img src={song.thumbnail} alt="" style={s.songThumb} />
+            <div style={s.songInfo}>
+              <div style={s.songTitle}>{song.title}</div>
+              <div style={s.songMeta}>{song.channel_title} · {song.count}회</div>
+            </div>
+            <span style={s.chevron}>{expanded === song.video_id ? '▲' : '▼'}</span>
+          </div>
+          {expanded === song.video_id && (
+            <CommentSection videoId={song.video_id} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CommentSection({ videoId }) {
+  const [comments, setComments] = useState(null);
+
+  useEffect(() => {
+    getSongComments(videoId).then(setComments).catch(() => setComments([]));
+  }, [videoId]);
+
+  if (comments === null) return <div style={s.commentWrap}><div style={s.commentEmpty}>댓글 불러오는 중...</div></div>;
+  if (comments.length === 0) return <div style={s.commentWrap}><div style={s.commentEmpty}>댓글이 없습니다.</div></div>;
+
+  return (
+    <div style={s.commentWrap}>
+      {comments.map(c => (
+        <div key={c.id} style={s.commentItem}>
+          <div style={s.commentMeta}>
+            <span style={s.commentName}>{c.commenter_name || '익명'}</span>
+            <span style={s.commentDate}>{new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
+          </div>
+          <div style={s.commentBody}>{c.body}</div>
+          {c.replies?.length > 0 && (
+            <div style={s.commentReplies}>
+              {c.replies.map(r => (
+                <div key={r.id} style={s.commentReplyItem}>
+                  <div style={s.commentMeta}>
+                    <span style={s.commentName}>{r.commenter_name || '익명'}</span>
+                    <span style={s.commentDate}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
+                  </div>
+                  <div style={s.commentBody}>{r.body}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const s = {
   wrap:            { padding: '16px 0', display: 'flex', flexDirection: 'column', gap: 24 },
   loading:         { color: '#888', fontSize: 13, padding: '40px 0', textAlign: 'center' },
@@ -274,4 +338,15 @@ const s = {
   bar:             { width: '100%', borderRadius: '3px 3px 0 0', minHeight: 2 },
   barValue:        { fontSize: 9, color: '#888', marginBottom: 2 },
   barLabel:        { fontSize: 10, color: '#888', height: 16 },
+
+  chevron:         { fontSize: 11, color: '#aaa', flexShrink: 0 },
+  commentWrap:     { padding: '12px 12px 16px 16px', background: '#fafafa', borderRadius: 8, marginBottom: 4, borderTop: '1px solid #eee' },
+  commentEmpty:    { fontSize: 13, color: '#aaa', padding: '8px 0' },
+  commentItem:     { marginTop: 12 },
+  commentMeta:     { display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 2 },
+  commentName:     { fontSize: 13, fontWeight: 700 },
+  commentDate:     { fontSize: 11, color: '#aaa' },
+  commentBody:     { fontSize: 13, lineHeight: 1.5 },
+  commentReplies:  { marginTop: 8, paddingLeft: 16, borderLeft: '2px solid #eee' },
+  commentReplyItem:{ marginTop: 8 },
 };
