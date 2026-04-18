@@ -132,9 +132,13 @@ router.get('/naver/callback', async (req, res) => {
 // body: { pendingToken, cafeName, agreed: true }
 // ────────────────────────────────────────────
 router.post('/complete', async (req, res) => {
-  const { pendingToken, cafeName, agreed } = req.body;
+  const { pendingToken, cafeName, agreed, agreements } = req.body;
   if (!pendingToken || !cafeName || !agreed)
     return res.status(400).json({ error: '필수 항목 누락' });
+
+  // 필수 약관 동의 검증
+  if (!agreements?.service || !agreements?.privacy || !agreements?.copyright)
+    return res.status(400).json({ error: '필수 약관에 모두 동의해야 합니다' });
 
   let pending;
   try {
@@ -151,6 +155,7 @@ router.post('/complete', async (req, res) => {
     naverId:              pending.naverId  || null,
     disclaimerAcceptedAt: new Date(),
     lastLoginAt:          new Date(),
+    agreements,
   });
 
   res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe) });

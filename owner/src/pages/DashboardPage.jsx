@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe, getSongComments } from '../api';
+import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe, getSongComments, updateMarketing } from '../api';
 import { getSocket, disconnectSocket } from '../socket';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
@@ -31,6 +31,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [noticeLoading, setNoticeLoading]   = useState(false);
   const [allowedPlatforms, setAllowedPlatforms] = useState(['youtube', 'soundcloud', 'spotify']);
   const [platformSaving, setPlatformSaving] = useState(false);
+  const [marketingAgreed, setMarketingAgreed] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(null);
 
   recsRef.current = recs;
@@ -69,6 +70,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       }
       if (latest.customer_url) {
         setCustomerUrl(latest.customer_url);
+      }
+      if (latest.marketing_agreed !== undefined) {
+        setMarketingAgreed(latest.marketing_agreed);
       }
     }).catch(() => {});
 
@@ -513,6 +517,11 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
           setAllowedPlatforms(allowed_platforms);
         } catch (e) { alert(e.message); }
         finally { setPlatformSaving(false); }
+      }} marketingAgreed={marketingAgreed} onMarketingChange={async (v) => {
+        try {
+          const { marketing_agreed } = await updateMarketing(v);
+          setMarketingAgreed(marketing_agreed);
+        } catch (e) { alert(e.message); }
       }} />}
       {tab === 'contact' && <ContactTab provider={cafe.provider} />}
     </div>
@@ -609,7 +618,7 @@ const PLATFORMS = [
   { id: 'spotify',    label: 'Spotify',    color: '#1db954' },
 ];
 
-function SettingsTab({ allowedPlatforms, saving, onSave }) {
+function SettingsTab({ allowedPlatforms, saving, onSave, marketingAgreed, onMarketingChange }) {
   const [selected, setSelected] = useState(allowedPlatforms);
 
   useEffect(() => { setSelected(allowedPlatforms); }, [allowedPlatforms]);
@@ -659,12 +668,26 @@ function SettingsTab({ allowedPlatforms, saving, onSave }) {
           </button>
         )}
       </div>
+
+      <div style={settingsStyles.section}>
+        <div style={settingsStyles.title}>마케팅 정보 수신</div>
+        <div style={settingsStyles.desc}>신규 기능, 업데이트, 이벤트 등의 알림을 이메일로 받습니다.</div>
+        <label style={settingsStyles.toggleRow}>
+          <input
+            type="checkbox"
+            checked={marketingAgreed}
+            onChange={e => onMarketingChange(e.target.checked)}
+            style={settingsStyles.checkbox}
+          />
+          <span>{marketingAgreed ? '수신 동의' : '수신 거부'}</span>
+        </label>
+      </div>
     </div>
   );
 }
 
 const settingsStyles = {
-  wrap:        { paddingTop: 8 },
+  wrap:        { paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 16 },
   section:     { background: '#f8f8f8', borderRadius: 12, padding: 20 },
   title:       { fontSize: 15, fontWeight: 700, marginBottom: 4 },
   desc:        { fontSize: 13, color: '#888', marginBottom: 16 },
@@ -672,6 +695,8 @@ const settingsStyles = {
   platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
   hint:        { fontSize: 12, color: '#ff9800', marginTop: 8 },
   saveBtn:     { marginTop: 16, padding: '10px 28px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
+  toggleRow:   { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' },
+  checkbox:    { width: 18, height: 18, cursor: 'pointer' },
 };
 
 function QRTab({ url, cafeName }) {

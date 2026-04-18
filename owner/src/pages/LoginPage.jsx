@@ -14,9 +14,20 @@ const TERMS = [
 ② 회원은 서비스를 이용하여 불법적인 행위를 하거나 타인의 권리를 침해해서는 안 됩니다.
 ③ 서비스는 운영상 필요한 경우 사전 고지 후 서비스를 변경하거나 중단할 수 있습니다.
 
-제3조 (면책)
+제3조 (회원 탈퇴)
+① 회원은 서비스 내 문의 기능 또는 이메일(sngmng6506@gmail.com)을 통해 탈퇴를 요청할 수 있습니다.
+② 탈퇴 시 회원의 개인정보는 관련 법령에 따른 보관 기간을 제외하고 즉시 파기됩니다.
+
+제4조 (면책)
 ① 서비스는 천재지변, 불가항력적 사유로 인한 서비스 중단에 대해 책임을 지지 않습니다.
-② 음악 재생에 따른 저작권 관련 분쟁 및 법적 책임은 회원에게 있습니다.`,
+② 음악 재생에 따른 저작권 관련 분쟁 및 법적 책임은 회원에게 있습니다.
+
+제5조 (약관 변경)
+① 서비스는 약관을 변경할 경우, 적용일 7일 전까지 서비스 내 공지 또는 이메일로 안내합니다.
+② 변경된 약관에 동의하지 않을 경우 회원은 탈퇴할 수 있습니다.
+
+제6조 (분쟁 해결)
+본 약관과 관련한 분쟁은 대한민국 법률에 따르며, 관할 법원은 민사소송법에 따릅니다.`,
   },
   {
     key: 'privacy',
@@ -25,6 +36,7 @@ const TERMS = [
     content: `■ 수집하는 개인정보 항목
   - 소셜 로그인 제공자로부터 수집: 이메일 주소, 이름, 소셜 계정 식별자
   - 서비스 이용 과정에서 자동 수집: 접속 IP 주소, 서비스 이용 기록
+  - 손님(비회원) 이용 시 수집: 기기 식별 닉네임, 댓글 내용, 접속 IP
 
 ■ 개인정보 수집·이용 목적
   - 회원 가입 및 계정 관리
@@ -36,6 +48,16 @@ const TERMS = [
   - 단, 관련 법령에 따라 일부 정보는 해당 기간 보관
     · 계약 또는 청약철회 기록: 5년 (전자상거래법)
     · 접속 로그 기록: 3개월 (통신비밀보호법)
+
+■ 개인정보 파기 절차 및 방법
+  - 회원 탈퇴 요청 시 전자적 파일은 복구할 수 없도록 삭제합니다.
+
+■ 개인정보 처리 위탁
+  - 클라우드 서버 운영: Railway (미국)
+  - 소셜 로그인 인증: Google, Naver
+
+■ 개인정보보호 책임자
+  - 이메일: sngmng6506@gmail.com
 
 ■ 동의 거부 시 불이익
   동의 거부 시 서비스 이용이 불가합니다.`,
@@ -53,7 +75,7 @@ const TERMS = [
     title: '마케팅 정보 수신 동의 (선택)',
     required: false,
     content: `서비스의 신규 기능, 업데이트, 이벤트 등 마케팅 정보를 이메일로 수신하는 것에 동의합니다.
-동의하지 않아도 서비스 이용에 불이익이 없으며, 언제든지 수신을 거부할 수 있습니다.`,
+동의하지 않아도 서비스 이용에 불이익이 없으며, 서비스 설정에서 언제든지 수신을 거부할 수 있습니다.`,
   },
 ];
 
@@ -124,7 +146,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setLoading(true);
     setError('');
     try {
-      const res = await completeRegistration(pendingToken, cafeName.trim());
+      const res = await completeRegistration(pendingToken, cafeName.trim(), agreements);
       localStorage.setItem('token', res.token);
       localStorage.setItem('cafe', JSON.stringify(res.cafe));
       onLogin(res.cafe);
@@ -133,6 +155,15 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleCancel() {
+    setPendingToken('');
+    setCafeName('');
+    setAgreements({ service: false, privacy: false, copyright: false, marketing: false });
+    setExpanded({});
+    setError('');
+    setStep('login');
   }
 
   function toggleAgreement(key) {
@@ -147,7 +178,10 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   if (step === 'setup') {
     return (
       <div style={styles.wrap}>
-        <h2 style={styles.title}>카페 정보 입력</h2>
+        <div style={styles.setupHeader}>
+          <button type="button" onClick={handleCancel} style={styles.backBtn}>← 뒤로</button>
+          <h2 style={styles.setupTitle}>카페 정보 입력</h2>
+        </div>
         <form onSubmit={handleSetupSubmit} style={styles.form}>
           <input
             placeholder="카페 이름"
@@ -221,6 +255,9 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
 const styles = {
   wrap:         { maxWidth: 380, margin: '80px auto', padding: '36px 32px', fontFamily: 'sans-serif', boxShadow: '0 2px 20px rgba(0,0,0,0.1)', borderRadius: 16 },
   title:        { textAlign: 'center', marginBottom: 8, fontSize: 24 },
+  setupHeader:  { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 },
+  setupTitle:   { fontSize: 20, fontWeight: 700, margin: 0, flex: 1, textAlign: 'center', paddingRight: 48 },
+  backBtn:      { fontSize: 13, color: '#888', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', flexShrink: 0 },
   subtitle:     { textAlign: 'center', color: '#888', fontSize: 14, marginBottom: 32 },
   form:         { display: 'flex', flexDirection: 'column', gap: 12 },
   input:        { padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, outline: 'none' },

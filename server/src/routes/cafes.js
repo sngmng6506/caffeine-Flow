@@ -48,6 +48,17 @@ router.put('/me/platforms', requireAuth, async (req, res) => {
   res.json({ allowed_platforms: filtered });
 });
 
+// PUT /api/v1/cafes/me/marketing  (마케팅 수신 동의 변경)
+router.put('/me/marketing', requireAuth, async (req, res) => {
+  const { marketing_agreed } = req.body;
+  const data = {
+    marketing_agreed: !!marketing_agreed,
+    marketing_agreed_at: marketing_agreed ? new Date() : null,
+  };
+  const cafe = await cafeService.update(req.owner.cafeId, data);
+  res.json({ marketing_agreed: cafe.marketing_agreed });
+});
+
 // PUT /api/v1/cafes/me/status  (신청 ON/OFF 토글)
 router.put('/me/status', requireAuth, async (req, res) => {
   const { is_accepting } = req.body;

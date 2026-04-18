@@ -22,14 +22,15 @@ async function apiFetch(method, path, body) {
 }
 
 export const googleLogin          = (idToken) => apiFetch('POST', '/auth/google', { idToken });
-export const completeRegistration = (pendingToken, cafeName) =>
-  apiFetch('POST', '/auth/complete', { pendingToken, cafeName, agreed: true });
+export const completeRegistration = (pendingToken, cafeName, agreements) =>
+  apiFetch('POST', '/auth/complete', { pendingToken, cafeName, agreed: true, agreements });
 
 export const getMe      = () => apiFetch('GET', '/cafes/me');
 export const updateMe     = (name)   => apiFetch('PUT', '/cafes/me', { name });
 export const updateNotice = (notice) => apiFetch('PUT', '/cafes/me/notice', { notice });
 export const setStatus  = (is_accepting) => apiFetch('PUT', '/cafes/me/status', { is_accepting });
 export const updatePlatforms = (allowed_platforms) => apiFetch('PUT', '/cafes/me/platforms', { allowed_platforms });
+export const updateMarketing = (marketing_agreed) => apiFetch('PUT', '/cafes/me/marketing', { marketing_agreed });
 
 export const getRecommendations = (slug) => apiFetch('GET',    `/cafes/${slug}/recommendations`);
 export const createRec          = (slug, data) => apiFetch('POST', `/cafes/${slug}/recommendations/owner`, data);

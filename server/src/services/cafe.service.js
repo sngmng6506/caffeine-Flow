@@ -27,8 +27,9 @@ async function findByNaverId(naverId) {
   return db('cafes').where({ naver_id: naverId }).first();
 }
 
-async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedAt, lastLoginAt }) {
+async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedAt, lastLoginAt, agreements }) {
   const slug = await uniqueSlug();
+  const now = new Date();
   const [cafe] = await db('cafes')
     .insert({
       name,
@@ -39,6 +40,11 @@ async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedA
       naver_id:               naverId               || null,
       disclaimer_accepted_at: disclaimerAcceptedAt  || null,
       last_login_at:          lastLoginAt           || null,
+      terms_agreed_at:        agreements?.service    ? now : null,
+      privacy_agreed_at:      agreements?.privacy    ? now : null,
+      copyright_agreed_at:    agreements?.copyright  ? now : null,
+      marketing_agreed:       !!agreements?.marketing,
+      marketing_agreed_at:    agreements?.marketing  ? now : null,
     })
     .returning('*');
   return cafe;
