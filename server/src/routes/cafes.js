@@ -4,7 +4,7 @@ const cafeService      = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
 
 function safeCafe(cafe) {
-  const { password_hash, ...rest } = cafe;
+  const { ...rest } = cafe;
   return rest;
 }
 

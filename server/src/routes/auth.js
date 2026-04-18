@@ -18,7 +18,7 @@ function issuePendingToken(payload) {
 }
 
 function safeCafe(cafe) {
-  const { password_hash, google_id, naver_id, ...rest } = cafe;
+  const { google_id, naver_id, ...rest } = cafe;
   return { ...rest, provider: google_id ? 'google' : 'naver' };
 }
 

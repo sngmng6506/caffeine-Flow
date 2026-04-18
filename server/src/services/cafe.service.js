@@ -35,7 +35,6 @@ async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedA
       name,
       slug,
       owner_email:            ownerEmail            || null,
-      password_hash:          null,
       google_id:              googleId              || null,
       naver_id:               naverId               || null,
       disclaimer_accepted_at: disclaimerAcceptedAt  || null,
