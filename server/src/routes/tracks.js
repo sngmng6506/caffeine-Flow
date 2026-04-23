@@ -58,8 +58,19 @@ router.get('/oembed', async (req, res) => {
   }
 
   if (platform === 'soundcloud') {
-    const trackUrl = normalizeSoundCloudUrl(rawUrl);
+    let trackUrl = normalizeSoundCloudUrl(rawUrl);
     if (!trackUrl) return res.status(400).json({ error: '유효한 SoundCloud URL이 아닙니다' });
+
+    // on.soundcloud.com 단축 URL → 실제 트랙 URL로 리다이렉트 추적
+    try {
+      const u = new URL(rawUrl);
+      if (u.hostname === 'on.soundcloud.com') {
+        const resp = await axios.head(rawUrl, { maxRedirects: 5, timeout: 5000 });
+        const resolved = resp.request?.res?.responseUrl || resp.request?._redirectable?._currentUrl;
+        if (resolved) trackUrl = normalizeSoundCloudUrl(resolved) || trackUrl;
+      }
+    } catch {}
+
     try {
       const { data } = await axios.get('https://soundcloud.com/oembed', {
         params: { url: trackUrl, format: 'json' },
