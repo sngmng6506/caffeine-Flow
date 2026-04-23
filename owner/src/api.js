@@ -31,7 +31,6 @@ export const updateNotice = (notice) => apiFetch('PUT', '/cafes/me/notice', { no
 export const setStatus  = (is_accepting) => apiFetch('PUT', '/cafes/me/status', { is_accepting });
 export const updatePlatforms = (allowed_platforms) => apiFetch('PUT', '/cafes/me/platforms', { allowed_platforms });
 export const updateMarketing = (marketing_agreed) => apiFetch('PUT', '/cafes/me/marketing', { marketing_agreed });
-export const updateAddress = (location) => apiFetch('PUT', '/cafes/me/address', location);
 
 export const getRecommendations = (slug) => apiFetch('GET',    `/cafes/${slug}/recommendations`);
 export const createRec          = (slug, data) => apiFetch('POST', `/cafes/${slug}/recommendations/owner`, data);
