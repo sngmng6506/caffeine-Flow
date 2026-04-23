@@ -136,7 +136,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
 
   async function handleSetupSubmit(e) {
     e.preventDefault();
-    if (!cafeName.trim() || !allRequired) return;
+    if (!cafeName.trim() || !allRequired || !location) return;
     setLoading(true);
     setError('');
     try {
@@ -231,7 +231,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
           />
 
           <div style={styles.addressBox}>
-            <div style={styles.addressLabel}>카페 위치 (선택)</div>
+            <div style={styles.addressLabel}>카페 위치 <span style={styles.required}>(필수)</span></div>
             {location ? (
               <div style={styles.addressResult}>
                 <div style={styles.addressText}>{location.roadAddress || location.address}</div>
@@ -273,7 +273,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
           </div>
 
           {error && <div style={styles.error}>{error}</div>}
-          <button type="submit" disabled={loading || !allRequired || !cafeName.trim()} style={styles.btn}>
+          <button type="submit" disabled={loading || !allRequired || !cafeName.trim() || !location} style={styles.btn}>
             {loading ? '처리 중...' : '가입 완료'}
           </button>
         </form>
