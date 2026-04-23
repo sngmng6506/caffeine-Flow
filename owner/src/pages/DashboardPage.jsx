@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe, getSongComments, updateMarketing, updateAddress } from '../api';
+import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe, getSongComments, updateAddress } from '../api';
 import { getSocket, disconnectSocket } from '../socket';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
@@ -31,7 +31,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [noticeLoading, setNoticeLoading]   = useState(false);
   const [allowedPlatforms, setAllowedPlatforms] = useState(['youtube', 'soundcloud', 'spotify']);
   const [platformSaving, setPlatformSaving] = useState(false);
-  const [marketingAgreed, setMarketingAgreed] = useState(false);
   const [cafeAddress, setCafeAddress] = useState(null);
   const [historyExpanded, setHistoryExpanded] = useState(null);
 
@@ -71,9 +70,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       }
       if (latest.customer_url) {
         setCustomerUrl(latest.customer_url);
-      }
-      if (latest.marketing_agreed !== undefined) {
-        setMarketingAgreed(latest.marketing_agreed);
       }
       if (latest.road_address || latest.address) {
         setCafeAddress({
@@ -528,11 +524,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
           setAllowedPlatforms(allowed_platforms);
         } catch (e) { alert(e.message); }
         finally { setPlatformSaving(false); }
-      }} marketingAgreed={marketingAgreed} onMarketingChange={async (v) => {
-        try {
-          const { marketing_agreed } = await updateMarketing(v);
-          setMarketingAgreed(marketing_agreed);
-        } catch (e) { alert(e.message); }
       }} cafeAddress={cafeAddress} onAddressChange={async (loc) => {
         try {
           await updateAddress(loc);
@@ -673,7 +664,7 @@ function openSettingsAddress(callback) {
   }
 }
 
-function SettingsTab({ allowedPlatforms, saving, onSave, marketingAgreed, onMarketingChange, cafeAddress, onAddressChange, onAddressClear }) {
+function SettingsTab({ allowedPlatforms, saving, onSave, cafeAddress, onAddressChange, onAddressClear }) {
   const [selected, setSelected] = useState(allowedPlatforms);
 
   useEffect(() => { setSelected(allowedPlatforms); }, [allowedPlatforms]);
@@ -725,20 +716,6 @@ function SettingsTab({ allowedPlatforms, saving, onSave, marketingAgreed, onMark
       </div>
 
       <div style={settingsStyles.section}>
-        <div style={settingsStyles.title}>마케팅 정보 수신</div>
-        <div style={settingsStyles.desc}>신규 기능, 업데이트, 이벤트 등의 알림을 이메일로 받습니다.</div>
-        <label style={settingsStyles.toggleRow}>
-          <input
-            type="checkbox"
-            checked={marketingAgreed}
-            onChange={e => onMarketingChange(e.target.checked)}
-            style={settingsStyles.checkbox}
-          />
-          <span>{marketingAgreed ? '수신 동의' : '수신 거부'}</span>
-        </label>
-      </div>
-
-      <div style={settingsStyles.section}>
         <div style={settingsStyles.title}>카페 위치</div>
         <div style={settingsStyles.desc}>카페 주소를 등록하면 지역 기반 통계를 제공받을 수 있습니다.</div>
         {cafeAddress ? (
@@ -764,8 +741,6 @@ const settingsStyles = {
   platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
   hint:        { fontSize: 12, color: '#ff9800', marginTop: 8 },
   saveBtn:     { marginTop: 16, padding: '10px 28px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
-  toggleRow:        { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' },
-  checkbox:         { width: 18, height: 18, cursor: 'pointer' },
   addressRow:       { display: 'flex', alignItems: 'center', gap: 8 },
   addressText:      { flex: 1, fontSize: 13, color: '#333', background: '#fff', padding: '8px 10px', borderRadius: 6, border: '1px solid #eee' },
   addressBtn:       { fontSize: 12, padding: '6px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', flexShrink: 0 },

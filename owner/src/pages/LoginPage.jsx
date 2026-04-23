@@ -70,13 +70,6 @@ const TERMS = [
 
 본 서비스는 음악 신청 및 추천 플랫폼으로, 실제 음악 재생 및 저작권 이용 허락 취득의 책임은 전적으로 카페 운영자(회원)에게 있습니다.`,
   },
-  {
-    key: 'marketing',
-    title: '마케팅 정보 수신 동의 (선택)',
-    required: false,
-    content: `서비스의 신규 기능, 업데이트, 이벤트 등 마케팅 정보를 이메일로 수신하는 것에 동의합니다.
-동의하지 않아도 서비스 이용에 불이익이 없으며, 서비스 설정에서 언제든지 수신을 거부할 수 있습니다.`,
-  },
 ];
 
 export default function LoginPage({ onLogin, initialPendingToken, oauthError }) {
@@ -84,14 +77,14 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   const [pendingToken, setPendingToken] = useState(initialPendingToken || '');
   const [cafeName, setCafeName] = useState('');
   const [location, setLocation] = useState(null);
-  const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false, marketing: false });
+  const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false });
   const [expanded, setExpanded] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(oauthError || '');
   const googleBtnRef = useRef(null);
 
   const allRequired = agreements.service && agreements.privacy && agreements.copyright;
-  const allChecked  = allRequired && agreements.marketing;
+  const allChecked  = allRequired;
 
   // Google Identity Services 스크립트 로드
   useEffect(() => {
@@ -162,7 +155,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setPendingToken('');
     setCafeName('');
     setLocation(null);
-    setAgreements({ service: false, privacy: false, copyright: false, marketing: false });
+    setAgreements({ service: false, privacy: false, copyright: false });
     setExpanded({});
     setError('');
     setStep('login');
@@ -217,7 +210,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
 
   function toggleAll() {
     const next = !allChecked;
-    setAgreements({ service: next, privacy: next, copyright: next, marketing: next });
+    setAgreements({ service: next, privacy: next, copyright: next });
   }
 
   if (step === 'setup') {
