@@ -31,7 +31,8 @@
     "publish": {
       "provider": "github",
       "owner": "sngmng6506",
-      "repo": "caffeine-Flow"
+      "repo": "caffeine-Flow",
+      "releaseType": "release"
     },
     "files": [
       "electron/**/*",
