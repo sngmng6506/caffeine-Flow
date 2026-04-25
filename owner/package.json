@@ -1,6 +1,6 @@
 {
   "name": "caffeine-flow-owner",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite --port 5174",
@@ -11,6 +11,7 @@
     "electron:build": "npm run build && electron-builder"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "socket.io-client": "^4.6.1"
@@ -27,6 +28,11 @@
   "build": {
     "appId": "com.caffeine-flow.owner",
     "productName": "Caffeine Flow",
+    "publish": {
+      "provider": "github",
+      "owner": "sngmng6506",
+      "repo": "caffeine-Flow"
+    },
     "files": [
       "electron/**/*",
       "public/**/*"

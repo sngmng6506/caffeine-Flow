@@ -1,4 +1,5 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 // 유저 제스처 없이는 autoplay 차단 (Chromium 엔진 레벨)
@@ -39,6 +40,19 @@ function preloadYoutube() {
       mainWindow.webContents.send('video-ended');
     }
   });
+
+  // http(s) 외 외부 프로토콜 차단 — Spotify 웹이 spotify: 스킴을 호출하면
+  // Windows가 MS Store로 넘기는 현상 방지
+  const blockExternalProtocol = (e, url) => {
+    if (!/^(https?|about|data|blob):/i.test(url)) {
+      e.preventDefault();
+    }
+  };
+  youtubeView.webContents.on('will-navigate', blockExternalProtocol);
+  youtubeView.webContents.on('will-redirect', blockExternalProtocol);
+  youtubeView.webContents.setWindowOpenHandler(({ url }) => (
+    /^https?:\/\//i.test(url) ? { action: 'allow' } : { action: 'deny' }
+  ));
 
   // 현재 재생 영상 감지 → React에 전달
   youtubeView.webContents.on('page-title-updated', (_e, title) => {
@@ -177,6 +191,10 @@ ipcMain.on('navigate-video', (_e, videoId) => {
 ipcMain.on('set-default-video', (_e, videoId) => { defaultVideoId = videoId; });
 ipcMain.on('clear-default-video', () => { defaultVideoId = null; });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  // 프로덕션 빌드에서만 업데이트 체크 (dev 모드에서는 no-op)
+  if (!isDev) autoUpdater.checkForUpdatesAndNotify();
+});
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

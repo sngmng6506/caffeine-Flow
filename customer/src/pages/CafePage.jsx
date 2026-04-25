@@ -45,7 +45,7 @@ export default function CafePage({ slug }) {
     .filter(r => r.status === 'pending')
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
   const queue = [...waitingQueue, ...pendingQueue];
-  const history = recs.filter(r => r.status === 'played')
+  const history = recs.filter(r => r.status === 'played' || r.status === 'skipped')
     .sort((a, b) => new Date(b.played_at || b.requested_at) - new Date(a.played_at || a.requested_at));
 
   useEffect(() => {
@@ -420,7 +420,7 @@ function CommentItem({ comment: c, videoId, slug, deviceName, isGlobal, onReplyA
     <div style={styles.commentItem}>
       <div style={styles.commentMeta}>
         <span style={styles.commenterName}>
-          {c.commenter_name || '익명'}{isGlobal && c.cafe_name ? <span style={styles.cafeTag}> in {c.cafe_name}</span> : ''}
+          {c.commenter_name || '익명'}{c.cafe_name ? <span style={styles.cafeTag}> in {c.cafe_name}</span> : ''}
         </span>
         <span style={styles.commentDate}>{new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
       </div>
@@ -433,7 +433,7 @@ function CommentItem({ comment: c, videoId, slug, deviceName, isGlobal, onReplyA
             <div key={r.id} style={styles.replyItem}>
               <div style={styles.commentMeta}>
                 <span style={styles.commenterName}>
-                  {r.commenter_name || '익명'}{isGlobal && r.cafe_name ? <span style={styles.cafeName}> in {r.cafe_name}</span> : ''}
+                  {r.commenter_name || '익명'}{r.cafe_name ? <span style={styles.cafeName}> in {r.cafe_name}</span> : ''}
                 </span>
                 <span style={styles.commentDate}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
               </div>
