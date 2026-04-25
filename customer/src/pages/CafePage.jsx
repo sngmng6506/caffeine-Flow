@@ -293,25 +293,28 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
         <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>추천순</button>
       </div>
     <ol style={styles.rankList}>
-      {sorted.map((item, i) => (
-        <li key={item.video_id} style={styles.rankItem}>
-          <div
-            style={styles.rankRow}
-            onClick={() => setExpanded(v => v === item.video_id ? null : item.video_id)}
-          >
-            <span style={styles.rank}>{i + 1}</span>
-            <img src={item.thumbnail} alt="" style={styles.thumb} />
-            <div style={styles.rankInfo}>
-              <div style={styles.rankTitle}>{item.title}</div>
-              <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 신청 · 👍 {item.total_votes || 0}</div>
+      {sorted.map((item, i) => {
+        const rowKey = `${item.video_id}__${i}`;
+        return (
+          <li key={rowKey} style={styles.rankItem}>
+            <div
+              style={styles.rankRow}
+              onClick={() => setExpanded(v => v === rowKey ? null : rowKey)}
+            >
+              <span style={styles.rank}>{i + 1}</span>
+              <img src={item.thumbnail} alt="" style={styles.thumb} />
+              <div style={styles.rankInfo}>
+                <div style={styles.rankTitle}>{item.title}</div>
+                <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 신청 · 👍 {item.total_votes || 0}</div>
+              </div>
+              <span style={styles.chevron}>{expanded === rowKey ? '▲' : '▼'}</span>
             </div>
-            <span style={styles.chevron}>{expanded === item.video_id ? '▲' : '▼'}</span>
-          </div>
-          {expanded === item.video_id && (
-            <CommentSection videoId={item.video_id} slug={slug} isGlobal={!slug} />
-          )}
-        </li>
-      ))}
+            {expanded === rowKey && (
+              <CommentSection videoId={item.video_id} slug={slug} isGlobal={!slug} />
+            )}
+          </li>
+        );
+      })}
     </ol>
     {hasMore && (
       <button onClick={onLoadMore} disabled={loading} style={styles.loadMoreBtn}>

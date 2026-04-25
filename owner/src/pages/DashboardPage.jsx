@@ -630,7 +630,7 @@ function SettingsTab({ allowedPlatforms, saving, onSave }) {
     <div style={settingsStyles.wrap}>
       <div style={settingsStyles.section}>
         <div style={settingsStyles.title}>허용 플랫폼</div>
-        <div style={settingsStyles.desc}>손님이 신청할 수 있는 음악 플랫폼을 선택하세요.</div>
+        <div style={settingsStyles.desc}>손님이 추천할 수 있는 음악 플랫폼을 선택하세요.</div>
         <div style={settingsStyles.platforms}>
           {PLATFORMS.map(p => {
             const active = selected.includes(p.id);
@@ -678,12 +678,21 @@ const settingsStyles = {
 function QRTab({ url, cafeName }) {
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=280x280&margin=10`;
 
-  function handleDownload() {
-    const a = document.createElement('a');
-    a.href = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=600x600&margin=20&format=png`;
-    a.download = `caffeine-flow-${cafeName}-qr.png`;
-    a.target = '_blank';
-    a.click();
+  async function handleDownload() {
+    const src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=600x600&margin=20&format=jpg`;
+    try {
+      const res = await fetch(src);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = `caffeine-flow-${cafeName}-qr.jpg`;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // CORS/네트워크 실패 시 새 탭 fallback
+      window.open(src, '_blank');
+    }
   }
 
   function handlePrint() { window.print(); }
@@ -692,9 +701,11 @@ function QRTab({ url, cafeName }) {
     <div style={qrStyles.outer}>
       <style>{`
         @media print {
+          @page { size: auto; margin: 0; }
+          html, body { margin: 0; padding: 0; height: 100vh; overflow: hidden; }
           body * { visibility: hidden; }
           .print-poster, .print-poster * { visibility: visible; }
-          .print-poster { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+          .print-poster { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         }
       `}</style>
 
@@ -708,7 +719,7 @@ function QRTab({ url, cafeName }) {
       {/* 버튼 (프린트 시 숨김) */}
       <div style={qrStyles.btnRow} className="no-print">
         <button onClick={handlePrint} style={qrStyles.btn}>프린트</button>
-        {/* <button onClick={handleDownload} style={{ ...qrStyles.btn, background: '#fff', color: '#1a1a2e', border: '1px solid #ddd' }}>QR 이미지 저장</button> */}
+        <button onClick={handleDownload} style={{ ...qrStyles.btn, background: '#fff', color: '#1a1a2e', border: '1px solid #ddd' }}>이미지 저장</button>
       </div>
     </div>
   );

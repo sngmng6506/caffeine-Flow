@@ -9,9 +9,12 @@ async function getStats(cafeId) {
 
   const topSongs = await db('recommendations')
     .where({ cafe_id: cafeId, status: 'played' })
-    .select('video_id', 'title', 'channel_title', 'thumbnail')
+    .select('video_id')
+    .select(db.raw('MAX(title) as title'))
+    .select(db.raw('MAX(channel_title) as channel_title'))
+    .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
-    .groupBy('video_id', 'title', 'channel_title', 'thumbnail')
+    .groupBy('video_id')
     .orderBy('count', 'desc')
     .limit(10);
 
@@ -46,31 +49,58 @@ async function getDailyStats(cafeId, dateStr) {
 
 const TOP_PAGE_SIZE = 10;
 
+// Spotify ?si=, YouTube &t= 등 추적 파라미터로 같은 곡이 여러 video_id로 저장된 과거 데이터 병합용
+function canonicalizeVideoId(id) {
+  if (!id) return id;
+  const q = id.indexOf('?');
+  return q === -1 ? id : id.substring(0, q);
+}
+
+// SQL로 1차 그룹 → JS에서 정규화 video_id로 2차 병합 (쿼리스트링 차이로 쪼개진 행 통합)
+function mergeByCanonicalId(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const key = canonicalizeVideoId(r.video_id);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...r, video_id: key, count: Number(r.count), total_votes: Number(r.total_votes || 0) });
+    } else {
+      existing.count += Number(r.count);
+      existing.total_votes += Number(r.total_votes || 0);
+    }
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
 async function getCafeTop10(cafeId, offset = 0) {
-  const items = await db('recommendations')
+  const rows = await db('recommendations')
     .where({ cafe_id: cafeId })
-    .select('video_id', 'title', 'channel_title', 'thumbnail')
+    .select('video_id')
+    .select(db.raw('MAX(title) as title'))
+    .select(db.raw('MAX(channel_title) as channel_title'))
+    .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
     .sum('vote_count as total_votes')
-    .groupBy('video_id', 'title', 'channel_title', 'thumbnail')
-    .orderBy('count', 'desc')
-    .limit(TOP_PAGE_SIZE + 1)
-    .offset(offset);
+    .groupBy('video_id');
 
-  return { items: items.slice(0, TOP_PAGE_SIZE), hasMore: items.length > TOP_PAGE_SIZE };
+  const merged = mergeByCanonicalId(rows);
+  const paged  = merged.slice(offset, offset + TOP_PAGE_SIZE);
+  return { items: paged, hasMore: merged.length > offset + TOP_PAGE_SIZE };
 }
 
 async function getGlobalTop10(offset = 0) {
-  const items = await db('recommendations')
-    .select('video_id', 'title', 'channel_title', 'thumbnail')
+  const rows = await db('recommendations')
+    .select('video_id')
+    .select(db.raw('MAX(title) as title'))
+    .select(db.raw('MAX(channel_title) as channel_title'))
+    .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
     .sum('vote_count as total_votes')
-    .groupBy('video_id', 'title', 'channel_title', 'thumbnail')
-    .orderBy('count', 'desc')
-    .limit(TOP_PAGE_SIZE + 1)
-    .offset(offset);
+    .groupBy('video_id');
 
-  return { items: items.slice(0, TOP_PAGE_SIZE), hasMore: items.length > TOP_PAGE_SIZE };
+  const merged = mergeByCanonicalId(rows);
+  const paged  = merged.slice(offset, offset + TOP_PAGE_SIZE);
+  return { items: paged, hasMore: merged.length > offset + TOP_PAGE_SIZE };
 }
 
 function since30Days() {

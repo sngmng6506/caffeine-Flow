@@ -28,6 +28,15 @@ function normalizeSoundCloudUrl(url) {
   return null;
 }
 
+// 쿼리스트링/fragment 제거 — 같은 트랙이 ?si=xxx 같은 추적 파라미터로 다른 ID로 저장되는 문제 방지
+function normalizeSpotifyUrl(url) {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname.replace(/\/$/, '')}`;
+  } catch {}
+  return url;
+}
+
 // GET /api/v1/tracks/oembed?url=...
 // YouTube / SoundCloud 통합 메타데이터 조회 (재생 아님)
 router.get('/oembed', async (req, res) => {
@@ -88,14 +97,15 @@ router.get('/oembed', async (req, res) => {
   }
 
   if (platform === 'spotify') {
+    const trackUrl = normalizeSpotifyUrl(rawUrl);
     try {
       const { data } = await axios.get('https://open.spotify.com/oembed', {
-        params: { url: rawUrl },
+        params: { url: trackUrl },
       });
       // oEmbed에 아티스트명이 없으므로 트랙 페이지 <title>에서 추출
       let artist = 'Spotify';
       try {
-        const page = await axios.get(rawUrl, {
+        const page = await axios.get(trackUrl, {
           headers: { 'User-Agent': 'Mozilla/5.0' },
           maxRedirects: 5,
           timeout: 5000,
@@ -109,7 +119,7 @@ router.get('/oembed', async (req, res) => {
       } catch {}
       return res.json({
         platform,
-        videoId:      rawUrl,
+        videoId:      trackUrl,
         title:        data.title,
         channelTitle: artist,
         thumbnail:    data.thumbnail_url || null,
