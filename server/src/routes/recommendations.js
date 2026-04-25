@@ -1,5 +1,5 @@
 const router    = require('express').Router({ mergeParams: true });
-const rateLimit = require('express-rate-limit');
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { requireAuth, requireCafeOwner } = require('../middleware/auth');
 const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
@@ -8,8 +8,8 @@ const statsService  = require('../services/stats.service');
 const requestLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 3,
-  // visitor_id 우선 — 같은 카페 와이파이의 여러 손님이 IP를 공유해도 각자 따로 카운트
-  keyGenerator: (req) => req.headers['x-visitor-id'] || req.ip,
+  // visitor_id 우선, 없으면 IP — IPv6 우회 방지를 위해 ipKeyGenerator 헬퍼로 정규화
+  keyGenerator: (req) => req.headers['x-visitor-id'] || ipKeyGenerator(req.ip),
   message: { error: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' },
 });
 
