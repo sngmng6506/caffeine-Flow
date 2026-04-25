@@ -8,6 +8,8 @@ const statsService  = require('../services/stats.service');
 const requestLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 3,
+  // visitor_id 우선 — 같은 카페 와이파이의 여러 손님이 IP를 공유해도 각자 따로 카운트
+  keyGenerator: (req) => req.headers['x-visitor-id'] || req.ip,
   message: { error: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' },
 });
 
@@ -23,18 +25,19 @@ router.get('/', async (req, res) => {
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   const recs = await recService.getRecommendations(cafe.id);
 
-  // 방문 기록 (같은 IP는 하루 1회만)
+  // 방문 기록 (같은 IP는 KST 기준 하루 1회만 — UNIQUE 제약 + ON CONFLICT DO NOTHING)
   const ip        = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
   const visitorId = req.headers['x-visitor-id'] || null;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const db    = require('../db/knex');
+  const db        = require('../db/knex');
   db('cafe_visits')
-    .where({ cafe_id: cafe.id, visitor_ip: ip })
-    .where('visited_at', '>=', today)
-    .first()
-    .then(existing => {
-      if (!existing) db('cafe_visits').insert({ cafe_id: cafe.id, visitor_ip: ip, visitor_id: visitorId }).catch(() => {});
+    .insert({
+      cafe_id:    cafe.id,
+      visitor_ip: ip,
+      visitor_id: visitorId,
+      visit_date: db.raw(`(now() AT TIME ZONE 'Asia/Seoul')::date`),
     })
+    .onConflict(['cafe_id', 'visitor_ip', 'visit_date'])
+    .ignore()
     .catch(() => {});
 
   const allowed_platforms = cafe.allowed_platforms ? cafe.allowed_platforms.split(',') : ['youtube', 'soundcloud', 'spotify'];

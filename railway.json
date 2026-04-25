@@ -5,7 +5,7 @@
     "buildCommand": "cd customer && npm install && npm run build && cd ../owner && npm install && echo VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID > .env && echo VITE_NAVER_ENABLED=$VITE_NAVER_ENABLED >> .env && cat .env && npm run build && cd ../server && npm install"
   },
   "deploy": {
-    "startCommand": "node server/server.js",
+    "startCommand": "npm run migrate --prefix server && node server/server.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }

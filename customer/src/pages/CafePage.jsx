@@ -184,13 +184,13 @@ export default function CafePage({ slug }) {
               {waitingQueue.map((r, i) => (
                 <div key={r.id}>
                   <div
-                    onClick={() => setQueueExpanded(v => v === r.video_id ? null : r.video_id)}
+                    onClick={() => setQueueExpanded(v => v === r.id ? null : r.id)}
                     style={{ cursor: 'pointer' }}
                   >
                     <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={i + 1}
-                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.video_id} />
+                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.id} />
                   </div>
-                  {queueExpanded === r.video_id && (
+                  {queueExpanded === r.id && (
                     <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
                   )}
                 </div>
@@ -203,13 +203,13 @@ export default function CafePage({ slug }) {
               {pendingQueue.map((r, i) => (
                 <div key={r.id}>
                   <div
-                    onClick={() => setQueueExpanded(v => v === r.video_id ? null : r.video_id)}
+                    onClick={() => setQueueExpanded(v => v === r.id ? null : r.id)}
                     style={{ cursor: 'pointer' }}
                   >
                     <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={waitingQueue.length + i + 1}
-                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.video_id} />
+                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.id} />
                   </div>
-                  {queueExpanded === r.video_id && (
+                  {queueExpanded === r.id && (
                     <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
                   )}
                 </div>
@@ -232,12 +232,12 @@ export default function CafePage({ slug }) {
               {history.slice(0, historyLimit).map(r => (
                 <div key={r.id}>
                   <div
-                    onClick={() => setHistoryExpanded(v => v === r.video_id ? null : r.video_id)}
+                    onClick={() => setHistoryExpanded(v => v === r.id ? null : r.id)}
                     style={{ cursor: 'pointer' }}
                   >
-                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} showDate expanded={historyExpanded === r.video_id} />
+                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} showDate expanded={historyExpanded === r.id} />
                   </div>
-                  {historyExpanded === r.video_id && (
+                  {historyExpanded === r.id && (
                     <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
                   )}
                 </div>

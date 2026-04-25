@@ -1,11 +1,10 @@
 const db = require('../db/knex');
+const { kstStartOfDay } = require('../utils/kst');
 
+// 최근 7일: KST 기준 6일 전 00:00 ~ 오늘 23:59:59.999
 function lastSevenDaysRange() {
-  const end   = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 6);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
+  const start = kstStartOfDay(6);
+  const end   = new Date(kstStartOfDay(0).getTime() + 86400000 - 1);
   return [start, end];
 }
 

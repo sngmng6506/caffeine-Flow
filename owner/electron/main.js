@@ -194,7 +194,14 @@ ipcMain.on('clear-default-video', () => { defaultVideoId = null; });
 app.whenReady().then(() => {
   createWindow();
   // 프로덕션 빌드에서만 업데이트 체크 (dev 모드에서는 no-op)
-  if (!isDev) autoUpdater.checkForUpdatesAndNotify();
+  if (!isDev) {
+    autoUpdater.on('error',                err  => console.error('[autoUpdater] error:', err));
+    autoUpdater.on('checking-for-update',  ()   => console.log('[autoUpdater] checking…'));
+    autoUpdater.on('update-available',     info => console.log('[autoUpdater] available:', info.version));
+    autoUpdater.on('update-not-available', ()   => console.log('[autoUpdater] up to date'));
+    autoUpdater.on('update-downloaded',    info => console.log('[autoUpdater] downloaded:', info.version));
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

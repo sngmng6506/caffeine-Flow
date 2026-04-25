@@ -1,4 +1,5 @@
 const db = require('../db/knex');
+const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour, getKstDay } = require('../utils/kst');
 
 async function getStats(cafeId) {
   const [total, played, skipped] = await Promise.all([
@@ -27,8 +28,8 @@ async function getStats(cafeId) {
 }
 
 async function getDailyStats(cafeId, dateStr) {
-  const start = new Date(dateStr + 'T00:00:00.000Z');
-  const end   = new Date(dateStr + 'T23:59:59.999Z');
+  const start = kstStartOfDateString(dateStr);
+  const end   = kstEndOfDateString(dateStr);
 
   const recs = await db('recommendations')
     .where({ cafe_id: cafeId })
@@ -36,7 +37,7 @@ async function getDailyStats(cafeId, dateStr) {
     .orderBy('requested_at', 'asc');
 
   const byHour = Array(24).fill(null).map(() => []);
-  for (const r of recs) byHour[new Date(r.requested_at).getHours()].push(r);
+  for (const r of recs) byHour[getKstHour(new Date(r.requested_at))].push(r);
 
   return {
     date:    dateStr,
@@ -103,10 +104,9 @@ async function getGlobalTop10(offset = 0) {
   return { items: paged, hasMore: merged.length > offset + TOP_PAGE_SIZE };
 }
 
+// 최근 30일 시작점 (KST 기준 30일 전 자정)
 function since30Days() {
-  const d = new Date();
-  d.setDate(d.getDate() - 30);
-  return d;
+  return kstStartOfDay(30);
 }
 
 async function getHourlyPattern(cafeId) {
@@ -116,7 +116,7 @@ async function getHourlyPattern(cafeId) {
     .select('requested_at');
 
   const counts = Array(24).fill(0);
-  for (const r of recs) counts[new Date(r.requested_at).getHours()]++;
+  for (const r of recs) counts[getKstHour(new Date(r.requested_at))]++;
   return counts.map((count, hour) => ({ hour, count }));
 }
 
@@ -127,7 +127,7 @@ async function getDayOfWeekPattern(cafeId) {
     .select('requested_at');
 
   const counts = Array(7).fill(0);
-  for (const r of recs) counts[new Date(r.requested_at).getDay()]++;
+  for (const r of recs) counts[getKstDay(new Date(r.requested_at))]++;
   const labels = ['일', '월', '화', '수', '목', '금', '토'];
   return counts.map((count, i) => ({ day: labels[i], count }));
 }
@@ -147,24 +147,22 @@ function groupAndPage(recs, offset, limit) {
 }
 
 async function getSongsByWeekday(cafeId, dayIndex, offset = 0, limit = 10) {
-  // getHourlyPattern/getDayOfWeekPattern 과 동일하게 JS new Date().getDay() 기준
   const recs = await db('recommendations')
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
     .select('video_id', 'title', 'channel_title', 'thumbnail', 'requested_at');
 
-  const filtered = recs.filter(r => new Date(r.requested_at).getDay() === dayIndex);
+  const filtered = recs.filter(r => getKstDay(new Date(r.requested_at)) === dayIndex);
   return groupAndPage(filtered, offset, limit);
 }
 
 async function getSongsByHour(cafeId, hour, offset = 0, limit = 10) {
-  // getHourlyPattern 과 동일하게 JS new Date().getHours() 기준
   const recs = await db('recommendations')
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
     .select('video_id', 'title', 'channel_title', 'thumbnail', 'requested_at');
 
-  const filtered = recs.filter(r => new Date(r.requested_at).getHours() === hour);
+  const filtered = recs.filter(r => getKstHour(new Date(r.requested_at)) === hour);
   return groupAndPage(filtered, offset, limit);
 }
 
