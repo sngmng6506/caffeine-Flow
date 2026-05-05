@@ -4,15 +4,21 @@ import { getSocket, disconnectSocket } from '../socket';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
 
+// 저장된 default 정보 → BGM URL 변환 (구버전 데이터 호환: videoId only도 처리)
+function savedToBgmUrl(info) {
+  if (!info) return null;
+  if (info.url) return info.url;
+  if (info.videoId?.startsWith('http')) return info.videoId;
+  return `https://www.youtube.com/watch?v=${info.videoId}`;
+}
+
 export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [cafe, setCafe]         = useState(initialCafe);
   const [recs, setRecs]         = useState([]);
   const recsRef = useRef([]);
   const [isAccepting, setIsAccepting] = useState(true);
   const [dragOver, setDragOver]           = useState(null); // 'playing' | 'accepted' | 'pending' | null
-  const [restoreUrl, setRestoreUrl]       = useState(null);
   const [nowPlaying, setNowPlaying]       = useState(null);
-  const [isDefaultPlaying, setIsDefaultPlaying] = useState(false);
   const [defaultVideo, setDefaultVideo] = useState(() => {
     try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; }
   });
@@ -92,18 +98,17 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     });
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
 
-    window.electronAPI?.onQueueRestore(url => setRestoreUrl(url));
     window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
-    window.electronAPI?.onDefaultPlaying(v => setIsDefaultPlaying(v));
 
-    // 앱 재시작 시 localStorage에 저장된 기본 재생 곡 복원
-    const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
-    if (saved) window.electronAPI?.setDefaultVideo(saved.videoId);
+    // 앱 시작 시 저장된 BGM URL을 bgmView에 미리 로드 (사장님이 ▶ 한 번 눌러두면 끝)
+    const savedBgm = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
+    const savedBgmUrl = savedToBgmUrl(savedBgm);
+    if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
     // 영상 종료 감지:
     // 1) playing → played
-    // 2) 대기곡(accepted) 1순위 → playing으로 승격 + URL 이동 (일시멈춤 상태)
-    // 3) 대기곡 없으면 → 기본곡 URL 또는 google.com (추천곡 유무 무관)
+    // 2) 대기곡(accepted) 1순위 있으면 playRec으로 이어 재생
+    // 3) 대기곡 없으면 endRec — bgmView 음소거 해제만 (BGM은 백그라운드에서 계속 재생 중)
     window.electronAPI?.onVideoEnded(() => {
       const playing = recsRef.current.find(r => r.status === 'playing');
       if (!playing) return;
@@ -115,21 +120,15 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
             .filter(r => r.status === 'accepted')
             .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
           if (nextAccepted) {
-            // 대기곡 1순위 → 수락(playing)으로 승격 + URL 이동 (block-next-play로 일시멈춤)
             updateRec(cafe.slug, nextAccepted.id, 'playing')
               .then(acc => {
                 setRecs(prev => prev.map(r => r.id === acc.id ? acc : r));
-                window.electronAPI?.navigateVideo(acc.video_id);
+                window.electronAPI?.playRec(acc.video_id);
               })
               .catch(console.error);
           } else {
-            // 대기곡 없음 → 기본곡 또는 google.com
-            const saved = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
-            if (saved) {
-              window.electronAPI?.navigateVideo(saved.videoId);
-            } else {
-              window.electronAPI?.navigateVideo('https://www.google.com');
-            }
+            // BGM이 백그라운드에서 음소거 상태로 계속 재생 중 — 음소거만 풀면 끊김 없이 이어 들림
+            window.electronAPI?.endRec();
           }
         })
         .catch(console.error);
@@ -179,13 +178,14 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   function handleSetDefault(info) {
     setDefaultVideo(info);
     localStorage.setItem('cf_default_video', JSON.stringify(info));
-    window.electronAPI?.setDefaultVideo(info.videoId);
+    const url = savedToBgmUrl(info);
+    if (url) window.electronAPI?.setBgmUrl(url);
   }
 
   function handleClearDefault() {
     setDefaultVideo(null);
     localStorage.removeItem('cf_default_video');
-    window.electronAPI?.clearDefaultVideo();
+    window.electronAPI?.clearBgm();
   }
 
   async function handleDrop(e, targetStatus) {
@@ -212,7 +212,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         });
         setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [...prev, rec]);
         handleClearDefault();
-        if (targetStatus === 'playing') window.electronAPI?.navigateVideo(data.videoId);
+        if (targetStatus === 'playing') window.electronAPI?.playRec(data.videoId);
         return;
       }
 
@@ -222,7 +222,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       if (!rec) return;
       const updated = await updateRec(cafe.slug, id, targetStatus);
       handleUpdate(updated);
-      if (targetStatus === 'playing') window.electronAPI?.navigateVideo(rec.video_id);
+      if (targetStatus === 'playing') window.electronAPI?.playRec(rec.video_id);
     } catch (err) { console.error(err); }
   }
 
@@ -398,7 +398,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
               <div style={styles.sectionTitle}>기본</div>
               <DefaultSection
                 defaultVideo={defaultVideo}
-                isPlaying={isDefaultPlaying}
+                isPlaying={!nowPlaying && !!defaultVideo}
                 onSet={handleSetDefault}
                 onClear={handleClearDefault}
               />
@@ -526,44 +526,58 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
   const [error, setError]       = useState('');
 
   async function handleSet() {
-    const match = inputUrl.match(/(?:[?&]v=|youtu\.be\/)([^&?]+)/);
-    if (!match) { setError('올바른 YouTube URL을 입력하세요'); return; }
-    const videoId = match[1];
+    const url = inputUrl.trim();
+    if (!/^https?:\/\//i.test(url)) { setError('http(s)로 시작하는 URL을 입력하세요'); return; }
     setSetting(true); setError('');
     try {
-      const res  = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-      const data = await res.json();
-      onSet({ videoId, title: data.title, thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` });
+      // YouTube/SoundCloud/Spotify는 서버 oembed로 메타데이터 시도, 그 외 또는 플레이리스트는 URL만 저장
+      let info = { url, title: url, thumbnail: null };
+      try {
+        const base = import.meta.env.VITE_SERVER_URL ? `${import.meta.env.VITE_SERVER_URL}/api/v1` : '/api/v1';
+        const res  = await fetch(`${base}/tracks/oembed?url=${encodeURIComponent(url)}`);
+        if (res.ok) {
+          const data = await res.json();
+          info = { url, title: data.title || url, thumbnail: data.thumbnail || null };
+        }
+      } catch { /* oembed 실패는 무시하고 URL만 저장 */ }
+      onSet(info);
       setInputUrl('');
     } catch {
-      setError('영상 정보를 불러오지 못했습니다');
+      setError('등록에 실패했습니다');
     } finally {
       setSetting(false);
     }
   }
 
   if (defaultVideo) {
+    const url = defaultVideo.url || (defaultVideo.videoId?.startsWith('http')
+      ? defaultVideo.videoId
+      : `https://www.youtube.com/watch?v=${defaultVideo.videoId}`);
     return (
       <div
-        style={{ ...dfStyles.card, cursor: 'grab' }}
+        style={dfStyles.card}
         draggable={true}
-        onClick={() => window.electronAPI?.navigateVideo(defaultVideo.videoId)}
         onDragStart={e => {
           e.dataTransfer.setData('text/plain', JSON.stringify({
-            type: 'default', videoId: defaultVideo.videoId,
-            title: defaultVideo.title, thumbnail: defaultVideo.thumbnail,
+            type: 'default',
+            videoId:   defaultVideo.videoId || url,
+            title:     defaultVideo.title,
+            thumbnail: defaultVideo.thumbnail,
           }));
           e.dataTransfer.effectAllowed = 'move';
         }}
       >
-        <img src={defaultVideo.thumbnail} alt="" style={dfStyles.thumb} />
+        {defaultVideo.thumbnail
+          ? <img src={defaultVideo.thumbnail} alt="" style={dfStyles.thumb} />
+          : <div style={{ ...dfStyles.thumb, background: '#eee' }} />
+        }
         <div style={dfStyles.info}>
           {isPlaying && <span style={dfStyles.playing}>▶ 재생 중</span>}
           <div style={dfStyles.title}>{defaultVideo.title}</div>
-          <div style={dfStyles.hint}>누르면 이동 합니다.</div>
+          <div style={dfStyles.hint}>신청곡 없을 때 자동 재생되는 매장 BGM</div>
         </div>
         <button
-          onClick={e => { e.stopPropagation(); onClear(); }}
+          onClick={onClear}
           draggable={false}
           onDragStart={e => e.stopPropagation()}
           style={dfStyles.clearBtn}
@@ -578,7 +592,7 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
         value={inputUrl}
         onChange={e => { setInputUrl(e.target.value); setError(''); }}
         onKeyDown={e => e.key === 'Enter' && handleSet()}
-        placeholder=""
+        placeholder="YouTube/Spotify/SoundCloud 링크 — 플레이리스트도 OK"
         style={dfStyles.input}
       />
       <button onClick={handleSet} disabled={setting || !inputUrl.trim()} style={dfStyles.setBtn}>

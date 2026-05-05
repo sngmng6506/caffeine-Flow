@@ -1,24 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  navigateVideo:    (videoId) => ipcRenderer.send('navigate-video', videoId),
-  // [자동재생 비활성화]
-  // playVideo:     (videoId) => ipcRenderer.send('play-video', videoId),
-  // stopVideo:     ()        => ipcRenderer.send('stop-video'),
-  showYoutube:      ()        => ipcRenderer.send('show-youtube'),
-  hideYoutube:      ()        => ipcRenderer.send('hide-youtube'),
-  setDefaultVideo:  (videoId) => ipcRenderer.send('set-default-video', videoId),
-  clearDefaultVideo:()        => ipcRenderer.send('clear-default-video'),
+  // 신청곡 시작/종료 — bgmView는 백그라운드 유지 + 음소거 토글
+  playRec:          (videoIdOrUrl) => ipcRenderer.send('play-rec', videoIdOrUrl),
+  endRec:           ()             => ipcRenderer.send('end-rec'),
 
-  onYoutubeState:   (cb) => ipcRenderer.on('youtube-state',   (_e, v)    => cb(v)),
-  onVideoEnded:     (cb) => ipcRenderer.on('video-ended',     ()         => cb()),
-  onQueueRestore:   (cb) => ipcRenderer.on('queue-restore',   (_e, url)  => cb(url)),
-  onNowPlaying:     (cb) => ipcRenderer.on('now-playing',     (_e, info) => cb(info)),
-  onDefaultPlaying: (cb) => ipcRenderer.on('default-playing', (_e, v)    => cb(v)),
+  // 매장 BGM URL 설정/해제
+  setBgmUrl:        (url) => ipcRenderer.send('set-bgm-url', url),
+  clearBgm:         ()    => ipcRenderer.send('clear-bgm'),
 
-  // 컴포넌트 언마운트 시 모든 리스너 일괄 제거
+  showYoutube:      () => ipcRenderer.send('show-youtube'),
+  hideYoutube:      () => ipcRenderer.send('hide-youtube'),
+
+  onYoutubeState:   (cb) => ipcRenderer.on('youtube-state', (_e, v)    => cb(v)),
+  onVideoEnded:     (cb) => ipcRenderer.on('video-ended',   ()         => cb()),
+  onNowPlaying:     (cb) => ipcRenderer.on('now-playing',   (_e, info) => cb(info)),
+
   removeAllListeners: () => {
-    ['youtube-state', 'video-ended', 'queue-restore', 'now-playing', 'default-playing']
-      .forEach(ch => ipcRenderer.removeAllListeners(ch));
+    ['youtube-state', 'video-ended', 'now-playing'].forEach(ch => ipcRenderer.removeAllListeners(ch));
   },
 });
