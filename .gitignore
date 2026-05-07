@@ -5,3 +5,4 @@ server/public/
 server/test-api.js
 server/test-db.js
 owner/dist/
+.claude/
