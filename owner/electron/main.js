@@ -7,7 +7,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
 
 const isDev = !app.isPackaged;
 const OWNER_URL = isDev
-  ? 'http://localhost:5174'
+  ? 'http://localhost:5174/owner/'
   : 'https://caffeine-flow-production.up.railway.app/owner/';
 
 const LEFT_RATIO = 0.42;
@@ -46,7 +46,7 @@ function createBgmView() {
     },
   });
   blockExternalProtocol(bgmView);
-  bgmView.webContents.loadURL('about:blank');
+  bgmView.webContents.loadURL('https://www.google.com');
 }
 
 // 신청곡용 BrowserView — 매번 새로 만들고 끝나면 destroy
@@ -182,7 +182,7 @@ ipcMain.on('set-bgm-url', (_e, url) => {
 // BGM 해제 — 빈 페이지로
 ipcMain.on('clear-bgm', () => {
   if (!bgmView) return;
-  bgmView.webContents.loadURL('about:blank');
+  bgmView.webContents.loadURL('https://www.google.com');
 });
 
 // 신청곡 시작: BGM 음소거 + recView 위에 띄움
