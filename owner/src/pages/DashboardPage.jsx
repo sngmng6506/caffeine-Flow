@@ -263,11 +263,18 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
   function handleUpdate(updated) {
     setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
-    // [자동재생 비활성화]
-    // if (updated.status === 'played' || updated.status === 'skipped') {
-    //   const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
-    //   playNextOrStop(latest);
-    // }
+    // 수락 시 재생 중인 곡 없으면 즉시 재생
+    if (updated.status === 'accepted') {
+      const hasPlaying = recsRef.current.some(r => r.status === 'playing');
+      if (!hasPlaying) {
+        updateRec(cafe.slug, updated.id, 'playing')
+          .then(playing => {
+            setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
+            window.electronAPI?.playRec(playing.video_id);
+          })
+          .catch(console.error);
+      }
+    }
   }
   function handleDelete(id) { setRecs(prev => prev.filter(r => r.id !== id)); }
 

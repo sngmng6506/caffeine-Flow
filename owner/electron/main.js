@@ -279,17 +279,22 @@ ipcMain.on('end-rec', () => {
     recView = null;
   }
   if (bgmView) {
-    // Spotify가 원래 플리에서 이탈했으면 복귀 후 재생, 아니면 Space로 재개
-    const nowUrl = bgmView.webContents.getURL();
-    const drifted = currentBgmUrl &&
-      currentBgmUrl.includes('open.spotify.com') &&
-      !nowUrl.includes(new URL(currentBgmUrl).pathname);
-    if (drifted) {
-      bgmView.webContents.executeJavaScript(
-        `window.location.href = ${JSON.stringify(currentBgmUrl)}`
-      ).catch(() => {});
-    } else {
-      sendSpaceToBgm(); // 제자리에 있으면 Space로 재개
+    try {
+      const nowUrl = bgmView.webContents.getURL();
+      const drifted = currentBgmUrl &&
+        currentBgmUrl.includes('open.spotify.com') &&
+        nowUrl.includes('open.spotify.com') &&
+        !nowUrl.includes(new URL(currentBgmUrl).pathname);
+      if (drifted) {
+        bgmView.webContents.executeJavaScript(
+          `window.location.href = ${JSON.stringify(currentBgmUrl)}`
+        ).catch(() => {});
+      } else {
+        sendSpaceToBgm();
+      }
+    } catch (e) {
+      console.error('[end-rec] bgm resume error:', e.message);
+      sendSpaceToBgm();
     }
     bgmView.webContents.setAudioMuted(false);
   }
