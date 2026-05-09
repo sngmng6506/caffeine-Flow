@@ -16,6 +16,7 @@ const OWNER_URL = isDev
 const LEFT_RATIO = 0.42;
 
 let mainWindow      = null;
+let currentBgmUrl   = null; // 현재 설정된 BGM URL — end-rec 시 이탈 여부 확인용
 // bgmView: 매장 BGM (Spotify/YouTube 플레이리스트 등 — 항상 살아있음, 신청곡 사이에도 상태 유지)
 let bgmView         = null;
 // recView: 손님 신청곡 (필요할 때만 생성, 끝나면 destroy)
@@ -222,6 +223,7 @@ ipcMain.on('hide-youtube', () => {
 
 // BGM URL 설정 — bgmView에 로드 (한 번 로드 후 신청곡 사이에도 상태 유지)
 ipcMain.on('set-bgm-url', (_e, url) => {
+  currentBgmUrl = url;
   if (!bgmView) createBgmView();
   const currentUrl = bgmView.webContents.getURL();
   // Spotify는 이미 로드된 상태면 SPA 라우팅으로 이동 — loadURL은 전체 새로고침이라 플레이어 상태 초기화됨
@@ -239,23 +241,18 @@ ipcMain.on('clear-bgm', () => {
   bgmView.webContents.loadURL('https://www.google.com');
 });
 
-// BGM 일시정지 — Spotify는 SDK 버튼 클릭, YouTube 등은 video.pause() 직접 호출
-const BGM_PAUSE_SCRIPT = `
-  const btn = document.querySelector('[data-testid="control-button-playpause"]');
-  if (btn) { btn.click(); }
-  else { document.querySelectorAll('video').forEach(v => { if (!v.paused) v.pause(); }); }
-`;
-const BGM_RESUME_SCRIPT = `
-  const btn = document.querySelector('[data-testid="control-button-playpause"]');
-  if (btn) { btn.click(); }
-  else { document.querySelectorAll('video').forEach(v => { if (v.paused) v.play(); }); }
-`;
+// BGM Space키로 재생/일시정지 토글 — DOM 셀렉터 없이 Spotify 키보드 핸들러 직접 트리거
+function sendSpaceToBgm() {
+  if (!bgmView) return;
+  bgmView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Space' });
+  bgmView.webContents.sendInputEvent({ type: 'keyUp',   keyCode: 'Space' });
+}
 
 // 신청곡 시작: BGM 일시정지 + recView 위에 띄움
 ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
   if (bgmView) {
     bgmView.webContents.setAudioMuted(true);
-    bgmView.webContents.executeJavaScript(BGM_PAUSE_SCRIPT).catch(() => {});
+    sendSpaceToBgm(); // Spotify Space = 일시정지
   }
 
   if (!recView) createRecView();
@@ -282,7 +279,18 @@ ipcMain.on('end-rec', () => {
     recView = null;
   }
   if (bgmView) {
-    bgmView.webContents.executeJavaScript(BGM_RESUME_SCRIPT).catch(() => {});
+    // Spotify가 원래 플리에서 이탈했으면 복귀 후 재생, 아니면 Space로 재개
+    const nowUrl = bgmView.webContents.getURL();
+    const drifted = currentBgmUrl &&
+      currentBgmUrl.includes('open.spotify.com') &&
+      !nowUrl.includes(new URL(currentBgmUrl).pathname);
+    if (drifted) {
+      bgmView.webContents.executeJavaScript(
+        `window.location.href = ${JSON.stringify(currentBgmUrl)}`
+      ).catch(() => {});
+    } else {
+      sendSpaceToBgm(); // 제자리에 있으면 Space로 재개
+    }
     bgmView.webContents.setAudioMuted(false);
   }
   mainWindow.webContents.send('now-playing', null);
