@@ -41,9 +41,11 @@ export default function App() {
   const [pending]                   = useState(initialState.pending);
   const [oauthError]                = useState(initialState.oauthError);
   const [youtubeVisible, setYoutubeVisible] = useState(false);
+  const [updateVersion, setUpdateVersion]   = useState(null);
 
   useEffect(() => {
     window.electronAPI?.onYoutubeState(visible => setYoutubeVisible(visible));
+    window.electronAPI?.onUpdateDownloaded(version => setUpdateVersion(version));
     // 앱 시작 시 이미 로그인 상태면 YouTube 패널 바로 열기
     if (initialState.cafe) window.electronAPI?.showYoutube();
   }, []);
@@ -63,14 +65,36 @@ export default function App() {
     ? { width: '42vw', height: '100vh', overflowY: 'auto' }
     : {};
 
+  const updateBanner = updateVersion && (
+    <div style={bannerStyle}>
+      v{updateVersion} 업데이트 준비 완료
+      <button onClick={() => window.electronAPI?.restartApp()} style={bannerBtnStyle}>
+        지금 재시작
+      </button>
+    </div>
+  );
+
   if (!cafe) return (
     <div style={containerStyle}>
+      {updateBanner}
       <LoginPage onLogin={handleLogin} initialPendingToken={pending} oauthError={oauthError} />
     </div>
   );
   return (
     <div style={containerStyle}>
+      {updateBanner}
       <DashboardPage cafe={cafe} onLogout={handleLogout} />
     </div>
   );
 }
+
+const bannerStyle = {
+  position: 'sticky', top: 0, zIndex: 9999,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+  background: '#1a1a2e', color: '#fff', fontSize: 13, fontWeight: 600,
+  padding: '10px 16px',
+};
+const bannerBtnStyle = {
+  padding: '5px 14px', borderRadius: 6, border: 'none',
+  background: '#4caf50', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13,
+};

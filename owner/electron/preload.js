@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onVideoEnded:     (cb) => ipcRenderer.on('video-ended',   ()         => cb()),
   onNowPlaying:     (cb) => ipcRenderer.on('now-playing',   (_e, info) => cb(info)),
 
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_e, version) => cb(version)),
+  restartApp:         ()   => ipcRenderer.send('restart-app'),
+
   removeAllListeners: () => {
     ['youtube-state', 'video-ended', 'now-playing'].forEach(ch => ipcRenderer.removeAllListeners(ch));
   },

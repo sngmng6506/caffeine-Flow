@@ -239,9 +239,13 @@ app.whenReady().then(() => {
     autoUpdater.on('checking-for-update',  ()   => console.log('[autoUpdater] checking…'));
     autoUpdater.on('update-available',     info => console.log('[autoUpdater] available:', info.version));
     autoUpdater.on('update-not-available', ()   => console.log('[autoUpdater] up to date'));
-    autoUpdater.on('update-downloaded',    info => console.log('[autoUpdater] downloaded:', info.version));
-    autoUpdater.checkForUpdatesAndNotify();
+    autoUpdater.on('update-downloaded',    info => {
+      console.log('[autoUpdater] downloaded:', info.version);
+      mainWindow.webContents.send('update-downloaded', info.version);
+    });
+    autoUpdater.checkForUpdates();
   }
+  ipcMain.on('restart-app', () => autoUpdater.quitAndInstall());
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
