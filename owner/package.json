@@ -1,6 +1,6 @@
 {
   "name": "caffeine-flow-owner",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite --port 5174",
@@ -32,6 +32,7 @@
     "electronDownload": {
       "mirror": "https://github.com/castlabs/electron-releases/releases/download/"
     },
+    "afterPack": "scripts/evs-sign.js",
     "publish": {
       "provider": "github",
       "owner": "sngmng6506",
