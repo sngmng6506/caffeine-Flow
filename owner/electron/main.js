@@ -239,12 +239,23 @@ ipcMain.on('clear-bgm', () => {
   bgmView.webContents.loadURL('https://www.google.com');
 });
 
+// BGM 일시정지 — Spotify는 SDK 버튼 클릭, YouTube 등은 video.pause() 직접 호출
+const BGM_PAUSE_SCRIPT = `
+  const btn = document.querySelector('[data-testid="control-button-playpause"]');
+  if (btn) { btn.click(); }
+  else { document.querySelectorAll('video').forEach(v => { if (!v.paused) v.pause(); }); }
+`;
+const BGM_RESUME_SCRIPT = `
+  const btn = document.querySelector('[data-testid="control-button-playpause"]');
+  if (btn) { btn.click(); }
+  else { document.querySelectorAll('video').forEach(v => { if (v.paused) v.play(); }); }
+`;
+
 // 신청곡 시작: BGM 일시정지 + recView 위에 띄움
-// mute만 하면 Spotify가 계속 진행되다 플리 끝나면 추천곡으로 넘어가므로 pause 사용
 ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
   if (bgmView) {
     bgmView.webContents.setAudioMuted(true);
-    bgmView.webContents.executeJavaScript(`document.querySelector('video')?.pause()`).catch(() => {});
+    bgmView.webContents.executeJavaScript(BGM_PAUSE_SCRIPT).catch(() => {});
   }
 
   if (!recView) createRecView();
@@ -271,7 +282,7 @@ ipcMain.on('end-rec', () => {
     recView = null;
   }
   if (bgmView) {
-    bgmView.webContents.executeJavaScript(`document.querySelector('video')?.play()`).catch(() => {});
+    bgmView.webContents.executeJavaScript(BGM_RESUME_SCRIPT).catch(() => {});
     bgmView.webContents.setAudioMuted(false);
   }
   mainWindow.webContents.send('now-playing', null);
