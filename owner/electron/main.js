@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, screen, components } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
@@ -266,7 +266,11 @@ ipcMain.on('end-rec', () => {
   mainWindow.webContents.send('now-playing', null);
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Widevine CDM 초기화 대기 (wvcus: 첫 실행 시 CDM 다운로드 후 사용 가능)
+  await components.whenReady();
+  console.log('[widevine] components ready:', components.status());
+
   createWindow();
   if (!isDev) {
     autoUpdater.on('error',                err  => console.error('[autoUpdater] error:', err));
