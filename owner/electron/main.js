@@ -4,6 +4,8 @@ const path = require('path');
 
 // 유저 제스처 없이는 autoplay 차단 (Chromium 엔진 레벨)
 app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
+// navigator.webdriver 숨김 — SoundCloud·Spotify 등이 Electron 감지 후 팝업 차단하는 것 방지
+app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
 const isDev = !app.isPackaged;
 const OWNER_URL = isDev
@@ -43,9 +45,10 @@ function blockExternalProtocol(view) {
       },
     };
   });
-  // 팝업 윈도우에도 동일한 UA 적용 (OAuth 차단 방지)
+  // 팝업 윈도우에도 동일한 UA 적용 + 명시적으로 표시 (OAuth 차단 방지)
   view.webContents.on('did-create-window', (popup) => {
     popup.webContents.setUserAgent(mainWindow.webContents.getUserAgent());
+    popup.show();
   });
 }
 
