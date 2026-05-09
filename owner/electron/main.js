@@ -242,7 +242,7 @@ ipcMain.on('clear-bgm', () => {
 });
 
 // BGM Space키로 재생/일시정지 토글 — DOM 셀렉터 없이 Spotify 키보드 핸들러 직접 트리거
-// 신청곡 시작: BGM 음소거 (Spotify Space 시도 제거 — 역효과 발생 가능)
+// 신청곡 시작: bgmView 음소거 — 플리는 뒤에서 계속 재생 중 (오버레이 구조 핵심)
 ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
   if (bgmView) bgmView.webContents.setAudioMuted(true);
 
@@ -259,28 +259,7 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
   recView.webContents.loadURL(url);
 });
 
-// Spotify 플리 복귀 + 재생 스크립트
-// 플리 URL로 SPA 이동 후 재생 버튼 클릭 — URL과 플레이어가 분리된 Spotify 특성 대응
-const SPOTIFY_RESTORE_AND_PLAY = (url) => `
-  window.location.href = ${JSON.stringify(url)};
-`;
-const SPOTIFY_CLICK_PLAY = `
-  (function() {
-    const selectors = [
-      '[data-testid="play-button"]',
-      '[data-testid="heroPlayButton"]',
-      'button[aria-label*="Play"]',
-      'button[aria-label*="재생"]',
-    ];
-    for (const s of selectors) {
-      const btn = document.querySelector(s);
-      if (btn) { btn.click(); return s; }
-    }
-    return 'not found';
-  })()
-`;
-
-// 신청곡 종료: recView 제거 + BGM 복구
+// 신청곡 종료: recView 제거 + bgmView 음소거 해제 → 플리 그 자리에서 이어짐
 ipcMain.on('end-rec', () => {
   if (recView && recViewAttached) {
     mainWindow.removeBrowserView(recView);
@@ -290,17 +269,7 @@ ipcMain.on('end-rec', () => {
     recView.webContents.destroy();
     recView = null;
   }
-  if (bgmView) {
-    bgmView.webContents.setAudioMuted(false);
-    // Spotify: 항상 플리 URL로 복귀 후 재생 버튼 클릭 — 추천곡 이탈 방지
-    if (currentBgmUrl && currentBgmUrl.includes('open.spotify.com')) {
-      bgmView.webContents.executeJavaScript(SPOTIFY_RESTORE_AND_PLAY(currentBgmUrl)).catch(() => {});
-      // SPA 이동 완료 후 재생 버튼 클릭 (1.5초 여유)
-      setTimeout(() => {
-        bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY).catch(() => {});
-      }, 1500);
-    }
-  }
+  if (bgmView) bgmView.webContents.setAudioMuted(false);
   mainWindow.webContents.send('now-playing', null);
 });
 
