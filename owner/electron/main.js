@@ -254,9 +254,6 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
     ? videoIdOrUrl
     : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
   recView.webContents.loadURL(url);
-  recView.webContents.once('dom-ready', () => {
-    recView.webContents.send('block-next-play');
-  });
 });
 
 // 신청곡 종료: recView 제거 + BGM 음소거 해제 → BGM이 끊김 없이 이어 재생
