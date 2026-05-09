@@ -12,15 +12,6 @@ function savedToBgmUrl(info) {
   return `https://www.youtube.com/watch?v=${info.videoId}`;
 }
 
-// Spotify 풀 URL → embed URL 변환 (풀 웹플레이어는 Electron에서 디바이스 등록 실패)
-function toSpotifyEmbed(url) {
-  if (!url) return url;
-  const m = url.match(/open\.spotify\.com\/(playlist|album|track|artist)\/([^?#]+)/i);
-  if (m && !url.includes('/embed/')) {
-    return `https://open.spotify.com/embed/${m[1]}/${m[2]}?utm_source=generator&theme=0`;
-  }
-  return url;
-}
 
 
 export default function DashboardPage({ cafe: initialCafe, onLogout }) {
@@ -115,7 +106,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
     // 앱 시작 시 저장된 BGM URL을 bgmView에 미리 로드 (사장님이 ▶ 한 번 눌러두면 끝)
     const savedBgm = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
-    const savedBgmUrl = toSpotifyEmbed(savedToBgmUrl(savedBgm));
+    const savedBgmUrl = savedToBgmUrl(savedBgm);
     if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
     // 영상 종료 감지:
@@ -191,7 +182,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   function handleSetDefault(info) {
     setDefaultVideo(info);
     localStorage.setItem('cf_default_video', JSON.stringify(info));
-    const url = toSpotifyEmbed(savedToBgmUrl(info));
+    const url = savedToBgmUrl(info);
     if (url) window.electronAPI?.setBgmUrl(url);
   }
 
