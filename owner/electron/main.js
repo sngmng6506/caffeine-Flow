@@ -9,6 +9,7 @@ app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
 // Spotify 재생용 Widevine CDM — Chrome 설치 경로에서 자동 탐색 (app.ready 전에 설정해야 함)
+let widevineStatus = 'not_found';
 (function loadWidevine() {
   const chromeDirs = [
     'C:\\Program Files\\Google\\Chrome\\Application',
@@ -17,7 +18,6 @@ app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
   ];
   for (const dir of chromeDirs) {
     if (!fs.existsSync(dir)) continue;
-    // 버전 디렉토리 중 가장 높은 버전 선택
     const versionDir = fs.readdirSync(dir)
       .filter(e => /^\d+\.\d+/.test(e))
       .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
@@ -29,11 +29,12 @@ app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
       const { version } = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       app.commandLine.appendSwitch('widevine-cdm-path', cdmPath);
       app.commandLine.appendSwitch('widevine-cdm-version', version);
-      console.log('[widevine] loaded from Chrome:', cdmPath, version);
+      widevineStatus = `loaded:${version}`;
+      console.log('[widevine] loaded:', cdmPath, version);
       return;
     } catch (_) {}
   }
-  console.warn('[widevine] Chrome not found — Spotify playback may not work');
+  console.warn('[widevine] Chrome not found');
 })();
 
 const isDev = !app.isPackaged;
@@ -200,7 +201,11 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    createBgmView(); // 백그라운드 미리 생성
+    createBgmView();
+  });
+  // React 앱이 완전히 로드된 후 widevine 상태 전달
+  mainWindow.webContents.once('did-finish-load', () => {
+    mainWindow.webContents.send('widevine-status', widevineStatus);
   });
   mainWindow.on('resize', resizeViews);
 

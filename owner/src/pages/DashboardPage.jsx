@@ -12,6 +12,16 @@ function savedToBgmUrl(info) {
   return `https://www.youtube.com/watch?v=${info.videoId}`;
 }
 
+// Spotify 풀 URL → embed URL 변환 (풀 웹플레이어는 Electron에서 디바이스 등록 실패)
+function toSpotifyEmbed(url) {
+  if (!url) return url;
+  const m = url.match(/open\.spotify\.com\/(playlist|album|track|artist)\/([^?#]+)/i);
+  if (m && !url.includes('/embed/')) {
+    return `https://open.spotify.com/embed/${m[1]}/${m[2]}?utm_source=generator&theme=0`;
+  }
+  return url;
+}
+
 
 export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [cafe, setCafe]         = useState(initialCafe);
@@ -44,6 +54,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const queue = recs.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'playing');
 
   const [customerUrl, setCustomerUrl] = useState('');
+  const [widevineStatus, setWidevineStatus] = useState(null);
 
   useEffect(() => {
     getRecommendations(cafe.slug)
@@ -100,10 +111,11 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
 
     window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
+    window.electronAPI?.onWidevineStatus(s => setWidevineStatus(s));
 
     // 앱 시작 시 저장된 BGM URL을 bgmView에 미리 로드 (사장님이 ▶ 한 번 눌러두면 끝)
     const savedBgm = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
-    const savedBgmUrl = savedToBgmUrl(savedBgm);
+    const savedBgmUrl = toSpotifyEmbed(savedToBgmUrl(savedBgm));
     if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
     // 영상 종료 감지:
@@ -179,7 +191,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   function handleSetDefault(info) {
     setDefaultVideo(info);
     localStorage.setItem('cf_default_video', JSON.stringify(info));
-    const url = savedToBgmUrl(info);
+    const url = toSpotifyEmbed(savedToBgmUrl(info));
     if (url) window.electronAPI?.setBgmUrl(url);
   }
 
@@ -402,6 +414,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
                 isPlaying={!nowPlaying && !!defaultVideo}
                 onSet={handleSetDefault}
                 onClear={handleClearDefault}
+                widevineStatus={widevineStatus}
               />
             </div>
 
@@ -521,7 +534,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 }
 
 
-function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
+function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatus }) {
   const [inputUrl, setInputUrl] = useState('');
   const [setting, setSetting]   = useState(false);
   const [error, setError]       = useState('');
@@ -576,6 +589,12 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
           {isPlaying && <span style={dfStyles.playing}>▶ 재생 중</span>}
           <div style={dfStyles.title}>{defaultVideo.title}</div>
           <div style={dfStyles.hint}>신청곡 없을 때 자동 재생되는 매장 BGM</div>
+          {/spotify\.com/i.test(url) && widevineStatus === 'not_found' && (
+            <div style={dfStyles.warn}>⚠️ Chrome 미설치 — Spotify 재생 불가</div>
+          )}
+          {/spotify\.com/i.test(url) && widevineStatus?.startsWith('loaded') && (
+            <div style={{ ...dfStyles.hint, color: '#1db954' }}>✓ Widevine 로드됨</div>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
           {/spotify\.com/i.test(url) && (
@@ -627,12 +646,15 @@ const dfStyles = {
   playing:  { fontSize: 11, fontWeight: 700, color: '#2196f3', display: 'block', marginBottom: 2 },
   title:    { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   hint:     { fontSize: 11, color: '#aaa', marginTop: 2 },
+  warn:     { fontSize: 11, color: '#e63946', marginTop: 2 },
   clearBtn: { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', flexShrink: 0 },
   inputRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingTop: 8, borderTop: '1px solid #eee' },
   input:    { flex: 1, fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', minWidth: 0 },
   setBtn:   { fontSize: 12, padding: '6px 14px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
   error:    { fontSize: 12, color: '#e63946', width: '100%' },
 };
+
+
 
 const PLATFORMS = [
   { id: 'youtube',    label: 'YouTube',    color: '#ff0000' },
