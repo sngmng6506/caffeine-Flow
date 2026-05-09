@@ -239,9 +239,13 @@ ipcMain.on('clear-bgm', () => {
   bgmView.webContents.loadURL('https://www.google.com');
 });
 
-// 신청곡 시작: BGM 음소거 + recView 위에 띄움
+// 신청곡 시작: BGM 일시정지 + recView 위에 띄움
+// mute만 하면 Spotify가 계속 진행되다 플리 끝나면 추천곡으로 넘어가므로 pause 사용
 ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
-  if (bgmView) bgmView.webContents.setAudioMuted(true);
+  if (bgmView) {
+    bgmView.webContents.setAudioMuted(true);
+    bgmView.webContents.executeJavaScript(`document.querySelector('video')?.pause()`).catch(() => {});
+  }
 
   if (!recView) createRecView();
   if (panelVisible && !recViewAttached) {
@@ -266,7 +270,10 @@ ipcMain.on('end-rec', () => {
     recView.webContents.destroy();
     recView = null;
   }
-  if (bgmView) bgmView.webContents.setAudioMuted(false);
+  if (bgmView) {
+    bgmView.webContents.executeJavaScript(`document.querySelector('video')?.play()`).catch(() => {});
+    bgmView.webContents.setAudioMuted(false);
+  }
   mainWindow.webContents.send('now-playing', null);
 });
 
