@@ -2,8 +2,6 @@ const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron')
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
-// 유저 제스처 없이는 autoplay 차단 (Chromium 엔진 레벨)
-app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
 // navigator.webdriver 숨김 — SoundCloud·Spotify 등이 Electron 감지 후 팝업 차단하는 것 방지
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
