@@ -704,6 +704,14 @@ function SettingsTab({ allowedPlatforms, saving, onSave }) {
         )}
       </div>
 
+      <div style={settingsStyles.section}>
+        <div style={settingsStyles.title}>디버그</div>
+        <div style={settingsStyles.desc}>오른쪽 브라우저(BGM 플레이어)의 개발자 도구를 엽니다.</div>
+        <button
+          onClick={() => window.electronAPI?.openBgmDevTools()}
+          style={settingsStyles.saveBtn}
+        >BGM DevTools 열기</button>
+      </div>
     </div>
   );
 }

@@ -203,6 +203,11 @@ ipcMain.on('open-login-window', (_e, url) => {
   });
 });
 
+// bgmView DevTools 토글 (디버깅용)
+ipcMain.on('open-bgm-devtools', () => {
+  if (bgmView) bgmView.webContents.openDevTools({ mode: 'detach' });
+});
+
 // 로그인 후 BGM 패널 표시
 ipcMain.on('show-youtube', () => {
   attachBgmPanel();

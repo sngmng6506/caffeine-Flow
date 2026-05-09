@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onVideoEnded:     (cb) => ipcRenderer.on('video-ended',   ()         => cb()),
   onNowPlaying:     (cb) => ipcRenderer.on('now-playing',   (_e, info) => cb(info)),
 
+  openBgmDevTools:     ()    => ipcRenderer.send('open-bgm-devtools'),
   openLoginWindow:     (url) => ipcRenderer.send('open-login-window', url),
   onLoginWindowClosed: (cb)  => ipcRenderer.on('login-window-closed', () => cb()),
   onWidevineStatus:    (cb)  => ipcRenderer.on('widevine-status', (_e, s) => cb(s)),
