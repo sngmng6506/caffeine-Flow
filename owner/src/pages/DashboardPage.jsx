@@ -12,6 +12,15 @@ function savedToBgmUrl(info) {
   return `https://www.youtube.com/watch?v=${info.videoId}`;
 }
 
+// SoundCloud 일반 URL → embed 플레이어 URL 변환 (로그인 없이 공개 플리 재생 가능)
+function toEmbedUrl(url) {
+  if (!url) return url;
+  if (/^https?:\/\/(www\.)?soundcloud\.com\//i.test(url)) {
+    return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=true&continuous_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false`;
+  }
+  return url;
+}
+
 export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [cafe, setCafe]         = useState(initialCafe);
   const [recs, setRecs]         = useState([]);
@@ -102,7 +111,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
     // 앱 시작 시 저장된 BGM URL을 bgmView에 미리 로드 (사장님이 ▶ 한 번 눌러두면 끝)
     const savedBgm = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
-    const savedBgmUrl = savedToBgmUrl(savedBgm);
+    const savedBgmUrl = toEmbedUrl(savedToBgmUrl(savedBgm));
     if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
     // 영상 종료 감지:
@@ -178,7 +187,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   function handleSetDefault(info) {
     setDefaultVideo(info);
     localStorage.setItem('cf_default_video', JSON.stringify(info));
-    const url = savedToBgmUrl(info);
+    const url = toEmbedUrl(savedToBgmUrl(info));
     if (url) window.electronAPI?.setBgmUrl(url);
   }
 
