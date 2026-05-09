@@ -223,7 +223,14 @@ ipcMain.on('hide-youtube', () => {
 // BGM URL 설정 — bgmView에 로드 (한 번 로드 후 신청곡 사이에도 상태 유지)
 ipcMain.on('set-bgm-url', (_e, url) => {
   if (!bgmView) createBgmView();
-  bgmView.webContents.loadURL(url);
+  const currentUrl = bgmView.webContents.getURL();
+  // Spotify는 이미 로드된 상태면 SPA 라우팅으로 이동 — loadURL은 전체 새로고침이라 플레이어 상태 초기화됨
+  const spotifyToSpotify = url.includes('open.spotify.com') && currentUrl.includes('open.spotify.com');
+  if (spotifyToSpotify) {
+    bgmView.webContents.executeJavaScript(`window.location.href = ${JSON.stringify(url)}`);
+  } else {
+    bgmView.webContents.loadURL(url);
+  }
 });
 
 // BGM 해제 — 빈 페이지로
