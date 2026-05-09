@@ -275,6 +275,16 @@ app.whenReady().then(async () => {
   await components.whenReady();
   console.log('[widevine] components ready:', components.status());
 
+  // DRM 관련 권한 자동 허용 (Spotify Widevine 라이선스 요청 등)
+  const { session } = require('electron');
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(['media', 'mediaKeySystem'].includes(permission));
+  });
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
+    if (['media', 'mediaKeySystem'].includes(permission)) return true;
+    return null;
+  });
+
   createWindow();
   if (!isDev) {
     autoUpdater.on('error',                err  => console.error('[autoUpdater] error:', err));
