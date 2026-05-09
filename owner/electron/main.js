@@ -6,8 +6,6 @@ const path = require('path');
 app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
 // navigator.webdriver 숨김 — SoundCloud·Spotify 등이 Electron 감지 후 팝업 차단하는 것 방지
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
-// Chromium 렌더러 레벨 팝업 차단 해제 — window.open()이 null 반환하는 것 방지 (SoundCloud·Spotify 로그인)
-app.commandLine.appendSwitch('disable-popup-blocking');
 
 const isDev = !app.isPackaged;
 const OWNER_URL = isDev
@@ -61,6 +59,7 @@ function createBgmView() {
     webPreferences: {
       contextIsolation: false,
       nodeIntegration: false,
+      preload: path.join(__dirname, 'stealth-preload.js'),
     },
   });
   blockExternalProtocol(bgmView);
@@ -186,7 +185,11 @@ ipcMain.on('open-login-window', (_e, url) => {
   loginWin = new BrowserWindow({
     width: 520, height: 720,
     title: '로그인',
-    webPreferences: { contextIsolation: false, nodeIntegration: false },
+    webPreferences: {
+      contextIsolation: false,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'stealth-preload.js'),
+    },
   });
   loginWin.loadURL(url);
   loginWin.on('closed', () => {
