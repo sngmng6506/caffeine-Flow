@@ -31,9 +31,22 @@ function blockExternalProtocol(view) {
   };
   view.webContents.on('will-navigate', handler);
   view.webContents.on('will-redirect', handler);
-  view.webContents.setWindowOpenHandler(({ url }) => (
-    /^https?:\/\//i.test(url) ? { action: 'allow' } : { action: 'deny' }
-  ));
+  // SoundCloud·Spotify 로그인 팝업 허용 — 적절한 크기로 BrowserWindow 생성
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    if (!/^https?:\/\//i.test(url)) return { action: 'deny' };
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        width: 500,
+        height: 700,
+        webPreferences: { contextIsolation: false, nodeIntegration: false },
+      },
+    };
+  });
+  // 팝업 윈도우에도 동일한 UA 적용 (OAuth 차단 방지)
+  view.webContents.on('did-create-window', (popup) => {
+    popup.webContents.setUserAgent(mainWindow.webContents.getUserAgent());
+  });
 }
 
 // BGM용 BrowserView — 한 번 만들면 신청곡 사이에도 destroy 안 함 (재생 위치 유지가 핵심)
