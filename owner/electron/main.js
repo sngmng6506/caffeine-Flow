@@ -179,6 +179,22 @@ function createWindow() {
   if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
 }
 
+// Spotify·SoundCloud 로그인용 독립 창 — BrowserView와 같은 세션 공유 → 로그인 후 bgmView에서도 인증 유지
+let loginWin = null;
+ipcMain.on('open-login-window', (_e, url) => {
+  if (loginWin && !loginWin.isDestroyed()) { loginWin.focus(); return; }
+  loginWin = new BrowserWindow({
+    width: 520, height: 720,
+    title: '로그인',
+    webPreferences: { contextIsolation: false, nodeIntegration: false },
+  });
+  loginWin.loadURL(url);
+  loginWin.on('closed', () => {
+    loginWin = null;
+    mainWindow.webContents.send('login-window-closed');
+  });
+});
+
 // 로그인 후 BGM 패널 표시
 ipcMain.on('show-youtube', () => {
   attachBgmPanel();

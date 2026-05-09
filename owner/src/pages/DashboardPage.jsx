@@ -12,14 +12,6 @@ function savedToBgmUrl(info) {
   return `https://www.youtube.com/watch?v=${info.videoId}`;
 }
 
-// SoundCloud 일반 URL → embed 플레이어 URL 변환 (로그인 없이 공개 플리 재생 가능)
-function toEmbedUrl(url) {
-  if (!url) return url;
-  if (/^https?:\/\/(www\.)?soundcloud\.com\//i.test(url)) {
-    return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&auto_play=true&continuous_play=true&hide_related=true&show_comments=false&show_user=false&show_reposts=false`;
-  }
-  return url;
-}
 
 export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [cafe, setCafe]         = useState(initialCafe);
@@ -111,7 +103,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
     // 앱 시작 시 저장된 BGM URL을 bgmView에 미리 로드 (사장님이 ▶ 한 번 눌러두면 끝)
     const savedBgm = (() => { try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; } })();
-    const savedBgmUrl = toEmbedUrl(savedToBgmUrl(savedBgm));
+    const savedBgmUrl = savedToBgmUrl(savedBgm);
     if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
     // 영상 종료 감지:
@@ -187,7 +179,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   function handleSetDefault(info) {
     setDefaultVideo(info);
     localStorage.setItem('cf_default_video', JSON.stringify(info));
-    const url = toEmbedUrl(savedToBgmUrl(info));
+    const url = savedToBgmUrl(info);
     if (url) window.electronAPI?.setBgmUrl(url);
   }
 
@@ -585,12 +577,28 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear }) {
           <div style={dfStyles.title}>{defaultVideo.title}</div>
           <div style={dfStyles.hint}>신청곡 없을 때 자동 재생되는 매장 BGM</div>
         </div>
-        <button
-          onClick={onClear}
-          draggable={false}
-          onDragStart={e => e.stopPropagation()}
-          style={dfStyles.clearBtn}
-        >해제</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+          {/spotify\.com/i.test(url) && (
+            <button
+              onClick={() => window.electronAPI?.openLoginWindow('https://accounts.spotify.com/ko/login')}
+              draggable={false} onDragStart={e => e.stopPropagation()}
+              style={{ ...dfStyles.clearBtn, background: '#1db954', color: '#fff', border: 'none' }}
+            >Spotify 로그인</button>
+          )}
+          {/soundcloud\.com/i.test(url) && (
+            <button
+              onClick={() => window.electronAPI?.openLoginWindow('https://soundcloud.com/signin')}
+              draggable={false} onDragStart={e => e.stopPropagation()}
+              style={{ ...dfStyles.clearBtn, background: '#ff5500', color: '#fff', border: 'none' }}
+            >SoundCloud 로그인</button>
+          )}
+          <button
+            onClick={onClear}
+            draggable={false}
+            onDragStart={e => e.stopPropagation()}
+            style={dfStyles.clearBtn}
+          >해제</button>
+        </div>
       </div>
     );
   }

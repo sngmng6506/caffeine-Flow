@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onVideoEnded:     (cb) => ipcRenderer.on('video-ended',   ()         => cb()),
   onNowPlaying:     (cb) => ipcRenderer.on('now-playing',   (_e, info) => cb(info)),
 
+  openLoginWindow:     (url) => ipcRenderer.send('open-login-window', url),
+  onLoginWindowClosed: (cb)  => ipcRenderer.on('login-window-closed', () => cb()),
+
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_e, version) => cb(version)),
   restartApp:         ()   => ipcRenderer.send('restart-app'),
 
