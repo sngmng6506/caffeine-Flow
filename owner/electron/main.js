@@ -1,11 +1,40 @@
 const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const fs   = require('fs');
 
 // 유저 제스처 없이는 autoplay 차단 (Chromium 엔진 레벨)
 app.commandLine.appendSwitch('autoplay-policy', 'user-gesture-required');
 // navigator.webdriver 숨김 — SoundCloud·Spotify 등이 Electron 감지 후 팝업 차단하는 것 방지
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
+
+// Spotify 재생용 Widevine CDM — Chrome 설치 경로에서 자동 탐색 (app.ready 전에 설정해야 함)
+(function loadWidevine() {
+  const chromeDirs = [
+    'C:\\Program Files\\Google\\Chrome\\Application',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application',
+    path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application'),
+  ];
+  for (const dir of chromeDirs) {
+    if (!fs.existsSync(dir)) continue;
+    // 버전 디렉토리 중 가장 높은 버전 선택
+    const versionDir = fs.readdirSync(dir)
+      .filter(e => /^\d+\.\d+/.test(e))
+      .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
+    if (!versionDir) continue;
+    const cdmPath      = path.join(dir, versionDir, 'WidevineCdm', '_platform_specific', 'win_x64', 'widevinecdm.dll');
+    const manifestPath = path.join(dir, versionDir, 'WidevineCdm', 'manifest.json');
+    if (!fs.existsSync(cdmPath) || !fs.existsSync(manifestPath)) continue;
+    try {
+      const { version } = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      app.commandLine.appendSwitch('widevine-cdm-path', cdmPath);
+      app.commandLine.appendSwitch('widevine-cdm-version', version);
+      console.log('[widevine] loaded from Chrome:', cdmPath, version);
+      return;
+    } catch (_) {}
+  }
+  console.warn('[widevine] Chrome not found — Spotify playback may not work');
+})();
 
 const isDev = !app.isPackaged;
 const OWNER_URL = isDev
