@@ -1,6 +1,6 @@
 {
   "name": "caffeine-flow-owner",
-  "version": "2.1.4",
+  "version": "2.1.5",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite --port 5174",
@@ -28,6 +28,10 @@
   "build": {
     "appId": "com.caffeine-flow.owner",
     "productName": "Caffeine Flow",
+    "electronVersion": "41.5.0+wvcus",
+    "electronDownload": {
+      "mirror": "https://github.com/castlabs/electron-releases/releases/download/"
+    },
     "publish": {
       "provider": "github",
       "owner": "sngmng6506",
