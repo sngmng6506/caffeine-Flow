@@ -50,6 +50,17 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const autoAcceptRef = useRef(autoAccept);
   autoAcceptRef.current = autoAccept;
 
+  const [panelRatio, setPanelRatio] = useState(() => {
+    const s = parseFloat(localStorage.getItem('cf_panel_ratio'));
+    return isNaN(s) ? 0.42 : s;
+  });
+  const isDraggingDivider = useRef(false);
+
+  // 앱 시작 시 저장된 panelRatio를 Electron에 동기화
+  useEffect(() => {
+    window.electronAPI?.setPanelRatio(panelRatio);
+  }, []); // eslint-disable-line
+
   useEffect(() => {
     getRecommendations(cafe.slug)
       .then(async ({ recommendations, is_accepting }) => {
@@ -184,6 +195,29 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       localStorage.setItem('cf_auto_accept', String(next));
       return next;
     });
+  }
+
+  function handleDividerMouseDown(e) {
+    e.preventDefault();
+    isDraggingDivider.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    function onMove(ev) {
+      if (!isDraggingDivider.current) return;
+      const ratio = Math.min(0.85, Math.max(0.15, ev.clientX / window.innerWidth));
+      setPanelRatio(ratio);
+      localStorage.setItem('cf_panel_ratio', String(ratio));
+      window.electronAPI?.setPanelRatio(ratio);
+    }
+    function onUp() {
+      isDraggingDivider.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    }
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   }
 
   async function handleNameSave() {
@@ -336,7 +370,20 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, maxWidth: Math.floor(panelRatio * window.innerWidth) - 8 }}>
+      {/* 좌우 패널 구분선 — 드래그로 비율 조정 */}
+      <div
+        onMouseDown={handleDividerMouseDown}
+        title="드래그하여 좌우 비율 조정"
+        style={{
+          position: 'fixed', top: 0, left: `${panelRatio * 100}%`,
+          width: 8, height: '100vh', cursor: 'col-resize', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'transparent',
+        }}
+      >
+        <div style={{ width: 2, height: '100%', background: '#ddd', borderRadius: 2 }} />
+      </div>
       <div style={styles.header}>
         <div>
           {editingName ? (
@@ -425,7 +472,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         <button onClick={() => handleTabChange('stats')}   style={{ ...styles.tab, ...(tab === 'stats'   ? styles.tabActive : {}) }}>통계</button>
         <button onClick={() => handleTabChange('qr')}      style={{ ...styles.tab, ...(tab === 'qr'      ? styles.tabActive : {}) }}>QR 코드</button>
         <button onClick={() => handleTabChange('settings')} style={{ ...styles.tab, ...(tab === 'settings' ? styles.tabActive : {}) }}>설정</button>
-        <button onClick={() => handleTabChange('contact')} style={{ ...styles.tab, ...(tab === 'contact' ? styles.tabActive : {}) }}>문의</button>
+        <button onClick={() => handleTabChange('contact')}   style={{ ...styles.tab, ...(tab === 'contact'   ? styles.tabActive : {}) }}>문의</button>
+        <button onClick={() => handleTabChange('shortcuts')} style={{ ...styles.tab, ...(tab === 'shortcuts' ? styles.tabActive : {}) }}>바로가기</button>
       </div>
 
       {tab === 'queue' && (() => {
@@ -564,7 +612,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         } catch (e) { alert(e.message); }
         finally { setPlatformSaving(false); }
       }} />}
-      {tab === 'contact' && <ContactTab provider={cafe.provider} />}
+      {tab === 'contact'   && <ContactTab provider={cafe.provider} />}
+      {tab === 'shortcuts' && <ShortcutsTab />}
     </div>
   );
 }
@@ -978,3 +1027,68 @@ const contactStyles = {
   desc:  { fontSize: 14, color: '#666', lineHeight: 1.8, marginBottom: 20 },
   btn:   { display: 'block', background: '#1a1a2e', color: '#fff', textAlign: 'center', borderRadius: 8, padding: '13px', fontSize: 14, fontWeight: 700, textDecoration: 'none' },
 };
+
+const SHORTCUT_GROUPS = [
+  {
+    platform: 'YouTube',
+    color: '#ff0000',
+    bg: '#fff5f5',
+    links: [
+      { label: 'YouTube Music', url: 'https://music.youtube.com' },
+      { label: 'YouTube', url: 'https://www.youtube.com' },
+      { label: '인기 음악 차트', url: 'https://www.youtube.com/feed/trending?bp=4gINGgt5dG1hX2NoYXJ0cw%3D%3D' },
+    ],
+  },
+  {
+    platform: 'Spotify',
+    color: '#1db954',
+    bg: '#f0fff5',
+    links: [
+      { label: 'Spotify', url: 'https://open.spotify.com' },
+      { label: '카페 플레이리스트', url: 'https://open.spotify.com/search/cafe%20playlist' },
+      { label: '로그인', url: 'https://accounts.spotify.com/ko/login' },
+    ],
+  },
+  {
+    platform: 'SoundCloud',
+    color: '#ff5500',
+    bg: '#fff8f5',
+    links: [
+      { label: 'SoundCloud', url: 'https://soundcloud.com' },
+      { label: '로그인', url: 'https://soundcloud.com/signin' },
+    ],
+  },
+];
+
+function ShortcutsTab() {
+  return (
+    <div style={{ paddingTop: 8 }}>
+      {SHORTCUT_GROUPS.map(({ platform, color, bg, links }) => (
+        <div key={platform} style={{ marginBottom: 14, borderRadius: 10, background: bg, padding: '12px 14px', border: `1px solid ${color}33` }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10, letterSpacing: 0.3 }}>{platform}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {links.map(({ label, url }) => (
+              <button
+                key={url}
+                onClick={() => window.electronAPI?.setBgmUrl(url)}
+                style={{
+                  padding: '6px 14px', borderRadius: 20,
+                  border: `1px solid ${color}`, background: '#fff',
+                  color, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
+        클릭하면 오른쪽 화면에서 해당 페이지가 열립니다
+      </div>
+    </div>
+  );
+}

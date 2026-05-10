@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onLoginWindowClosed: (cb)  => ipcRenderer.on('login-window-closed', () => cb()),
   onWidevineStatus:    (cb)  => ipcRenderer.on('widevine-status', (_e, s) => cb(s)),
 
+  setPanelRatio:      (ratio) => ipcRenderer.send('set-panel-ratio', ratio),
+
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_e, version) => cb(version)),
   restartApp:         ()   => ipcRenderer.send('restart-app'),
 

@@ -13,7 +13,7 @@ const OWNER_URL = isDev
   ? 'http://localhost:5174/owner/'
   : 'https://caffeine-flow-production.up.railway.app/owner/';
 
-const LEFT_RATIO = 0.42;
+let LEFT_RATIO = 0.42;
 
 let mainWindow      = null;
 let currentBgmUrl   = null; // 현재 설정된 BGM URL — end-rec 시 이탈 여부 확인용
@@ -203,6 +203,12 @@ ipcMain.on('open-login-window', (_e, url) => {
     loginWin = null;
     mainWindow.webContents.send('login-window-closed');
   });
+});
+
+// 좌우 패널 비율 조정 — React 드래그 핸들에서 호출
+ipcMain.on('set-panel-ratio', (_e, ratio) => {
+  LEFT_RATIO = Math.min(0.85, Math.max(0.15, ratio));
+  resizeViews();
 });
 
 // bgmView DevTools 토글 (디버깅용)
