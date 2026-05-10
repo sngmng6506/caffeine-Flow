@@ -242,10 +242,28 @@ ipcMain.on('clear-bgm', () => {
   bgmView.webContents.loadURL('https://www.google.com');
 });
 
-// BGM Space키로 재생/일시정지 토글 — DOM 셀렉터 없이 Spotify 키보드 핸들러 직접 트리거
-// 신청곡 시작: bgmView 음소거 — 플리는 뒤에서 계속 재생 중 (오버레이 구조 핵심)
+// Spotify play/pause 버튼 클릭 — aria-label로 현재 상태 판단
+const SPOTIFY_CLICK_PLAY_IF_PAUSED = `
+  (function() {
+    const btn = document.querySelector('[data-testid="control-button-playpause"]');
+    if (!btn) return 'no-btn';
+    const label = btn.getAttribute('aria-label') || '';
+    const isPaused = label.includes('재생') || label.toLowerCase().includes('play');
+    if (isPaused) { btn.click(); return 'clicked'; }
+    return 'already-playing';
+  })()
+`;
+
+// 신청곡 시작: bgmView 음소거
+// setAudioMuted(true)가 Spotify를 pause시키므로, 잠시 후 play 클릭해 무음 재생 상태 유지
 ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
-  if (bgmView) bgmView.webContents.setAudioMuted(true);
+  if (bgmView) {
+    bgmView.webContents.setAudioMuted(true);
+    // Spotify가 pause 처리할 시간(300ms) 후 play 클릭 → 무음 상태로 플리 계속 재생
+    setTimeout(() => {
+      if (bgmView) bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
+    }, 300);
+  }
 
   if (!recView) createRecView();
   if (panelVisible && !recViewAttached) {
@@ -272,10 +290,8 @@ ipcMain.on('end-rec', () => {
   }
   if (bgmView) {
     bgmView.webContents.setAudioMuted(false);
-    // 음소거 해제 후 일시중단된 AudioContext 재개 — 합성 클릭으로 user gesture 트리거
-    bgmView.webContents.executeJavaScript(
-      `document.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`
-    ).catch(() => {});
+    // 혹시 paused 상태로 남아있으면 play 클릭 (play-rec의 setTimeout이 늦게 처리된 경우 대비)
+    bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
   }
   mainWindow.webContents.send('now-playing', null);
 });
