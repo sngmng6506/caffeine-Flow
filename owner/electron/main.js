@@ -23,6 +23,7 @@ let bgmView         = null;
 let recView         = null;
 let recViewAttached = false;
 let panelVisible    = false;
+let spotifyPoll     = null; // Spotify 트랙 종료 감지 폴링 — end-rec 시 반드시 clear
 
 function getContentSize() {
   return mainWindow.getContentSize();
@@ -283,24 +284,52 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
     : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
   recView.webContents.loadURL(url);
 
-  // Spotify 수락곡: youtube-preload가 video 엘리먼트를 못찾으므로
-  // SPA URL 변경(did-navigate-in-page)으로 트랙 종료 감지
+  // Spotify 수락곡 — 정확히 한 곡만 재생하고 종료
   if (url.includes('open.spotify.com')) {
     const trackPath = (() => { try { return new URL(url).pathname; } catch { return null; } })();
     if (trackPath) {
       let spotifyEndFired = false;
-      // Spotify 초기화 완료 후 감지 시작 (초기 SPA 이동 오감지 방지)
+
+      // 트랙 변경 감지 즉시: recView 음소거 + video-ended 전송
+      const fireSpotifyEnd = () => {
+        if (spotifyEndFired) return;
+        spotifyEndFired = true;
+        if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
+        // recView가 살아있는 동안 다음 곡 소리 즉시 차단
+        try { if (recView) recView.webContents.setAudioMuted(true); } catch {}
+        mainWindow.webContents.send('video-ended');
+      };
+
+      // Spotify 페이지 로드 안정화(5s) 후 감지 시작
       setTimeout(() => {
-        if (!recView) return;
+        if (!recView || spotifyEndFired) return;
+
+        // ① 오토플레이 비활성화 시도 (근본 차단)
+        recView.webContents.executeJavaScript(`
+          (function() {
+            const btn = document.querySelector('[data-testid="autoplay-button"]');
+            if (btn && btn.getAttribute('aria-checked') === 'true') { btn.click(); return 'disabled'; }
+            return btn ? 'already-off' : 'not-found';
+          })()
+        `).then(r => console.log('[Spotify] autoplay toggle:', r)).catch(() => {});
+
+        // ② did-navigate-in-page — 즉시 감지 (SPA 라우팅)
         const onNav = (_e, navUrl) => {
-          if (spotifyEndFired) return;
           if (!navUrl.includes(trackPath)) {
-            spotifyEndFired = true;
             try { recView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
-            mainWindow.webContents.send('video-ended');
+            fireSpotifyEnd();
           }
         };
         if (recView) recView.webContents.on('did-navigate-in-page', onNav);
+
+        // ③ URL 폴링 2s 간격 — did-navigate-in-page 미발생 케이스 보완
+        spotifyPoll = setInterval(() => {
+          if (spotifyEndFired || !recView) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
+          try {
+            const cur = recView.webContents.getURL();
+            if (cur && !cur.includes(trackPath)) fireSpotifyEnd();
+          } catch { clearInterval(spotifyPoll); spotifyPoll = null; }
+        }, 2000);
       }, 5000);
     }
   }
@@ -308,6 +337,7 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
 
 // 신청곡 종료: recView 제거 + bgmView 음소거 해제 → 플리 그 자리에서 이어짐
 ipcMain.on('end-rec', () => {
+  if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
   if (recView && recViewAttached) {
     mainWindow.removeBrowserView(recView);
     recViewAttached = false;
