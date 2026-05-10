@@ -370,7 +370,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   }
 
   return (
-    <div style={{ ...styles.page, maxWidth: Math.floor(panelRatio * window.innerWidth) - 8 }}>
+    <div style={{ ...styles.page, margin: 0, width: `calc(${(panelRatio * 100).toFixed(2)}vw - 32px)`, maxWidth: 'none' }}>
       {/* 좌우 패널 구분선 — 드래그로 비율 조정 */}
       <div
         onMouseDown={handleDividerMouseDown}
@@ -909,7 +909,7 @@ function ContactTab({ provider }) {
 }
 
 const styles = {
-  page:              { maxWidth: 600, margin: '0 auto', padding: '16px', fontFamily: 'sans-serif' },
+  page:              { padding: '16px', fontFamily: 'sans-serif' },
   header:            { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' },
   nameRow:           { display: 'flex', alignItems: 'center', gap: 6 },
   cafeName:          { fontWeight: 700, fontSize: 18 },
@@ -933,8 +933,8 @@ const styles = {
   noticeInput:       { fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', resize: 'none', fontFamily: 'sans-serif' },
   noticeActions:     { display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' },
   noticeCount:       { fontSize: 12, color: '#aaa', marginRight: 'auto' },
-  tabs:              { display: 'flex', marginBottom: 16, borderBottom: '2px solid #eee' },
-  tab:               { padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#888', display: 'flex', alignItems: 'center', gap: 6 },
+  tabs:              { display: 'flex', marginBottom: 16, borderBottom: '2px solid #eee', overflowX: 'auto' },
+  tab:               { padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#888', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', flexShrink: 0 },
   tabActive:         { color: '#1a1a2e', fontWeight: 700, borderBottom: '2px solid #1a1a2e', marginBottom: -2 },
   badge:             { background: '#e63946', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 11 },
   empty:             { textAlign: 'center', color: '#aaa', padding: '40px 0' },
