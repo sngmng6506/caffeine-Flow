@@ -579,6 +579,13 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatu
           e.dataTransfer.effectAllowed = 'move';
         }}
       >
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
+          onClick={() => window.electronAPI?.setBgmUrl(url)}
+          title="클릭하면 해당 링크로 이동"
+          draggable={false}
+          onDragStart={e => e.stopPropagation()}
+        >
         {defaultVideo.thumbnail
           ? <img src={defaultVideo.thumbnail} alt="" style={dfStyles.thumb} />
           : <div style={{ ...dfStyles.thumb, background: '#eee' }} />
@@ -586,13 +593,14 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatu
         <div style={dfStyles.info}>
           {isPlaying && <span style={dfStyles.playing}>▶ 재생 중</span>}
           <div style={dfStyles.title}>{defaultVideo.title}</div>
-          <div style={dfStyles.hint}>신청곡 없을 때 자동 재생되는 매장 BGM</div>
+          <div style={dfStyles.hint}>클릭하면 해당 플레이어로 이동 · 신청곡 없을 때 자동 재생</div>
           {/spotify\.com/i.test(url) && widevineStatus === 'not_found' && (
             <div style={dfStyles.warn}>⚠️ Chrome 미설치 — Spotify 재생 불가</div>
           )}
           {/spotify\.com/i.test(url) && widevineStatus?.startsWith('loaded') && (
             <div style={{ ...dfStyles.hint, color: '#1db954' }}>✓ Widevine 로드됨</div>
           )}
+        </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
           {/spotify\.com/i.test(url) && (

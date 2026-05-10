@@ -276,6 +276,28 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
     ? videoIdOrUrl
     : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
   recView.webContents.loadURL(url);
+
+  // Spotify 수락곡: youtube-preload가 video 엘리먼트를 못찾으므로
+  // SPA URL 변경(did-navigate-in-page)으로 트랙 종료 감지
+  if (url.includes('open.spotify.com')) {
+    const trackPath = (() => { try { return new URL(url).pathname; } catch { return null; } })();
+    if (trackPath) {
+      let spotifyEndFired = false;
+      // Spotify 초기화 완료 후 감지 시작 (초기 SPA 이동 오감지 방지)
+      setTimeout(() => {
+        if (!recView) return;
+        const onNav = (_e, navUrl) => {
+          if (spotifyEndFired) return;
+          if (!navUrl.includes(trackPath)) {
+            spotifyEndFired = true;
+            try { recView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
+            mainWindow.webContents.send('video-ended');
+          }
+        };
+        if (recView) recView.webContents.on('did-navigate-in-page', onNav);
+      }, 5000);
+    }
+  }
 });
 
 // 신청곡 종료: recView 제거 + bgmView 음소거 해제 → 플리 그 자리에서 이어짐
