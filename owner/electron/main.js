@@ -220,6 +220,45 @@ ipcMain.on('set-panel-ratio', (_e, ratio) => {
   resizeViews();
 });
 
+// 특정 도메인의 모든 쿠키/스토리지 초기화 (DataDome 봇 차단 마커 제거용)
+async function clearDomainSession(domains) {
+  const { session } = require('electron');
+  const sess = session.defaultSession;
+  try {
+    const allCookies = await sess.cookies.get({});
+    const targets = allCookies.filter(c =>
+      domains.some(d => (c.domain || '').includes(d))
+    );
+    for (const c of targets) {
+      const cleanDomain = (c.domain || '').replace(/^\./, '');
+      const url = `https://${cleanDomain}${c.path || '/'}`;
+      try { await sess.cookies.remove(url, c.name); } catch (_) {}
+    }
+    console.log('[clear-session] removed', targets.length, 'cookies for', domains.join(','));
+    // localStorage / IndexedDB 등도 origin 단위로 초기화
+    for (const d of domains) {
+      try {
+        await sess.clearStorageData({
+          origin: `https://${d}`,
+          storages: ['localstorage', 'sessionstorage', 'indexdb', 'serviceworkers', 'cachestorage'],
+        });
+      } catch (_) {}
+    }
+    return targets.length;
+  } catch (e) {
+    console.error('[clear-session] failed:', e);
+    return 0;
+  }
+}
+
+ipcMain.handle('clear-soundcloud-session', async () => {
+  return await clearDomainSession(['soundcloud.com', 'datadome.co', 'datadome.com']);
+});
+
+ipcMain.handle('clear-spotify-session', async () => {
+  return await clearDomainSession(['spotify.com', 'scdn.co']);
+});
+
 // bgmView DevTools 토글 (디버깅용)
 ipcMain.on('open-bgm-devtools', () => {
   if (bgmView) bgmView.webContents.openDevTools({ mode: 'detach' });

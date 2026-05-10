@@ -723,11 +723,23 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatu
             >Spotify 로그인</button>
           )}
           {/soundcloud\.com/i.test(url) && (
-            <button
-              onClick={() => window.electronAPI?.openLoginWindow('https://soundcloud.com/signin')}
-              draggable={false} onDragStart={e => e.stopPropagation()}
-              style={{ ...dfStyles.clearBtn, background: '#ff5500', color: '#fff', border: 'none' }}
-            >SoundCloud 로그인</button>
+            <>
+              <button
+                onClick={() => window.electronAPI?.openLoginWindow('https://soundcloud.com/signin')}
+                draggable={false} onDragStart={e => e.stopPropagation()}
+                style={{ ...dfStyles.clearBtn, background: '#ff5500', color: '#fff', border: 'none' }}
+              >SoundCloud 로그인</button>
+              <button
+                onClick={async () => {
+                  const n = await window.electronAPI?.clearSoundCloudSession();
+                  alert(`SoundCloud 쿠키 ${n}개 삭제됨. 로그인 창을 엽니다.`);
+                  window.electronAPI?.openLoginWindow('https://soundcloud.com/signin');
+                }}
+                draggable={false} onDragStart={e => e.stopPropagation()}
+                title="DataDome 봇 차단 마커가 쿠키에 박혀있을 때 사용"
+                style={{ ...dfStyles.clearBtn, background: '#fff', color: '#ff5500', border: '1px solid #ff5500', fontSize: 11 }}
+              >쿠키 초기화 후 로그인</button>
+            </>
           )}
           <button
             onClick={onClear}
