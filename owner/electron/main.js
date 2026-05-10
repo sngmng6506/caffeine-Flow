@@ -295,28 +295,60 @@ async function readBgmSpotifyTrackUrl() {
   } catch { return null; }
 }
 
-// bgmView를 SPA로 이동 + 잠시 후 play 클릭 (재시도 포함)
+// 페이지의 메인 재생 버튼 클릭 (트랙/앨범/플리 페이지의 큰 재생 버튼)
+// widget 토글이 아닌 "이 페이지 콘텐츠를 처음부터 재생" → Spotify Connect 상태 강제 덮어쓰기
+const SPOTIFY_CLICK_PAGE_PLAY = `
+  (function() {
+    const candidates = [
+      '[data-testid="action-bar-row"] [data-testid="play-button"]',
+      '[data-testid="action-bar-row"] button[aria-label*="재생"]',
+      '[data-testid="action-bar-row"] button[aria-label*="Play"]',
+      'section [data-testid="play-button"]',
+      'main [data-testid="play-button"]',
+      'button[data-testid="play-button"]',
+      '[data-testid="play-button"]',
+      'button[data-encore-id="buttonPrimary"][aria-label*="재생"]',
+      'button[data-encore-id="buttonPrimary"][aria-label*="Play"]',
+    ];
+    for (const sel of candidates) {
+      const btn = document.querySelector(sel);
+      if (!btn) continue;
+      const label = btn.getAttribute('aria-label') || '';
+      const isPause = label.includes('일시 정지') || label.toLowerCase().includes('pause');
+      if (isPause) { console.log('[CF page-play]', sel, '→ already playing'); return 'already-playing'; }
+      btn.click();
+      console.log('[CF page-play] clicked:', sel, 'label:', label);
+      return 'clicked';
+    }
+    console.log('[CF page-play] no button found');
+    return 'no-btn';
+  })()
+`;
+
+// bgmView를 loadURL로 강제 전환 + 페이지 재생 버튼 클릭 (재시도)
+// loadURL이 SPA보다 무겁지만 Spotify Connect 상태를 확실히 리셋 가능
 function bgmSpotifyNavigateAndPlay(targetUrl) {
   if (!bgmView || !targetUrl) return;
-  const curUrl = bgmView.webContents.getURL();
-  if (curUrl === targetUrl) {
-    // 동일 URL이면 SPA 이동 의미 없음 → loadURL 강제 새로고침
-    bgmView.webContents.loadURL(targetUrl);
-  } else {
-    bgmView.webContents.executeJavaScript(
-      `window.location.href = ${JSON.stringify(targetUrl)}`
-    ).catch(() => {});
-  }
-  // play 버튼이 DOM에 나타날 때까지 최대 6번 (1.5s + 1s*5) 재시도
+  console.log('[bgmNav] loadURL →', targetUrl);
+  bgmView.webContents.loadURL(targetUrl);
+
   let retries = 0;
+  const maxRetries = 8;
   const tryClick = async () => {
-    if (!bgmView || retries >= 6) return;
+    if (!bgmView || retries >= maxRetries) return;
     retries++;
-    const r = await bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => 'err');
-    if (r === 'no-btn' || r === 'err') setTimeout(tryClick, 1000);
-    else console.log('[takeover] play click:', r, 'retries:', retries);
+    const r = await bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PAGE_PLAY).catch(() => 'err');
+    console.log('[bgmNav] page-play attempt', retries, '→', r);
+    if (r === 'clicked' || r === 'already-playing') return; // 성공
+    setTimeout(tryClick, 1000);
   };
-  setTimeout(tryClick, 1500);
+
+  // 페이지 로드 완료 후 2.5s 대기 (Spotify SPA가 페이지 콘텐츠 렌더링할 시간)
+  bgmView.webContents.once('did-finish-load', () => {
+    setTimeout(tryClick, 2500);
+  });
+  // fallback (did-finish-load 미발생 시)
+  setTimeout(tryClick, 5000);
 }
 
 // takeover 모드: bgmView 신청곡 종료 감지
