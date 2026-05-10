@@ -23,7 +23,8 @@ let bgmView         = null;
 let recView         = null;
 let recViewAttached = false;
 let panelVisible    = false;
-let spotifyPoll     = null; // Spotify 트랙 종료 감지 폴링 — end-rec 시 반드시 clear
+let spotifyPoll        = null; // Spotify 트랙 종료 감지 폴링 — end-rec 시 반드시 clear
+let savedBgmTrackUrl   = null; // play-rec 직전 bgmView에서 재생 중이던 트랙 URL
 
 function getContentSize() {
   return mainWindow.getContentSize();
@@ -271,6 +272,30 @@ const SPOTIFY_CLICK_PLAY_IF_PAUSED = `
 // 신청곡 시작: bgmView 음소거
 // setAudioMuted(true)가 Spotify를 pause시키므로, 잠시 후 play 클릭해 무음 재생 상태 유지
 ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
+  // BGM이 Spotify일 때 현재 재생 중인 트랙 URL 저장 → end-rec 시 복원에 사용
+  savedBgmTrackUrl = null;
+  if (bgmView && currentBgmUrl?.includes('open.spotify.com')) {
+    bgmView.webContents.executeJavaScript(`
+      (function() {
+        const selectors = [
+          '[data-testid="context-item-link-title"]',
+          '[data-testid="nowplaying-track-link"]',
+          '[data-testid="now-playing-widget"] a[href*="/track/"]',
+          'footer a[href*="/track/"]',
+          'a[href*="/track/"]',
+        ];
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.href && el.href.includes('/track/')) return el.href;
+        }
+        return null;
+      })()
+    `).then(u => {
+      savedBgmTrackUrl = u || currentBgmUrl;
+      console.log('[BGM] saved track URL:', savedBgmTrackUrl);
+    }).catch(() => { savedBgmTrackUrl = currentBgmUrl; });
+  }
+
   if (bgmView) {
     bgmView.webContents.setAudioMuted(true);
     // Spotify가 pause 처리할 시간(300ms) 후 play 클릭 → 무음 상태로 플리 계속 재생
@@ -353,30 +378,47 @@ ipcMain.on('end-rec', () => {
     recView.webContents.destroy();
     recView = null;
   }
-  if (bgmView) {
-    bgmView.webContents.setAudioMuted(false);
 
-    const bgmIsSpotify = currentBgmUrl && currentBgmUrl.includes('open.spotify.com');
-    if (bgmIsSpotify) {
-      // Spotify BGM: recView가 Spotify 세션을 점유했으므로 bgmView가 세션을 재점령하도록
-      // 300ms 대기 후 BGM URL로 다시 네비게이션 (SPA 라우팅으로 상태 최대한 유지)
+  if (!bgmView) { mainWindow.webContents.send('now-playing', null); return; }
+
+  bgmView.webContents.setAudioMuted(false);
+
+  const bgmIsSpotify = currentBgmUrl?.includes('open.spotify.com');
+  if (bgmIsSpotify) {
+    // Spotify BGM 복원:
+    // recView가 Spotify 세션을 점유했으므로 bgmView에서 저장해둔 트랙으로 명시적 이동 후 play
+    const targetUrl = savedBgmTrackUrl || currentBgmUrl;
+    savedBgmTrackUrl = null;
+    console.log('[end-rec] Spotify BGM restore → ', targetUrl);
+
+    const clickPlayAfterNav = () => {
+      // Spotify SPA가 초기화될 시간 대기 후 play 클릭
       setTimeout(() => {
-        if (!bgmView) return;
-        const curUrl = bgmView.webContents.getURL();
-        const alreadySpotify = curUrl.includes('open.spotify.com');
-        if (alreadySpotify) {
-          bgmView.webContents.executeJavaScript(
-            `window.location.href = ${JSON.stringify(currentBgmUrl)}`
-          ).catch(() => {});
-        } else {
-          bgmView.webContents.loadURL(currentBgmUrl);
-        }
-      }, 300);
+        if (bgmView) bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
+      }, 2000);
+    };
+
+    const curUrl = bgmView.webContents.getURL();
+    const isSameUrl = curUrl === targetUrl;
+
+    if (isSameUrl || !curUrl.includes('open.spotify.com')) {
+      // 같은 URL이거나 Spotify가 아닌 경우 → loadURL로 강제 이동
+      bgmView.webContents.loadURL(targetUrl);
+      bgmView.webContents.once('did-finish-load', clickPlayAfterNav);
     } else {
-      // YouTube·SoundCloud: 오버레이가 정상 작동 — 음소거만 풀면 그 자리에서 이어짐
-      bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
+      // 다른 Spotify URL → SPA 라우팅 (전체 새로고침 없이 이동)
+      bgmView.webContents.once('did-navigate-in-page', clickPlayAfterNav);
+      bgmView.webContents.executeJavaScript(
+        `window.location.href = ${JSON.stringify(targetUrl)}`
+      ).catch(() => {});
+      // 혹시 did-navigate-in-page 미발생 시 fallback
+      setTimeout(clickPlayAfterNav, 4000);
     }
+  } else {
+    // YouTube·SoundCloud: 오버레이 정상 작동 — 음소거 해제만으로 이어짐
+    bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
   }
+
   mainWindow.webContents.send('now-playing', null);
 });
 
