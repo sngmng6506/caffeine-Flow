@@ -319,40 +319,89 @@ function bgmSpotifyNavigateAndPlay(targetUrl) {
   setTimeout(tryClick, 1500);
 }
 
-// takeover 모드: bgmView에서 현재 재생 중인 신청곡 종료 감지 (URL 변경)
+// takeover 모드: bgmView 신청곡 종료 감지
+// Spotify는 URL이 안 바뀌고 하단 now-playing 위젯에서만 다음 곡으로 넘어가므로 DOM 폴링이 필수
 function setupBgmSpotifyEndDetection(requestUrl) {
   if (!bgmView) return;
-  const trackPath = (() => { try { return new URL(requestUrl).pathname; } catch { return null; } })();
-  if (!trackPath) return;
+  const idMatch = requestUrl.match(/\/track\/([A-Za-z0-9]+)/);
+  const requestTrackId = idMatch?.[1];
+  if (!requestTrackId) return;
+  console.log('[takeover] detection start, target track ID:', requestTrackId);
 
   let endFired = false;
-  // Spotify 자동재생 토글 끄기
+  let confirmedPlaying = false; // 신청곡이 실제 재생 시작됐는지
+  let changeCount = 0;          // 다른 트랙으로 바뀐 폴링 연속 횟수
+
+  // Spotify 자동재생 토글 끄기 (best-effort)
   bgmView.webContents.executeJavaScript(`
     (function() {
       const btn = document.querySelector('[data-testid="autoplay-button"]');
       if (btn && btn.getAttribute('aria-checked') === 'true') { btn.click(); return 'disabled'; }
       return btn ? 'already-off' : 'not-found';
     })()
-  `).then(r => console.log('[takeover] autoplay:', r)).catch(() => {});
+  `).then(r => console.log('[takeover] autoplay toggle:', r)).catch(() => {});
 
   const fireEnd = () => {
     if (endFired) return;
     endFired = true;
+    console.log('[takeover] firing video-ended');
     cleanup();
     mainWindow.webContents.send('video-ended');
   };
-  const onNav = (_e, navUrl) => {
-    if (!navUrl.includes(trackPath)) fireEnd();
-  };
-  bgmView.webContents.on('did-navigate-in-page', onNav);
 
-  const poll = setInterval(() => {
+  // 1초 간격으로 now-playing 위젯의 현재 재생 트랙 ID 확인
+  const poll = setInterval(async () => {
     if (endFired || !bgmView) { clearInterval(poll); return; }
     try {
-      const cur = bgmView.webContents.getURL();
-      if (cur && !cur.includes(trackPath)) fireEnd();
-    } catch { clearInterval(poll); }
-  }, 2000);
+      const trackHref = await bgmView.webContents.executeJavaScript(`
+        (function() {
+          const selectors = [
+            '[data-testid="context-item-link-title"]',
+            '[data-testid="nowplaying-track-link"]',
+            '[data-testid="now-playing-widget"] a[href*="/track/"]',
+            'footer a[href*="/track/"]',
+          ];
+          for (const sel of selectors) {
+            const el = document.querySelector(sel);
+            if (el && el.href && el.href.includes('/track/')) return el.href;
+          }
+          return null;
+        })()
+      `);
+      if (!trackHref) return;
+
+      const playingMatch = trackHref.match(/\/track\/([A-Za-z0-9]+)/);
+      const playingId = playingMatch?.[1];
+      if (!playingId) return;
+
+      const isRequestTrack = playingId === requestTrackId;
+      if (!confirmedPlaying) {
+        // Spotify가 신청곡을 실제로 재생 중이라고 확인될 때까지 대기
+        if (isRequestTrack) {
+          confirmedPlaying = true;
+          console.log('[takeover] confirmed rec playing:', playingId);
+        }
+        return;
+      }
+      // 신청곡이 다른 트랙으로 바뀌었는지 감시 (2회 연속 = 2초 안정)
+      if (!isRequestTrack) {
+        changeCount++;
+        console.log('[takeover] changed →', playingId, '(count:', changeCount, ')');
+        if (changeCount >= 2) fireEnd();
+      } else {
+        changeCount = 0;
+      }
+    } catch (e) {
+      // ignore - 일시적 DOM 접근 실패는 무시
+    }
+  }, 1000);
+
+  // URL 변경도 backup으로 (Spotify가 URL을 바꾸는 케이스 — 가능성 낮지만)
+  const trackPath = `/track/${requestTrackId}`;
+  const onNav = (_e, navUrl) => {
+    if (!navUrl.includes(trackPath) && confirmedPlaying) fireEnd();
+  };
+  bgmView.webContents.on('did-navigate-in-page', onNav);
 
   const cleanup = () => {
     try { bgmView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
@@ -405,20 +454,26 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
   }
   recView.webContents.loadURL(url);
 
-  // overlay 모드에서 rec=Spotify인 경우 (BGM=YouTube/SoundCloud) — recView에서 종료 감지
+  // overlay 모드 + rec=Spotify (BGM=YouTube/SoundCloud) — recView DOM 폴링으로 종료 감지
   if (isSpotifyRec) {
-    const trackPath = (() => { try { return new URL(url).pathname; } catch { return null; } })();
-    if (trackPath) {
-      let spotifyEndFired = false;
-      const fireSpotifyEnd = () => {
-        if (spotifyEndFired) return;
-        spotifyEndFired = true;
+    const idMatch = url.match(/\/track\/([A-Za-z0-9]+)/);
+    const requestTrackId = idMatch?.[1];
+    if (requestTrackId) {
+      let endFired = false;
+      let confirmedPlaying = false;
+      let changeCount = 0;
+
+      const fireEnd = () => {
+        if (endFired) return;
+        endFired = true;
         if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
         try { if (recView) recView.webContents.setAudioMuted(true); } catch {}
         mainWindow.webContents.send('video-ended');
       };
+
       setTimeout(() => {
-        if (!recView || spotifyEndFired) return;
+        if (!recView || endFired) return;
+
         recView.webContents.executeJavaScript(`
           (function() {
             const btn = document.querySelector('[data-testid="autoplay-button"]');
@@ -426,20 +481,54 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
             return btn ? 'already-off' : 'not-found';
           })()
         `).catch(() => {});
+
+        // DOM 폴링 — now-playing 위젯의 현재 트랙 ID 감시
+        spotifyPoll = setInterval(async () => {
+          if (endFired || !recView) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
+          try {
+            const trackHref = await recView.webContents.executeJavaScript(`
+              (function() {
+                const selectors = [
+                  '[data-testid="context-item-link-title"]',
+                  '[data-testid="nowplaying-track-link"]',
+                  '[data-testid="now-playing-widget"] a[href*="/track/"]',
+                  'footer a[href*="/track/"]',
+                ];
+                for (const sel of selectors) {
+                  const el = document.querySelector(sel);
+                  if (el && el.href && el.href.includes('/track/')) return el.href;
+                }
+                return null;
+              })()
+            `);
+            if (!trackHref) return;
+            const m = trackHref.match(/\/track\/([A-Za-z0-9]+)/);
+            const playingId = m?.[1];
+            if (!playingId) return;
+
+            const isRequestTrack = playingId === requestTrackId;
+            if (!confirmedPlaying) {
+              if (isRequestTrack) confirmedPlaying = true;
+              return;
+            }
+            if (!isRequestTrack) {
+              changeCount++;
+              if (changeCount >= 2) fireEnd();
+            } else {
+              changeCount = 0;
+            }
+          } catch {}
+        }, 1000);
+
+        // URL 변경 backup
+        const trackPath = `/track/${requestTrackId}`;
         const onNav = (_e, navUrl) => {
-          if (!navUrl.includes(trackPath)) {
+          if (!navUrl.includes(trackPath) && confirmedPlaying) {
             try { recView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
-            fireSpotifyEnd();
+            fireEnd();
           }
         };
         if (recView) recView.webContents.on('did-navigate-in-page', onNav);
-        spotifyPoll = setInterval(() => {
-          if (spotifyEndFired || !recView) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
-          try {
-            const cur = recView.webContents.getURL();
-            if (cur && !cur.includes(trackPath)) fireSpotifyEnd();
-          } catch { clearInterval(spotifyPoll); spotifyPoll = null; }
-        }, 2000);
       }, 5000);
     }
   }
