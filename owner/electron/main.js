@@ -23,8 +23,10 @@ let bgmView         = null;
 let recView         = null;
 let recViewAttached = false;
 let panelVisible    = false;
-let spotifyPoll        = null; // Spotify 트랙 종료 감지 폴링 — end-rec 시 반드시 clear
-let savedBgmTrackUrl   = null; // play-rec 직전 bgmView에서 재생 중이던 트랙 URL
+let spotifyPoll          = null; // recView Spotify 트랙 종료 감지 폴링 (overlay 모드)
+let savedBgmTrackUrl     = null; // takeover 모드: BGM 트랙 URL 저장 → end-rec 시 복원
+let currentRecMode       = null; // 'overlay' | 'spotify-takeover' | null
+let bgmSpotifyEndCleanup = null; // takeover 모드: bgmView 종료 감지 cleanup fn
 
 function getContentSize() {
   return mainWindow.getContentSize();
@@ -269,20 +271,19 @@ const SPOTIFY_CLICK_PLAY_IF_PAUSED = `
   })()
 `;
 
-// 신청곡 시작: bgmView 음소거
-// setAudioMuted(true)가 Spotify를 pause시키므로, 잠시 후 play 클릭해 무음 재생 상태 유지
-ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
-  // BGM이 Spotify일 때 현재 재생 중인 트랙 URL 저장 → end-rec 시 복원에 사용
-  savedBgmTrackUrl = null;
-  if (bgmView && currentBgmUrl?.includes('open.spotify.com')) {
-    bgmView.webContents.executeJavaScript(`
+// === Spotify+Spotify takeover 헬퍼들 ===
+
+// bgmView Spotify DOM에서 현재 재생 중인 트랙 URL 추출
+async function readBgmSpotifyTrackUrl() {
+  if (!bgmView) return null;
+  try {
+    return await bgmView.webContents.executeJavaScript(`
       (function() {
         const selectors = [
           '[data-testid="context-item-link-title"]',
           '[data-testid="nowplaying-track-link"]',
           '[data-testid="now-playing-widget"] a[href*="/track/"]',
           'footer a[href*="/track/"]',
-          'a[href*="/track/"]',
         ];
         for (const sel of selectors) {
           const el = document.querySelector(sel);
@@ -290,15 +291,107 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
         }
         return null;
       })()
-    `).then(u => {
-      savedBgmTrackUrl = u || currentBgmUrl;
-      console.log('[BGM] saved track URL:', savedBgmTrackUrl);
-    }).catch(() => { savedBgmTrackUrl = currentBgmUrl; });
+    `);
+  } catch { return null; }
+}
+
+// bgmView를 SPA로 이동 + 잠시 후 play 클릭 (재시도 포함)
+function bgmSpotifyNavigateAndPlay(targetUrl) {
+  if (!bgmView || !targetUrl) return;
+  const curUrl = bgmView.webContents.getURL();
+  if (curUrl === targetUrl) {
+    // 동일 URL이면 SPA 이동 의미 없음 → loadURL 강제 새로고침
+    bgmView.webContents.loadURL(targetUrl);
+  } else {
+    bgmView.webContents.executeJavaScript(
+      `window.location.href = ${JSON.stringify(targetUrl)}`
+    ).catch(() => {});
   }
+  // play 버튼이 DOM에 나타날 때까지 최대 6번 (1.5s + 1s*5) 재시도
+  let retries = 0;
+  const tryClick = async () => {
+    if (!bgmView || retries >= 6) return;
+    retries++;
+    const r = await bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => 'err');
+    if (r === 'no-btn' || r === 'err') setTimeout(tryClick, 1000);
+    else console.log('[takeover] play click:', r, 'retries:', retries);
+  };
+  setTimeout(tryClick, 1500);
+}
+
+// takeover 모드: bgmView에서 현재 재생 중인 신청곡 종료 감지 (URL 변경)
+function setupBgmSpotifyEndDetection(requestUrl) {
+  if (!bgmView) return;
+  const trackPath = (() => { try { return new URL(requestUrl).pathname; } catch { return null; } })();
+  if (!trackPath) return;
+
+  let endFired = false;
+  // Spotify 자동재생 토글 끄기
+  bgmView.webContents.executeJavaScript(`
+    (function() {
+      const btn = document.querySelector('[data-testid="autoplay-button"]');
+      if (btn && btn.getAttribute('aria-checked') === 'true') { btn.click(); return 'disabled'; }
+      return btn ? 'already-off' : 'not-found';
+    })()
+  `).then(r => console.log('[takeover] autoplay:', r)).catch(() => {});
+
+  const fireEnd = () => {
+    if (endFired) return;
+    endFired = true;
+    cleanup();
+    mainWindow.webContents.send('video-ended');
+  };
+  const onNav = (_e, navUrl) => {
+    if (!navUrl.includes(trackPath)) fireEnd();
+  };
+  bgmView.webContents.on('did-navigate-in-page', onNav);
+
+  const poll = setInterval(() => {
+    if (endFired || !bgmView) { clearInterval(poll); return; }
+    try {
+      const cur = bgmView.webContents.getURL();
+      if (cur && !cur.includes(trackPath)) fireEnd();
+    } catch { clearInterval(poll); }
+  }, 2000);
+
+  const cleanup = () => {
+    try { bgmView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
+    clearInterval(poll);
+  };
+  bgmSpotifyEndCleanup = cleanup;
+}
+
+// 신청곡 시작 — Spotify+Spotify는 takeover, 그 외는 overlay
+ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
+  const url = videoIdOrUrl.startsWith('http')
+    ? videoIdOrUrl
+    : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
+  const isSpotifyRec = url.includes('open.spotify.com');
+  const bgmIsSpotify = currentBgmUrl?.includes('open.spotify.com');
+
+  // === takeover 모드: BGM=Spotify + rec=Spotify ===
+  // 두 개의 동시 Spotify 세션은 Connect 충돌로 작동 불가 → bgmView 하나로 처리
+  if (bgmView && isSpotifyRec && bgmIsSpotify) {
+    currentRecMode = 'spotify-takeover';
+
+    // 1) BGM 트랙 URL 저장 (DOM 실패 시 플리 URL로 fallback)
+    savedBgmTrackUrl = (await readBgmSpotifyTrackUrl()) || currentBgmUrl;
+    console.log('[takeover] saved BGM:', savedBgmTrackUrl, '→ rec:', url);
+
+    // 2) bgmView를 신청곡으로 이동 + play
+    bgmSpotifyNavigateAndPlay(url);
+
+    // 3) Spotify SPA 안정화 후 종료 감지 시작
+    setTimeout(() => setupBgmSpotifyEndDetection(url), 5000);
+    return;
+  }
+
+  // === overlay 모드: 그 외 모든 케이스 ===
+  currentRecMode = 'overlay';
 
   if (bgmView) {
     bgmView.webContents.setAudioMuted(true);
-    // Spotify가 pause 처리할 시간(300ms) 후 play 클릭 → 무음 상태로 플리 계속 재생
+    // setAudioMuted가 Spotify를 pause시키므로 잠시 후 play 클릭해 무음 재생 유지
     setTimeout(() => {
       if (bgmView) bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
     }, 300);
@@ -310,42 +403,29 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
     recViewAttached = true;
     resizeViews();
   }
-
-  const url = videoIdOrUrl.startsWith('http')
-    ? videoIdOrUrl
-    : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
   recView.webContents.loadURL(url);
 
-  // Spotify 수락곡 — 정확히 한 곡만 재생하고 종료
-  if (url.includes('open.spotify.com')) {
+  // overlay 모드에서 rec=Spotify인 경우 (BGM=YouTube/SoundCloud) — recView에서 종료 감지
+  if (isSpotifyRec) {
     const trackPath = (() => { try { return new URL(url).pathname; } catch { return null; } })();
     if (trackPath) {
       let spotifyEndFired = false;
-
-      // 트랙 변경 감지 즉시: recView 음소거 + video-ended 전송
       const fireSpotifyEnd = () => {
         if (spotifyEndFired) return;
         spotifyEndFired = true;
         if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
-        // recView가 살아있는 동안 다음 곡 소리 즉시 차단
         try { if (recView) recView.webContents.setAudioMuted(true); } catch {}
         mainWindow.webContents.send('video-ended');
       };
-
-      // Spotify 페이지 로드 안정화(5s) 후 감지 시작
       setTimeout(() => {
         if (!recView || spotifyEndFired) return;
-
-        // ① 오토플레이 비활성화 시도 (근본 차단)
         recView.webContents.executeJavaScript(`
           (function() {
             const btn = document.querySelector('[data-testid="autoplay-button"]');
             if (btn && btn.getAttribute('aria-checked') === 'true') { btn.click(); return 'disabled'; }
             return btn ? 'already-off' : 'not-found';
           })()
-        `).then(r => console.log('[Spotify] autoplay toggle:', r)).catch(() => {});
-
-        // ② did-navigate-in-page — 즉시 감지 (SPA 라우팅)
+        `).catch(() => {});
         const onNav = (_e, navUrl) => {
           if (!navUrl.includes(trackPath)) {
             try { recView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
@@ -353,8 +433,6 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
           }
         };
         if (recView) recView.webContents.on('did-navigate-in-page', onNav);
-
-        // ③ URL 폴링 2s 간격 — did-navigate-in-page 미발생 케이스 보완
         spotifyPoll = setInterval(() => {
           if (spotifyEndFired || !recView) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
           try {
@@ -367,9 +445,27 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
   }
 });
 
-// 신청곡 종료: recView 제거 + bgmView 복원
+// 신청곡 종료 — 모드별 분기
 ipcMain.on('end-rec', () => {
+  // overlay 모드 detector cleanup
   if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
+  // takeover 모드 detector cleanup
+  if (bgmSpotifyEndCleanup) { bgmSpotifyEndCleanup(); bgmSpotifyEndCleanup = null; }
+
+  const mode = currentRecMode;
+  currentRecMode = null;
+
+  // === takeover 모드 종료: bgmView를 저장해둔 BGM 트랙으로 복귀 ===
+  if (mode === 'spotify-takeover') {
+    const targetUrl = savedBgmTrackUrl || currentBgmUrl;
+    savedBgmTrackUrl = null;
+    console.log('[end-rec takeover] restore →', targetUrl);
+    if (bgmView && targetUrl) bgmSpotifyNavigateAndPlay(targetUrl);
+    mainWindow.webContents.send('now-playing', null);
+    return;
+  }
+
+  // === overlay 모드 종료: recView 제거 + bgmView 음소거 해제 ===
   if (recView && recViewAttached) {
     mainWindow.removeBrowserView(recView);
     recViewAttached = false;
@@ -378,47 +474,11 @@ ipcMain.on('end-rec', () => {
     recView.webContents.destroy();
     recView = null;
   }
-
-  if (!bgmView) { mainWindow.webContents.send('now-playing', null); return; }
-
-  bgmView.webContents.setAudioMuted(false);
-
-  const bgmIsSpotify = currentBgmUrl?.includes('open.spotify.com');
-  if (bgmIsSpotify) {
-    // Spotify BGM 복원:
-    // recView가 Spotify 세션을 점유했으므로 bgmView에서 저장해둔 트랙으로 명시적 이동 후 play
-    const targetUrl = savedBgmTrackUrl || currentBgmUrl;
-    savedBgmTrackUrl = null;
-    console.log('[end-rec] Spotify BGM restore → ', targetUrl);
-
-    const clickPlayAfterNav = () => {
-      // Spotify SPA가 초기화될 시간 대기 후 play 클릭
-      setTimeout(() => {
-        if (bgmView) bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
-      }, 2000);
-    };
-
-    const curUrl = bgmView.webContents.getURL();
-    const isSameUrl = curUrl === targetUrl;
-
-    if (isSameUrl || !curUrl.includes('open.spotify.com')) {
-      // 같은 URL이거나 Spotify가 아닌 경우 → loadURL로 강제 이동
-      bgmView.webContents.loadURL(targetUrl);
-      bgmView.webContents.once('did-finish-load', clickPlayAfterNav);
-    } else {
-      // 다른 Spotify URL → SPA 라우팅 (전체 새로고침 없이 이동)
-      bgmView.webContents.once('did-navigate-in-page', clickPlayAfterNav);
-      bgmView.webContents.executeJavaScript(
-        `window.location.href = ${JSON.stringify(targetUrl)}`
-      ).catch(() => {});
-      // 혹시 did-navigate-in-page 미발생 시 fallback
-      setTimeout(clickPlayAfterNav, 4000);
-    }
-  } else {
-    // YouTube·SoundCloud: 오버레이 정상 작동 — 음소거 해제만으로 이어짐
+  if (bgmView) {
+    bgmView.webContents.setAudioMuted(false);
+    // 혹시 paused 상태로 남아있으면 play 클릭 (Spotify BGM + 비-Spotify rec 케이스 등)
     bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
   }
-
   mainWindow.webContents.send('now-playing', null);
 });
 
