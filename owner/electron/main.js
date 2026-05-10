@@ -62,6 +62,7 @@ function createBgmView() {
       contextIsolation: false,
       nodeIntegration: false,
       preload: path.join(__dirname, 'stealth-preload.js'),
+      backgroundThrottling: false, // 뒤에 가려져 있어도 JS 실행 유지 (Spotify 플레이어 중단 방지)
     },
   });
   blockExternalProtocol(bgmView);
@@ -269,7 +270,13 @@ ipcMain.on('end-rec', () => {
     recView.webContents.destroy();
     recView = null;
   }
-  if (bgmView) bgmView.webContents.setAudioMuted(false);
+  if (bgmView) {
+    bgmView.webContents.setAudioMuted(false);
+    // 음소거 해제 후 일시중단된 AudioContext 재개 — 합성 클릭으로 user gesture 트리거
+    bgmView.webContents.executeJavaScript(
+      `document.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))`
+    ).catch(() => {});
+  }
   mainWindow.webContents.send('now-playing', null);
 });
 
