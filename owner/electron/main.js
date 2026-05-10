@@ -24,7 +24,6 @@ let recView         = null;
 let recViewAttached = false;
 let panelVisible    = false;
 let spotifyPoll          = null; // recView Spotify 트랙 종료 감지 폴링 (overlay 모드)
-let savedBgmTrackUrl     = null; // takeover 모드: BGM 트랙 URL 저장 → end-rec 시 복원
 let currentRecMode       = null; // 'overlay' | 'spotify-takeover' | null
 let bgmSpotifyEndCleanup = null; // takeover 모드: bgmView 종료 감지 cleanup fn
 
@@ -273,28 +272,6 @@ const SPOTIFY_CLICK_PLAY_IF_PAUSED = `
 
 // === Spotify+Spotify takeover 헬퍼들 ===
 
-// bgmView Spotify DOM에서 현재 재생 중인 트랙 URL 추출
-async function readBgmSpotifyTrackUrl() {
-  if (!bgmView) return null;
-  try {
-    return await bgmView.webContents.executeJavaScript(`
-      (function() {
-        const selectors = [
-          '[data-testid="context-item-link-title"]',
-          '[data-testid="nowplaying-track-link"]',
-          '[data-testid="now-playing-widget"] a[href*="/track/"]',
-          'footer a[href*="/track/"]',
-        ];
-        for (const sel of selectors) {
-          const el = document.querySelector(sel);
-          if (el && el.href && el.href.includes('/track/')) return el.href;
-        }
-        return null;
-      })()
-    `);
-  } catch { return null; }
-}
-
 // 페이지의 메인 재생 버튼 클릭 (트랙/앨범/플리 페이지의 큰 재생 버튼)
 // widget 토글이 아닌 "이 페이지 콘텐츠를 처음부터 재생" → Spotify Connect 상태 강제 덮어쓰기
 const SPOTIFY_CLICK_PAGE_PLAY = `
@@ -400,9 +377,8 @@ function setupBgmSpotifyEndDetection(requestUrl) {
       `);
       if (!info) return;
 
-      // 시그니처: DOM 트랙 ID 우선, 없으면 title|artist
-      const id = info.domHref ? (info.domHref.match(/\/track\/([A-Za-z0-9]+)/) || [])[1] : null;
-      const sig = id || (info.title ? `${info.title}|${info.artist || ''}` : null);
+      // 시그니처: mediaSession title|artist 우선 (DOM path는 실제 재생곡과 다를 수 있음)
+      const sig = info.title ? `${info.title}|${info.artist || ''}` : null;
       if (!sig) return;
 
       if (!savedSig) {
@@ -438,15 +414,8 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
   // 두 개의 동시 Spotify 세션은 Connect 충돌로 작동 불가 → bgmView 하나로 처리
   if (bgmView && isSpotifyRec && bgmIsSpotify) {
     currentRecMode = 'spotify-takeover';
-
-    // 1) BGM 트랙 URL 저장 (DOM 실패 시 플리 URL로 fallback)
-    savedBgmTrackUrl = (await readBgmSpotifyTrackUrl()) || currentBgmUrl;
-    console.log('[takeover] saved BGM:', savedBgmTrackUrl, '→ rec:', url);
-
-    // 2) bgmView를 신청곡으로 이동 + play
+    console.log('[takeover] play rec in bgmView:', url);
     bgmSpotifyNavigateAndPlay(url);
-
-    // 3) Spotify SPA 안정화 후 종료 감지 시작
     setTimeout(() => setupBgmSpotifyEndDetection(url), 5000);
     return;
   }
@@ -539,12 +508,11 @@ ipcMain.on('end-rec', () => {
   const mode = currentRecMode;
   currentRecMode = null;
 
-  // === takeover 모드 종료: bgmView를 저장해둔 BGM 트랙으로 복귀 ===
+  // === takeover 모드 종료: bgmView를 원래 BGM URL(플리/앨범)로 복귀 ===
+  // 트랙 URL이 아닌 플리 URL로 가야 플리 컨텍스트에서 재생 (트랙으로 가면 앨범 autoplay)
   if (mode === 'spotify-takeover') {
-    const targetUrl = savedBgmTrackUrl || currentBgmUrl;
-    savedBgmTrackUrl = null;
-    console.log('[end-rec takeover] restore →', targetUrl);
-    if (bgmView && targetUrl) bgmSpotifyNavigateAndPlay(targetUrl);
+    console.log('[end-rec takeover] restore to BGM URL:', currentBgmUrl);
+    if (bgmView && currentBgmUrl) bgmSpotifyNavigateAndPlay(currentBgmUrl);
     mainWindow.webContents.send('now-playing', null);
     return;
   }

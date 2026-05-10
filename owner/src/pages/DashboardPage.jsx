@@ -189,12 +189,37 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     catch { setIsAccepting(!next); }
   }
 
-  function toggleAutoAccept() {
-    setAutoAccept(prev => {
-      const next = !prev;
-      localStorage.setItem('cf_auto_accept', String(next));
-      return next;
-    });
+  async function toggleAutoAccept() {
+    const next = !autoAccept;
+    setAutoAccept(next);
+    localStorage.setItem('cf_auto_accept', String(next));
+    if (!next) return; // OFF 전환은 즉시 종료
+
+    // ON 전환: 추천곡 → 대기곡 일괄 이동 + 재생 중 없으면 첫 대기곡 자동 재생
+    let snapshot = recsRef.current;
+    const pending = snapshot.filter(r => r.status === 'pending');
+    if (pending.length > 0) {
+      const updates = (await Promise.all(
+        pending.map(r => updateRec(cafe.slug, r.id, 'accepted').catch(() => null))
+      )).filter(Boolean);
+      const updateMap = Object.fromEntries(updates.map(u => [u.id, u]));
+      snapshot = snapshot.map(r => updateMap[r.id] || r);
+      setRecs(snapshot);
+    }
+
+    const hasPlaying = snapshot.some(r => r.status === 'playing');
+    if (hasPlaying) return;
+
+    const firstAccepted = snapshot
+      .filter(r => r.status === 'accepted')
+      .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
+    if (!firstAccepted) return;
+
+    try {
+      const playing = await updateRec(cafe.slug, firstAccepted.id, 'playing');
+      setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
+      window.electronAPI?.playRec(playing.video_id);
+    } catch (e) { console.error(e); }
   }
 
   function handleDividerMouseDown(e) {
