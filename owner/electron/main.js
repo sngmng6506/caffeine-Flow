@@ -202,6 +202,11 @@ ipcMain.on('open-login-window', (_e, url) => {
       preload: path.join(__dirname, 'stealth-preload.js'),
     },
   });
+  // 메인창과 동일한 페이크 UA 적용 (Electron 흔적 제거)
+  try {
+    const ua = mainWindow.webContents.getUserAgent();
+    loginWin.webContents.setUserAgent(ua);
+  } catch (_) {}
   loginWin.loadURL(url);
   loginWin.on('closed', () => {
     loginWin = null;
