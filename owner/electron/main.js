@@ -320,93 +320,77 @@ function bgmSpotifyNavigateAndPlay(targetUrl) {
 }
 
 // takeover 모드: bgmView 신청곡 종료 감지
-// Spotify는 URL이 안 바뀌고 하단 now-playing 위젯에서만 다음 곡으로 넘어가므로 DOM 폴링이 필수
+// 핵심: DOM 셀렉터는 Spotify 버전마다 바뀌므로 표준 navigator.mediaSession.metadata 사용
+//      (OS 미디어 컨트롤용으로 Spotify가 늘 갱신함 → title/artist 안정적으로 획득)
 function setupBgmSpotifyEndDetection(requestUrl) {
   if (!bgmView) return;
-  const idMatch = requestUrl.match(/\/track\/([A-Za-z0-9]+)/);
-  const requestTrackId = idMatch?.[1];
-  if (!requestTrackId) return;
-  console.log('[takeover] detection start, target track ID:', requestTrackId);
+  console.log('[takeover] detection setup for:', requestUrl);
 
   let endFired = false;
-  let confirmedPlaying = false; // 신청곡이 실제 재생 시작됐는지
-  let changeCount = 0;          // 다른 트랙으로 바뀐 폴링 연속 횟수
-
-  // Spotify 자동재생 토글 끄기 (best-effort)
-  bgmView.webContents.executeJavaScript(`
-    (function() {
-      const btn = document.querySelector('[data-testid="autoplay-button"]');
-      if (btn && btn.getAttribute('aria-checked') === 'true') { btn.click(); return 'disabled'; }
-      return btn ? 'already-off' : 'not-found';
-    })()
-  `).then(r => console.log('[takeover] autoplay toggle:', r)).catch(() => {});
+  let savedSig = null;       // 신청곡이 처음 잡혔을 때의 시그니처 (baseline)
+  let changeCount = 0;       // baseline에서 바뀐 폴링 연속 횟수
 
   const fireEnd = () => {
     if (endFired) return;
     endFired = true;
-    console.log('[takeover] firing video-ended');
     cleanup();
+    console.log('[takeover] firing video-ended');
     mainWindow.webContents.send('video-ended');
   };
 
-  // 1초 간격으로 now-playing 위젯의 현재 재생 트랙 ID 확인
+  // 1초 간격 폴링: mediaSession 우선, DOM은 backup
   const poll = setInterval(async () => {
     if (endFired || !bgmView) { clearInterval(poll); return; }
     try {
-      const trackHref = await bgmView.webContents.executeJavaScript(`
+      const info = await bgmView.webContents.executeJavaScript(`
         (function() {
-          const selectors = [
+          const meta = navigator.mediaSession && navigator.mediaSession.metadata;
+          const title = meta && meta.title || null;
+          const artist = meta && meta.artist || null;
+          // DOM backup
+          let domHref = null;
+          const sels = [
             '[data-testid="context-item-link-title"]',
             '[data-testid="nowplaying-track-link"]',
-            '[data-testid="now-playing-widget"] a[href*="/track/"]',
+            '[data-testid="context-item-info-title"] a',
             'footer a[href*="/track/"]',
+            'aside a[href*="/track/"]',
           ];
-          for (const sel of selectors) {
+          for (const sel of sels) {
             const el = document.querySelector(sel);
-            if (el && el.href && el.href.includes('/track/')) return el.href;
+            const link = el && el.href ? el : el && el.querySelector ? el.querySelector('a[href*="/track/"]') : null;
+            if (link && link.href && link.href.includes('/track/')) { domHref = link.href; break; }
           }
-          return null;
+          const out = { title: title, artist: artist, domHref: domHref };
+          console.log('[CF takeover poll]', JSON.stringify(out));
+          return out;
         })()
       `);
-      if (!trackHref) return;
+      if (!info) return;
 
-      const playingMatch = trackHref.match(/\/track\/([A-Za-z0-9]+)/);
-      const playingId = playingMatch?.[1];
-      if (!playingId) return;
+      // 시그니처: DOM 트랙 ID 우선, 없으면 title|artist
+      const id = info.domHref ? (info.domHref.match(/\/track\/([A-Za-z0-9]+)/) || [])[1] : null;
+      const sig = id || (info.title ? `${info.title}|${info.artist || ''}` : null);
+      if (!sig) return;
 
-      const isRequestTrack = playingId === requestTrackId;
-      if (!confirmedPlaying) {
-        // Spotify가 신청곡을 실제로 재생 중이라고 확인될 때까지 대기
-        if (isRequestTrack) {
-          confirmedPlaying = true;
-          console.log('[takeover] confirmed rec playing:', playingId);
-        }
+      if (!savedSig) {
+        savedSig = sig;
+        console.log('[takeover] baseline saved:', sig);
         return;
       }
-      // 신청곡이 다른 트랙으로 바뀌었는지 감시 (2회 연속 = 2초 안정)
-      if (!isRequestTrack) {
+      if (sig !== savedSig) {
         changeCount++;
-        console.log('[takeover] changed →', playingId, '(count:', changeCount, ')');
+        console.log('[takeover] changed →', sig, 'count:', changeCount);
         if (changeCount >= 2) fireEnd();
       } else {
         changeCount = 0;
       }
     } catch (e) {
-      // ignore - 일시적 DOM 접근 실패는 무시
+      // ignore
     }
   }, 1000);
 
-  // URL 변경도 backup으로 (Spotify가 URL을 바꾸는 케이스 — 가능성 낮지만)
-  const trackPath = `/track/${requestTrackId}`;
-  const onNav = (_e, navUrl) => {
-    if (!navUrl.includes(trackPath) && confirmedPlaying) fireEnd();
-  };
-  bgmView.webContents.on('did-navigate-in-page', onNav);
-
-  const cleanup = () => {
-    try { bgmView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
-    clearInterval(poll);
-  };
+  const cleanup = () => clearInterval(poll);
   bgmSpotifyEndCleanup = cleanup;
 }
 
@@ -454,83 +438,62 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
   }
   recView.webContents.loadURL(url);
 
-  // overlay 모드 + rec=Spotify (BGM=YouTube/SoundCloud) — recView DOM 폴링으로 종료 감지
+  // overlay 모드 + rec=Spotify (BGM=YouTube/SoundCloud) — mediaSession baseline 감시
   if (isSpotifyRec) {
-    const idMatch = url.match(/\/track\/([A-Za-z0-9]+)/);
-    const requestTrackId = idMatch?.[1];
-    if (requestTrackId) {
-      let endFired = false;
-      let confirmedPlaying = false;
-      let changeCount = 0;
+    let endFired = false;
+    let savedSig = null;
+    let changeCount = 0;
 
-      const fireEnd = () => {
-        if (endFired) return;
-        endFired = true;
-        if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
-        try { if (recView) recView.webContents.setAudioMuted(true); } catch {}
-        mainWindow.webContents.send('video-ended');
-      };
+    const fireEnd = () => {
+      if (endFired) return;
+      endFired = true;
+      if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
+      try { if (recView) recView.webContents.setAudioMuted(true); } catch {}
+      mainWindow.webContents.send('video-ended');
+    };
 
-      setTimeout(() => {
-        if (!recView || endFired) return;
+    setTimeout(() => {
+      if (!recView || endFired) return;
 
-        recView.webContents.executeJavaScript(`
-          (function() {
-            const btn = document.querySelector('[data-testid="autoplay-button"]');
-            if (btn && btn.getAttribute('aria-checked') === 'true') { btn.click(); return 'disabled'; }
-            return btn ? 'already-off' : 'not-found';
-          })()
-        `).catch(() => {});
-
-        // DOM 폴링 — now-playing 위젯의 현재 트랙 ID 감시
-        spotifyPoll = setInterval(async () => {
-          if (endFired || !recView) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
-          try {
-            const trackHref = await recView.webContents.executeJavaScript(`
-              (function() {
-                const selectors = [
-                  '[data-testid="context-item-link-title"]',
-                  '[data-testid="nowplaying-track-link"]',
-                  '[data-testid="now-playing-widget"] a[href*="/track/"]',
-                  'footer a[href*="/track/"]',
-                ];
-                for (const sel of selectors) {
-                  const el = document.querySelector(sel);
-                  if (el && el.href && el.href.includes('/track/')) return el.href;
-                }
-                return null;
-              })()
-            `);
-            if (!trackHref) return;
-            const m = trackHref.match(/\/track\/([A-Za-z0-9]+)/);
-            const playingId = m?.[1];
-            if (!playingId) return;
-
-            const isRequestTrack = playingId === requestTrackId;
-            if (!confirmedPlaying) {
-              if (isRequestTrack) confirmedPlaying = true;
-              return;
-            }
-            if (!isRequestTrack) {
-              changeCount++;
-              if (changeCount >= 2) fireEnd();
-            } else {
-              changeCount = 0;
-            }
-          } catch {}
-        }, 1000);
-
-        // URL 변경 backup
-        const trackPath = `/track/${requestTrackId}`;
-        const onNav = (_e, navUrl) => {
-          if (!navUrl.includes(trackPath) && confirmedPlaying) {
-            try { recView?.webContents.removeListener('did-navigate-in-page', onNav); } catch {}
-            fireEnd();
+      spotifyPoll = setInterval(async () => {
+        if (endFired || !recView) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
+        try {
+          const info = await recView.webContents.executeJavaScript(`
+            (function() {
+              const meta = navigator.mediaSession && navigator.mediaSession.metadata;
+              const title = meta && meta.title || null;
+              const artist = meta && meta.artist || null;
+              let domHref = null;
+              const sels = [
+                '[data-testid="context-item-link-title"]',
+                '[data-testid="nowplaying-track-link"]',
+                '[data-testid="context-item-info-title"] a',
+                'footer a[href*="/track/"]',
+              ];
+              for (const sel of sels) {
+                const el = document.querySelector(sel);
+                const link = el && el.href ? el : el && el.querySelector ? el.querySelector('a[href*="/track/"]') : null;
+                if (link && link.href && link.href.includes('/track/')) { domHref = link.href; break; }
+              }
+              const out = { title: title, artist: artist, domHref: domHref };
+              console.log('[CF overlay poll]', JSON.stringify(out));
+              return out;
+            })()
+          `);
+          if (!info) return;
+          const id = info.domHref ? (info.domHref.match(/\/track\/([A-Za-z0-9]+)/) || [])[1] : null;
+          const sig = id || (info.title ? `${info.title}|${info.artist || ''}` : null);
+          if (!sig) return;
+          if (!savedSig) { savedSig = sig; return; }
+          if (sig !== savedSig) {
+            changeCount++;
+            if (changeCount >= 2) fireEnd();
+          } else {
+            changeCount = 0;
           }
-        };
-        if (recView) recView.webContents.on('did-navigate-in-page', onNav);
-      }, 5000);
-    }
+        } catch {}
+      }, 1000);
+    }, 5000);
   }
 });
 
