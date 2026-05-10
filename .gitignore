@@ -1,7 +1,7 @@
 node_modules/
 data/history.json
 .env
-server/public/
+server/public/customer/
 server/test-api.js
 server/test-db.js
 owner/dist/
