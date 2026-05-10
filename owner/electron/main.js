@@ -26,6 +26,7 @@ let panelVisible    = false;
 let spotifyPoll          = null; // recView Spotify 트랙 종료 감지 폴링 (overlay 모드)
 let currentRecMode       = null; // 'overlay' | 'spotify-takeover' | null
 let bgmSpotifyEndCleanup = null; // takeover 모드: bgmView 종료 감지 cleanup fn
+let savedBgmMeta         = null; // takeover 모드: 재생 중이던 BGM 트랙 메타 ({title, artist, trackId})
 
 function getContentSize() {
   return mainWindow.getContentSize();
@@ -302,30 +303,90 @@ const SPOTIFY_CLICK_PAGE_PLAY = `
   })()
 `;
 
-// bgmView를 loadURL로 강제 전환 + 페이지 재생 버튼 클릭 (재시도)
-// loadURL이 SPA보다 무겁지만 Spotify Connect 상태를 확실히 리셋 가능
-function bgmSpotifyNavigateAndPlay(targetUrl) {
+// 플리 페이지에서 특정 트랙 row를 찾아 클릭 (resume 용)
+// 리턴값: 'clicked' | 'no-rows' | 'not-found' | 'err'
+const SPOTIFY_CLICK_PLAYLIST_ROW = (meta) => `
+  (function() {
+    const targetTrackId = ${JSON.stringify(meta?.trackId || null)};
+    const targetTitle = ${JSON.stringify(meta?.title || null)};
+    if (!targetTrackId && !targetTitle) return 'no-meta';
+
+    const rows = document.querySelectorAll('[data-testid="tracklist-row"]');
+    if (rows.length === 0) return 'no-rows';
+
+    for (const row of rows) {
+      const link = row.querySelector('a[href*="/track/"]');
+      if (!link) continue;
+      const rowTrackId = (link.href.match(/\\/track\\/([A-Za-z0-9]+)/) || [])[1];
+      const rowTitle = (link.textContent || '').trim();
+      const matchById = targetTrackId && rowTrackId === targetTrackId;
+      const matchByTitle = targetTitle && rowTitle === targetTitle;
+      if (!matchById && !matchByTitle) continue;
+
+      // row 내부 재생 버튼 (호버 시 노출되는 ▶) 찾기
+      const btns = row.querySelectorAll('button, [role="button"]');
+      for (const btn of btns) {
+        const label = btn.getAttribute('aria-label') || '';
+        if (label.includes('재생') || label.toLowerCase().includes('play')) {
+          btn.click();
+          console.log('[CF row-play] clicked btn for:', rowTitle);
+          return 'clicked';
+        }
+      }
+      // fallback: row를 더블클릭해 재생
+      const evt = new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window });
+      row.dispatchEvent(evt);
+      console.log('[CF row-play] dblclick on:', rowTitle);
+      return 'clicked';
+    }
+    return 'not-found';
+  })()
+`;
+
+// bgmView를 loadURL로 강제 전환 + 재생
+// resumeMeta가 있으면 플리에서 해당 트랙 row를 찾아 클릭, 없으면 페이지 메인 재생 버튼 클릭
+function bgmSpotifyNavigateAndPlay(targetUrl, resumeMeta = null) {
   if (!bgmView || !targetUrl) return;
-  console.log('[bgmNav] loadURL →', targetUrl);
+  console.log('[bgmNav] loadURL →', targetUrl, resumeMeta ? '(with resume meta)' : '');
   bgmView.webContents.loadURL(targetUrl);
 
   let retries = 0;
-  const maxRetries = 8;
-  const tryClick = async () => {
+  const maxRetries = 10;
+  const tryPlay = async () => {
     if (!bgmView || retries >= maxRetries) return;
     retries++;
+
+    // resume이 요청되면 먼저 플리 row 클릭 시도
+    if (resumeMeta && (resumeMeta.title || resumeMeta.trackId)) {
+      const r = await bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAYLIST_ROW(resumeMeta)).catch(() => 'err');
+      console.log('[bgmNav] row-play attempt', retries, '→', r);
+      if (r === 'clicked') {
+        // 성공 → 음소거 해제
+        try { bgmView.webContents.setAudioMuted(false); } catch {}
+        return;
+      }
+      if (r === 'no-rows') {
+        // 아직 트랙 목록 미로드 → 재시도
+        setTimeout(tryPlay, 1000);
+        return;
+      }
+      // 'not-found' / 'no-meta' / 'err' → 페이지 재생 버튼으로 fallback
+    }
+
+    // 페이지 메인 재생 버튼 (플리 처음부터 / 트랙 시작)
     const r = await bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PAGE_PLAY).catch(() => 'err');
     console.log('[bgmNav] page-play attempt', retries, '→', r);
-    if (r === 'clicked' || r === 'already-playing') return; // 성공
-    setTimeout(tryClick, 1000);
+    if (r === 'clicked' || r === 'already-playing') {
+      try { bgmView.webContents.setAudioMuted(false); } catch {}
+      return;
+    }
+    setTimeout(tryPlay, 1000);
   };
 
-  // 페이지 로드 완료 후 2.5s 대기 (Spotify SPA가 페이지 콘텐츠 렌더링할 시간)
   bgmView.webContents.once('did-finish-load', () => {
-    setTimeout(tryClick, 2500);
+    setTimeout(tryPlay, 2000);
   });
-  // fallback (did-finish-load 미발생 시)
-  setTimeout(tryClick, 5000);
+  setTimeout(tryPlay, 5000);
 }
 
 // takeover 모드: bgmView 신청곡 종료 감지
@@ -343,6 +404,8 @@ function setupBgmSpotifyEndDetection(requestUrl) {
     if (endFired) return;
     endFired = true;
     cleanup();
+    // 다음 곡 음성 즉시 차단 — navigation 완료 전까지 무음
+    try { if (bgmView) bgmView.webContents.setAudioMuted(true); } catch {}
     console.log('[takeover] firing video-ended');
     mainWindow.webContents.send('video-ended');
   };
@@ -389,7 +452,7 @@ function setupBgmSpotifyEndDetection(requestUrl) {
       if (sig !== savedSig) {
         changeCount++;
         console.log('[takeover] changed →', sig, 'count:', changeCount);
-        if (changeCount >= 2) fireEnd();
+        if (changeCount >= 1) fireEnd();
       } else {
         changeCount = 0;
       }
@@ -414,6 +477,39 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
   // 두 개의 동시 Spotify 세션은 Connect 충돌로 작동 불가 → bgmView 하나로 처리
   if (bgmView && isSpotifyRec && bgmIsSpotify) {
     currentRecMode = 'spotify-takeover';
+
+    // rec 시작 전 재생 중이던 BGM 트랙 메타 저장 (end-rec 시 플리 위치 복원용)
+    savedBgmMeta = await bgmView.webContents.executeJavaScript(`
+      (function() {
+        const m = navigator.mediaSession && navigator.mediaSession.metadata;
+        const title = m && m.title || null;
+        const artist = m && m.artist || null;
+        // now-playing 위젯 링크의 URI 파라미터에서 실제 재생 중 트랙 ID 추출
+        let trackId = null;
+        const sels = [
+          '[data-testid="context-item-link-title"]',
+          '[data-testid="nowplaying-track-link"]',
+          'footer a[href*="/track/"]',
+        ];
+        for (const sel of sels) {
+          const el = document.querySelector(sel);
+          const link = el && el.href ? el : el && el.querySelector ? el.querySelector('a[href*="/track/"]') : null;
+          if (!link || !link.href) continue;
+          try {
+            const u = new URL(link.href);
+            const uri = u.searchParams.get('uri') || '';
+            const m2 = uri.match(/track[:%3A]+([A-Za-z0-9]+)/i);
+            if (m2) { trackId = m2[1]; break; }
+            // URI 없으면 path에서
+            const m3 = link.href.match(/\\/track\\/([A-Za-z0-9]+)/);
+            if (m3) { trackId = m3[1]; }
+          } catch {}
+        }
+        return { title: title, artist: artist, trackId: trackId };
+      })()
+    `).catch(() => null);
+    console.log('[takeover] saved BGM meta:', savedBgmMeta);
+
     console.log('[takeover] play rec in bgmView:', url);
     bgmSpotifyNavigateAndPlay(url);
     setTimeout(() => setupBgmSpotifyEndDetection(url), 5000);
@@ -509,10 +605,13 @@ ipcMain.on('end-rec', () => {
   currentRecMode = null;
 
   // === takeover 모드 종료: bgmView를 원래 BGM URL(플리/앨범)로 복귀 ===
-  // 트랙 URL이 아닌 플리 URL로 가야 플리 컨텍스트에서 재생 (트랙으로 가면 앨범 autoplay)
+  // 저장한 BGM 트랙 메타가 있으면 그 트랙 row 클릭 (위치 복원)
+  // 없으면 페이지 메인 재생 버튼 (플리 처음부터)
   if (mode === 'spotify-takeover') {
-    console.log('[end-rec takeover] restore to BGM URL:', currentBgmUrl);
-    if (bgmView && currentBgmUrl) bgmSpotifyNavigateAndPlay(currentBgmUrl);
+    const resumeMeta = savedBgmMeta;
+    savedBgmMeta = null;
+    console.log('[end-rec takeover] restore to BGM URL:', currentBgmUrl, 'resume:', resumeMeta);
+    if (bgmView && currentBgmUrl) bgmSpotifyNavigateAndPlay(currentBgmUrl, resumeMeta);
     mainWindow.webContents.send('now-playing', null);
     return;
   }
