@@ -229,10 +229,17 @@ ipcMain.on('hide-youtube', () => {
   mainWindow.webContents.send('youtube-state', false);
 });
 
-// BGM URL 설정 — bgmView에 로드 (한 번 로드 후 신청곡 사이에도 상태 유지)
+// BGM URL 설정 — bgmView에 로드 + 패널이 닫혀있으면 자동으로 붙임
 ipcMain.on('set-bgm-url', (_e, url) => {
   currentBgmUrl = url;
   if (!bgmView) createBgmView();
+  // 패널이 숨겨진 상태면 자동 attach — 클릭 시 즉시 오른쪽에 표시
+  if (!panelVisible) {
+    mainWindow.addBrowserView(bgmView);
+    panelVisible = true;
+    resizeViews();
+    mainWindow.webContents.send('youtube-state', true);
+  }
   const currentUrl = bgmView.webContents.getURL();
   // Spotify는 이미 로드된 상태면 SPA 라우팅으로 이동 — loadURL은 전체 새로고침이라 플레이어 상태 초기화됨
   const spotifyToSpotify = url.includes('open.spotify.com') && currentUrl.includes('open.spotify.com');
@@ -335,7 +342,7 @@ ipcMain.on('play-rec', (_e, videoIdOrUrl) => {
   }
 });
 
-// 신청곡 종료: recView 제거 + bgmView 음소거 해제 → 플리 그 자리에서 이어짐
+// 신청곡 종료: recView 제거 + bgmView 복원
 ipcMain.on('end-rec', () => {
   if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
   if (recView && recViewAttached) {
@@ -348,8 +355,27 @@ ipcMain.on('end-rec', () => {
   }
   if (bgmView) {
     bgmView.webContents.setAudioMuted(false);
-    // 혹시 paused 상태로 남아있으면 play 클릭 (play-rec의 setTimeout이 늦게 처리된 경우 대비)
-    bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
+
+    const bgmIsSpotify = currentBgmUrl && currentBgmUrl.includes('open.spotify.com');
+    if (bgmIsSpotify) {
+      // Spotify BGM: recView가 Spotify 세션을 점유했으므로 bgmView가 세션을 재점령하도록
+      // 300ms 대기 후 BGM URL로 다시 네비게이션 (SPA 라우팅으로 상태 최대한 유지)
+      setTimeout(() => {
+        if (!bgmView) return;
+        const curUrl = bgmView.webContents.getURL();
+        const alreadySpotify = curUrl.includes('open.spotify.com');
+        if (alreadySpotify) {
+          bgmView.webContents.executeJavaScript(
+            `window.location.href = ${JSON.stringify(currentBgmUrl)}`
+          ).catch(() => {});
+        } else {
+          bgmView.webContents.loadURL(currentBgmUrl);
+        }
+      }, 300);
+    } else {
+      // YouTube·SoundCloud: 오버레이가 정상 작동 — 음소거만 풀면 그 자리에서 이어짐
+      bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
+    }
   }
   mainWindow.webContents.send('now-playing', null);
 });
