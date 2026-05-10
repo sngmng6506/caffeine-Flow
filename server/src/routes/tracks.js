@@ -99,27 +99,70 @@ router.get('/oembed', async (req, res) => {
       }
     } catch {}
 
+    // 1차: oembed API (빠르고 깨끗함)
     try {
       const { data } = await axios.get('https://soundcloud.com/oembed', {
         params: { url: trackUrl, format: 'json' },
-        headers: { 'User-Agent': UA },
+        headers: { 'User-Agent': UA, 'Accept': 'application/json' },
         timeout: 10000,
       });
       return res.json({
         platform,
-        videoId:      trackUrl,           // SoundCloud는 track URL을 ID로 사용
+        videoId:      trackUrl,
         title:        data.title,
         channelTitle: data.author_name,
         thumbnail:    data.thumbnail_url || null,
       });
     } catch (e) {
+      console.error('[oembed soundcloud] failed:', e.response?.status, e.message, '— falling back to page scrape');
+    }
+
+    // 2차: 트랙 페이지 HTML의 Open Graph / Twitter 메타태그 파싱
+    // (oembed는 Railway IP 차단 가능 — 공개 페이지는 더 관대함)
+    try {
+      const { data: html } = await axios.get(trackUrl, {
+        headers: {
+          'User-Agent': UA,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+        timeout: 10000,
+      });
+      const matchAttr = (re) => (html.match(re) || [])[1];
+      const ogTitle = matchAttr(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)
+        || matchAttr(/<meta\s+name=["']twitter:title["']\s+content=["']([^"']+)["']/i);
+      const ogImage = matchAttr(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i)
+        || matchAttr(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
+
+      if (!ogTitle) {
+        return res.status(400).json({ error: '트랙 정보를 가져올 수 없습니다 (페이지 형식 변경)' });
+      }
+
+      // SoundCloud의 og:title은 보통 "Track Name by Artist" 또는 "Track Name | SoundCloud"
+      let title  = ogTitle.replace(/\s*\|\s*Free Listening on SoundCloud\s*$/i, '').replace(/\s*\|\s*SoundCloud\s*$/i, '');
+      let artist = 'SoundCloud';
+      const byMatch = title.match(/^(.+?)\s+by\s+(.+?)\s*$/i);
+      if (byMatch) {
+        title  = byMatch[1].trim();
+        artist = byMatch[2].trim();
+      }
+
+      return res.json({
+        platform,
+        videoId:      trackUrl,
+        title,
+        channelTitle: artist,
+        thumbnail:    ogImage || null,
+      });
+    } catch (e) {
       const status = e.response?.status;
-      console.error('[oembed soundcloud] failed:', trackUrl, '| status:', status, '| msg:', e.message);
+      console.error('[scrape soundcloud] failed:', trackUrl, '| status:', status, '| msg:', e.message);
       let msg = '트랙 정보를 가져올 수 없습니다';
       if (status === 404) msg += ' (트랙이 비공개이거나 삭제됨)';
-      else if (status === 403) msg += ' (지역 제한 또는 접근 거부)';
-      else if (status) msg += ` (SoundCloud ${status})`;
-      else msg += ' (네트워크 오류)';
+      else if (status === 403) msg += ' (SoundCloud가 서버 IP를 차단)';
+      else if (status === 429) msg += ' (요청 한도 초과 — 잠시 후 재시도)';
+      else if (status)         msg += ` (SoundCloud ${status})`;
+      else                     msg += ' (네트워크 오류)';
       return res.status(400).json({ error: msg });
     }
   }
