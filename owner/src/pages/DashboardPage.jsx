@@ -46,6 +46,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
   const [customerUrl, setCustomerUrl] = useState('');
   const [widevineStatus, setWidevineStatus] = useState(null);
+  const [autoAccept, setAutoAccept] = useState(() => localStorage.getItem('cf_auto_accept') === 'true');
+  const autoAcceptRef = useRef(autoAccept);
+  autoAcceptRef.current = autoAccept;
 
   useEffect(() => {
     getRecommendations(cafe.slug)
@@ -95,7 +98,31 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     });
 
     socket.on('recommendations_update', ({ action, rec, id }) => {
-      if (action === 'add')    setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
+      if (action === 'add') {
+        if (autoAcceptRef.current) {
+          updateRec(cafe.slug, rec.id, 'accepted')
+            .then(updated => {
+              setRecs(prev => prev.some(r => r.id === updated.id)
+                ? prev.map(r => r.id === updated.id ? updated : r)
+                : [...prev, updated]
+              );
+              const hasPlaying = recsRef.current.some(r => r.status === 'playing');
+              if (!hasPlaying) {
+                updateRec(cafe.slug, updated.id, 'playing')
+                  .then(playing => {
+                    setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
+                    window.electronAPI?.playRec(playing.video_id);
+                  })
+                  .catch(console.error);
+              }
+            })
+            .catch(() => {
+              setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
+            });
+        } else {
+          setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
+        }
+      }
       if (action === 'update' || action === 'vote') setRecs(prev => prev.map(r => r.id === rec.id ? rec : r));
       if (action === 'delete') setRecs(prev => prev.filter(r => r.id !== id));
     });
@@ -149,6 +176,14 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     setIsAccepting(next);
     try { await setStatus(next); }
     catch { setIsAccepting(!next); }
+  }
+
+  function toggleAutoAccept() {
+    setAutoAccept(prev => {
+      const next = !prev;
+      localStorage.setItem('cf_auto_accept', String(next));
+      return next;
+    });
   }
 
   async function handleNameSave() {
@@ -336,6 +371,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         <div style={styles.headerRight}>
           <button onClick={toggleAccepting} style={{ ...styles.toggleBtn, background: isAccepting ? '#4caf50' : '#888' }}>
             {isAccepting ? '추천 받는 중' : '추천 닫힘'}
+          </button>
+          <button onClick={toggleAutoAccept} style={{ ...styles.toggleBtn, background: autoAccept ? '#ff9800' : '#9e9e9e', fontSize: 12 }}>
+            자동 수락 {autoAccept ? 'ON' : 'OFF'}
           </button>
           <button onClick={onLogout} style={styles.logoutBtn}>로그아웃</button>
         </div>
