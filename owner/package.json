@@ -1,6 +1,6 @@
 {
   "name": "caffeine-flow-owner",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite --port 5174",
