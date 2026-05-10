@@ -70,19 +70,40 @@ router.get('/oembed', async (req, res) => {
     let trackUrl = normalizeSoundCloudUrl(rawUrl);
     if (!trackUrl) return res.status(400).json({ error: '유효한 SoundCloud URL이 아닙니다' });
 
-    // on.soundcloud.com 단축 URL → 실제 트랙 URL로 리다이렉트 추적
+    const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+
+    // on.soundcloud.com / soundcloud.app.goo.gl 단축 URL → GET으로 리다이렉트 추적
     try {
       const u = new URL(rawUrl);
-      if (u.hostname === 'on.soundcloud.com') {
-        const resp = await axios.head(rawUrl, { maxRedirects: 5, timeout: 5000 });
+      const isShort = u.hostname === 'on.soundcloud.com' || u.hostname.endsWith('soundcloud.app.goo.gl');
+      if (isShort) {
+        const resp = await axios.get(rawUrl, {
+          maxRedirects: 5,
+          timeout: 8000,
+          headers: { 'User-Agent': UA },
+        });
         const resolved = resp.request?.res?.responseUrl || resp.request?._redirectable?._currentUrl;
         if (resolved) trackUrl = normalizeSoundCloudUrl(resolved) || trackUrl;
+      }
+    } catch (e) {
+      console.error('[oembed soundcloud] short URL resolve failed:', e.message);
+    }
+
+    // 트랙 URL인지 검증 (프로필/태그 URL 거르기)
+    try {
+      const tu = new URL(trackUrl);
+      const parts = tu.pathname.split('/').filter(Boolean);
+      // 트랙: /user/track-slug, 셋: /user/sets/set-slug
+      if (parts.length < 2) {
+        return res.status(400).json({ error: 'SoundCloud 트랙 URL이 아닙니다 (프로필/태그 페이지 등)' });
       }
     } catch {}
 
     try {
       const { data } = await axios.get('https://soundcloud.com/oembed', {
         params: { url: trackUrl, format: 'json' },
+        headers: { 'User-Agent': UA },
+        timeout: 10000,
       });
       return res.json({
         platform,
@@ -91,8 +112,15 @@ router.get('/oembed', async (req, res) => {
         channelTitle: data.author_name,
         thumbnail:    data.thumbnail_url || null,
       });
-    } catch {
-      return res.status(400).json({ error: '트랙 정보를 가져올 수 없습니다 (비공개 또는 잘못된 URL)' });
+    } catch (e) {
+      const status = e.response?.status;
+      console.error('[oembed soundcloud] failed:', trackUrl, '| status:', status, '| msg:', e.message);
+      let msg = '트랙 정보를 가져올 수 없습니다';
+      if (status === 404) msg += ' (트랙이 비공개이거나 삭제됨)';
+      else if (status === 403) msg += ' (지역 제한 또는 접근 거부)';
+      else if (status) msg += ` (SoundCloud ${status})`;
+      else msg += ' (네트워크 오류)';
+      return res.status(400).json({ error: msg });
     }
   }
 
