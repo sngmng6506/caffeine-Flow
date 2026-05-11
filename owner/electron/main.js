@@ -1,4 +1,4 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen, components } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, screen, components, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
@@ -257,6 +257,13 @@ ipcMain.handle('clear-soundcloud-session', async () => {
 
 ipcMain.handle('clear-spotify-session', async () => {
   return await clearDomainSession(['spotify.com', 'scdn.co']);
+});
+
+// 외부 브라우저(시스템 기본 브라우저)로 URL 열기 — DataDome 등 진단/우회용
+ipcMain.on('open-external', (_e, url) => {
+  try {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) shell.openExternal(url);
+  } catch (e) { console.error('[open-external]', e); }
 });
 
 // bgmView DevTools 토글 (디버깅용)

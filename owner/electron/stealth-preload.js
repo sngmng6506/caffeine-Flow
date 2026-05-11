@@ -156,3 +156,54 @@ try {
     return origToString.call(this);
   };
 } catch (_) {}
+
+// 12. Canvas fingerprint 랜덤화 (DataDome 등 캔버스 fingerprint 차단)
+try {
+  const noise = () => Math.floor(Math.random() * 3) - 1;
+  const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
+  HTMLCanvasElement.prototype.toDataURL = function (...args) {
+    try {
+      const ctx = this.getContext('2d');
+      if (ctx && this.width > 0 && this.height > 0) {
+        const data = ctx.getImageData(0, 0, this.width, this.height);
+        for (let i = 0; i < data.data.length; i += 4) {
+          data.data[i]     = Math.max(0, Math.min(255, data.data[i]     + noise()));
+          data.data[i + 1] = Math.max(0, Math.min(255, data.data[i + 1] + noise()));
+          data.data[i + 2] = Math.max(0, Math.min(255, data.data[i + 2] + noise()));
+        }
+        ctx.putImageData(data, 0, 0);
+      }
+    } catch (_) {}
+    return origToDataURL.apply(this, args);
+  };
+  const origGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+  CanvasRenderingContext2D.prototype.getImageData = function (...args) {
+    const data = origGetImageData.apply(this, args);
+    try {
+      for (let i = 0; i < data.data.length; i += 4) {
+        data.data[i]     = Math.max(0, Math.min(255, data.data[i]     + noise()));
+        data.data[i + 1] = Math.max(0, Math.min(255, data.data[i + 1] + noise()));
+        data.data[i + 2] = Math.max(0, Math.min(255, data.data[i + 2] + noise()));
+      }
+    } catch (_) {}
+    return data;
+  };
+} catch (_) {}
+
+// 13. AudioContext fingerprint 노이즈 (sub-perceptible 변동)
+try {
+  const origGetChannelData = AudioBuffer.prototype.getChannelData;
+  AudioBuffer.prototype.getChannelData = function (...args) {
+    const data = origGetChannelData.apply(this, args);
+    try {
+      for (let i = 0; i < data.length; i += 100) data[i] += (Math.random() - 0.5) * 1e-10;
+    } catch (_) {}
+    return data;
+  };
+} catch (_) {}
+
+// 14. hardwareConcurrency / deviceMemory 일반적 값으로 정규화
+try {
+  Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8, configurable: true });
+  Object.defineProperty(navigator, 'deviceMemory',        { get: () => 8, configurable: true });
+} catch (_) {}

@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   clearSoundCloudSession: () => ipcRenderer.invoke('clear-soundcloud-session'),
   clearSpotifySession:    () => ipcRenderer.invoke('clear-spotify-session'),
+  openExternal:           (url) => ipcRenderer.send('open-external', url),
 
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_e, version) => cb(version)),
   restartApp:         ()   => ipcRenderer.send('restart-app'),

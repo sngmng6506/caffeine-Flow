@@ -1095,6 +1095,7 @@ const SHORTCUT_GROUPS = [
       { label: 'SoundCloud', url: 'https://soundcloud.com',          action: 'bgm' },
       { label: '로그인',      url: 'https://soundcloud.com/signin',   action: 'login' },
       { label: '쿠키 초기화 후 로그인', url: 'https://soundcloud.com/signin', action: 'clear-soundcloud-login' },
+      { label: '외부 브라우저로 로그인', url: 'https://soundcloud.com/signin', action: 'external' },
     ],
   },
 ];
@@ -1117,6 +1118,10 @@ async function runShortcutAction(link) {
     window.electronAPI?.openLoginWindow(url);
     return;
   }
+  if (action === 'external') {
+    window.electronAPI?.openExternal(url);
+    return;
+  }
   // default: navigate bgmView
   window.electronAPI?.setBgmUrl(url);
 }
@@ -1129,15 +1134,20 @@ function ShortcutsTab() {
           <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10, letterSpacing: 0.3 }}>{platform}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {links.map((link) => {
-              const isReset = link.action === 'clear-soundcloud-login' || link.action === 'clear-spotify-login';
+              const isReset    = link.action === 'clear-soundcloud-login' || link.action === 'clear-spotify-login';
+              const isExternal = link.action === 'external';
+              const borderStyle = isReset ? 'dashed' : (isExternal ? 'dotted' : 'solid');
+              const title = isReset
+                ? 'DataDome 봇 차단 마커가 쿠키에 박혔을 때 사용'
+                : (isExternal ? '시스템 기본 브라우저(Chrome 등)에서 열기 — IP 차단 진단/우회용' : undefined);
               return (
                 <button
                   key={link.label}
                   onClick={() => runShortcutAction(link)}
-                  title={isReset ? 'DataDome 등 봇 차단 마커가 쿠키에 박혔을 때 사용' : undefined}
+                  title={title}
                   style={{
                     padding: '6px 14px', borderRadius: 20,
-                    border: `1px ${isReset ? 'dashed' : 'solid'} ${color}`, background: '#fff',
+                    border: `1px ${borderStyle} ${color}`, background: '#fff',
                     color, cursor: 'pointer', fontSize: 13, fontWeight: 600,
                     transition: 'opacity 0.15s',
                   }}
