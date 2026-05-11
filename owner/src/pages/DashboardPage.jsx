@@ -1096,6 +1096,7 @@ const SHORTCUT_GROUPS = [
       { label: '로그인',      url: 'https://soundcloud.com/signin',   action: 'login' },
       { label: '쿠키 초기화 후 로그인', url: 'https://soundcloud.com/signin', action: 'clear-soundcloud-login' },
       { label: '외부 브라우저로 로그인', url: 'https://soundcloud.com/signin', action: 'external' },
+      { label: 'Chrome 쿠키 가져오기', url: 'https://soundcloud.com',  action: 'import-cookies' },
     ],
   },
 ];
@@ -1122,6 +1123,22 @@ async function runShortcutAction(link) {
     window.electronAPI?.openExternal(url);
     return;
   }
+  if (action === 'import-cookies') {
+    const instructions = [
+      '1. Chrome에 "Cookie Editor" 확장 설치 (https://chromewebstore.google.com/detail/cookie-editor)',
+      '2. soundcloud.com에서 로그인 상태로 확장 아이콘 클릭',
+      '3. Export 메뉴 → JSON 형식으로 클립보드 복사 (또는 파일 저장)',
+      '4. 메모장에 붙여넣고 .json 파일로 저장',
+      '5. 확인 누르면 파일 선택 창이 열림 — 그 .json 파일 선택',
+    ].join('\n');
+    if (!confirm('Chrome 쿠키 가져오기 안내:\n\n' + instructions + '\n\n진행할까요?')) return;
+    const result = await window.electronAPI?.importCookiesFromFile();
+    if (!result || result.canceled) return;
+    if (result.error) { alert('실패: ' + result.error); return; }
+    alert(`완료! 성공 ${result.success}개 / 실패 ${result.failed}개 (총 ${result.total}개)\n\n오른쪽 화면을 soundcloud.com으로 이동해 로그인 상태 확인하세요.`);
+    window.electronAPI?.setBgmUrl(url);
+    return;
+  }
   // default: navigate bgmView
   window.electronAPI?.setBgmUrl(url);
 }
@@ -1136,10 +1153,13 @@ function ShortcutsTab() {
             {links.map((link) => {
               const isReset    = link.action === 'clear-soundcloud-login' || link.action === 'clear-spotify-login';
               const isExternal = link.action === 'external';
+              const isImport   = link.action === 'import-cookies';
               const borderStyle = isReset ? 'dashed' : (isExternal ? 'dotted' : 'solid');
+              const filled = isImport;
               const title = isReset
                 ? 'DataDome 봇 차단 마커가 쿠키에 박혔을 때 사용'
-                : (isExternal ? '시스템 기본 브라우저(Chrome 등)에서 열기 — IP 차단 진단/우회용' : undefined);
+                : (isExternal ? '시스템 기본 브라우저(Chrome 등)에서 열기 — IP 차단 진단/우회용'
+                  : (isImport ? 'Chrome에서 export한 SoundCloud 쿠키 JSON 파일을 import (Cookie Editor 확장 필요)' : undefined));
               return (
                 <button
                   key={link.label}
@@ -1147,8 +1167,10 @@ function ShortcutsTab() {
                   title={title}
                   style={{
                     padding: '6px 14px', borderRadius: 20,
-                    border: `1px ${borderStyle} ${color}`, background: '#fff',
-                    color, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    border: `1px ${borderStyle} ${color}`,
+                    background: filled ? color : '#fff',
+                    color: filled ? '#fff' : color,
+                    cursor: 'pointer', fontSize: 13, fontWeight: 600,
                     transition: 'opacity 0.15s',
                   }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}

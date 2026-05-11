@@ -1,4 +1,5 @@
-const { app, BrowserWindow, BrowserView, ipcMain, screen, components, shell } = require('electron');
+const { app, BrowserWindow, BrowserView, ipcMain, screen, components, shell, dialog } = require('electron');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
@@ -264,6 +265,64 @@ ipcMain.on('open-external', (_e, url) => {
   try {
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) shell.openExternal(url);
   } catch (e) { console.error('[open-external]', e); }
+});
+
+// Chrome 쿠키 import — Cookie Editor 등 확장에서 JSON으로 export한 파일 읽어 Electron 세션에 주입
+// DataDome이 Electron 자체 로그인을 차단할 때, Chrome에서 성공한 세션을 그대로 복제하는 우회로
+ipcMain.handle('import-cookies-from-file', async () => {
+  const { session } = require('electron');
+  const result = await dialog.showOpenDialog({
+    title: 'Cookie Editor에서 export한 JSON 파일 선택',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths[0]) return { canceled: true };
+
+  try {
+    const json    = await fs.promises.readFile(result.filePaths[0], 'utf8');
+    const cookies = JSON.parse(json);
+    if (!Array.isArray(cookies)) throw new Error('JSON이 배열 형식이 아닙니다 (Cookie Editor 형식이어야 함)');
+
+    const sess  = session.defaultSession;
+    let success = 0, failed = 0;
+    const errors = [];
+    for (const c of cookies) {
+      try {
+        if (!c.name || !c.domain) { failed++; continue; }
+        const cleanDomain = String(c.domain).replace(/^\./, '');
+        const url = `${c.secure === false ? 'http' : 'https'}://${cleanDomain}${c.path || '/'}`;
+        // sameSite 매핑 (Cookie Editor 'unspecified' → Electron 'no_restriction')
+        let sameSite = c.sameSite || 'no_restriction';
+        if (sameSite === 'unspecified' || sameSite === 'no_restriction') sameSite = 'no_restriction';
+        else if (sameSite === 'lax')    sameSite = 'lax';
+        else if (sameSite === 'strict') sameSite = 'strict';
+        else if (sameSite === 'no_restriction' || sameSite === 'none') sameSite = 'no_restriction';
+        else sameSite = 'no_restriction';
+
+        await sess.cookies.set({
+          url,
+          name:           c.name,
+          value:          String(c.value || ''),
+          domain:         c.domain,
+          path:           c.path || '/',
+          secure:         !!c.secure,
+          httpOnly:       !!c.httpOnly,
+          expirationDate: c.expirationDate || (c.session ? undefined : (Date.now() / 1000) + 86400 * 365),
+          sameSite,
+        });
+        success++;
+      } catch (e) {
+        failed++;
+        if (errors.length < 3) errors.push(`${c.name}: ${e.message}`);
+      }
+    }
+    console.log(`[cookie-import] success ${success} / failed ${failed} / total ${cookies.length}`);
+    if (errors.length) console.error('[cookie-import] sample errors:', errors);
+    return { success, failed, total: cookies.length, errors };
+  } catch (e) {
+    console.error('[cookie-import] failed:', e);
+    return { error: e.message };
+  }
 });
 
 // bgmView DevTools 토글 (디버깅용)
