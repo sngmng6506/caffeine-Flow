@@ -655,11 +655,51 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
   const isSoundCloudRec = url.includes('soundcloud.com');
   if (isSoundCloudRec) {
     recView.webContents.once('did-finish-load', () => {
-      // 로그인/회원가입 모달 차단 — 자동클릭이 모달 닫기 버튼을 잘못 누르거나 화면을 가리는 문제 방지.
-      // 비로그인 + 자동재생 사용 시나리오 전용이므로 손해 없음.
-      recView.webContents.insertCSS(`
-        .modal, .modal__overlay, .modal__modal, .signupOverlay, [role="dialog"] { display: none !important; }
-        body { overflow: auto !important; }
+      // 로그인/회원가입 모달 차단 — CSS만으론 SoundCloud가 모달을 동적으로
+      // 다시 그려서 안 막힘. style 주입 + MutationObserver로 노드 자체 제거 + close 버튼 클릭 병행.
+      recView.webContents.executeJavaScript(`
+        (function() {
+          const style = document.createElement('style');
+          style.textContent = \`
+            .modal, .modal__modal, .modal__overlay, .signupOverlay, .signinModal,
+            [role="dialog"], [aria-modal="true"], dialog[open] { display: none !important; }
+            body { overflow: auto !important; }
+          \`;
+          (document.head || document.documentElement).appendChild(style);
+
+          function killModals() {
+            // 1) 표준 모달 셀렉터 제거
+            document.querySelectorAll('[role="dialog"], [aria-modal="true"], .modal, dialog[open], .signupOverlay, .signinModal, [class*="signupModal"], [class*="signinModal"], [class*="onboardingModal"]').forEach(el => {
+              try { el.remove(); } catch {}
+            });
+            // 2) close 버튼 클릭 (fallback)
+            document.querySelectorAll('button[aria-label*="Close" i], .modal__closeButton, button[title*="Close" i], button[aria-label*="Dismiss" i]').forEach(b => {
+              try { b.click(); } catch {}
+            });
+            // 3) 휴리스틱: position:fixed + 큰 박스 + "Sign in/up" 또는 "Log in" 텍스트 포함
+            document.querySelectorAll('div, section, aside').forEach(el => {
+              if (!el.children || el.children.length === 0) return;
+              const cs = getComputedStyle(el);
+              if (cs.position !== 'fixed') return;
+              if (el.offsetHeight < 150 || el.offsetWidth < 150) return;
+              const t = (el.innerText || '').toLowerCase();
+              if (t.includes('sign in') || t.includes('sign up') || t.includes('log in')) {
+                try { el.remove(); } catch {}
+              }
+            });
+            // 4) body scroll lock 해제
+            if (document.body) { document.body.style.overflow = ''; document.body.classList.remove('modalOpen', 'no-scroll'); }
+          }
+          killModals();
+          try {
+            let pending = null;
+            const obs = new MutationObserver(() => {
+              if (pending) return;
+              pending = setTimeout(() => { pending = null; killModals(); }, 100);
+            });
+            obs.observe(document.documentElement, { childList: true, subtree: true });
+          } catch {}
+        })()
       `).catch(() => {});
 
       let attempts = 0;
