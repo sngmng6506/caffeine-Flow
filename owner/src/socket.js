@@ -6,7 +6,7 @@ let socket = null;
 
 export function getSocket(slug) {
   if (!socket) {
-    socket = io(`${SERVER}/cafe`, { query: { slug } });
+    socket = io(`${SERVER}/cafe`, { query: { slug, role: 'owner' } });
   }
   return socket;
 }

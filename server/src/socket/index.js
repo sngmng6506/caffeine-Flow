@@ -3,24 +3,37 @@ const db = require('../db/knex');
 function initSocket(io) {
   const cafeNsp = io.of('/cafe');
 
+  // slug별 사장님 소켓 ID 집합 — peak concurrent에서 차감
+  const ownerSockets = new Map(); // slug -> Set<socketId>
+
   cafeNsp.on('connection', (socket) => {
-    const slug = socket.handshake.query.slug;
+    const { slug, role } = socket.handshake.query;
     if (!slug) return socket.disconnect();
 
     socket.join(slug);
-    updatePeakConcurrent(cafeNsp, slug);
+
+    if (role === 'owner') {
+      if (!ownerSockets.has(slug)) ownerSockets.set(slug, new Set());
+      ownerSockets.get(slug).add(socket.id);
+    } else {
+      // 손님 입장 시에만 피크 갱신 의미가 있음
+      updatePeakConcurrent(cafeNsp, slug, ownerSockets);
+    }
 
     socket.on('disconnect', () => {
-      // 접속자 감소 시에는 피크 갱신 불필요
+      ownerSockets.get(slug)?.delete(socket.id);
+      if (ownerSockets.get(slug)?.size === 0) ownerSockets.delete(slug);
     });
   });
 }
 
-async function updatePeakConcurrent(nsp, slug) {
+async function updatePeakConcurrent(nsp, slug, ownerSockets) {
   try {
     const room = nsp.adapter.rooms.get(slug);
-    const count = room ? room.size : 0;
-    if (count <= 1) return; // 사장님 1명만 접속한 경우 무시
+    const total = room ? room.size : 0;
+    const owners = ownerSockets.get(slug)?.size || 0;
+    const customers = total - owners;
+    if (customers < 1) return;
 
     const cafeService = require('../services/cafe.service');
     const cafe = await cafeService.findBySlug(slug);
@@ -32,16 +45,16 @@ async function updatePeakConcurrent(nsp, slug) {
       .first();
 
     if (existing) {
-      if (count > (existing.peak_concurrent || 0)) {
+      if (customers > (existing.peak_concurrent || 0)) {
         await db('daily_stats')
           .where({ id: existing.id })
-          .update({ peak_concurrent: count });
+          .update({ peak_concurrent: customers });
       }
     } else {
       await db('daily_stats')
-        .insert({ cafe_id: cafe.id, date: today, peak_concurrent: count })
+        .insert({ cafe_id: cafe.id, date: today, peak_concurrent: customers })
         .onConflict(['cafe_id', 'date'])
-        .merge({ peak_concurrent: count });
+        .merge({ peak_concurrent: customers });
     }
   } catch (err) {
     // 통계 실패는 무시
