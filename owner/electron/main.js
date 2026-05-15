@@ -6,6 +6,10 @@ const path = require('path');
 // navigator.webdriver 숨김 — SoundCloud·Spotify 등이 Electron 감지 후 팝업 차단하는 것 방지
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
 
+// 신청곡 자동 재생 허용 — Chromium 기본 정책은 user gesture 없는 오디오를 차단함.
+// 신청 수락 시 recView가 새 페이지를 로드하면 클릭 컨텍스트가 끊겨 SoundCloud autoplay가 막히므로 정책 자체를 풀어줌.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 // CastLabs Electron에 Widevine CDM 내장 — 별도 로딩 불필요
 const widevineStatus = 'castlabs';
 
@@ -644,6 +648,31 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
     resizeViews();
   }
   recView.webContents.loadURL(url);
+
+  // SoundCloud는 페이지 로드만으론 재생 안 됨 — 메인 재생 버튼을 직접 클릭.
+  // DOM이 늦게 붙는 경우가 있어 짧은 간격으로 몇 번 재시도.
+  if (url.includes('soundcloud.com')) {
+    recView.webContents.once('did-finish-load', () => {
+      let attempts = 0;
+      const tryClick = () => {
+        if (!recView || attempts >= 10) return;
+        attempts++;
+        recView.webContents.executeJavaScript(`
+          (function() {
+            const sels = ['button.playButton', '.sc-button-play', 'button[aria-label="Play"]', 'button[title="Play"]'];
+            for (const sel of sels) {
+              const btn = document.querySelector(sel);
+              if (btn) { btn.click(); return 'clicked'; }
+            }
+            return 'not-found';
+          })()
+        `).then((r) => {
+          if (r !== 'clicked') setTimeout(tryClick, 500);
+        }).catch(() => setTimeout(tryClick, 500));
+      };
+      setTimeout(tryClick, 400);
+    });
+  }
 
   // overlay 모드 + rec=Spotify (BGM=YouTube/SoundCloud) — mediaSession baseline 감시
   if (isSpotifyRec) {
