@@ -668,14 +668,15 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
           (document.head || document.documentElement).appendChild(style);
 
           function killModals() {
-            // 0) SoundCloud는 로그인 팝업을 secure.soundcloud.com/one-tap iframe (Google One Tap)으로 띄움.
-            //    main DOM의 모달 셀렉터에 안 잡혀서 별도 처리 필요. iframe 발견 시 fixed wrapper까지 거슬러 제거.
+            // 0) SoundCloud 로그인 위젯 iframe (one-tap / web-auth / signin)을 감싸는 모달 wrapper 제거.
+            //    iframe 로드는 webRequest에서 cancel돼도 wrapper(X 버튼+반투명 배경)는 DOM에 남기 때문.
+            //    SoundCloud는 엔드포인트를 자주 바꿔서 src에 secure.soundcloud.com 만 매칭.
             document.querySelectorAll('iframe').forEach(f => {
               if (!f.src) return;
-              if (!/secure\.soundcloud\.com\/one-tap|accounts\.google\.com\/gsi|\/signin\?/i.test(f.src)) return;
+              if (!/secure\.soundcloud\.com|accounts\.google\.com\/gsi|api-auth\.soundcloud\.com/i.test(f.src)) return;
               let target = f;
               let cur = f.parentElement;
-              for (let i = 0; i < 6 && cur; i++) {
+              for (let i = 0; i < 8 && cur; i++) {
                 if (getComputedStyle(cur).position === 'fixed') { target = cur; break; }
                 cur = cur.parentElement;
               }
