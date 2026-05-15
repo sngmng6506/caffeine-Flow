@@ -5,13 +5,31 @@ const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
 
-const requestLimiter = rateLimit({
+// 신청 한도는 두 차원으로 적용:
+//  (1) visitor_id (클라이언트 localStorage UUID) — 같은 브라우저 식별
+//  (2) IP — 헤더가 위조돼도 우회 불가한 최후 방어선
+// visitor_id 헤더는 사용자가 매 요청마다 새로 생성해 위조할 수 있으므로
+// 단독으로 쓰면 무력화됨. 둘 다 통과해야만 신청 허용.
+const REQUEST_MESSAGE = { error: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' };
+
+const visitorLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 3,
-  // visitor_id 우선, 없으면 IP — IPv6 우회 방지를 위해 ipKeyGenerator 헬퍼로 정규화
-  keyGenerator: (req) => req.headers['x-visitor-id'] || ipKeyGenerator(req.ip),
-  message: { error: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' },
+  keyGenerator: (req) => req.headers['x-visitor-id'] || `ip:${ipKeyGenerator(req.ip)}`,
+  message: REQUEST_MESSAGE,
 });
+
+// IP 단독 제한은 visitor 한도(3)보다 살짝 여유롭게 — 같은 매장에서 가족·일행이
+// 동일 NAT IP로 동시에 신청하는 정상 케이스 허용. 단, 한 IP에서 분당 10건은
+// 정상 사용으로 보기 어려움.
+const ipLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: REQUEST_MESSAGE,
+});
+
+const requestLimiters = [visitorLimiter, ipLimiter];
 
 const MAX_QUEUE_SIZE = 30;
 
@@ -45,7 +63,7 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/v1/cafes/:slug/recommendations  (손님 신청)
-router.post('/', requestLimiter, async (req, res) => {
+router.post('/', requestLimiters, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   if (!cafe.is_accepting) return res.status(403).json({ error: '현재 추천을 받지 않습니다' });
