@@ -722,25 +722,6 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatu
               style={{ ...dfStyles.clearBtn, background: '#1db954', color: '#fff', border: 'none' }}
             >Spotify 로그인</button>
           )}
-          {/soundcloud\.com/i.test(url) && (
-            <>
-              <button
-                onClick={() => window.electronAPI?.openLoginWindow('https://soundcloud.com/signin')}
-                draggable={false} onDragStart={e => e.stopPropagation()}
-                style={{ ...dfStyles.clearBtn, background: '#ff5500', color: '#fff', border: 'none' }}
-              >SoundCloud 로그인</button>
-              <button
-                onClick={async () => {
-                  const n = await window.electronAPI?.clearSoundCloudSession();
-                  alert(`SoundCloud 쿠키 ${n}개 삭제됨. 로그인 창을 엽니다.`);
-                  window.electronAPI?.openLoginWindow('https://soundcloud.com/signin');
-                }}
-                draggable={false} onDragStart={e => e.stopPropagation()}
-                title="DataDome 봇 차단 마커가 쿠키에 박혀있을 때 사용"
-                style={{ ...dfStyles.clearBtn, background: '#fff', color: '#ff5500', border: '1px solid #ff5500', fontSize: 11 }}
-              >쿠키 초기화 후 로그인</button>
-            </>
-          )}
           <button
             onClick={onClear}
             draggable={false}
@@ -1092,11 +1073,7 @@ const SHORTCUT_GROUPS = [
     color: '#ff5500',
     bg: '#fff8f5',
     links: [
-      { label: 'SoundCloud', url: 'https://soundcloud.com',          action: 'bgm' },
-      { label: '로그인',      url: 'https://soundcloud.com/signin',   action: 'login' },
-      { label: '쿠키 초기화 후 로그인', url: 'https://soundcloud.com/signin', action: 'clear-soundcloud-login' },
-      { label: '외부 브라우저로 로그인', url: 'https://soundcloud.com/signin', action: 'external' },
-      { label: 'Chrome 쿠키 가져오기', url: 'https://soundcloud.com',  action: 'import-cookies' },
+      { label: 'SoundCloud', url: 'https://soundcloud.com', action: 'bgm' },
     ],
   },
 ];
@@ -1107,36 +1084,10 @@ async function runShortcutAction(link) {
     window.electronAPI?.openLoginWindow(url);
     return;
   }
-  if (action === 'clear-soundcloud-login') {
-    const n = await window.electronAPI?.clearSoundCloudSession();
-    alert(`SoundCloud 쿠키 ${n}개 삭제됨. 로그인 창을 엽니다.`);
-    window.electronAPI?.openLoginWindow(url);
-    return;
-  }
   if (action === 'clear-spotify-login') {
     const n = await window.electronAPI?.clearSpotifySession();
     alert(`Spotify 쿠키 ${n}개 삭제됨. 로그인 창을 엽니다.`);
     window.electronAPI?.openLoginWindow(url);
-    return;
-  }
-  if (action === 'external') {
-    window.electronAPI?.openExternal(url);
-    return;
-  }
-  if (action === 'import-cookies') {
-    const instructions = [
-      '1. Chrome에 "Cookie Editor" 확장 설치 (https://chromewebstore.google.com/detail/cookie-editor)',
-      '2. soundcloud.com에서 로그인 상태로 확장 아이콘 클릭',
-      '3. Export 메뉴 → JSON 형식으로 클립보드 복사 (또는 파일 저장)',
-      '4. 메모장에 붙여넣고 .json 파일로 저장',
-      '5. 확인 누르면 파일 선택 창이 열림 — 그 .json 파일 선택',
-    ].join('\n');
-    if (!confirm('Chrome 쿠키 가져오기 안내:\n\n' + instructions + '\n\n진행할까요?')) return;
-    const result = await window.electronAPI?.importCookiesFromFile();
-    if (!result || result.canceled) return;
-    if (result.error) { alert('실패: ' + result.error); return; }
-    alert(`완료! 성공 ${result.success}개 / 실패 ${result.failed}개 (총 ${result.total}개)\n\n오른쪽 화면을 soundcloud.com으로 이동해 로그인 상태 확인하세요.`);
-    window.electronAPI?.setBgmUrl(url);
     return;
   }
   // default: navigate bgmView
@@ -1151,25 +1102,16 @@ function ShortcutsTab() {
           <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10, letterSpacing: 0.3 }}>{platform}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {links.map((link) => {
-              const isReset    = link.action === 'clear-soundcloud-login' || link.action === 'clear-spotify-login';
-              const isExternal = link.action === 'external';
-              const isImport   = link.action === 'import-cookies';
-              const borderStyle = isReset ? 'dashed' : (isExternal ? 'dotted' : 'solid');
-              const filled = isImport;
-              const title = isReset
-                ? 'DataDome 봇 차단 마커가 쿠키에 박혔을 때 사용'
-                : (isExternal ? '시스템 기본 브라우저(Chrome 등)에서 열기 — IP 차단 진단/우회용'
-                  : (isImport ? 'Chrome에서 export한 SoundCloud 쿠키 JSON 파일을 import (Cookie Editor 확장 필요)' : undefined));
+              const isReset = link.action === 'clear-spotify-login';
               return (
                 <button
                   key={link.label}
                   onClick={() => runShortcutAction(link)}
-                  title={title}
+                  title={isReset ? 'DataDome 봇 차단 마커가 쿠키에 박혔을 때 사용' : undefined}
                   style={{
                     padding: '6px 14px', borderRadius: 20,
-                    border: `1px ${borderStyle} ${color}`,
-                    background: filled ? color : '#fff',
-                    color: filled ? '#fff' : color,
+                    border: `1px ${isReset ? 'dashed' : 'solid'} ${color}`,
+                    background: '#fff', color,
                     cursor: 'pointer', fontSize: 13, fontWeight: 600,
                     transition: 'opacity 0.15s',
                   }}

@@ -884,6 +884,14 @@ app.whenReady().then(async () => {
     return null;
   });
 
+  // SoundCloud 로그인 팝업(secure.soundcloud.com/one-tap iframe + Google One Tap) 네트워크 차단.
+  // DOM 제거는 iframe이 늦게 attach되면 놓치기도 해서, 요청 자체를 cancel하는 게 가장 확실.
+  // 실제 로그인 흐름(soundcloud.com/signin)은 다른 URL이라 영향 없음.
+  session.defaultSession.webRequest.onBeforeRequest(
+    { urls: ['*://secure.soundcloud.com/one-tap*', '*://accounts.google.com/gsi/iframe*'] },
+    (_details, callback) => callback({ cancel: true })
+  );
+
   createWindow();
   if (!isDev) {
     autoUpdater.on('error',                err  => console.error('[autoUpdater] error:', err));
