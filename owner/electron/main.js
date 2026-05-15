@@ -893,6 +893,17 @@ app.whenReady().then(async () => {
     (_details, callback) => callback({ cancel: true })
   );
 
+  // Feature-Policy 응답 헤더 제거 — SoundCloud가 ambient-light-sensor / battery / wake-lock /
+  // document-domain 같은 미지원·구식 feature를 헤더에 박아 보내서 Chromium이 "Unrecognized
+  // feature" 경고를 콘솔에 매번 뿌림. 기능에는 영향 없으므로 그냥 스트립.
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = details.responseHeaders || {};
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === 'feature-policy') delete headers[k];
+    }
+    callback({ responseHeaders: headers });
+  });
+
   createWindow();
   if (!isDev) {
     autoUpdater.on('error',                err  => console.error('[autoUpdater] error:', err));
