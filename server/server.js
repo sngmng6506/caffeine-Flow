@@ -5,12 +5,35 @@ const http      = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
 
-const { PORT } = require('./src/config');
+const { PORT, APP_URL } = require('./src/config');
 const initSocket = require('./src/socket');
 
 const app    = express();
 const server = http.createServer(app);
-const io     = new Server(server, { cors: { origin: '*' } });
+
+// 허용 origin: APP_URL + 개발용 localhost. 빈 origin(파일·앱 내장 브라우저)도 허용 —
+// Electron BrowserView·일부 모바일 WebView가 빈 origin으로 옴.
+function buildAllowedOrigins() {
+  const set = new Set();
+  if (APP_URL) {
+    set.add(APP_URL.replace(/\/$/, ''));
+  }
+  // 개발 편의: Vite 기본 포트들 허용
+  set.add('http://localhost:5173');
+  set.add('http://localhost:5174');
+  return set;
+}
+const ALLOWED_ORIGINS = buildAllowedOrigins();
+
+function corsOriginCheck(origin, cb) {
+  if (!origin) return cb(null, true);
+  if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+  cb(new Error(`Origin not allowed: ${origin}`));
+}
+
+const io = new Server(server, {
+  cors: { origin: corsOriginCheck, credentials: false },
+});
 
 // io를 라우트에서 참조할 수 있도록 등록
 app.set('io', io);
