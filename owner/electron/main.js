@@ -668,6 +668,19 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
           (document.head || document.documentElement).appendChild(style);
 
           function killModals() {
+            // 0) SoundCloud는 로그인 팝업을 secure.soundcloud.com/one-tap iframe (Google One Tap)으로 띄움.
+            //    main DOM의 모달 셀렉터에 안 잡혀서 별도 처리 필요. iframe 발견 시 fixed wrapper까지 거슬러 제거.
+            document.querySelectorAll('iframe').forEach(f => {
+              if (!f.src) return;
+              if (!/secure\.soundcloud\.com\/one-tap|accounts\.google\.com\/gsi|\/signin\?/i.test(f.src)) return;
+              let target = f;
+              let cur = f.parentElement;
+              for (let i = 0; i < 6 && cur; i++) {
+                if (getComputedStyle(cur).position === 'fixed') { target = cur; break; }
+                cur = cur.parentElement;
+              }
+              try { target.remove(); } catch {}
+            });
             // 1) 표준 모달 셀렉터 제거
             document.querySelectorAll('[role="dialog"], [aria-modal="true"], .modal, dialog[open], .signupOverlay, .signinModal, [class*="signupModal"], [class*="signinModal"], [class*="onboardingModal"]').forEach(el => {
               try { el.remove(); } catch {}
