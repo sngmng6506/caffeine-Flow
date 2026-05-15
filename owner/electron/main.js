@@ -655,6 +655,13 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
   const isSoundCloudRec = url.includes('soundcloud.com');
   if (isSoundCloudRec) {
     recView.webContents.once('did-finish-load', () => {
+      // 로그인/회원가입 모달 차단 — 자동클릭이 모달 닫기 버튼을 잘못 누르거나 화면을 가리는 문제 방지.
+      // 비로그인 + 자동재생 사용 시나리오 전용이므로 손해 없음.
+      recView.webContents.insertCSS(`
+        .modal, .modal__overlay, .modal__modal, .signupOverlay, [role="dialog"] { display: none !important; }
+        body { overflow: auto !important; }
+      `).catch(() => {});
+
       let attempts = 0;
       const tryClick = () => {
         if (!recView || attempts >= 10) return;
