@@ -24,10 +24,8 @@
 | `customer/` | 손님용 Vite/React SPA                             |
 | `owner/`    | 사장님용 Vite/React SPA + Electron 데스크톱 앱     |
 | `extension/`| Chrome 익스텐션 (v1 프로토콜, **현재 미사용**)    |
-| `legacy/`   | v1 단일파일 서버 (**보관용, 운영 환경에서 미사용**) |
 
 배포 entry는 `railway.json`이 `server/server.js`를 명시한다.
-`npm run legacy`는 보관된 v1을 로컬에서 띄울 때만 사용.
 
 ## License
 

@@ -1,5 +1,4 @@
 node_modules/
-legacy/data/history.json
 .env
 server/public/customer/
 server/test-api.js

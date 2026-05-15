@@ -2,7 +2,6 @@
   "name": "caffeine-flow",
   "version": "2.0.0",
   "scripts": {
-    "legacy": "node legacy/server.js",
     "dev:server": "cd server && npm run dev",
     "dev:customer": "cd customer && npm run dev",
     "dev:owner": "cd owner && npm run dev"
