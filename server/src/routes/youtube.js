@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const axios  = require('axios');
+const { YOUTUBE_API_KEY } = require('../config');
 
 function extractVideoId(url) {
   try {
