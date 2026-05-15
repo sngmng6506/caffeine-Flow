@@ -682,27 +682,23 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
               }
               try { target.remove(); } catch {}
             });
-            // 1) 표준 모달 셀렉터 제거
-            document.querySelectorAll('[role="dialog"], [aria-modal="true"], .modal, dialog[open], .signupOverlay, .signinModal, [class*="signupModal"], [class*="signinModal"], [class*="onboardingModal"]').forEach(el => {
+            // 1) SoundCloud 인증 모달 정밀 셀렉터 — 실제 DOM 분석 결과 적용.
+            //    .auth-modal: X 버튼 + 반투명 배경(modalWhiteout)
+            //    .webAuthContainerWrapper: web-auth iframe 컨테이너 (모달과 형제 관계)
+            //    .onetapAuthContainer: 헤더의 one-tap intermediate iframe 컨테이너
+            document.querySelectorAll('.auth-modal, .webAuthContainerWrapper, .onetapAuthContainer, .modalWhiteout').forEach(el => {
               try { el.remove(); } catch {}
             });
-            // 2) close 버튼 클릭 (fallback)
-            document.querySelectorAll('button[aria-label*="Close" i], .modal__closeButton, button[title*="Close" i], button[aria-label*="Dismiss" i]').forEach(b => {
-              try { b.click(); } catch {}
+            // 2) 표준 모달 셀렉터 (기타 SC 모달 대비 안전망)
+            document.querySelectorAll('[role="dialog"], [aria-modal="true"], dialog[open], [class*="signupModal"], [class*="signinModal"], [class*="onboardingModal"]').forEach(el => {
+              try { el.remove(); } catch {}
             });
-            // 3) 휴리스틱: position:fixed + 큰 박스 + "Sign in/up" 또는 "Log in" 텍스트 포함
-            document.querySelectorAll('div, section, aside').forEach(el => {
-              if (!el.children || el.children.length === 0) return;
-              const cs = getComputedStyle(el);
-              if (cs.position !== 'fixed') return;
-              if (el.offsetHeight < 150 || el.offsetWidth < 150) return;
-              const t = (el.innerText || '').toLowerCase();
-              if (t.includes('sign in') || t.includes('sign up') || t.includes('log in')) {
-                try { el.remove(); } catch {}
-              }
-            });
-            // 4) body scroll lock 해제
-            if (document.body) { document.body.style.overflow = ''; document.body.classList.remove('modalOpen', 'no-scroll'); }
+            // 3) body 스크롤 잠금 해제 + show-onetap 같은 마커 클래스 제거
+            if (document.body) {
+              document.body.classList.remove('show-onetap', 'g-overflow-hidden', 'modalOpen', 'no-scroll');
+              document.body.style.overflow = '';
+              document.body.style.paddingRight = '';
+            }
           }
           killModals();
           try {
