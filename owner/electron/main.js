@@ -650,13 +650,22 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
   }
   recView.webContents.loadURL(url);
 
+  // SoundCloud 인증 모달 강제 비표시 — insertCSS는 executeJavaScript와 달리
+  // JS 실행 실패·타이밍 이슈와 무관하게 렌더러 레벨에서 항상 적용됨. 1차 방어선.
+  // DOM 제거(아래 executeJavaScript)는 2차 방어선으로 유지.
+  if (url.includes('soundcloud.com')) {
+    recView.webContents.insertCSS(`
+      .auth-modal, .modalWhiteout, .webAuthContainerWrapper, .onetapAuthContainer { display: none !important; }
+      body.show-onetap, body.g-overflow-hidden { overflow: auto !important; }
+    `).catch((e) => console.error('[CF insertCSS]', e));
+  }
+
   // SoundCloud는 페이지 로드만으론 재생 안 됨 — 메인 재생 버튼을 직접 클릭.
   // DOM이 늦게 붙는 경우가 있어 짧은 간격으로 몇 번 재시도.
   const isSoundCloudRec = url.includes('soundcloud.com');
   if (isSoundCloudRec) {
     recView.webContents.once('did-finish-load', () => {
-      // 로그인/회원가입 모달 차단 — CSS만으론 SoundCloud가 모달을 동적으로
-      // 다시 그려서 안 막힘. style 주입 + MutationObserver로 노드 자체 제거 + close 버튼 클릭 병행.
+      // 2차 방어선: DOM 제거 + MutationObserver. JS 실패해도 1차 CSS가 처리.
       recView.webContents.executeJavaScript(`
         (function() {
           const style = document.createElement('style');
@@ -708,9 +717,9 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
               pending = setTimeout(() => { pending = null; killModals(); }, 100);
             });
             obs.observe(document.documentElement, { childList: true, subtree: true });
-          } catch {}
+          } catch (e) { console.error('[CF observer]', e); }
         })()
-      `).catch(() => {});
+      `).catch((e) => console.error('[CF killModals]', e));
 
       let attempts = 0;
       const tryClick = () => {
