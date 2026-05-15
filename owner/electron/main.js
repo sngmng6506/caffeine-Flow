@@ -884,11 +884,12 @@ app.whenReady().then(async () => {
     return null;
   });
 
-  // SoundCloud 로그인 팝업(secure.soundcloud.com/one-tap iframe + Google One Tap) 네트워크 차단.
-  // DOM 제거는 iframe이 늦게 attach되면 놓치기도 해서, 요청 자체를 cancel하는 게 가장 확실.
-  // 실제 로그인 흐름(soundcloud.com/signin)은 다른 URL이라 영향 없음.
+  // SoundCloud 로그인 팝업 네트워크 차단.
+  // secure.soundcloud.com 은 /one-tap, /web-auth 등 임베디드 로그인 위젯 전용 서브도메인.
+  // 트랙 재생·메타데이터는 soundcloud.com / api-v2.soundcloud.com / sndcdn.com 사용.
+  // 운영 시 로그인 UI를 제거했으므로 서브도메인 전체를 막아도 손해 없음.
   session.defaultSession.webRequest.onBeforeRequest(
-    { urls: ['*://secure.soundcloud.com/one-tap*', '*://accounts.google.com/gsi/iframe*'] },
+    { urls: ['*://secure.soundcloud.com/*', '*://accounts.google.com/gsi/iframe*'] },
     (_details, callback) => callback({ cancel: true })
   );
 
