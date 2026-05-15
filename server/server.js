@@ -52,6 +52,10 @@ app.use(express.static(staticPath));
 // Routes
 app.use('/api/v1/auth',                         require('./src/routes/auth'));
 app.use('/api/v1/cafes',                         require('./src/routes/cafes'));
+// Owner-only recommendation routes must be mounted before the public
+// router so authenticated handlers (/owner, PUT /:id, DELETE /:id) win
+// the path match before public routes get a chance.
+app.use('/api/v1/cafes/:slug/recommendations',   require('./src/routes/recommendations.owner'));
 app.use('/api/v1/cafes/:slug/recommendations',   require('./src/routes/recommendations'));
 app.use('/api/v1/youtube',                       require('./src/routes/youtube'));
 app.use('/api/v1/tracks',                        require('./src/routes/tracks'));
