@@ -29,6 +29,7 @@ let recView         = null;
 let recViewAttached = false;
 let panelVisible    = false;
 let spotifyPoll          = null; // recView Spotify 트랙 종료 감지 폴링 (overlay 모드)
+let soundcloudPoll       = null; // recView SoundCloud 트랙 종료 감지 폴링 (autoplay로 넘어간 트랙 변화 감지)
 let currentRecMode       = null; // 'overlay' | 'spotify-takeover' | null
 let bgmSpotifyEndCleanup = null; // takeover 모드: bgmView 종료 감지 cleanup fn
 let savedBgmMeta         = null; // takeover 모드: 재생 중이던 BGM 트랙 메타 ({title, artist, trackId})
@@ -651,7 +652,8 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
 
   // SoundCloud는 페이지 로드만으론 재생 안 됨 — 메인 재생 버튼을 직접 클릭.
   // DOM이 늦게 붙는 경우가 있어 짧은 간격으로 몇 번 재시도.
-  if (url.includes('soundcloud.com')) {
+  const isSoundCloudRec = url.includes('soundcloud.com');
+  if (isSoundCloudRec) {
     recView.webContents.once('did-finish-load', () => {
       let attempts = 0;
       const tryClick = () => {
@@ -672,6 +674,40 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
       };
       setTimeout(tryClick, 400);
     });
+
+    // SoundCloud는 트랙 끝나면 자체적으로 다음 추천 트랙 autoplay → ended 이벤트 미발생.
+    // mediaSession 제목 변화로 종료 감지 (Spotify와 동일 패턴, 2회 연속 변경되면 fire).
+    let endFired = false;
+    let savedSig = null;
+    let changeCount = 0;
+    setTimeout(() => {
+      if (!recView || endFired) return;
+      soundcloudPoll = setInterval(async () => {
+        if (endFired || !recView) { clearInterval(soundcloudPoll); soundcloudPoll = null; return; }
+        try {
+          const info = await recView.webContents.executeJavaScript(`
+            (function() {
+              const m = navigator.mediaSession && navigator.mediaSession.metadata;
+              return { title: m && m.title || null, artist: m && m.artist || null };
+            })()
+          `);
+          const sig = info && info.title ? `${info.title}|${info.artist || ''}` : null;
+          if (!sig) return;
+          if (!savedSig) { savedSig = sig; return; }
+          if (sig !== savedSig) {
+            changeCount++;
+            if (changeCount >= 2) {
+              endFired = true;
+              clearInterval(soundcloudPoll); soundcloudPoll = null;
+              try { recView.webContents.setAudioMuted(true); } catch {}
+              mainWindow.webContents.send('video-ended');
+            }
+          } else {
+            changeCount = 0;
+          }
+        } catch {}
+      }, 1000);
+    }, 4000);
   }
 
   // overlay 모드 + rec=Spotify (BGM=YouTube/SoundCloud) — mediaSession baseline 감시
@@ -737,6 +773,7 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
 ipcMain.on('end-rec', () => {
   // overlay 모드 detector cleanup
   if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
+  if (soundcloudPoll) { clearInterval(soundcloudPoll); soundcloudPoll = null; }
   // takeover 모드 detector cleanup
   if (bgmSpotifyEndCleanup) { bgmSpotifyEndCleanup(); bgmSpotifyEndCleanup = null; }
 
