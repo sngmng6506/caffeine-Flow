@@ -1,12 +1,15 @@
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+const path      = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const express   = require('express');
 require('express-async-errors');
 const http      = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
+const { networkInterfaces } = require('os');
 
 const { PORT, APP_URL } = require('./src/config');
 const initSocket = require('./src/socket');
+const statsService = require('./src/services/stats.service');
 
 const app    = express();
 const server = http.createServer(app);
@@ -43,7 +46,7 @@ app.use(express.json());
 app.use(rateLimit({ windowMs: 60_000, max: 120 })); // 전체 API 분당 120회
 
 // 손님 앱 정적 파일 서빙
-const staticPath = require('path').join(__dirname, 'public');
+const staticPath = path.join(__dirname, 'public');
 app.use(express.static(staticPath));
 
 // Routes
@@ -58,7 +61,7 @@ app.use('/api/v1/songs/:videoId/comments',             require('./src/routes/son
 // GET /api/v1/top10  (전체 카페 통합 TOP10, 인증 불필요)
 app.get('/api/v1/top10', async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
-  res.json(await require('./src/services/stats.service').getGlobalTop10(offset));
+  res.json(await statsService.getGlobalTop10(offset));
 });
 
 // Health check
@@ -66,13 +69,13 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', version: 'v2' }));
 
 // Owner SPA fallback
 app.get('/owner/*', (_req, res) => {
-  res.sendFile(require('path').join(staticPath, 'owner/index.html'));
+  res.sendFile(path.join(staticPath, 'owner/index.html'));
 });
 app.get('/owner', (_req, res) => res.redirect('/owner/'));
 
 // Customer SPA fallback — API 아닌 모든 경로에서 index.html 반환
 app.get('*', (_req, res) => {
-  res.sendFile(require('path').join(staticPath, 'index.html'));
+  res.sendFile(path.join(staticPath, 'index.html'));
 });
 
 // 전역 에러 핸들러
@@ -84,7 +87,6 @@ app.use((err, _req, res, _next) => {
 initSocket(io);
 
 server.listen(PORT, async () => {
-  const { networkInterfaces } = require('os');
   const nets = networkInterfaces();
   let localIp = 'localhost';
   for (const iface of Object.values(nets)) {

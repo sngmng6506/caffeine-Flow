@@ -4,6 +4,7 @@ const { requireAuth, requireCafeOwner } = require('../middleware/auth');
 const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
+const db            = require('../db/knex');
 
 // 신청 한도는 두 차원으로 적용:
 //  (1) visitor_id (클라이언트 localStorage UUID) — 같은 브라우저 식별
@@ -46,7 +47,6 @@ router.get('/', async (req, res) => {
   // 방문 기록 (같은 IP는 KST 기준 하루 1회만 — UNIQUE 제약 + ON CONFLICT DO NOTHING)
   const ip        = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
   const visitorId = req.headers['x-visitor-id'] || null;
-  const db        = require('../db/knex');
   db('cafe_visits')
     .insert({
       cafe_id:    cafe.id,

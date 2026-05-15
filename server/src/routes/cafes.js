@@ -3,12 +3,13 @@ const { requireAuth }  = require('../middleware/auth');
 const cafeService      = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
+const { APP_URL } = require('../config');
+const db = require('../db/knex');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.owner.slug);
   if (!cafe) return res.status(404).json({ error: 'Not found' });
-  const { APP_URL } = require('../config');
   const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
   res.json({ ...safeCafe(cafe), customer_url: `${baseUrl}/${cafe.slug}` });
 });
@@ -80,7 +81,6 @@ router.put('/me/status', requireAuth, async (req, res) => {
 
 // GET /api/v1/cafes/me/history?offset=0&date=YYYY-MM-DD
 router.get('/me/history', requireAuth, async (req, res) => {
-  const db     = require('../db/knex');
   const offset = parseInt(req.query.offset) || 0;
   const limit  = 20;
   let query = db('recommendations')
