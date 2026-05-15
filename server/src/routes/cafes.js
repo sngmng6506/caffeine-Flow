@@ -2,11 +2,7 @@ const router = require('express').Router();
 const { requireAuth }  = require('../middleware/auth');
 const cafeService      = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
-
-function safeCafe(cafe) {
-  const { ...rest } = cafe;
-  return rest;
-}
+const { safeCafe } = require('../utils/cafe-sanitize');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {

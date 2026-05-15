@@ -4,6 +4,7 @@ const axios    = require('axios');
 const { OAuth2Client } = require('google-auth-library');
 const { JWT_SECRET, GOOGLE_CLIENT_ID, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, APP_URL, SERVER_URL } = require('../config');
 const cafeService = require('../services/cafe.service');
+const { safeCafe } = require('../utils/cafe-sanitize');
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -15,11 +16,6 @@ function issueToken(cafe) {
 // 신규 가입 대기 토큰 (10분 유효)
 function issuePendingToken(payload) {
   return jwt.sign({ ...payload, pending: true }, JWT_SECRET, { expiresIn: '10m' });
-}
-
-function safeCafe(cafe) {
-  const { google_id, naver_id, ...rest } = cafe;
-  return { ...rest, provider: google_id ? 'google' : 'naver' };
 }
 
 // ────────────────────────────────────────────
