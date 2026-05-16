@@ -33,6 +33,19 @@ let soundcloudPoll       = null; // recView SoundCloud 트랙 종료 감지 폴�
 let currentRecMode       = null; // 'overlay' | 'spotify-takeover' | null
 let bgmSpotifyEndCleanup = null; // takeover 모드: bgmView 종료 감지 cleanup fn
 let savedBgmMeta         = null; // takeover 모드: 재생 중이던 BGM 트랙 메타 ({title, artist, trackId})
+let isQuitting           = false; // before-quit 이후 모든 비동기 콜백이 send 시도 안 하도록 차단
+
+// 앱 종료 중에 setInterval/setTimeout이 한 번 더 fire되어 destroy된 window/webContents에
+// send/executeJavaScript 호출하다 메인 프로세스가 uncaught throw로 crash dialog 띄우는 것 방지.
+function safeSend(channel, ...args) {
+  if (isQuitting) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (!mainWindow.webContents.isDestroyed()) {
+      safeSend(channel, ...args);
+    }
+  } catch {}
+}
 
 function getContentSize() {
   return mainWindow.getContentSize();
@@ -94,7 +107,7 @@ function createRecView() {
   // 영상 종료 감지 → React에 video-ended 전달
   recView.webContents.on('ipc-message', (_e, channel) => {
     if (channel === 'youtube-video-ended') {
-      mainWindow.webContents.send('video-ended');
+      safeSend('video-ended');
     }
   });
 
@@ -105,13 +118,13 @@ function createRecView() {
     const match = url.match(/[?&]v=([^&]+)/);
     if (match) {
       const videoId = match[1];
-      mainWindow.webContents.send('now-playing', {
+      safeSend('now-playing', {
         videoId,
         title: title.replace(/ - YouTube$/, ''),
         thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
       });
     } else {
-      mainWindow.webContents.send('now-playing', null);
+      safeSend('now-playing', null);
     }
   });
 }
@@ -188,7 +201,7 @@ function createWindow() {
   });
   // React 앱이 완전히 로드된 후 widevine 상태 전달
   mainWindow.webContents.once('did-finish-load', () => {
-    mainWindow.webContents.send('widevine-status', widevineStatus);
+    safeSend('widevine-status', widevineStatus);
   });
   mainWindow.on('resize', resizeViews);
 
@@ -216,7 +229,7 @@ ipcMain.on('open-login-window', (_e, url) => {
   loginWin.loadURL(url);
   loginWin.on('closed', () => {
     loginWin = null;
-    mainWindow.webContents.send('login-window-closed');
+    safeSend('login-window-closed');
   });
 });
 
@@ -338,13 +351,13 @@ ipcMain.on('open-bgm-devtools', () => {
 // 로그인 후 BGM 패널 표시
 ipcMain.on('show-youtube', () => {
   attachBgmPanel();
-  mainWindow.webContents.send('youtube-state', true);
+  safeSend('youtube-state', true);
 });
 
 // 로그아웃 시 모든 view 제거
 ipcMain.on('hide-youtube', () => {
   detachAll();
-  mainWindow.webContents.send('youtube-state', false);
+  safeSend('youtube-state', false);
 });
 
 // BGM URL 설정 — bgmView에 로드 + 패널이 닫혀있으면 자동으로 붙임
@@ -356,7 +369,7 @@ ipcMain.on('set-bgm-url', (_e, url) => {
     mainWindow.addBrowserView(bgmView);
     panelVisible = true;
     resizeViews();
-    mainWindow.webContents.send('youtube-state', true);
+    safeSend('youtube-state', true);
   }
   const currentUrl = bgmView.webContents.getURL();
   // Spotify는 이미 로드된 상태면 SPA 라우팅으로 이동 — loadURL은 전체 새로고침이라 플레이어 상태 초기화됨
@@ -522,12 +535,12 @@ function setupBgmSpotifyEndDetection(requestUrl) {
     // 다음 곡 음성 즉시 차단 — navigation 완료 전까지 무음
     try { if (bgmView) bgmView.webContents.setAudioMuted(true); } catch {}
     console.log('[takeover] firing video-ended');
-    mainWindow.webContents.send('video-ended');
+    safeSend('video-ended');
   };
 
   // 1초 간격 폴링: mediaSession 우선, DOM은 backup
   const poll = setInterval(async () => {
-    if (endFired || !bgmView) { clearInterval(poll); return; }
+    if (isQuitting || endFired || !bgmView || bgmView.webContents.isDestroyed()) { clearInterval(poll); return; }
     try {
       const info = await bgmView.webContents.executeJavaScript(`
         (function() {
@@ -727,7 +740,7 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
       // → 우리 종료 감지가 video-ended 발화 → 큐에서 사라지는 증상.
       let attempts = 0;
       const tryClick = async () => {
-        if (!recView || attempts >= 20) return;
+        if (isQuitting || !recView || recView.webContents.isDestroyed() || attempts >= 20) return;
         attempts++;
         try {
           const state = await recView.webContents.executeJavaScript(`
@@ -775,7 +788,7 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
     setTimeout(() => {
       if (!recView || endFired) return;
       soundcloudPoll = setInterval(async () => {
-        if (endFired || !recView) { clearInterval(soundcloudPoll); soundcloudPoll = null; return; }
+        if (isQuitting || endFired || !recView || recView.webContents.isDestroyed()) { clearInterval(soundcloudPoll); soundcloudPoll = null; return; }
         try {
           const info = await recView.webContents.executeJavaScript(`
             (function() {
@@ -792,7 +805,7 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
               endFired = true;
               clearInterval(soundcloudPoll); soundcloudPoll = null;
               try { recView.webContents.setAudioMuted(true); } catch {}
-              mainWindow.webContents.send('video-ended');
+              safeSend('video-ended');
             }
           } else {
             changeCount = 0;
@@ -813,14 +826,14 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
       endFired = true;
       if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
       try { if (recView) recView.webContents.setAudioMuted(true); } catch {}
-      mainWindow.webContents.send('video-ended');
+      safeSend('video-ended');
     };
 
     setTimeout(() => {
       if (!recView || endFired) return;
 
       spotifyPoll = setInterval(async () => {
-        if (endFired || !recView) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
+        if (isQuitting || endFired || !recView || recView.webContents.isDestroyed()) { clearInterval(spotifyPoll); spotifyPoll = null; return; }
         try {
           const info = await recView.webContents.executeJavaScript(`
             (function() {
@@ -880,7 +893,7 @@ ipcMain.on('end-rec', () => {
     savedBgmMeta = null;
     console.log('[end-rec takeover] restore to BGM URL:', currentBgmUrl, 'resume:', resumeMeta);
     if (bgmView && currentBgmUrl) bgmSpotifyNavigateAndPlay(currentBgmUrl, resumeMeta);
-    mainWindow.webContents.send('now-playing', null);
+    safeSend('now-playing', null);
     return;
   }
 
@@ -898,7 +911,7 @@ ipcMain.on('end-rec', () => {
     // 혹시 paused 상태로 남아있으면 play 클릭 (Spotify BGM + 비-Spotify rec 케이스 등)
     bgmView.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
   }
-  mainWindow.webContents.send('now-playing', null);
+  safeSend('now-playing', null);
 });
 
 app.whenReady().then(async () => {
@@ -944,7 +957,7 @@ app.whenReady().then(async () => {
     autoUpdater.on('update-not-available', ()   => console.log('[autoUpdater] up to date'));
     autoUpdater.on('update-downloaded',    info => {
       console.log('[autoUpdater] downloaded:', info.version);
-      mainWindow.webContents.send('update-downloaded', info.version);
+      safeSend('update-downloaded', info.version);
     });
     autoUpdater.checkForUpdates();
   }
@@ -952,3 +965,12 @@ app.whenReady().then(async () => {
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+
+// 앱 종료 직전 모든 polling·timer 정리 — destroy된 webContents에 콜백이 fire되는 것을 막아
+// "Object has been destroyed" uncaught exception을 사전 차단.
+app.on('before-quit', () => {
+  isQuitting = true;
+  if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
+  if (soundcloudPoll) { clearInterval(soundcloudPoll); soundcloudPoll = null; }
+  if (bgmSpotifyEndCleanup) { try { bgmSpotifyEndCleanup(); } catch {} bgmSpotifyEndCleanup = null; }
+});
