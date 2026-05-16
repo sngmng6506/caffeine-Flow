@@ -725,6 +725,9 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
       const tryClick = () => {
         if (!recView || attempts >= 10) return;
         attempts++;
+        // 두 번째 인자 true: executeJavaScript를 user gesture로 실행 → synthetic click이
+        // 실제 사용자 클릭으로 인정돼 첫 신청곡도 audio 재생 허용됨.
+        // (기본값 false 상태에선 Chromium이 첫 재생을 막아 사용자가 수동 클릭해야 했음)
         recView.webContents.executeJavaScript(`
           (function() {
             const sels = ['button.playButton', '.sc-button-play', 'button[aria-label="Play"]', 'button[title="Play"]'];
@@ -734,7 +737,7 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
             }
             return 'not-found';
           })()
-        `).then((r) => {
+        `, true).then((r) => {
           if (r !== 'clicked') setTimeout(tryClick, 500);
         }).catch(() => setTimeout(tryClick, 500));
       };
