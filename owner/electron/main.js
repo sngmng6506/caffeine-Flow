@@ -721,40 +721,43 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
         })()
       `).catch((e) => console.error('[CF killModals]', e));
 
+      // SC는 페이지 이동 직후 트랙 메타데이터 로드하느라 재생 버튼을 잠시 비활성 상태로 둠.
+      // 한 번 클릭하고 끝내면 비활성 상태 클릭이 no-op으로 묻혀 재생 안 됨.
+      // 매 시도마다 (1) audio 재생 중인지 확인 → 재생 중이면 종료, (2) 아니면 다시 클릭, 반복.
       let attempts = 0;
       const tryClick = async () => {
-        if (!recView || attempts >= 10) return;
+        if (!recView || attempts >= 20) return;
         attempts++;
-        // btn.click() (synthetic)은 SoundCloud가 event.isTrusted=false로 보고 reject.
-        // 대신 button 좌표를 가져와 sendInputEvent로 실제 마우스 입력을 dispatch →
-        // Chromium 입력 시스템 경유 → isTrusted=true 이벤트 발화 → SC player accept.
         try {
-          const rect = await recView.webContents.executeJavaScript(`
+          const state = await recView.webContents.executeJavaScript(`
             (function() {
-              const sels = ['button.playButton', '.sc-button-play', 'button[aria-label="Play"]', 'button[title="Play"]'];
+              const audio = document.querySelector('audio');
+              if (audio && !audio.paused && audio.currentTime > 0) return { playing: true };
+              // 재생 버튼 찾기 (SC는 <a class="playButton">). title="Pause"는 이미 재생 중이라 제외.
+              const sels = ['a.playButton', 'button.playButton', '.sc-button-play', '[title="Play"]'];
               for (const sel of sels) {
                 const btn = document.querySelector(sel);
-                if (btn) {
-                  const r = btn.getBoundingClientRect();
-                  if (r.width > 0 && r.height > 0) {
-                    return { x: r.left + r.width/2, y: r.top + r.height/2 };
-                  }
+                if (!btn) continue;
+                if (btn.getAttribute('title') === 'Pause') continue;
+                const r = btn.getBoundingClientRect();
+                if (r.width > 0 && r.height > 0) {
+                  return { playing: false, x: r.left + r.width/2, y: r.top + r.height/2 };
                 }
               }
-              return null;
+              return { playing: false };
             })()
           `);
-          if (rect && rect.x > 0 && rect.y > 0) {
-            const x = Math.round(rect.x), y = Math.round(rect.y);
+          if (state.playing) return;
+          if (state.x && state.y) {
+            const x = Math.round(state.x), y = Math.round(state.y);
             recView.webContents.sendInputEvent({ type: 'mouseMove', x, y });
             recView.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
             recView.webContents.sendInputEvent({ type: 'mouseUp',   x, y, button: 'left', clickCount: 1 });
-            return;
           }
         } catch {}
-        setTimeout(tryClick, 500);
+        setTimeout(tryClick, 700);
       };
-      setTimeout(tryClick, 400);
+      setTimeout(tryClick, 600);
     });
 
     // SoundCloud는 트랙 끝나면 자체적으로 다음 추천 트랙 autoplay → ended 이벤트 미발생.
