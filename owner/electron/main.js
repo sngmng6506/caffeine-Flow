@@ -722,24 +722,37 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
       `).catch((e) => console.error('[CF killModals]', e));
 
       let attempts = 0;
-      const tryClick = () => {
+      const tryClick = async () => {
         if (!recView || attempts >= 10) return;
         attempts++;
-        // 두 번째 인자 true: executeJavaScript를 user gesture로 실행 → synthetic click이
-        // 실제 사용자 클릭으로 인정돼 첫 신청곡도 audio 재생 허용됨.
-        // (기본값 false 상태에선 Chromium이 첫 재생을 막아 사용자가 수동 클릭해야 했음)
-        recView.webContents.executeJavaScript(`
-          (function() {
-            const sels = ['button.playButton', '.sc-button-play', 'button[aria-label="Play"]', 'button[title="Play"]'];
-            for (const sel of sels) {
-              const btn = document.querySelector(sel);
-              if (btn) { btn.click(); return 'clicked'; }
-            }
-            return 'not-found';
-          })()
-        `, true).then((r) => {
-          if (r !== 'clicked') setTimeout(tryClick, 500);
-        }).catch(() => setTimeout(tryClick, 500));
+        // btn.click() (synthetic)은 SoundCloud가 event.isTrusted=false로 보고 reject.
+        // 대신 button 좌표를 가져와 sendInputEvent로 실제 마우스 입력을 dispatch →
+        // Chromium 입력 시스템 경유 → isTrusted=true 이벤트 발화 → SC player accept.
+        try {
+          const rect = await recView.webContents.executeJavaScript(`
+            (function() {
+              const sels = ['button.playButton', '.sc-button-play', 'button[aria-label="Play"]', 'button[title="Play"]'];
+              for (const sel of sels) {
+                const btn = document.querySelector(sel);
+                if (btn) {
+                  const r = btn.getBoundingClientRect();
+                  if (r.width > 0 && r.height > 0) {
+                    return { x: r.left + r.width/2, y: r.top + r.height/2 };
+                  }
+                }
+              }
+              return null;
+            })()
+          `);
+          if (rect && rect.x > 0 && rect.y > 0) {
+            const x = Math.round(rect.x), y = Math.round(rect.y);
+            recView.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+            recView.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
+            recView.webContents.sendInputEvent({ type: 'mouseUp',   x, y, button: 'left', clickCount: 1 });
+            return;
+          }
+        } catch {}
+        setTimeout(tryClick, 500);
       };
       setTimeout(tryClick, 400);
     });
