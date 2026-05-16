@@ -966,11 +966,29 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 
-// 앱 종료 직전 모든 polling·timer 정리 — destroy된 webContents에 콜백이 fire되는 것을 막아
-// "Object has been destroyed" uncaught exception을 사전 차단.
-app.on('before-quit', () => {
-  isQuitting = true;
+// 앱 종료 직전 polling·timer 정리 + renderer cleanup 호출 (playing → played 마킹).
+// destroy된 webContents에 콜백이 fire되는 것을 막아 "Object has been destroyed" uncaught
+// exception을 사전 차단하면서, 손님 화면에 가짜 "재생 중" 상태가 남지 않게 처리.
+let cleanupRequested = false;
+app.on('before-quit', (event) => {
+  // polling은 즉시 정리 (어차피 cleanup 끝나면 quit이라 안전)
   if (spotifyPoll) { clearInterval(spotifyPoll); spotifyPoll = null; }
   if (soundcloudPoll) { clearInterval(soundcloudPoll); soundcloudPoll = null; }
   if (bgmSpotifyEndCleanup) { try { bgmSpotifyEndCleanup(); } catch {} bgmSpotifyEndCleanup = null; }
+
+  // renderer에 cleanup 요청. 회신 받기 전까지 quit 보류.
+  if (cleanupRequested) return; // 이미 cleanup 진행 중·완료 → 그대로 quit 진행
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) {
+    isQuitting = true; return;
+  }
+  event.preventDefault();
+  cleanupRequested = true;
+  try { mainWindow.webContents.send('cleanup-before-quit'); } catch {}
+  // 3초 timeout — renderer가 실패해도 강제 quit
+  setTimeout(() => { isQuitting = true; app.quit(); }, 3000);
+});
+
+ipcMain.on('cleanup-done', () => {
+  isQuitting = true;
+  app.quit();
 });

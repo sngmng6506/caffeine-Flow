@@ -176,6 +176,18 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         .catch(console.error);
     });
 
+    // 앱 종료 직전: 현재 playing 곡들을 played로 마킹 → 손님 화면에 "재생 중" 가짜 표시 제거.
+    // pending·accepted 큐는 유지 (다음 영업 시작 시 이어 재생).
+    window.electronAPI?.onCleanupBeforeQuit(async () => {
+      try {
+        const playing = recsRef.current.filter(r => r.status === 'playing');
+        await Promise.all(
+          playing.map(r => updateRec(cafe.slug, r.id, 'played').catch(() => null))
+        );
+      } catch {}
+      window.electronAPI?.cleanupDone();
+    });
+
     return () => {
       disconnectSocket();
       window.electronAPI?.removeAllListeners();

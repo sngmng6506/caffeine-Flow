@@ -31,7 +31,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_e, version) => cb(version)),
   restartApp:         ()   => ipcRenderer.send('restart-app'),
 
+  // 종료 전 cleanup: main에서 'cleanup-before-quit' 보내면 renderer가 playing → played
+  // 처리 후 'cleanup-done' 회신. main이 회신 받으면 quit 진행 (3초 timeout fallback).
+  onCleanupBeforeQuit: (cb) => ipcRenderer.on('cleanup-before-quit', () => cb()),
+  cleanupDone:         ()   => ipcRenderer.send('cleanup-done'),
+
   removeAllListeners: () => {
-    ['youtube-state', 'video-ended', 'now-playing'].forEach(ch => ipcRenderer.removeAllListeners(ch));
+    ['youtube-state', 'video-ended', 'now-playing', 'cleanup-before-quit'].forEach(ch => ipcRenderer.removeAllListeners(ch));
   },
 });
