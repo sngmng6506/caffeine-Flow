@@ -721,9 +721,10 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
         })()
       `).catch((e) => console.error('[CF killModals]', e));
 
-      // SC는 페이지 이동 직후 트랙 메타데이터 로드하느라 재생 버튼을 잠시 비활성 상태로 둠.
-      // 한 번 클릭하고 끝내면 비활성 상태 클릭이 no-op으로 묻혀 재생 안 됨.
-      // 매 시도마다 (1) audio 재생 중인지 확인 → 재생 중이면 종료, (2) 아니면 다시 클릭, 반복.
+      // SC 트랙 페이지에는 재생 버튼이 여러 곳에 있음(메인 hero / related tracks / 하단 bar).
+      // 메인 트랙의 hero 재생 버튼만 정밀하게 타겟해야 함 — 안 그러면 related track 재생 버튼을
+      // 누르게 돼서 SC가 현재 트랙을 멈추고 다른 트랙으로 점프함 → mediaSession 시그니처 변화
+      // → 우리 종료 감지가 video-ended 발화 → 큐에서 사라지는 증상.
       let attempts = 0;
       const tryClick = async () => {
         if (!recView || attempts >= 20) return;
@@ -732,13 +733,19 @@ ipcMain.on('play-rec', async (_e, videoIdOrUrl) => {
           const state = await recView.webContents.executeJavaScript(`
             (function() {
               const audio = document.querySelector('audio');
-              if (audio && !audio.paused && audio.currentTime > 0) return { playing: true };
-              // 재생 버튼 찾기 (SC는 <a class="playButton">). title="Pause"는 이미 재생 중이라 제외.
-              const sels = ['a.playButton', 'button.playButton', '.sc-button-play', '[title="Play"]'];
+              // 재생 시작은 paused=false 만으로 충분 (초기 버퍼링 중엔 currentTime=0이라 그것까지 요구하면 false negative).
+              if (audio && !audio.paused) return { playing: true };
+              // hero(메인) 재생 버튼만 매칭. related tracks·playControls 의 .playButton 은 무시.
+              const sels = [
+                '.fullListenHero a.playButton',
+                '.soundTitle__playButtonHero a',
+                '.fullHero a.playButton',
+                '.l-listen-hero a.sc-button-play',
+              ];
               for (const sel of sels) {
                 const btn = document.querySelector(sel);
                 if (!btn) continue;
-                if (btn.getAttribute('title') === 'Pause') continue;
+                if (btn.getAttribute('title') === 'Pause') continue; // 이미 재생 중
                 const r = btn.getBoundingClientRect();
                 if (r.width > 0 && r.height > 0) {
                   return { playing: false, x: r.left + r.width/2, y: r.top + r.height/2 };
