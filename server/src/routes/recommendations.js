@@ -12,6 +12,9 @@ const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
 const db            = require('../db/knex');
 const { MAX_QUEUE_SIZE, broadcast, getClientIp } = require('./_recommendations.shared');
+const { validateString, validateInEnum } = require('../utils/validate');
+
+const VALID_PLATFORMS = ['youtube', 'soundcloud', 'spotify'];
 
 // 신청 한도는 두 차원으로 적용:
 //  (1) visitor_id (클라이언트 localStorage UUID) — 같은 브라우저 식별
@@ -69,10 +72,30 @@ router.post('/', requestLimiters, async (req, res) => {
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   if (!cafe.is_accepting) return res.status(403).json({ error: '현재 추천을 받지 않습니다' });
 
-  const { videoId, title, channelTitle, thumbnail, duration, requesterName, platform = 'youtube' } = req.body;
-  if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
+  const body = req.body || {};
+  const videoIdCheck = validateString(body.videoId, { max: 1000, name: 'videoId' });
+  if (videoIdCheck.error) return res.status(400).json({ error: videoIdCheck.error });
+  const titleCheck = validateString(body.title, { max: 500, name: 'title' });
+  if (titleCheck.error) return res.status(400).json({ error: titleCheck.error });
+  const channelCheck = validateString(body.channelTitle, { max: 200, allowNull: true, name: 'channelTitle' });
+  if (channelCheck.error) return res.status(400).json({ error: channelCheck.error });
+  const thumbnailCheck = validateString(body.thumbnail, { max: 500, allowNull: true, name: 'thumbnail' });
+  if (thumbnailCheck.error) return res.status(400).json({ error: thumbnailCheck.error });
+  const durationCheck = validateString(body.duration, { max: 20, allowNull: true, name: 'duration' });
+  if (durationCheck.error) return res.status(400).json({ error: durationCheck.error });
+  const requesterCheck = validateString(body.requesterName, { max: 50, allowNull: true, name: 'requesterName' });
+  if (requesterCheck.error) return res.status(400).json({ error: requesterCheck.error });
+  const platformCheck = validateInEnum(body.platform || 'youtube', VALID_PLATFORMS, { name: 'platform' });
+  if (platformCheck.error) return res.status(400).json({ error: platformCheck.error });
+  const { value: videoId } = videoIdCheck;
+  const { value: title } = titleCheck;
+  const channelTitle = channelCheck.value;
+  const thumbnail = thumbnailCheck.value;
+  const duration = durationCheck.value;
+  const requesterName = requesterCheck.value;
+  const platform = platformCheck.value;
 
-  const allowed = cafe.allowed_platforms ? cafe.allowed_platforms.split(',') : ['youtube', 'soundcloud', 'spotify'];
+  const allowed = cafe.allowed_platforms ? cafe.allowed_platforms.split(',') : VALID_PLATFORMS;
   if (!allowed.includes(platform)) {
     const platformNames = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify' };
     return res.status(403).json({ error: `이 카페에서는 ${platformNames[platform] || platform} 신청을 받지 않습니다` });
@@ -86,7 +109,8 @@ router.post('/', requestLimiters, async (req, res) => {
     return res.status(429).json({ error: `대기열이 가득 찼습니다 (최대 ${MAX_QUEUE_SIZE}곡)` });
 
   const ip  = getClientIp(req);
-  const visitorId = req.headers['x-visitor-id'] || null;
+  const rawVisitor = req.headers['x-visitor-id'];
+  const visitorId = typeof rawVisitor === 'string' && rawVisitor.length <= 64 ? rawVisitor : null;
   const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform, visitorId });
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });
@@ -137,10 +161,12 @@ router.delete('/:id/vote', async (req, res) => {
 
 // POST /api/v1/cafes/:slug/recommendations/:id/comments
 router.post('/:id/comments', async (req, res) => {
-  const { commenterName, body } = req.body;
-  if (!body) return res.status(400).json({ error: 'body 필수' });
+  const bodyCheck = validateString(req.body?.body, { max: 200, name: 'body' });
+  if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
+  const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });
+  if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
   const ip      = getClientIp(req);
-  const comment = await recService.addComment(req.params.id, { commenterIp: ip, commenterName, body });
+  const comment = await recService.addComment(req.params.id, { commenterIp: ip, commenterName: nameCheck.value, body: bodyCheck.value });
   broadcast(req, req.params.slug, 'comment_added', { recommendationId: req.params.id, comment });
   res.status(201).json(comment);
 });

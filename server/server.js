@@ -5,6 +5,8 @@ require('express-async-errors');
 const http      = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
+const helmet       = require('helmet');
+const cookieParser = require('cookie-parser');
 const { networkInterfaces } = require('os');
 
 const { PORT, APP_URL } = require('./src/config');
@@ -42,7 +44,10 @@ const io = new Server(server, {
 app.set('io', io);
 
 app.set('trust proxy', 1); // Railway 등 리버스 프록시 뒤에서 실제 IP 인식
-app.use(express.json());
+// 보안 헤더 — CSP는 inline script가 많은 SPA·SoundCloud iframe 호환 위해 미설정. 그 외 표준 헤더만.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(cookieParser());
+app.use(express.json({ limit: '64kb' })); // body 크기 상한 — DoS 방어
 app.use(rateLimit({ windowMs: 60_000, max: 120 })); // 전체 API 분당 120회
 
 // 손님 앱 정적 파일 서빙

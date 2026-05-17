@@ -1,5 +1,32 @@
 const router = require('express').Router();
 const axios  = require('axios');
+const dns    = require('dns');
+const net    = require('net');
+
+// SSRF 차단 — axios가 요청 직전 호스트 DNS 결과를 검사해 private/loopback/link-local IP를
+// 가리키면 즉시 reject. SoundCloud 단축 URL이 리다이렉트 추적 중에 내부망 호스트로
+// 유도되는 케이스 방어.
+const PRIVATE_IPV4_RE = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|0\.|255\.)/;
+function isPrivateAddress(addr) {
+  if (!addr) return true;
+  if (net.isIPv6(addr)) return true; // 단순화: IPv6는 전부 막음 (소셜 oembed는 다 IPv4)
+  return PRIVATE_IPV4_RE.test(addr);
+}
+async function assertPublicHost(host) {
+  return new Promise((resolve, reject) => {
+    dns.lookup(host, { all: true }, (err, addresses) => {
+      if (err) return reject(new Error(`DNS 해석 실패: ${host}`));
+      const blocked = addresses.find(a => isPrivateAddress(a.address));
+      if (blocked) return reject(new Error(`내부 IP 차단: ${host} → ${blocked.address}`));
+      resolve();
+    });
+  });
+}
+async function safeAxiosGet(url, options = {}) {
+  const u = new URL(url);
+  await assertPublicHost(u.hostname);
+  return axios.get(url, options);
+}
 
 function detectPlatform(url) {
   try {
@@ -77,7 +104,7 @@ router.get('/oembed', async (req, res) => {
       const u = new URL(rawUrl);
       const isShort = u.hostname === 'on.soundcloud.com' || u.hostname.endsWith('soundcloud.app.goo.gl');
       if (isShort) {
-        const resp = await axios.get(rawUrl, {
+        const resp = await safeAxiosGet(rawUrl, {
           maxRedirects: 5,
           timeout: 8000,
           headers: { 'User-Agent': UA },

@@ -1,9 +1,15 @@
 const router      = require('express').Router({ mergeParams: true });
 const cafeService = require('../services/cafe.service');
 const svc         = require('../services/song_comments.service');
+const { validateString } = require('../utils/validate');
 
 function getIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+}
+
+function safeVisitorId(req) {
+  const v = req.headers['x-visitor-id'];
+  return typeof v === 'string' && v.length <= 64 ? v : null;
 }
 
 // GET  /api/v1/cafes/:slug/songs/:videoId/comments
@@ -15,16 +21,17 @@ router.get('/', async (req, res) => {
 // POST /api/v1/cafes/:slug/songs/:videoId/comments
 // POST /api/v1/songs/:videoId/comments
 router.post('/', async (req, res) => {
-  const { commenterName, body } = req.body;
-  if (!body?.trim()) return res.status(400).json({ error: 'body 필수' });
+  const bodyCheck = validateString(req.body?.body, { max: 200, name: 'body' });
+  if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
+  const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });
+  if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
 
   const cafeId = await resolveCafeId(req);
-  const visitorId = req.headers['x-visitor-id'] || null;
   const comment = await svc.addComment(req.params.videoId, cafeId, {
     commenterIp:   getIp(req),
-    commenterName: commenterName || undefined,
-    body:          body.trim(),
-    visitorId,
+    commenterName: nameCheck.value || undefined,
+    body:          bodyCheck.value,
+    visitorId:     safeVisitorId(req),
   });
   res.status(201).json(comment);
 });
@@ -32,16 +39,17 @@ router.post('/', async (req, res) => {
 // POST /api/v1/cafes/:slug/songs/:videoId/comments/:commentId/replies
 // POST /api/v1/songs/:videoId/comments/:commentId/replies
 router.post('/:commentId/replies', async (req, res) => {
-  const { commenterName, body } = req.body;
-  if (!body?.trim()) return res.status(400).json({ error: 'body 필수' });
+  const bodyCheck = validateString(req.body?.body, { max: 200, name: 'body' });
+  if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
+  const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });
+  if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
 
   const cafeId = await resolveCafeId(req);
-  const visitorId = req.headers['x-visitor-id'] || null;
   const reply = await svc.addReply(req.params.commentId, cafeId, {
     commenterIp:   getIp(req),
-    commenterName: commenterName || undefined,
-    body:          body.trim(),
-    visitorId,
+    commenterName: nameCheck.value || undefined,
+    body:          bodyCheck.value,
+    visitorId:     safeVisitorId(req),
   });
   res.status(201).json(reply);
 });

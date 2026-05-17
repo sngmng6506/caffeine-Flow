@@ -1,10 +1,15 @@
 const router   = require('express').Router();
 const jwt      = require('jsonwebtoken');
+const crypto   = require('crypto');
 const axios    = require('axios');
 const { OAuth2Client } = require('google-auth-library');
 const { JWT_SECRET, GOOGLE_CLIENT_ID, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, APP_URL, SERVER_URL } = require('../config');
 const cafeService = require('../services/cafe.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
+const { validateString, validateBool } = require('../utils/validate');
+
+const NAVER_STATE_COOKIE = 'cf_naver_state';
+const STATE_COOKIE_OPTS = { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/api/v1/auth' };
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -25,7 +30,8 @@ function issuePendingToken(payload) {
 // ────────────────────────────────────────────
 router.post('/google', async (req, res) => {
   const { idToken, cafeName, agreed } = req.body;
-  if (!idToken) return res.status(400).json({ error: 'idToken 필수' });
+  const idTokenCheck = validateString(idToken, { max: 4096, name: 'idToken' });
+  if (idTokenCheck.error) return res.status(400).json({ error: idTokenCheck.error });
 
   let payload;
   try {
@@ -46,8 +52,10 @@ router.post('/google', async (req, res) => {
 
   // 신규 가입 완료
   if (cafeName && agreed) {
+    const nameCheck = validateString(cafeName, { max: 100, name: '카페명' });
+    if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
     const cafe = await cafeService.create({
-      name: cafeName,
+      name: nameCheck.value,
       ownerEmail: email,
       googleId,
       disclaimerAcceptedAt: new Date(),
@@ -61,9 +69,10 @@ router.post('/google', async (req, res) => {
 
 // ────────────────────────────────────────────
 // GET /api/v1/auth/naver  → 네이버 로그인 페이지로 리다이렉트
+// state는 암호학적으로 안전한 nonce. HttpOnly 쿠키에 저장하고 콜백에서 대조 → CSRF 차단.
 // ────────────────────────────────────────────
 router.get('/naver', (req, res) => {
-  const state       = Math.random().toString(36).slice(2);
+  const state       = crypto.randomBytes(24).toString('hex');
   const redirectUri = `${SERVER_URL}/api/v1/auth/naver/callback`;
   const params = new URLSearchParams({
     response_type: 'code',
@@ -71,9 +80,8 @@ router.get('/naver', (req, res) => {
     redirect_uri:  redirectUri,
     state,
   });
-  const fullUrl = `https://nid.naver.com/oauth2.0/authorize?${params}`;
-  console.log('[naver] full URL:', fullUrl);
-  res.redirect(fullUrl);
+  res.cookie(NAVER_STATE_COOKIE, state, STATE_COOKIE_OPTS);
+  res.redirect(`https://nid.naver.com/oauth2.0/authorize?${params}`);
 });
 
 // ────────────────────────────────────────────
@@ -83,6 +91,14 @@ router.get('/naver/callback', async (req, res) => {
   const { code, state } = req.query;
   // 사장님 앱은 /owner/ 경로에서 서빙됨 — 콜백 리다이렉트도 해당 경로로
   const ownerUrl = `${APP_URL.replace(/\/$/, '')}/owner/`;
+
+  // CSRF: 쿠키에 저장한 state와 URL의 state 가 일치해야만 통과. timingSafeEqual 로 비교.
+  const expectedState = req.cookies?.[NAVER_STATE_COOKIE];
+  res.clearCookie(NAVER_STATE_COOKIE, { ...STATE_COOKIE_OPTS, maxAge: 0 });
+  if (!expectedState || typeof state !== 'string' || expectedState.length !== state.length ||
+      !crypto.timingSafeEqual(Buffer.from(expectedState), Buffer.from(state))) {
+    return res.redirect(`${ownerUrl}?error=invalid_state`);
+  }
   if (!code) return res.redirect(`${ownerUrl}?error=naver_cancelled`);
 
   try {
@@ -129,8 +145,11 @@ router.get('/naver/callback', async (req, res) => {
 // ────────────────────────────────────────────
 router.post('/complete', async (req, res) => {
   const { pendingToken, cafeName, agreed, agreements, location } = req.body;
-  if (!pendingToken || !cafeName || !agreed)
-    return res.status(400).json({ error: '필수 항목 누락' });
+  const tokenCheck = validateString(pendingToken, { max: 4096, name: 'pendingToken' });
+  if (tokenCheck.error) return res.status(400).json({ error: tokenCheck.error });
+  const nameCheck = validateString(cafeName, { max: 100, name: '카페명' });
+  if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
+  if (!agreed) return res.status(400).json({ error: '약관 동의 필수' });
 
   // 필수 약관 동의 검증
   if (!agreements?.service || !agreements?.privacy || !agreements?.copyright)
@@ -149,7 +168,7 @@ router.post('/complete', async (req, res) => {
   }
 
   const cafe = await cafeService.create({
-    name:                 cafeName,
+    name:                 nameCheck.value,
     ownerEmail:           pending.email || null,
     googleId:             pending.googleId || null,
     naverId:              pending.naverId  || null,

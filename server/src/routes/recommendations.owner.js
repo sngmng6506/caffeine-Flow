@@ -8,6 +8,7 @@ const { requireAuth, requireCafeOwner } = require('../middleware/auth');
 const cafeService = require('../services/cafe.service');
 const recService  = require('../services/recommendation.service');
 const { broadcast } = require('./_recommendations.shared');
+const { validateString, validateInEnum } = require('../utils/validate');
 
 const ownerOnly = [requireAuth, requireCafeOwner];
 
@@ -16,14 +17,28 @@ router.post('/owner', ownerOnly, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
 
-  const { videoId, title, channelTitle, thumbnail, duration, status } = req.body;
-  if (!videoId || !title) return res.status(400).json({ error: 'videoId, title 필수' });
+  const body = req.body || {};
+  const videoIdCheck = validateString(body.videoId, { max: 1000, name: 'videoId' });
+  if (videoIdCheck.error) return res.status(400).json({ error: videoIdCheck.error });
+  const titleCheck = validateString(body.title, { max: 500, name: 'title' });
+  if (titleCheck.error) return res.status(400).json({ error: titleCheck.error });
+  const channelCheck = validateString(body.channelTitle, { max: 200, allowNull: true, name: 'channelTitle' });
+  if (channelCheck.error) return res.status(400).json({ error: channelCheck.error });
+  const thumbnailCheck = validateString(body.thumbnail, { max: 500, allowNull: true, name: 'thumbnail' });
+  if (thumbnailCheck.error) return res.status(400).json({ error: thumbnailCheck.error });
+  const durationCheck = validateString(body.duration, { max: 20, allowNull: true, name: 'duration' });
+  if (durationCheck.error) return res.status(400).json({ error: durationCheck.error });
+  const { value: videoId } = videoIdCheck;
+  const { value: title } = titleCheck;
+  const channelTitle = channelCheck.value;
+  const thumbnail = thumbnailCheck.value;
+  const duration = durationCheck.value;
 
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
   if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
 
   const validStatuses = ['pending', 'accepted', 'playing'];
-  const recStatus = validStatuses.includes(status) ? status : 'pending';
+  const recStatus = validStatuses.includes(body.status) ? body.status : 'pending';
 
   if (recStatus === 'playing') {
     const cleared = await recService.clearPlaying(cafe.id, null);

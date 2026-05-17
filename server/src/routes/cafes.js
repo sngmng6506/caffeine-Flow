@@ -4,6 +4,7 @@ const cafeService      = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { APP_URL } = require('../config');
+const { validateString, validateBool } = require('../utils/validate');
 const db = require('../db/knex');
 
 // GET /api/v1/cafes/me
@@ -16,16 +17,18 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // PUT /api/v1/cafes/me
 router.put('/me', requireAuth, async (req, res) => {
-  const { name } = req.body;
-  const cafe = await cafeService.update(req.owner.cafeId, { name });
+  const nameCheck = validateString(req.body?.name, { max: 100, name: '카페명' });
+  if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
+  const cafe = await cafeService.update(req.owner.cafeId, { name: nameCheck.value });
   req.app.get('io')?.of('/cafe').to(cafe.slug).emit('cafe_updated', { cafe_name: cafe.name });
   res.json(safeCafe(cafe));
 });
 
 // PUT /api/v1/cafes/me/notice
 router.put('/me/notice', requireAuth, async (req, res) => {
-  const { notice } = req.body;
-  const cafe = await cafeService.update(req.owner.cafeId, { notice: notice?.trim() || null });
+  const noticeCheck = validateString(req.body?.notice, { max: 500, allowNull: true, name: '공지' });
+  if (noticeCheck.error) return res.status(400).json({ error: noticeCheck.error });
+  const cafe = await cafeService.update(req.owner.cafeId, { notice: noticeCheck.value });
   req.app.get('io')?.of('/cafe').to(cafe.slug).emit('notice_updated', { notice: cafe.notice });
   res.json({ notice: cafe.notice });
 });
@@ -73,8 +76,9 @@ router.put('/me/address', requireAuth, async (req, res) => {
 
 // PUT /api/v1/cafes/me/status  (신청 ON/OFF 토글)
 router.put('/me/status', requireAuth, async (req, res) => {
-  const { is_accepting } = req.body;
-  const cafe = await cafeService.update(req.owner.cafeId, { is_accepting });
+  const check = validateBool(req.body?.is_accepting, { name: 'is_accepting' });
+  if (check.error) return res.status(400).json({ error: check.error });
+  const cafe = await cafeService.update(req.owner.cafeId, { is_accepting: check.value });
   req.app.get('io')?.of('/cafe').to(cafe.slug).emit('system_toggled', { is_accepting: cafe.is_accepting });
   res.json({ is_accepting: cafe.is_accepting });
 });
