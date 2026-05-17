@@ -16,17 +16,6 @@
 - 시간대 / 요일별 통계
 - 손님용 QR 코드 생성
 
-## 디렉토리 구조
-
-| 경로        | 역할                                              |
-| ----------- | ------------------------------------------------- |
-| `server/`   | Express + Postgres 백엔드 (v2, **활성**)          |
-| `customer/` | 손님용 Vite/React SPA                             |
-| `owner/`    | 사장님용 Vite/React SPA + Electron 데스크톱 앱     |
-| `extension/`| Chrome 익스텐션 (v1 프로토콜, **현재 미사용**)    |
-
-배포 entry는 `railway.json`이 `server/server.js`를 명시한다.
-
 ## License
 
 BSL
