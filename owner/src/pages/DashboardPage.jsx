@@ -719,6 +719,9 @@ function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatu
           {isPlaying && <span style={dfStyles.playing}>▶ 재생 중</span>}
           <div style={dfStyles.title}>{defaultVideo.title}</div>
           <div style={dfStyles.hint}>클릭하면 해당 플레이어로 이동 · 신청곡 없을 때 자동 재생</div>
+          {/spotify\.com/i.test(url) && (
+            <div style={{ ...dfStyles.hint, color: '#1db954' }}>※ Spotify 계정 로그인 필요 (Premium 권장)</div>
+          )}
           {/spotify\.com/i.test(url) && widevineStatus === 'not_found' && (
             <div style={dfStyles.warn}>⚠️ Chrome 미설치 — Spotify 재생 불가</div>
           )}
@@ -1064,6 +1067,7 @@ const SHORTCUT_GROUPS = [
     platform: 'YouTube',
     color: '#ff0000',
     bg: '#fff5f5',
+    note: '계정 불필요',
     links: [
       { label: 'YouTube Music', url: 'https://music.youtube.com' },
       { label: 'YouTube', url: 'https://www.youtube.com' },
@@ -1074,6 +1078,7 @@ const SHORTCUT_GROUPS = [
     platform: 'Spotify',
     color: '#1db954',
     bg: '#f0fff5',
+    note: '계정 필요 (Premium 권장)',
     links: [
       { label: 'Spotify',         url: 'https://open.spotify.com',                       action: 'bgm' },
       { label: '카페 플레이리스트', url: 'https://open.spotify.com/search/cafe%20playlist', action: 'bgm' },
@@ -1085,6 +1090,7 @@ const SHORTCUT_GROUPS = [
     platform: 'SoundCloud',
     color: '#ff5500',
     bg: '#fff8f5',
+    note: '계정 불필요',
     links: [
       { label: 'SoundCloud', url: 'https://soundcloud.com', action: 'bgm' },
     ],
@@ -1110,9 +1116,12 @@ async function runShortcutAction(link) {
 function ShortcutsTab() {
   return (
     <div style={{ paddingTop: 8 }}>
-      {SHORTCUT_GROUPS.map(({ platform, color, bg, links }) => (
+      {SHORTCUT_GROUPS.map(({ platform, color, bg, note, links }) => (
         <div key={platform} style={{ marginBottom: 14, borderRadius: 10, background: bg, padding: '12px 14px', border: `1px solid ${color}33` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10, letterSpacing: 0.3 }}>{platform}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10, letterSpacing: 0.3 }}>
+            {platform}
+            {note && <span style={{ marginLeft: 8, fontWeight: 400, color: '#888', fontSize: 11 }}>· {note}</span>}
+          </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {links.map((link) => {
               const isReset = link.action === 'clear-spotify-login';
