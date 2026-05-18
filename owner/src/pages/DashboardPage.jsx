@@ -240,6 +240,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     isDraggingDivider.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
+    // 드래그 동안 BrowserView 임시 detach — renderer 가 전체 윈도우 mousemove 캡처.
+    window.electronAPI?.dividerDragStart?.();
     function onMove(ev) {
       if (!isDraggingDivider.current) return;
       const ratio = Math.min(0.85, Math.max(0.15, ev.clientX / window.innerWidth));
@@ -251,6 +253,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       isDraggingDivider.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      window.electronAPI?.dividerDragEnd?.();
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     }
@@ -409,14 +412,18 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
   return (
     <div style={{ ...styles.page, margin: 0, width: `calc(${(panelRatio * 100).toFixed(2)}vw - 32px)`, maxWidth: 'none' }}>
-      {/* 좌우 패널 구분선 — 드래그로 비율 조정 */}
+      {/* 좌우 패널 구분선 — 드래그로 비율 조정.
+          BrowserView 가 left=panelRatio% 부터 시작하는 네이티브 레이어라
+          그 픽셀에 div 를 놓으면 BrowserView 가 mousedown 을 가로채 클릭이 안 잡힘.
+          그래서 div 를 좌측으로 8px 시프트해 클릭 영역을 전부 renderer 안에 둠.
+          시각적 line은 right 끝에 두어 BrowserView 경계와 맞붙어 보이게. */}
       <div
         onMouseDown={handleDividerMouseDown}
         title="드래그하여 좌우 비율 조정"
         style={{
-          position: 'fixed', top: 0, left: `${panelRatio * 100}%`,
+          position: 'fixed', top: 0, left: `calc(${(panelRatio * 100).toFixed(2)}% - 8px)`,
           width: 8, height: '100vh', cursor: 'col-resize', zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           background: 'transparent',
         }}
       >
@@ -621,13 +628,13 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
           {history.map(r => (
             <div key={r.id}>
               <div
-                onClick={() => setHistoryExpanded(v => v === r.video_id ? null : r.video_id)}
+                onClick={() => setHistoryExpanded(v => v === r.id ? null : r.id)}
                 style={{ cursor: 'pointer' }}
               >
                 <RecommendCard slug={cafe.slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete}
-                  expanded={historyExpanded === r.video_id} />
+                  expanded={historyExpanded === r.id} />
               </div>
-              {historyExpanded === r.video_id && (
+              {historyExpanded === r.id && (
                 <OwnerCommentSection videoId={r.video_id} />
               )}
             </div>

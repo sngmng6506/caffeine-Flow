@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onWidevineStatus:    (cb)  => ipcRenderer.on('widevine-status', (_e, s) => cb(s)),
 
   setPanelRatio:      (ratio) => ipcRenderer.send('set-panel-ratio', ratio),
+  dividerDragStart:   ()      => ipcRenderer.send('divider-drag-start'),
+  dividerDragEnd:     ()      => ipcRenderer.send('divider-drag-end'),
 
   clearSoundCloudSession: () => ipcRenderer.invoke('clear-soundcloud-session'),
   clearSpotifySession:    () => ipcRenderer.invoke('clear-spotify-session'),

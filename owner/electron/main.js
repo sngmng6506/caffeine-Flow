@@ -239,6 +239,24 @@ ipcMain.on('set-panel-ratio', (_e, ratio) => {
   resizeViews();
 });
 
+// 분할바 드래그 시작/종료 — BrowserView가 renderer 위 네이티브 레이어라
+// 드래그 중 커서가 BrowserView 영역으로 넘어가면 mousemove 가 renderer 에 안 잡힘.
+// 드래그 동안 view 를 detach 해 renderer 가 전체 윈도우 이벤트를 캡처하도록.
+let viewsDetachedForDrag = false;
+ipcMain.on('divider-drag-start', () => {
+  if (viewsDetachedForDrag) return;
+  if (recView && recViewAttached) { mainWindow.removeBrowserView(recView); }
+  if (bgmView && panelVisible)    { mainWindow.removeBrowserView(bgmView); }
+  viewsDetachedForDrag = true;
+});
+ipcMain.on('divider-drag-end', () => {
+  if (!viewsDetachedForDrag) return;
+  if (bgmView && panelVisible)    { mainWindow.addBrowserView(bgmView); }
+  if (recView && recViewAttached) { mainWindow.addBrowserView(recView); }
+  resizeViews();
+  viewsDetachedForDrag = false;
+});
+
 // 특정 도메인의 모든 쿠키/스토리지 초기화 (DataDome 봇 차단 마커 제거용)
 async function clearDomainSession(domains) {
   const { session } = require('electron');
