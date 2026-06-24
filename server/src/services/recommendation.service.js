@@ -1,5 +1,6 @@
 const db = require('../db/knex');
 const { kstStartOfDay } = require('../utils/kst');
+const { canonicalizeVideoId } = require('../utils/video-id');
 
 // 최근 7일: KST 기준 6일 전 00:00 ~ 오늘 23:59:59.999
 function lastSevenDaysRange() {
@@ -22,7 +23,7 @@ async function findById(id) {
 
 async function findActiveByVideoId(cafeId, videoId) {
   return db('recommendations')
-    .where({ cafe_id: cafeId, video_id: videoId })
+    .where({ cafe_id: cafeId, video_id: canonicalizeVideoId(videoId) })
     .whereIn('status', ['pending', 'accepted', 'playing'])
     .first();
 }
@@ -40,7 +41,7 @@ async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, 
   const [rec] = await db('recommendations')
     .insert({
       cafe_id:        cafeId,
-      video_id:       videoId,
+      video_id:       canonicalizeVideoId(videoId),
       title,
       channel_title:  channelTitle,
       thumbnail,
