@@ -1,5 +1,13 @@
 const db = require('../db/knex');
-const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour, getKstDay } = require('../utils/kst');
+const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour } = require('../utils/kst');
+const { canonicalizeVideoId } = require('../utils/video-id');
+
+// 통계 쿼리의 KST 시/요일 분류를 SQL 로 내릴 때 쓰는 표현식.
+// JS 의 new Date(t + 9h).getUTCHours()/getUTCDay() 산술을 그대로 복제:
+//   (requested_at AT TIME ZONE 'UTC') + INTERVAL '9 hours' 의 hour / dow.
+// → 808행 경계값 포함 동치 검증 완료 (JS getKstHour/getKstDay 와 모든 파티션 일치).
+const SQL_KST_HOUR = `EXTRACT(HOUR FROM (requested_at AT TIME ZONE 'UTC') + INTERVAL '9 hours')`;
+const SQL_KST_DOW  = `EXTRACT(DOW  FROM (requested_at AT TIME ZONE 'UTC') + INTERVAL '9 hours')`;
 
 async function getStats(cafeId) {
   const [total, played, skipped] = await Promise.all([
@@ -50,12 +58,7 @@ async function getDailyStats(cafeId, dateStr) {
 
 const TOP_PAGE_SIZE = 10;
 
-// Spotify ?si=, YouTube &t= 등 추적 파라미터로 같은 곡이 여러 video_id로 저장된 과거 데이터 병합용
-function canonicalizeVideoId(id) {
-  if (!id) return id;
-  const q = id.indexOf('?');
-  return q === -1 ? id : id.substring(0, q);
-}
+// canonicalizeVideoId 는 ../utils/video-id 에서 import (write 시점과 규칙 공유).
 
 // SQL로 1차 그룹 → JS에서 정규화 video_id로 2차 병합 (쿼리스트링 차이로 쪼개진 행 통합)
 function mergeByCanonicalId(rows) {
@@ -110,24 +113,28 @@ function since30Days() {
 }
 
 async function getHourlyPattern(cafeId) {
-  const recs = await db('recommendations')
+  const rows = await db('recommendations')
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
-    .select('requested_at');
+    .select(db.raw(`${SQL_KST_HOUR}::int AS hour`))
+    .count('id as count')
+    .groupByRaw('1');
 
   const counts = Array(24).fill(0);
-  for (const r of recs) counts[getKstHour(new Date(r.requested_at))]++;
+  for (const r of rows) counts[Number(r.hour)] = Number(r.count);
   return counts.map((count, hour) => ({ hour, count }));
 }
 
 async function getDayOfWeekPattern(cafeId) {
-  const recs = await db('recommendations')
+  const rows = await db('recommendations')
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
-    .select('requested_at');
+    .select(db.raw(`${SQL_KST_DOW}::int AS dow`))
+    .count('id as count')
+    .groupByRaw('1');
 
   const counts = Array(7).fill(0);
-  for (const r of recs) counts[getKstDay(new Date(r.requested_at))]++;
+  for (const r of rows) counts[Number(r.dow)] = Number(r.count);
   const labels = ['일', '월', '화', '수', '목', '금', '토'];
   return counts.map((count, i) => ({ day: labels[i], count }));
 }
@@ -150,20 +157,20 @@ async function getSongsByWeekday(cafeId, dayIndex, offset = 0, limit = 10) {
   const recs = await db('recommendations')
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
+    .whereRaw(`${SQL_KST_DOW}::int = ?`, [dayIndex])
     .select('video_id', 'title', 'channel_title', 'thumbnail', 'requested_at');
 
-  const filtered = recs.filter(r => getKstDay(new Date(r.requested_at)) === dayIndex);
-  return groupAndPage(filtered, offset, limit);
+  return groupAndPage(recs, offset, limit);
 }
 
 async function getSongsByHour(cafeId, hour, offset = 0, limit = 10) {
   const recs = await db('recommendations')
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
+    .whereRaw(`${SQL_KST_HOUR}::int = ?`, [hour])
     .select('video_id', 'title', 'channel_title', 'thumbnail', 'requested_at');
 
-  const filtered = recs.filter(r => getKstHour(new Date(r.requested_at)) === hour);
-  return groupAndPage(filtered, offset, limit);
+  return groupAndPage(recs, offset, limit);
 }
 
 module.exports = { getStats, getDailyStats, getCafeTop10, getGlobalTop10, getHourlyPattern, getDayOfWeekPattern, getSongsByWeekday, getSongsByHour };
