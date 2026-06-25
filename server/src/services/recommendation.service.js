@@ -101,26 +101,34 @@ async function remove(id) {
 }
 
 async function vote(recommendationId, voterIp, visitorId) {
-  // UNIQUE(recommendation_id, voter_ip) 제약으로 중복 투표 차단 (23505 에러)
-  await db('votes').insert({ recommendation_id: recommendationId, voter_ip: voterIp, visitor_id: visitorId || null });
-  const [rec] = await db('recommendations')
-    .where({ id: recommendationId })
-    .increment('vote_count', 1)
-    .returning('*');
-  return rec;
+  // votes insert 와 vote_count increment 를 한 트랜잭션으로 묶어 카운터 드리프트 방지.
+  // 중복 투표는 UNIQUE(recommendation_id, voter_ip) 위반(23505) → trx rollback 되고
+  // 에러가 그대로 전파되어 라우트에서 409 처리됨(동작 동일).
+  return db.transaction(async (trx) => {
+    await trx('votes').insert({ recommendation_id: recommendationId, voter_ip: voterIp, visitor_id: visitorId || null });
+    const [rec] = await trx('recommendations')
+      .where({ id: recommendationId })
+      .increment('vote_count', 1)
+      .returning('*');
+    return rec;
+  });
 }
 
 async function unvote(recommendationId, voterIp) {
-  const deleted = await db('votes')
-    .where({ recommendation_id: recommendationId, voter_ip: voterIp })
-    .delete();
-  if (!deleted) throw Object.assign(new Error('투표 기록이 없습니다'), { status: 404 });
-  const [rec] = await db('recommendations')
-    .where({ id: recommendationId })
-    .where('vote_count', '>', 0)
-    .decrement('vote_count', 1)
-    .returning('*');
-  return rec;
+  // votes delete 와 vote_count decrement 를 한 트랜잭션으로 묶음.
+  // 투표 기록이 없으면 throw → rollback(삭제 0건이라 되돌릴 것도 없음) + 404 전파.
+  return db.transaction(async (trx) => {
+    const deleted = await trx('votes')
+      .where({ recommendation_id: recommendationId, voter_ip: voterIp })
+      .delete();
+    if (!deleted) throw Object.assign(new Error('투표 기록이 없습니다'), { status: 404 });
+    const [rec] = await trx('recommendations')
+      .where({ id: recommendationId })
+      .where('vote_count', '>', 0)
+      .decrement('vote_count', 1)
+      .returning('*');
+    return rec;
+  });
 }
 
 async function addComment(recommendationId, { commenterIp, commenterName, body }) {
