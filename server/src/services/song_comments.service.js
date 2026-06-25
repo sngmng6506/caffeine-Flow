@@ -1,4 +1,5 @@
 const db = require('../db/knex');
+const { canonicalizeVideoId } = require('../utils/video-id');
 
 function withCafeName(query) {
   return query
@@ -6,10 +7,12 @@ function withCafeName(query) {
     .select('song_comments.*', 'cafes.name as cafe_name');
 }
 
-// 전체 카페 공유 댓글 (video_id 기준)
+// 전체 카페 공유 댓글 (video_id 기준, 추적 파라미터 무시하고 곡 단위로 통합)
 async function getComments(videoId) {
+  // split_part 로 ? 이전만 비교 → 과거 raw 저장분(abc?si=1)과 신규 canonical(abc) 모두 매칭.
+  // (canonicalizeVideoId 와 동일 규칙. 댓글은 곡당 소량이라 인덱스 미사용 부담 없음.)
   const all = await withCafeName(
-    db('song_comments').where({ 'song_comments.video_id': videoId })
+    db('song_comments').whereRaw(`split_part(song_comments.video_id, ?, 1) = ?`, ['?', canonicalizeVideoId(videoId)])
   ).orderBy('song_comments.created_at', 'asc');
 
   const topLevel = all.filter(c => c.parent_id === null);
@@ -23,7 +26,7 @@ async function getComments(videoId) {
 
 async function addComment(videoId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {
   const [comment] = await db('song_comments')
-    .insert({ video_id: videoId, cafe_id: cafeId, commenter_ip: commenterIp, commenter_name: commenterName, body, visitor_id: visitorId || null })
+    .insert({ video_id: canonicalizeVideoId(videoId), cafe_id: cafeId, commenter_ip: commenterIp, commenter_name: commenterName, body, visitor_id: visitorId || null })
     .returning('*');
   return { ...comment, cafe_name: null, replies: [] };
 }
