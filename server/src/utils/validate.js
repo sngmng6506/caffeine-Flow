@@ -26,4 +26,23 @@ function validateBool(value, { name = 'field' } = {}) {
   return { error: `${name} 형식 오류` };
 }
 
-module.exports = { validateString, validateInEnum, validateBool };
+// 추천곡 신청/등록 body 공통 검증 — public·owner 라우트에 복붙돼 있던
+// 6필드 블록을 한 곳으로. 실패 시 { error }, 성공 시 { value: {...} }.
+function validateRecommendationBody(body = {}) {
+  const checks = [
+    ['videoId',       validateString(body.videoId,       { max: 1000, name: 'videoId' })],
+    ['title',         validateString(body.title,         { max: 500,  name: 'title' })],
+    ['channelTitle',  validateString(body.channelTitle,  { max: 200,  allowNull: true, name: 'channelTitle' })],
+    ['thumbnail',     validateString(body.thumbnail,     { max: 500,  allowNull: true, name: 'thumbnail' })],
+    ['duration',      validateString(body.duration,      { max: 20,   allowNull: true, name: 'duration' })],
+    ['requesterName', validateString(body.requesterName, { max: 50,   allowNull: true, name: 'requesterName' })],
+  ];
+  const value = {};
+  for (const [key, result] of checks) {
+    if (result.error) return { error: result.error };
+    value[key] = result.value;
+  }
+  return { value };
+}
+
+module.exports = { validateString, validateInEnum, validateBool, validateRecommendationBody };
