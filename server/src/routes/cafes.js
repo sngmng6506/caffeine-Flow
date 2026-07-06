@@ -6,6 +6,7 @@ const { safeCafe } = require('../utils/cafe-sanitize');
 const { APP_URL } = require('../config');
 const { validateString, validateBool } = require('../utils/validate');
 const db = require('../db/knex');
+const { kstStartOfDateString, kstEndOfDateString } = require('../utils/kst');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -93,8 +94,10 @@ router.get('/me/history', requireAuth, async (req, res) => {
     .orderBy('requested_at', 'desc');
 
   if (req.query.date) {
-    const start = new Date(req.query.date + 'T00:00:00.000Z');
-    const end   = new Date(req.query.date + 'T23:59:59.999Z');
+    // KST 경계 사용 — UTC 자정 기준이면 KST 09:00~다음날 08:59가 잡혀
+    // 통계 탭(KST 기준)과 이력 날짜 필터가 서로 다른 하루를 보게 됨
+    const start = kstStartOfDateString(req.query.date);
+    const end   = kstEndOfDateString(req.query.date);
     query = query.whereBetween('requested_at', [start, end]);
   }
 
