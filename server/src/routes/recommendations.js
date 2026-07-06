@@ -11,7 +11,7 @@ const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
 const db            = require('../db/knex');
-const { MAX_QUEUE_SIZE, broadcast, getClientIp } = require('./_recommendations.shared');
+const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId } = require('./_recommendations.shared');
 const { validateString, validateInEnum } = require('../utils/validate');
 
 const VALID_PLATFORMS = ['youtube', 'soundcloud', 'spotify'];
@@ -109,8 +109,7 @@ router.post('/', requestLimiters, async (req, res) => {
     return res.status(429).json({ error: `대기열이 가득 찼습니다 (최대 ${MAX_QUEUE_SIZE}곡)` });
 
   const ip  = getClientIp(req);
-  const rawVisitor = req.headers['x-visitor-id'];
-  const visitorId = typeof rawVisitor === 'string' && rawVisitor.length <= 64 ? rawVisitor : null;
+  const visitorId = safeVisitorId(req);
   const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform, visitorId });
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });

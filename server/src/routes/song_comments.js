@@ -2,15 +2,7 @@ const router      = require('express').Router({ mergeParams: true });
 const cafeService = require('../services/cafe.service');
 const svc         = require('../services/song_comments.service');
 const { validateString } = require('../utils/validate');
-
-function getIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
-}
-
-function safeVisitorId(req) {
-  const v = req.headers['x-visitor-id'];
-  return typeof v === 'string' && v.length <= 64 ? v : null;
-}
+const { getClientIp, safeVisitorId } = require('./_recommendations.shared');
 
 // GET  /api/v1/cafes/:slug/songs/:videoId/comments
 // GET  /api/v1/songs/:videoId/comments
@@ -28,7 +20,7 @@ router.post('/', async (req, res) => {
 
   const cafeId = await resolveCafeId(req);
   const comment = await svc.addComment(req.params.videoId, cafeId, {
-    commenterIp:   getIp(req),
+    commenterIp:   getClientIp(req),
     commenterName: nameCheck.value || undefined,
     body:          bodyCheck.value,
     visitorId:     safeVisitorId(req),
@@ -46,7 +38,7 @@ router.post('/:commentId/replies', async (req, res) => {
 
   const cafeId = await resolveCafeId(req);
   const reply = await svc.addReply(req.params.commentId, cafeId, {
-    commenterIp:   getIp(req),
+    commenterIp:   getClientIp(req),
     commenterName: nameCheck.value || undefined,
     body:          bodyCheck.value,
     visitorId:     safeVisitorId(req),

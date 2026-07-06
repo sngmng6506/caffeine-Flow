@@ -5,8 +5,18 @@ function broadcast(req, slug, event, data) {
   req.app.get('io')?.of('/cafe').to(slug).emit(event, data);
 }
 
+// 클라이언트 IP는 반드시 req.ip 사용 — server.js에서 trust proxy 1을 설정했으므로
+// Express가 Railway 프록시가 붙인 X-Forwarded-For의 마지막(신뢰 가능) 값을 반환한다.
+// 헤더를 직접 파싱해 첫 값을 쓰면 클라이언트가 위조한 IP가 잡혀서
+// 투표 UNIQUE 제약·rate limit·방문 통계 dedupe가 전부 우회 가능.
 function getClientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+  return req.ip;
 }
 
-module.exports = { MAX_QUEUE_SIZE, broadcast, getClientIp };
+// x-visitor-id 헤더 정규화 — 문자열이 아니거나 과도하게 길면 무시
+function safeVisitorId(req) {
+  const v = req.headers['x-visitor-id'];
+  return typeof v === 'string' && v.length <= 64 ? v : null;
+}
+
+module.exports = { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId };
