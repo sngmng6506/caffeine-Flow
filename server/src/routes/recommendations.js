@@ -132,6 +132,16 @@ router.delete('/:id/cancel', async (req, res) => {
   if (!['pending', 'accepted'].includes(rec.status))
     return res.status(409).json({ error: '이미 처리된 추천곡은 취소할 수 없습니다' });
 
+  // 본인 신청만 취소 가능 — rec.id는 소켓으로 모든 손님에게 브로드캐스트되므로
+  // ID만으로 삭제를 허용하면 남의 신청을 지울 수 있음. visitor_id(같은 브라우저)
+  // 또는 requester_ip(같은 기기·NAT) 중 하나라도 일치해야 본인으로 간주.
+  const ip        = getClientIp(req);
+  const visitorId = req.headers['x-visitor-id'] || null;
+  const isOwner =
+    (rec.visitor_id && visitorId && rec.visitor_id === visitorId) ||
+    (rec.requester_ip && rec.requester_ip === ip);
+  if (!isOwner) return res.status(403).json({ error: '본인이 신청한 곡만 취소할 수 있습니다' });
+
   await recService.remove(rec.id);
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'delete', id: rec.id });
   res.json({ ok: true });
