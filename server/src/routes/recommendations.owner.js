@@ -68,7 +68,13 @@ router.put('/:id', ownerOnly, async (req, res) => {
     }
   }
 
-  const rec = await recService.updateStatus(req.params.id, status);
+  let rec;
+  try {
+    rec = await recService.updateStatus(req.params.id, status);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec });
   res.json(rec);
 });

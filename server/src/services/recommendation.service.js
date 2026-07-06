@@ -54,9 +54,28 @@ async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, 
   return rec;
 }
 
+// 종료 상태(played/skipped/rejected)에서는 어떤 전이도 불가.
+// pending↔accepted↔playing 사이는 사장님 드래그 UI가 양방향 이동을
+// 허용하므로 자유 전이. (playing→accepted 되돌리기 등)
+const TERMINAL_STATUSES = ['played', 'skipped', 'rejected'];
+
+function isValidTransition(from, to) {
+  if (from === to) return true;
+  return !TERMINAL_STATUSES.includes(from);
+}
+
 async function updateStatus(id, status) {
-  const updates = { status };
   const now = new Date();
+  const current = await db('recommendations').where({ id }).first();
+  if (!current) throw Object.assign(new Error('추천곡을 찾을 수 없습니다'), { status: 404 });
+  if (!isValidTransition(current.status, status)) {
+    throw Object.assign(
+      new Error(`이미 종료된 곡입니다 (${current.status} → ${status} 불가)`),
+      { status: 409 }
+    );
+  }
+
+  const updates = { status };
 
   if (status === 'playing') {
     updates.playing_started_at = now;
@@ -65,8 +84,7 @@ async function updateStatus(id, status) {
   if (status === 'played' || status === 'skipped') {
     updates.played_at = now;
     // 재생 시작 시각이 있으면 재생 시간 계산
-    const current = await db('recommendations').where({ id }).first();
-    if (current?.playing_started_at) {
+    if (current.playing_started_at) {
       updates.play_duration_seconds = Math.round((now - new Date(current.playing_started_at)) / 1000);
     }
   }
@@ -129,4 +147,4 @@ async function addComment(recommendationId, { commenterIp, commenterName, body }
   return comment;
 }
 
-module.exports = { getRecommendations, findById, findActiveByVideoId, countActive, add, updateStatus, clearPlaying, remove, vote, unvote, addComment };
+module.exports = { getRecommendations, findById, findActiveByVideoId, countActive, add, updateStatus, clearPlaying, remove, vote, unvote, addComment, isValidTransition, TERMINAL_STATUSES };
