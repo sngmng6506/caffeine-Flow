@@ -47,7 +47,13 @@ router.post('/owner', ownerOnly, async (req, res) => {
     }
   }
 
-  const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: '127.0.0.1', requesterName: null });
+  let rec;
+  try {
+    rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: '127.0.0.1', requesterName: null });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
+    throw err;
+  }
   const updated = recStatus !== 'pending' ? await recService.updateStatus(rec.id, recStatus) : rec;
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec: updated });

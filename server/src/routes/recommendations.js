@@ -115,7 +115,14 @@ router.post('/', requestLimiters, async (req, res) => {
 
   const ip  = getClientIp(req);
   const visitorId = safeVisitorId(req);
-  const rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform, visitorId });
+  let rec;
+  try {
+    rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform, visitorId });
+  } catch (err) {
+    // partial unique index(018) — 사전 중복 체크와 insert 사이 race를 DB가 확정 차단
+    if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
+    throw err;
+  }
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });
   res.status(201).json(rec);
