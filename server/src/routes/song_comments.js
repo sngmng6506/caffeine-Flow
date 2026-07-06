@@ -2,7 +2,9 @@ const router      = require('express').Router({ mergeParams: true });
 const cafeService = require('../services/cafe.service');
 const svc         = require('../services/song_comments.service');
 const { validateString } = require('../utils/validate');
-const { getClientIp, safeVisitorId } = require('./_recommendations.shared');
+const { getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
+
+const commentLimiters = makeDualLimiter({ visitorMax: 5, ipMax: 15, message: '잠시 후 다시 댓글을 남겨주세요 (1분에 5개 제한)' });
 
 // GET  /api/v1/cafes/:slug/songs/:videoId/comments
 // GET  /api/v1/songs/:videoId/comments
@@ -12,7 +14,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/v1/cafes/:slug/songs/:videoId/comments
 // POST /api/v1/songs/:videoId/comments
-router.post('/', async (req, res) => {
+router.post('/', commentLimiters, async (req, res) => {
   const bodyCheck = validateString(req.body?.body, { max: 200, name: 'body' });
   if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
   const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });
@@ -30,7 +32,7 @@ router.post('/', async (req, res) => {
 
 // POST /api/v1/cafes/:slug/songs/:videoId/comments/:commentId/replies
 // POST /api/v1/songs/:videoId/comments/:commentId/replies
-router.post('/:commentId/replies', async (req, res) => {
+router.post('/:commentId/replies', commentLimiters, async (req, res) => {
   const bodyCheck = validateString(req.body?.body, { max: 200, name: 'body' });
   if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
   const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });

@@ -19,4 +19,27 @@ function safeVisitorId(req) {
   return typeof v === 'string' && v.length <= 64 ? v : null;
 }
 
-module.exports = { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId };
+// visitor_id + IP 이중 rate limiter 생성기 — 신청 라우트에서 검증된 패턴을
+// 댓글·투표 등 다른 익명 쓰기 API에도 재사용하기 위한 팩토리.
+// visitor_id는 위조 가능하므로 IP 한도가 최후 방어선 (신청 라우트 주석 참조).
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+
+function makeDualLimiter({ windowMs = 60_000, visitorMax, ipMax, message }) {
+  const msg = { error: message };
+  return [
+    rateLimit({
+      windowMs,
+      max: visitorMax,
+      keyGenerator: (req) => req.headers['x-visitor-id'] || `ip:${ipKeyGenerator(req.ip)}`,
+      message: msg,
+    }),
+    rateLimit({
+      windowMs,
+      max: ipMax,
+      keyGenerator: (req) => ipKeyGenerator(req.ip),
+      message: msg,
+    }),
+  ];
+}
+
+module.exports = { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter };

@@ -11,7 +11,7 @@ const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
 const db            = require('../db/knex');
-const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId } = require('./_recommendations.shared');
+const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
 const { validateString, validateInEnum } = require('../utils/validate');
 
 const VALID_PLATFORMS = ['youtube', 'soundcloud', 'spotify'];
@@ -41,6 +41,11 @@ const ipLimiter = rateLimit({
 });
 
 const requestLimiters = [visitorLimiter, ipLimiter];
+
+// 투표·댓글도 익명 쓰기 API — 전역 분당 120에만 의존하면 도배 가능.
+// 투표는 토글(추가/취소) UX상 신청보다 여유롭게, 댓글은 신청과 유사하게.
+const voteLimiters    = makeDualLimiter({ visitorMax: 15, ipMax: 40, message: '잠시 후 다시 시도해주세요 (투표 한도 초과)' });
+const commentLimiters = makeDualLimiter({ visitorMax: 5,  ipMax: 15, message: '잠시 후 다시 댓글을 남겨주세요 (1분에 5개 제한)' });
 
 // GET /api/v1/cafes/:slug/recommendations
 router.get('/', async (req, res) => {
@@ -147,7 +152,7 @@ router.delete('/:id/cancel', async (req, res) => {
 });
 
 // POST /api/v1/cafes/:slug/recommendations/:id/vote
-router.post('/:id/vote', async (req, res) => {
+router.post('/:id/vote', voteLimiters, async (req, res) => {
   const ip = getClientIp(req);
   const visitorId = req.headers['x-visitor-id'] || null;
   try {
@@ -161,7 +166,7 @@ router.post('/:id/vote', async (req, res) => {
 });
 
 // DELETE /api/v1/cafes/:slug/recommendations/:id/vote
-router.delete('/:id/vote', async (req, res) => {
+router.delete('/:id/vote', voteLimiters, async (req, res) => {
   const ip = getClientIp(req);
   const rec = await recService.unvote(req.params.id, ip);
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'vote', rec });
@@ -169,7 +174,7 @@ router.delete('/:id/vote', async (req, res) => {
 });
 
 // POST /api/v1/cafes/:slug/recommendations/:id/comments
-router.post('/:id/comments', async (req, res) => {
+router.post('/:id/comments', commentLimiters, async (req, res) => {
   const bodyCheck = validateString(req.body?.body, { max: 200, name: 'body' });
   if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
   const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });
