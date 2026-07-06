@@ -62,7 +62,6 @@ app.use('/api/v1/cafes',                         require('./src/routes/cafes'));
 // the path match before public routes get a chance.
 app.use('/api/v1/cafes/:slug/recommendations',   require('./src/routes/recommendations.owner'));
 app.use('/api/v1/cafes/:slug/recommendations',   require('./src/routes/recommendations'));
-app.use('/api/v1/youtube',                       require('./src/routes/youtube'));
 app.use('/api/v1/tracks',                        require('./src/routes/tracks'));
 app.use('/api/v1/cafes/:slug/songs/:videoId/comments', require('./src/routes/song_comments'));
 app.use('/api/v1/songs/:videoId/comments',             require('./src/routes/song_comments'));
