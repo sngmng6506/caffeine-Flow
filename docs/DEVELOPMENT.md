@@ -1,12 +1,12 @@
 # 개발 가이드
 
-로컬 개발 환경 설정, 환경변수, 마이그레이션, 테스트, 배포.
+로컬 개발 환경 설정, 환경변수, 마이그레이션, 테스트, 배포를 다룬다.
 
 ---
 
 ## 환경변수
 
-루트 `.env` 파일 (config.js가 `../../.env`로 로드). 서버·customer 공용.
+루트에 `.env` 파일을 둔다(config.js가 `../../.env` 경로로 읽는다). 서버와 customer가 함께 쓴다.
 
 | 키 | 필수 | 설명 |
 | --- | :-: | --- |
@@ -58,9 +58,9 @@ npm run migrate:rollback --prefix server   # 마지막 배치 롤백
 ```
 
 **주의**
-- 공유 DB(Railway 등)에는 로컬에서 `migrate`를 돌리지 말 것 — 배포 시 startCommand가 자동 실행한다.
-- `recommendations.id`는 UUID다. 집계 시 `MIN(id)`는 실패하므로 `ROW_NUMBER() OVER (... ORDER BY)`를 쓴다 (018 참고).
-- 새 마이그레이션은 up/down을 모두 구현하고, 파괴적 작업 전 기존 데이터 정리 로직을 포함한다.
+- 공유 DB(Railway 등)에는 로컬에서 `migrate`를 돌리지 않는다. 배포할 때 startCommand가 알아서 실행한다.
+- `recommendations.id`는 UUID다. 집계할 때 `MIN(id)`는 실패하므로 `ROW_NUMBER() OVER (... ORDER BY)`를 쓴다(018 참고).
+- 새 마이그레이션은 up/down을 모두 구현하고, 데이터를 지우거나 바꾸는 작업 전에 기존 데이터를 정리하는 로직을 함께 넣는다.
 
 ---
 
@@ -71,44 +71,44 @@ npm test --prefix server        # 단위 + 통합
 npm run test:unit --prefix server   # 단위만 (DB 불필요)
 ```
 
-- **단위** (`tests/*.test.mjs`) — 검증 헬퍼·KST·상태 전이 등 순수 로직. DB 불필요.
-- **통합** (`tests/integration.test.mjs`) — 실제 Postgres에 마이그레이션 적용 후 supertest로 라우트 검증. 아래 환경변수 필요:
+- **단위** (`tests/*.test.mjs`) — 검증 헬퍼, KST, 상태 전이처럼 DB가 필요 없는 순수 로직을 다룬다.
+- **통합** (`tests/integration.test.mjs`) — 실제 Postgres에 마이그레이션을 적용한 뒤 supertest로 라우트를 검증한다. 아래 환경변수가 필요하다:
   ```bash
   NODE_ENV=test \
   DATABASE_URL=postgres://postgres:test@localhost:5432/caffeine_test \
   JWT_SECRET=any \
   npm test --prefix server
   ```
-- `NODE_ENV=test`면 rate limiter가 스킵된다 (같은 IP 연속 요청 때문).
+- `NODE_ENV=test`이면 rate limiter를 건너뛴다. 테스트가 같은 IP에서 연속으로 요청을 보내기 때문이다.
 
-CI(`.github/workflows/ci.yml`)는 push·PR마다 postgres:16 서비스 컨테이너를 띄워 전 파일 구문 검사 + 테스트를 돌린다.
+CI(`.github/workflows/ci.yml`)는 push와 PR마다 postgres:16 서비스 컨테이너를 띄워 전체 파일 구문 검사와 테스트를 실행한다.
 
 ---
 
 ## 배포
 
 ### 서버 (Railway)
-`railway.json`대로 git push 시 자동 빌드:
+`railway.json` 설정에 따라 git push하면 자동으로 빌드된다:
 ```
 build: customer 빌드 → owner 빌드(VITE env inject) → server 설치
 start: npm run migrate --prefix server && node server/server.js
 ```
 
 빌드 산출물:
-- `server/public/` — 손님 SPA (gitignored, 매 배포 빌드)
-- `server/public/owner/` — 사장님 SPA (**committed**, Railway fallback). owner 소스 수정 시 로컬 빌드 → commit·push 해야 반영
+- `server/public/` — 손님 SPA. gitignore 대상이며 배포할 때마다 새로 빌드된다.
+- `server/public/owner/` — 사장님 SPA. 저장소에 **커밋**되며 Railway 빌드 실패 시 fallback으로 쓰인다. owner 소스를 고치면 로컬에서 빌드한 뒤 commit·push해야 반영된다.
 
 ### 사장님 데스크톱 (GitHub Releases)
-로컬에서 직접 (코드 서명·바이너리 업로드가 로컬 환경 의존):
+코드 서명과 바이너리 업로드가 로컬 환경에 의존하므로, 로컬에서 직접 실행한다:
 ```bash
 cd owner
 GH_TOKEN=<github_pat> npm run electron:build -- --publish always
 ```
-흐름: Vite → electron-rebuild → packaging → CastLabs EVS 서명 → NSIS 인스톨러 → signtool 서명 → blockmap → GitHub Release + `latest.yml`. 매 빌드 5~15분.
+빌드 흐름은 Vite → electron-rebuild → packaging → CastLabs EVS 서명 → NSIS 인스톨러 → signtool 서명 → blockmap → GitHub Release + `latest.yml` 순이다. 한 번에 5~15분 걸린다.
 
-업데이트: 클라이언트가 `latest.yml`을 polling → 새 인스톨러 다운로드 → 재시작 시 `autoUpdater.quitAndInstall`.
+업데이트는 클라이언트가 `latest.yml`을 polling하다가 새 인스톨러를 내려받고, 재시작할 때 `autoUpdater.quitAndInstall`로 적용하는 방식이다.
 
-버전 범프: `owner/package.json`의 `version`을 올리고 커밋 → 빌드.
+버전을 올릴 때는 `owner/package.json`의 `version`을 수정해 커밋한 뒤 빌드한다.
 
 ---
 

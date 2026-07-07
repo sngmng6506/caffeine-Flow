@@ -1,8 +1,7 @@
 # Caffeine Flow
 
 
-
-YouTube · SoundCloud · Spotify 세 플랫폼을 한 화면에서 **매장 BGM(고정) + 신청곡(임시 오버레이)** 구조로 재생
+YouTube · SoundCloud · Spotify 세 플랫폼을 한 화면에서 **매장 BGM(고정) + 신청곡(임시 오버레이)** 구조로 재생한다.
 
 | | |
 | --- | --- |
@@ -61,7 +60,7 @@ cd owner && npm run electron:dev
 | [AGENTS.md](AGENTS.md) | AI 도구 협업 규칙 (도구 무관 계약) |
 | [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) | 커밋 메시지 형식 |
 
-> AI 도구별 어댑터 `CLAUDE.md` · `GEMINI.md` · `.cursor/rules` 는 모두 `AGENTS.md` 계약을 참조한다.
+> AI 도구별 어댑터인 `CLAUDE.md` · `GEMINI.md` · `.cursor/rules`는 모두 `AGENTS.md` 계약을 참조한다.
 
 ## 라이센스
 

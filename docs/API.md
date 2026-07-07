@@ -1,6 +1,6 @@
 # API 레퍼런스
 
-Base URL: `/api/v1`. 모든 응답은 JSON. 인증이 필요한 엔드포인트는 `Authorization: Bearer <JWT>` 헤더를 요구한다.
+Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔드포인트는 `Authorization: Bearer <JWT>` 헤더를 요구한다.
 
 범례: 🔓 공개 · 🔒 사장님 인증(requireAuth) · 🏪 카페 소유자(requireCafeOwner) · ⏱ rate limited
 
@@ -21,7 +21,7 @@ Base URL: `/api/v1`. 모든 응답은 JSON. 인증이 필요한 엔드포인트�
 
 ## 카페 관리 — `/cafes`
 
-모두 사장님 인증(🔒). JWT의 slug로 대상 카페를 특정한다.
+모두 사장님 인증(🔒)이 필요하다. JWT에 담긴 slug로 대상 카페를 식별한다.
 
 | Method | Path | 설명 |
 | --- | --- | --- |
@@ -44,7 +44,7 @@ Base URL: `/api/v1`. 모든 응답은 JSON. 인증이 필요한 엔드포인트�
 
 ## 추천곡 — `/cafes/:slug/recommendations`
 
-owner 라우터가 public보다 먼저 마운트된다 (인증 핸들러가 경로 매치를 먼저 가져가도록).
+owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경로 매칭을 먼저 가져가도록 하기 위해서다).
 
 ### 공개 (손님)
 | Method | Path | 인증 | 설명 |
@@ -68,7 +68,7 @@ owner 라우터가 public보다 먼저 마운트된다 (인증 핸들러가 경�
 
 ## 곡 댓글 — `/songs/:videoId/comments`
 
-카페 무관하게 video_id 기준으로 묶이는 곡별 댓글. `/cafes/:slug/songs/:videoId/comments`로도 접근 가능.
+카페와 상관없이 video_id를 기준으로 묶이는 곡별 댓글이다. `/cafes/:slug/songs/:videoId/comments` 경로로도 접근할 수 있다.
 
 | Method | Path | 인증 | 설명 |
 | --- | --- | :-: | --- |
