@@ -23,6 +23,18 @@ function issuePendingToken(payload) {
   return jwt.sign({ ...payload, pending: true }, JWT_SECRET, { expiresIn: '10m' });
 }
 
+
+// 같은 이메일의 다른 provider 계정 존재 여부 확인 — 정책상 provider별
+// 별도 계정을 허용하므로 차단하지 않고, 서버 로그 + 응답 힌트만 남긴다.
+// (사용자가 실수로 다른 소셜 로그인으로 새 카페를 만드는 케이스 추적/안내용)
+async function checkEmailOverlap(email) {
+  if (!email) return null;
+  const existing = await cafeService.findByEmail(email);
+  if (!existing) return null;
+  console.warn(`[auth] 이메일 중복 가입: ${email} — 기존 카페 "${existing.name}" (${existing.google_id ? 'google' : 'naver'})와 별도 계정 생성`);
+  return '같은 이메일로 가입된 다른 소셜 로그인 계정이 있습니다. 기존 카페를 찾으시면 이전에 쓰던 로그인 방식을 사용해주세요.';
+}
+
 // ────────────────────────────────────────────
 // POST /api/v1/auth/google
 // body: { idToken }                         → 기존 회원: { token, cafe }
@@ -54,13 +66,14 @@ router.post('/google', async (req, res) => {
   if (cafeName && agreed) {
     const nameCheck = validateString(cafeName, { max: 100, name: '카페명' });
     if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
+    const emailWarning = await checkEmailOverlap(email);
     const cafe = await cafeService.create({
       name: nameCheck.value,
       ownerEmail: email,
       googleId,
       disclaimerAcceptedAt: new Date(),
     });
-    return res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe) });
+    return res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe), emailWarning });
   }
 
   // 신규 회원 → 가입 정보 입력 필요
@@ -167,6 +180,7 @@ router.post('/complete', async (req, res) => {
     return res.status(401).json({ error: '만료되었거나 유효하지 않은 요청입니다. 다시 시도해주세요.' });
   }
 
+  const emailWarning = await checkEmailOverlap(pending.email);
   const cafe = await cafeService.create({
     name:                 nameCheck.value,
     ownerEmail:           pending.email || null,
@@ -178,7 +192,7 @@ router.post('/complete', async (req, res) => {
     location,
   });
 
-  res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe) });
+  res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe), emailWarning });
 });
 
 module.exports = router;
