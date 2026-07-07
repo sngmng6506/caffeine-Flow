@@ -132,7 +132,7 @@ router.delete('/:id/cancel', async (req, res) => {
   // ID만으로 삭제를 허용하면 남의 신청을 지울 수 있음. visitor_id(같은 브라우저)
   // 또는 requester_ip(같은 기기·NAT) 중 하나라도 일치해야 본인으로 간주.
   const ip        = getClientIp(req);
-  const visitorId = req.headers['x-visitor-id'] || null;
+  const visitorId = safeVisitorId(req);
   const isOwner =
     (rec.visitor_id && visitorId && rec.visitor_id === visitorId) ||
     (rec.requester_ip && rec.requester_ip === ip);
