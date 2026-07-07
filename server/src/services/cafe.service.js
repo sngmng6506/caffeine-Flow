@@ -1,14 +1,22 @@
 const db = require('../db/knex');
 
+const crypto = require('crypto');
+
 function generateSlug() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  // Math.random 대신 crypto — slug는 QR로 공개되는 값이지만 예측 가능할
+  // 이유는 없고, randomInt는 모듈로 편향도 없음
+  return Array.from({ length: 8 }, () => chars[crypto.randomInt(chars.length)]).join('');
 }
 
 async function uniqueSlug() {
-  let slug;
-  do { slug = generateSlug(); } while (await findBySlug(slug));
-  return slug;
+  // 36^8 (~2.8조) 공간이라 충돌은 사실상 없지만, DB 오류 등으로
+  // findBySlug가 계속 truthy를 반환하는 비정상 상황에서 무한루프 방지
+  for (let i = 0; i < 10; i++) {
+    const slug = generateSlug();
+    if (!(await findBySlug(slug))) return slug;
+  }
+  throw new Error('slug 생성 실패 — 10회 연속 충돌 (DB 상태 확인 필요)');
 }
 
 async function findBySlug(slug) {
