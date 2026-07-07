@@ -31,19 +31,18 @@ Caffeine Flow의 심화 구조 문서. 재생 파이프라인, 실시간 통신,
 │       ├── App.jsx            slug 파싱 → CafePage
 │       ├── pages/             CafePage · RecommendForm · SongCard 등
 │       └── api.js · socket.js
-├── owner/                     사장님 SPA + Electron
-│   ├── electron/
-│   │   ├── main.js            메인 프로세스 (BrowserView 관리, 종료 감지, 자동 업데이트)
-│   │   ├── preload.js         메인 윈도우 IPC bridge
-│   │   ├── stealth-preload.js bgmView·recView 봇 감지 우회
-│   │   └── youtube-preload.js YouTube <video> ended 감지
-│   ├── src/
-│   │   ├── App.jsx            OAuth 콜백 파싱(fragment) · 로그인 분기
-│   │   └── pages/
-│   │       ├── DashboardPage.jsx     메인 대시보드
-│   │       └── dashboard/            탭별 서브컴포넌트(분리됨)
-│   └── scripts/evs-sign.js    electron-builder afterPack (CastLabs EVS 서명)
-└── extension/                 (v1 Chrome 익스텐션, 미사용)
+└── owner/                     사장님 SPA + Electron
+    ├── electron/
+    │   ├── main.js            메인 프로세스 (BrowserView 관리, 종료 감지, 자동 업데이트)
+    │   ├── preload.js         메인 윈도우 IPC bridge
+    │   ├── stealth-preload.js bgmView·recView 봇 감지 우회
+    │   └── youtube-preload.js YouTube <video> ended 감지
+    ├── src/
+    │   ├── App.jsx            OAuth 콜백 파싱(fragment) · 로그인 분기
+    │   └── pages/
+    │       ├── DashboardPage.jsx     메인 대시보드
+    │       └── dashboard/            탭별 서브컴포넌트(분리됨)
+    └── scripts/evs-sign.js    electron-builder afterPack (CastLabs EVS 서명)
 ```
 
 ---

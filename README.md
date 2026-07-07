@@ -48,7 +48,6 @@ cd owner && npm run electron:dev
 ├── owner/         사장님 SPA + Electron 데스크톱
 │   ├── electron/    메인 프로세스, preload, 스텔스
 │   └── src/         대시보드·로그인 UI
-├── extension/     (v1 Chrome 익스텐션, 미사용)
 └── railway.json   빌드·실행 설정
 ```
 
