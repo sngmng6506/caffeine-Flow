@@ -22,10 +22,32 @@ async function assertPublicHost(host) {
     });
   });
 }
+function hostAllowed(hostname, allowed) {
+  return allowed.some((d) => hostname === d || hostname.endsWith('.' + d));
+}
+
+// 사용자 입력 URL fetch는 반드시 이 함수를 통해:
+//  - DNS 사설 IP 차단 (assertPublicHost)
+//  - allowedHosts: 최초 요청·리다이렉트 모두 플랫폼 도메인으로 제한
+//  - 응답 크기 2MB 제한 (거대 페이지로 메모리 압박 방지)
 async function safeAxiosGet(url, options = {}) {
+  const { allowedHosts, ...rest } = options;
   const u = new URL(url);
+  if (allowedHosts && !hostAllowed(u.hostname, allowedHosts)) {
+    throw new Error(`허용되지 않은 호스트: ${u.hostname}`);
+  }
   await assertPublicHost(u.hostname);
-  return axios.get(url, options);
+  return axios.get(url, {
+    maxContentLength: 2_000_000,
+    maxBodyLength: 2_000_000,
+    maxRedirects: 5,
+    ...rest,
+    beforeRedirect: (opts) => {
+      if (allowedHosts && !hostAllowed(opts.hostname, allowedHosts)) {
+        throw new Error(`허용되지 않은 리다이렉트: ${opts.hostname}`);
+      }
+    },
+  });
 }
 
 function detectPlatform(url) {
@@ -105,6 +127,7 @@ router.get('/oembed', async (req, res) => {
       const isShort = u.hostname === 'on.soundcloud.com' || u.hostname.endsWith('soundcloud.app.goo.gl');
       if (isShort) {
         const resp = await safeAxiosGet(rawUrl, {
+          allowedHosts: ['soundcloud.com', 'on.soundcloud.com', 'soundcloud.app.goo.gl', 'goo.gl'],
           maxRedirects: 5,
           timeout: 8000,
           headers: { 'User-Agent': UA },
@@ -147,7 +170,8 @@ router.get('/oembed', async (req, res) => {
     // 2차: 트랙 페이지 HTML의 Open Graph / Twitter 메타태그 파싱
     // (oembed는 Railway IP 차단 가능 — 공개 페이지는 더 관대함)
     try {
-      const { data: html } = await axios.get(trackUrl, {
+      const { data: html } = await safeAxiosGet(trackUrl, {
+        allowedHosts: ['soundcloud.com'],
         headers: {
           'User-Agent': UA,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -155,11 +179,14 @@ router.get('/oembed', async (req, res) => {
         },
         timeout: 10000,
       });
-      const matchAttr = (re) => (html.match(re) || [])[1];
-      const ogTitle = matchAttr(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)
-        || matchAttr(/<meta\s+name=["']twitter:title["']\s+content=["']([^"']+)["']/i);
-      const ogImage = matchAttr(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i)
-        || matchAttr(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
+      // 속성 순서에 관계없이 <meta ... (property|name)="key" ... content="..."> 매칭
+      const metaContent = (attr, key) => {
+        const fwd = new RegExp(`<meta[^>]*${attr}=["']${key}["'][^>]*content=["']([^"']+)["']`, 'i');
+        const rev = new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*${attr}=["']${key}["']`, 'i');
+        return (html.match(fwd) || html.match(rev) || [])[1];
+      };
+      const ogTitle = metaContent('property', 'og:title')   || metaContent('name', 'twitter:title');
+      const ogImage = metaContent('property', 'og:image')   || metaContent('name', 'twitter:image');
 
       if (!ogTitle) {
         return res.status(400).json({ error: '트랙 정보를 가져올 수 없습니다 (페이지 형식 변경)' });
@@ -203,7 +230,8 @@ router.get('/oembed', async (req, res) => {
       // oEmbed에 아티스트명이 없으므로 트랙 페이지 <title>에서 추출
       let artist = 'Spotify';
       try {
-        const page = await axios.get(trackUrl, {
+        const page = await safeAxiosGet(trackUrl, {
+          allowedHosts: ['open.spotify.com', 'spotify.com', 'spotify.link'],
           headers: { 'User-Agent': 'Mozilla/5.0' },
           maxRedirects: 5,
           timeout: 5000,
