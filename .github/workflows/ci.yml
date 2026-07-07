@@ -8,6 +8,18 @@ on:
 jobs:
   server-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: caffeine_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,12 +32,13 @@ jobs:
         working-directory: server
       - name: Syntax check (routes/services/utils)
         run: |
+          node --check server.js && node --check app.js
           find src -name '*.js' -print0 | xargs -0 -n1 node --check
         working-directory: server
-      - name: Unit tests
+      - name: Unit + integration tests
         run: npm test
         working-directory: server
         env:
-          # 테스트는 DB에 연결하지 않지만 config.js가 존재 자체를 검증함
-          DATABASE_URL: postgres://ci-placeholder
+          NODE_ENV: test
+          DATABASE_URL: postgres://postgres:test@localhost:5432/caffeine_test
           JWT_SECRET: ci-only-secret-not-used-in-runtime-0000

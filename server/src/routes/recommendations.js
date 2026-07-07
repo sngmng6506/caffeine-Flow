@@ -28,6 +28,7 @@ const visitorLimiter = rateLimit({
   max: 3,
   keyGenerator: (req) => req.headers['x-visitor-id'] || `ip:${ipKeyGenerator(req.ip)}`,
   message: REQUEST_MESSAGE,
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 // IP 단독 제한은 visitor 한도(3)보다 살짝 여유롭게 — 같은 매장에서 가족·일행이
@@ -38,6 +39,7 @@ const ipLimiter = rateLimit({
   max: 10,
   keyGenerator: (req) => ipKeyGenerator(req.ip),
   message: REQUEST_MESSAGE,
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 const requestLimiters = [visitorLimiter, ipLimiter];

@@ -24,6 +24,10 @@ function safeVisitorId(req) {
 // visitor_id는 위조 가능하므로 IP 한도가 최후 방어선 (신청 라우트 주석 참조).
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
+// NODE_ENV=test에서는 스킵 — 통합 테스트가 같은 IP(127.0.0.1)에서
+// 연속 요청을 보내므로 한도에 걸려 시나리오 검증이 불가능해짐
+const skipInTest = () => process.env.NODE_ENV === 'test';
+
 function makeDualLimiter({ windowMs = 60_000, visitorMax, ipMax, message }) {
   const msg = { error: message };
   return [
@@ -32,12 +36,14 @@ function makeDualLimiter({ windowMs = 60_000, visitorMax, ipMax, message }) {
       max: visitorMax,
       keyGenerator: (req) => req.headers['x-visitor-id'] || `ip:${ipKeyGenerator(req.ip)}`,
       message: msg,
+      skip: skipInTest,
     }),
     rateLimit({
       windowMs,
       max: ipMax,
       keyGenerator: (req) => ipKeyGenerator(req.ip),
       message: msg,
+      skip: skipInTest,
     }),
   ];
 }
