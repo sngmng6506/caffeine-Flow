@@ -1,4 +1,22 @@
 const db = require('../db/knex');
+const jwt = require('jsonwebtoken');
+const { kstTodayString } = require('../utils/kst');
+
+const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
+
+// role=owner는 handshake query만으로 신뢰할 수 없음 (손님이 위조해서
+// 붙으면 peak concurrent 통계에서 자기 자신을 owner로 차감시켜 왜곡 가능).
+// auth.token의 JWT를 검증하고 slug 일치까지 확인 — 실패 시 손님으로 취급.
+function verifyOwner(socket, slug) {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return false;
+    const payload = jwt.verify(token, JWT_SECRET);
+    return payload.slug === slug;
+  } catch {
+    return false;
+  }
+}
 
 function initSocket(io) {
   const cafeNsp = io.of('/cafe');
@@ -12,7 +30,7 @@ function initSocket(io) {
 
     socket.join(slug);
 
-    if (role === 'owner') {
+    if (role === 'owner' && verifyOwner(socket, slug)) {
       if (!ownerSockets.has(slug)) ownerSockets.set(slug, new Set());
       ownerSockets.get(slug).add(socket.id);
     } else {
@@ -39,7 +57,8 @@ async function updatePeakConcurrent(nsp, slug, ownerSockets) {
     const cafe = await cafeService.findBySlug(slug);
     if (!cafe) return;
 
-    const today = new Date().toISOString().slice(0, 10);
+    // 방문/이력 통계와 동일하게 KST 기준 날짜 사용 (UTC면 오전 9시 전 피크가 전날로 기록됨)
+    const today = kstTodayString();
     const existing = await db('daily_stats')
       .where({ cafe_id: cafe.id, date: today })
       .first();

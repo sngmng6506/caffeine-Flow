@@ -26,7 +26,13 @@ function getKstDay(date) {
   return new Date(date.getTime() + KST_OFFSET_MS).getUTCDay();
 }
 
+// 현재 시각의 KST 기준 날짜 문자열 (YYYY-MM-DD)
+function kstTodayString(date = new Date()) {
+  return new Date(date.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
 module.exports = {
+  kstTodayString,
   kstStartOfDateString,
   kstEndOfDateString,
   kstStartOfDay,

@@ -6,7 +6,10 @@ let socket = null;
 
 export function getSocket(slug) {
   if (!socket) {
-    socket = io(`${SERVER}/cafe`, { query: { slug, role: 'owner' } });
+    socket = io(`${SERVER}/cafe`, {
+      query: { slug, role: 'owner' },
+      auth:  { token: localStorage.getItem('token') },
+    });
   }
   return socket;
 }
