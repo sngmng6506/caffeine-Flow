@@ -3,7 +3,11 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 
 function parseInitialState() {
-  const params = new URLSearchParams(window.location.search);
+  // OAuth 콜백 파라미터는 fragment(#) 우선 — 토큰이 서버 로그/Referer에
+  // 남지 않도록 서버가 fragment로 보냄. query는 구버전 서버 호환 폴백.
+  const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const fromQuery = new URLSearchParams(window.location.search);
+  const params = { get: (k) => fromHash.get(k) ?? fromQuery.get(k) };
 
   if (params.get('token') && params.get('cafe')) {
     const token    = params.get('token');

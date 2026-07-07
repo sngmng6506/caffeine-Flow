@@ -139,12 +139,14 @@ router.get('/naver/callback', async (req, res) => {
       await cafeService.update(existing.id, { last_login_at: new Date() });
       const token = issueToken(existing);
       const cafe  = encodeURIComponent(JSON.stringify(safeCafe(existing)));
-      return res.redirect(`${ownerUrl}?token=${token}&cafe=${cafe}`);
+      // 토큰을 query가 아닌 fragment로 전달 — fragment는 서버 액세스 로그·
+      // Referer 헤더에 남지 않음 (query의 30일 JWT는 로그로 유출될 수 있음)
+      return res.redirect(`${ownerUrl}#token=${token}&cafe=${cafe}`);
     }
 
     // 신규 회원 → pending 토큰으로 클라이언트에 전달
     const pendingToken = issuePendingToken({ naverId, email, name });
-    return res.redirect(`${ownerUrl}?pending=${pendingToken}`);
+    return res.redirect(`${ownerUrl}#pending=${pendingToken}`);
 
   } catch (err) {
     console.error('[naver callback]', err.message);
