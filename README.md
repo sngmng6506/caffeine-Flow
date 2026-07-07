@@ -105,8 +105,10 @@ cd owner && npm run electron:dev
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | 재생 모드·종료 감지·소켓·DB 스키마 등 심화 구조 |
 | **[docs/API.md](docs/API.md)** | REST 엔드포인트 전체 목록 (인증·rate limit 포함) |
 | **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | 로컬 개발·환경변수·마이그레이션·배포 |
-| **[AGENTS.md](AGENTS.md)** | AI 도구 협업 규칙 (Claude Code / Codex / Gemini) |
+| **[AGENTS.md](AGENTS.md)** | AI 도구 협업 규칙 (도구 무관 계약) |
 | **[COMMIT_CONVENTION.md](COMMIT_CONVENTION.md)** | 커밋 메시지 형식 |
+
+AI 도구별 어댑터: `CLAUDE.md` · `GEMINI.md` · `.cursor/rules` — 모두 `AGENTS.md` 계약을 참조하는 얇은 설정 파일이다.
 
 ---
 
