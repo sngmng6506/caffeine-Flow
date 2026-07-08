@@ -66,7 +66,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         return;
       }
       if (activeVideoIds.includes(data.videoId)) {
-        setError('이미 대기 중인 곡입니다. 다른 곡을 추천해주세요.');
+        setError('이미 대기 중인 곡입니다. 다른 곡을 신청해주세요.');
         setUrl('');
         return;
       }
@@ -126,7 +126,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         <div style={styles.btnRow}>
           <button onClick={() => setStep('input')} style={styles.cancelBtn}>취소</button>
           <button onClick={handleSubmit} disabled={loading} style={styles.submitBtn}>
-            {loading ? '추천 중...' : '추천하기'}
+            {loading ? '신청 중...' : '신청하기'}
           </button>
         </div>
       </div>

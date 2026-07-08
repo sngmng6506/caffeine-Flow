@@ -47,7 +47,7 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
           {rec.platform === 'soundcloud' && <span style={{ ...styles.platformBadge, background: '#ff5500' }}>SC</span>}
           {rec.platform === 'spotify'    && <span style={{ ...styles.platformBadge, background: '#1db954' }}>SP</span>}
           {rec.channel_title}{rec.duration && ` · ${rec.duration}`}
-          {rec.requester_name && ` · 추천: ${rec.requester_name}`}
+          {rec.requester_name && ` · 신청: ${rec.requester_name}`}
         </div>
         <div style={styles.meta}>👍 {rec.vote_count}표</div>
         {filter && (

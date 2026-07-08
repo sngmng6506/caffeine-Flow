@@ -28,7 +28,7 @@ export default function SettingsTab({ allowedPlatforms, saving, onSave }) {
     <div style={settingsStyles.wrap}>
       <div style={settingsStyles.section}>
         <div style={settingsStyles.title}>허용 플랫폼</div>
-        <div style={settingsStyles.desc}>손님이 추천할 수 있는 음악 플랫폼을 선택하세요.</div>
+        <div style={settingsStyles.desc}>손님이 신청할 수 있는 음악 플랫폼을 선택하세요.</div>
         <div style={settingsStyles.platforms}>
           {PLATFORMS.map(p => {
             const active = selected.includes(p.id);

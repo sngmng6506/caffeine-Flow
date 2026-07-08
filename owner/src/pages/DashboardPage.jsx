@@ -468,7 +468,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         </div>
         <div style={styles.headerRight}>
           <button onClick={toggleAccepting} style={{ ...styles.toggleBtn, background: isAccepting ? '#4caf50' : '#888' }}>
-            {isAccepting ? '추천 받는 중' : '추천 닫힘'}
+            {isAccepting ? '신청 받는 중' : '신청 닫힘'}
           </button>
           <button onClick={toggleAutoAccept} style={{ ...styles.toggleBtn, background: autoAccept ? '#ff9800' : '#9e9e9e', fontSize: 12 }}>
             자동 수락 {autoAccept ? 'ON' : 'OFF'}
@@ -517,7 +517,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
       <div style={styles.tabs}>
         <button onClick={() => handleTabChange('queue')}   style={{ ...styles.tab, ...(tab === 'queue'   ? styles.tabActive : {}) }}>
-          추천 목록 {recs.filter(r => r.status === 'pending').length > 0 && <span style={styles.badge}>{recs.filter(r => r.status === 'pending').length}</span>}
+          신청 목록 {recs.filter(r => r.status === 'pending').length > 0 && <span style={styles.badge}>{recs.filter(r => r.status === 'pending').length}</span>}
         </button>
         <button onClick={() => handleTabChange('history')} style={{ ...styles.tab, ...(tab === 'history' ? styles.tabActive : {}) }}>이력</button>
         <button onClick={() => handleTabChange('stats')}   style={{ ...styles.tab, ...(tab === 'stats'   ? styles.tabActive : {}) }}>통계</button>
@@ -568,7 +568,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
                       <RecommendCard key={r.id} slug={cafe.slug} rec={r}
                         onUpdate={handleUpdate} onDelete={handleDelete} context="playing" />
                     ))
-                  : <div style={styles.emptySlot}>재생 중인 추천곡 없음</div>
+                  : <div style={styles.emptySlot}>재생 중인 신청곡 없음</div>
               }
             </div>
 
@@ -599,7 +599,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
               onDrop={e => handleDrop(e, 'pending')}
             >
               <div style={styles.sectionTitle}>
-                추천 곡 {pending.length > 0 && <span style={styles.badge}>{pending.length}</span>}
+                신청곡 {pending.length > 0 && <span style={styles.badge}>{pending.length}</span>}
               </div>
               {loading
                 ? <div style={styles.emptySlot}>불러오는 중...</div>
@@ -608,7 +608,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
                       <RecommendCard key={r.id} slug={cafe.slug} rec={r} position={i + 1}
                         onUpdate={handleUpdate} onDelete={handleDelete} context="pending" hasPlaying={hasPlaying} />
                     ))
-                  : <div style={styles.emptySlot}>추천된 곡 없음</div>
+                  : <div style={styles.emptySlot}>신청된 곡 없음</div>
               }
             </div>
           </div>

@@ -80,7 +80,7 @@ export default function StatsPanel() {
       </Section>
 
       {/* ── 시간대별 추천 패턴 ── */}
-      <Section title="시간대별 추천 패턴" sub="최근 30일 기준">
+      <Section title="시간대별 신청 패턴" sub="최근 30일 기준">
         <BarChart
           data={hourly}
           labelKey="hour"
@@ -115,7 +115,7 @@ export default function StatsPanel() {
       </Section>
 
       {/* ── 요일별 추천 패턴 ── */}
-      <Section title="요일별 추천 패턴" sub="최근 30일 기준">
+      <Section title="요일별 신청 패턴" sub="최근 30일 기준">
         <BarChart
           data={weekday}
           labelKey="day"
@@ -164,7 +164,7 @@ export default function StatsPanel() {
 function SongList({ recs, label, hasMore, onMore }) {
   const [expanded, setExpanded] = useState(null);
 
-  if (recs.length === 0) return <div style={s.listEmpty}>{label} 추천된 곡이 없습니다.</div>;
+  if (recs.length === 0) return <div style={s.listEmpty}>{label} 신청된 곡이 없습니다.</div>;
 
   return (
     <div style={s.songList}>

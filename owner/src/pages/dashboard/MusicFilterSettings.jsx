@@ -4,9 +4,9 @@ import { getMe, updateMusicFilter } from '../../api';
 const DEFAULT_PROMPT = '조용한 작업 카페입니다. 잔잔한 재즈, 로파이, 어쿠스틱, 부드러운 팝은 허용하고, 욕설이 많은 곡, 클럽 음악, 과하게 시끄러운 힙합/EDM은 거절해주세요.';
 
 const STRICTNESS = [
-  { id: 'low', label: '느슨하게', desc: '명확히 안 맞는 곡만 거절' },
-  { id: 'medium', label: '보통', desc: '분위기와 안 맞으면 거절' },
-  { id: 'high', label: '엄격하게', desc: '조금만 충돌해도 거절' },
+  { id: 'low', label: '느슨하게' },
+  { id: 'medium', label: '보통' },
+  { id: 'high', label: '엄격' },
 ];
 
 function normalize(latest = {}) {
@@ -107,8 +107,7 @@ export default function MusicFilterSettings() {
               onClick={() => setForm(prev => ({ ...prev, strictness: item.id }))}
               style={{ ...styles.strictnessBtn, ...(active ? styles.strictnessActive : {}) }}
             >
-              <strong>{item.label}</strong>
-              <span>{item.desc}</span>
+              {item.label}
             </button>
           );
         })}
@@ -142,7 +141,7 @@ const styles = {
   count: { fontSize: 11, color: '#aaa', textAlign: 'right', marginTop: 4 },
   warn: { fontSize: 12, color: '#e63946', marginTop: 6 },
   strictnessRow: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 },
-  strictnessBtn: { display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', padding: 10, borderRadius: 10, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 12, color: '#777', outline: 'none' },
+  strictnessBtn: { padding: '10px 0', textAlign: 'center', borderRadius: 10, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#777', outline: 'none' },
   strictnessActive: { borderColor: '#1a1a2e', background: '#1a1a2e', color: '#fff' },
   info: { marginTop: 14, padding: 12, borderRadius: 8, background: '#fff7e6', color: '#8a5a00', fontSize: 12, lineHeight: 1.45 },
   actions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 16, flexWrap: 'wrap' },

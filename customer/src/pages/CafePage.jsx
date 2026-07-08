@@ -8,7 +8,7 @@ import SongCard from './SongCard';
 
 function getTabs(cafeName) {
   return [
-    { id: 'queue',     label: '추천곡' },
+    { id: 'queue',     label: '신청곡' },
     { id: 'history',  label: '최근 7일' },
     { id: 'cafeTop',  label: cafeName ? `${cafeName} TOP` : '카페 TOP' },
     { id: 'globalTop', label: '전체 TOP' },
@@ -147,7 +147,7 @@ export default function CafePage({ slug }) {
     <div style={styles.page}>
       {cafeName && <h2 style={styles.cafeName}>{cafeName}</h2>}
       {notice && <div style={styles.notice}>📢 {notice}</div>}
-      {!isAccepting && <div style={styles.closed}>현재 추천을 받지 않습니다</div>}
+      {!isAccepting && <div style={styles.closed}>현재 신청을 받지 않습니다</div>}
 
       <NowPlaying rec={nowPlaying} />
 
@@ -217,7 +217,7 @@ export default function CafePage({ slug }) {
             </section>
           )}
           {waitingQueue.length === 0 && pendingQueue.length === 0 && (
-            <div style={styles.empty}>대기 중인 추천곡이 없습니다.<br />첫 번째 곡을 추천해보세요!</div>
+            <div style={styles.empty}>대기 중인 신청곡이 없습니다.<br />첫 번째 곡을 신청해보세요!</div>
           )}
         </>
       )}
@@ -291,7 +291,7 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
     <>
       <div style={styles.sortBar}>
         <button onClick={() => setSortBy('count')} style={{ ...styles.sortBtn, ...(sortBy === 'count' ? styles.sortActive : {}) }}>신청순</button>
-        <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>추천순</button>
+        <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>좋아요순</button>
       </div>
     <ol style={styles.rankList}>
       {sorted.map((item, i) => {
