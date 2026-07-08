@@ -78,7 +78,7 @@ const settingsStyles = {
   title:       { fontSize: 15, fontWeight: 700, marginBottom: 4 },
   desc:        { fontSize: 13, color: '#888', marginBottom: 16 },
   platforms:   { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15' },
+  platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
   hint:        { fontSize: 12, color: '#ff9800', marginTop: 8 },
   saveBtn:     { marginTop: 16, padding: '10px 28px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
 };
