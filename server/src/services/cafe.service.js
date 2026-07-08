@@ -50,6 +50,7 @@ async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedA
       terms_agreed_at:        agreements?.service    ? now : null,
       privacy_agreed_at:      agreements?.privacy    ? now : null,
       copyright_agreed_at:    agreements?.copyright  ? now : null,
+      age_confirmed_at:       agreements?.age        ? now : null,
       marketing_agreed:       !!agreements?.marketing,
       marketing_agreed_at:    agreements?.marketing  ? now : null,
       address:                location?.address      || null,

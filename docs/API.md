@@ -12,10 +12,10 @@ Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔
 
 | Method | Path | 인증 | 설명 |
 | --- | --- | :-: | --- |
-| POST | `/auth/google` | 🔓 | Google idToken 로그인. body에 `cafeName`+`agreed`면 신규 가입 |
+| POST | `/auth/google` | 🔓 | Google idToken 로그인. 신규 회원이면 `needsSetup`+`pendingToken` 반환 |
 | GET | `/auth/naver` | 🔓 | Naver OAuth 시작 (state 쿠키 발급 후 리다이렉트) |
 | GET | `/auth/naver/callback` | 🔓 | Naver 콜백 → 토큰을 **URL fragment**로 담아 앱으로 리다이렉트 |
-| POST | `/auth/complete` | 🔓 | pending 토큰으로 신규 가입 완료 (Google·Naver 공통) |
+| POST | `/auth/complete` | 🔓 | pending 토큰으로 신규 가입 완료 (Google·Naver 공통 단일 경로). 필수 동의: 만 14세·이용약관·개인정보·공연권 안내 |
 
 로그인 응답: `{ token, cafe }`. 신규 회원: `{ needsSetup: true, pendingToken }`. 같은 이메일의 타 provider 계정이 있으면 응답에 `emailWarning` 힌트 포함.
 

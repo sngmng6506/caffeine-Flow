@@ -38,10 +38,10 @@ async function checkEmailOverlap(email) {
 // ────────────────────────────────────────────
 // POST /api/v1/auth/google
 // body: { idToken }                         → 기존 회원: { token, cafe }
-// body: { idToken, cafeName, agreed: true } → 신규 가입: { token, cafe }
+// 기존 회원 → { token, cafe } / 신규 회원 → { needsSetup, pendingToken } (가입은 /complete에서)
 // ────────────────────────────────────────────
 router.post('/google', async (req, res) => {
-  const { idToken, cafeName, agreed } = req.body;
+  const { idToken } = req.body;
   const idTokenCheck = validateString(idToken, { max: 4096, name: 'idToken' });
   if (idTokenCheck.error) return res.status(400).json({ error: idTokenCheck.error });
 
@@ -62,21 +62,10 @@ router.post('/google', async (req, res) => {
     return res.json({ token: issueToken(existing), cafe: safeCafe(existing) });
   }
 
-  // 신규 가입 완료
-  if (cafeName && agreed) {
-    const nameCheck = validateString(cafeName, { max: 100, name: '카페명' });
-    if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
-    const emailWarning = await checkEmailOverlap(email);
-    const cafe = await cafeService.create({
-      name: nameCheck.value,
-      ownerEmail: email,
-      googleId,
-      disclaimerAcceptedAt: new Date(),
-    });
-    return res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe), emailWarning });
-  }
-
-  // 신규 회원 → 가입 정보 입력 필요
+  // 신규 회원 → 가입 정보 입력 필요.
+  // 모든 신규 가입은 /complete 한 곳으로 통일한다 — 과거의 인라인 가입
+  // 분기(cafeName+agreed)는 약관별 동의 시각 기록 없이 계정을 만들 수
+  // 있는 컴플라이언스 구멍이라 제거했다.
   return res.json({ needsSetup: true, pendingToken: issuePendingToken({ googleId, email, name }) });
 });
 
@@ -167,6 +156,8 @@ router.post('/complete', async (req, res) => {
   if (!agreed) return res.status(400).json({ error: '약관 동의 필수' });
 
   // 필수 약관 동의 검증
+  if (!agreements?.age)
+    return res.status(400).json({ error: '만 14세 이상 확인이 필요합니다' });
   if (!agreements?.service || !agreements?.privacy || !agreements?.copyright)
     return res.status(400).json({ error: '필수 약관에 모두 동의해야 합니다' });
 
