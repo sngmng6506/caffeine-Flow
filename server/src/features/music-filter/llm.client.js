@@ -79,11 +79,11 @@ async function callMusicFilterLlm(messages) {
       model: res.data?.model || MUSIC_FILTER_MODEL,
     };
   } catch (err) {
-    if (err.code) throw err;
+    if (err.code === 'ECONNABORTED') throw withCode(err, 'LLM_TIMEOUT');
     if (err.response?.status) {
       throw withCode(new Error(`LLM API HTTP ${err.response.status}`), `LLM_HTTP_${err.response.status}`);
     }
-    if (err.code === 'ECONNABORTED') throw withCode(err, 'LLM_TIMEOUT');
+    if (err.code?.startsWith?.('LLM_')) throw err;
     throw withCode(err, 'LLM_REQUEST_FAILED');
   }
 }
