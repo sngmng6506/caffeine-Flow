@@ -1,8 +1,17 @@
 import { useState } from 'react';
 import { updateRec, deleteRec } from '../api';
 
+function filterLabel(rec) {
+  if (!rec.filter_status || rec.filter_status === 'skipped') return null;
+  if (rec.filter_status === 'accepted') return { text: 'AI 통과', style: styles.filterAccepted };
+  if (rec.filter_status === 'rejected') return { text: 'AI 거절', style: styles.filterRejected };
+  if (rec.filter_status === 'error_rejected') return { text: 'AI 오류 거절', style: styles.filterError };
+  return null;
+}
+
 export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, position, expanded }) {
   const [loading, setLoading] = useState(false);
+  const filter = filterLabel(rec);
 
   async function handle(action) {
     setLoading(true);
@@ -41,6 +50,12 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
           {rec.requester_name && ` · 추천: ${rec.requester_name}`}
         </div>
         <div style={styles.meta}>👍 {rec.vote_count}표</div>
+        {filter && (
+          <div style={styles.filterRow} title={rec.filter_reason || ''}>
+            <span style={{ ...styles.filterBadge, ...filter.style }}>{filter.text}</span>
+            {rec.filter_reason && <span style={styles.filterReason}>{rec.filter_reason}</span>}
+          </div>
+        )}
 
         {/* 추천 재생 중 섹션 */}
         {context === 'playing' && (
@@ -99,4 +114,10 @@ const styles = {
   skipBtn:    { fontSize: 11, padding: '3px 10px', borderRadius: 6, border: 'none', background: '#ff9800', color: '#fff', cursor: 'pointer', fontWeight: 600 },
   platformBadge: { fontSize: 10, fontWeight: 700, color: '#fff', padding: '1px 5px', borderRadius: 3, marginRight: 4 },
   commentHint:   { fontSize: 11, color: '#aaa', flexShrink: 0, alignSelf: 'center' },
+  filterRow:     { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, maxWidth: '100%' },
+  filterBadge:   { fontSize: 10, fontWeight: 800, borderRadius: 999, padding: '2px 7px', flexShrink: 0 },
+  filterAccepted:{ background: '#e8f5e9', color: '#2e7d32' },
+  filterRejected:{ background: '#ffebee', color: '#c62828' },
+  filterError:   { background: '#fff3e0', color: '#ef6c00' },
+  filterReason:  { fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 };
