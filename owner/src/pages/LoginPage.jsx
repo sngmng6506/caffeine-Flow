@@ -318,6 +318,12 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
       <div style={styles.oauthBtns}>
         {/* Google 로그인 버튼 (GIS SDK가 렌더링) */}
         <div ref={googleBtnRef} />
+        {!import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+          <div style={styles.configWarn}>
+            Google 로그인을 사용할 수 없습니다.<br />
+            (관리자: VITE_GOOGLE_CLIENT_ID 빌드 설정을 확인해 주세요)
+          </div>
+        )}
 
         {/* 네이버 로그인 버튼 — VITE_NAVER_ENABLED=true 설정 시 활성화 */}
         {import.meta.env.VITE_NAVER_ENABLED === 'true' && (
@@ -348,6 +354,7 @@ const styles = {
   form:         { display: 'flex', flexDirection: 'column', gap: 12 },
   input:        { padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, outline: 'none' },
   oauthBtns:    { display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' },
+  configWarn:   { fontSize: 12, color: "#e63946", textAlign: "center", lineHeight: 1.5, padding: "12px", background: "#fff5f5", borderRadius: 8, width: 320, boxSizing: "border-box" },
   naverBtn:     { position: 'relative', display: 'flex', alignItems: 'center', width: 320, padding: '10px 16px', borderRadius: 8, border: 'none', background: '#03C75A', color: '#fff', fontSize: 15, fontWeight: 600, cursor: 'pointer' },
   naverBtnText: { flex: 1, textAlign: 'center' },
   naverN:       { width: 24, height: 24, borderRadius: 4, background: '#fff', color: '#03C75A', fontWeight: 900, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' },
