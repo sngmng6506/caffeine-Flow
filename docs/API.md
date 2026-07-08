@@ -31,6 +31,7 @@ Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔
 | PUT | `/cafes/me` | 카페명 등 기본 정보 |
 | PUT | `/cafes/me/notice` | 공지 |
 | PUT | `/cafes/me/platforms` | 허용 플랫폼 (youtube/soundcloud/spotify) |
+| PUT | `/cafes/me/music-filter` | AI 음악 필터 설정. 판단 결과는 수락/거절만 사용하며 AI 오류 시 자동 거절 |
 | PUT | `/cafes/me/marketing` | 마케팅 수신 동의 |
 | PUT | `/cafes/me/address` | 주소·좌표 |
 | PUT | `/cafes/me/status` | 신청 ON/OFF |
@@ -52,7 +53,7 @@ owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경�
 | Method | Path | 인증 | 설명 |
 | --- | --- | :-: | --- |
 | GET | `/` | 🔓 | 큐 조회 (+ 방문 기록, KST 하루 1회) |
-| POST | `/` | 🔓 ⏱ | 신청. 중복 409, 큐 초과 429 |
+| POST | `/` | 🔓 ⏱ | 신청. 중복 409, 큐 초과 429. AI 필터 ON이면 LLM 판단 후 수락/거절 |
 | GET | `/top10` | 🔓 | 매장 TOP10 (`?offset=`) |
 | DELETE | `/:id/cancel` | 🔓 | 본인 신청 취소 — visitor_id/IP 일치 필요, 불일치 403 |
 | POST | `/:id/vote` | 🔓 ⏱ | 투표. 중복 409 |
@@ -110,7 +111,8 @@ owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경�
 | --- | --- |
 | 400 | 입력 검증 실패 |
 | 401 | 토큰 없음·만료 |
-| 403 | 권한 없음 (타 카페 / 타인 신청 취소) |
+| 403 | 권한 없음 또는 AI 필터 판단 거절 |
 | 409 | 중복 (신청·투표) 또는 잘못된 상태 전이 |
 | 429 | rate limit 초과 (큐 만석 포함) |
 | 500 | 서버 오류 |
+| 503 | AI 필터 API 실패로 신청 자동 거절 |
