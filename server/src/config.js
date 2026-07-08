@@ -23,4 +23,10 @@ module.exports = {
   NAVER_CLIENT_SECRET: env('NAVER_CLIENT_SECRET'),
   APP_URL:             env('APP_URL',    'http://localhost:5174'),
   SERVER_URL:          env('SERVER_URL', 'http://localhost:3000'),
+
+  // AI 음악 필터 — 기능을 켠 카페에서만 사용. 키가 없으면 요청 시 error_rejected 처리.
+  OPENAI_API_KEY:          env('OPENAI_API_KEY'),
+  OPENAI_BASE_URL:         env('OPENAI_BASE_URL', 'https://api.openai.com/v1').replace(/\/$/, ''),
+  MUSIC_FILTER_MODEL:      env('MUSIC_FILTER_MODEL', 'gpt-4.1-mini'),
+  MUSIC_FILTER_TIMEOUT_MS: Number(env('MUSIC_FILTER_TIMEOUT_MS', '8000')) || 8000,
 };
