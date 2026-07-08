@@ -6,8 +6,10 @@ const TERMS = [
     key: 'service',
     title: '서비스 이용약관',
     required: true,
-    content: `제1조 (목적)
-본 약관은 Caffeine Flow(이하 "서비스")가 제공하는 카페 음악 추천 플랫폼의 이용 조건 및 절차, 이용자와 서비스 간의 권리·의무 및 책임사항을 규정합니다.
+    content: `시행일: 2026년 7월 8일
+
+제1조 (목적)
+본 약관은 Caffeine Flow(이하 "서비스")가 제공하는 카페 음악 추천 플랫폼의 이용 조건과, 이용자와 서비스 사이의 권리·의무를 정합니다.
 
 제2조 (서비스 이용)
 ① 서비스는 카페 운영자(이하 "회원")가 손님으로부터 음악 신청을 받고 관리할 수 있는 플랫폼을 제공합니다.
@@ -15,60 +17,83 @@ const TERMS = [
 ③ 서비스는 운영상 필요한 경우 사전 고지 후 서비스를 변경하거나 중단할 수 있습니다.
 
 제3조 (회원 탈퇴)
-① 회원은 서비스 내 문의 기능 또는 이메일(sngmng6506@gmail.com)을 통해 탈퇴를 요청할 수 있습니다.
-② 탈퇴 시 회원의 개인정보는 관련 법령에 따른 보관 기간을 제외하고 즉시 파기됩니다.
+① 회원은 서비스 내 문의 기능 또는 이메일(sngmng6506@gmail.com)로 언제든 탈퇴를 요청할 수 있습니다.
+② 탈퇴 시 회원의 개인정보는 관련 법령에 따라 보관이 필요한 정보를 제외하고 지체 없이 파기됩니다.
 
 제4조 (면책)
-① 서비스는 천재지변, 불가항력적 사유로 인한 서비스 중단에 대해 책임을 지지 않습니다.
-② 음악 재생에 따른 저작권 관련 분쟁 및 법적 책임은 회원에게 있습니다.
+① 서비스는 천재지변 등 불가항력으로 인한 서비스 중단에 대해 책임을 지지 않습니다.
+② 서비스는 음악 재생 플랫폼 도구를 제공할 뿐, 매장 내 음악 재생에 필요한 저작권 이용 허락을 대신 취득하거나 제공하지 않습니다. 공연권 등 저작권 관련 의무의 이행 주체는 매장을 운영하는 회원입니다.
 
 제5조 (약관 변경)
-① 서비스는 약관을 변경할 경우, 적용일 7일 전까지 서비스 내 공지 또는 이메일로 안내합니다.
-② 변경된 약관에 동의하지 않을 경우 회원은 탈퇴할 수 있습니다.
+① 약관을 변경할 경우 적용일 7일 전까지 서비스 내 공지 또는 이메일로 안내합니다.
+② 변경된 약관에 동의하지 않는 회원은 탈퇴할 수 있습니다.
 
 제6조 (분쟁 해결)
-본 약관과 관련한 분쟁은 대한민국 법률에 따르며, 관할 법원은 민사소송법에 따릅니다.`,
+본 약관과 관련한 분쟁에는 대한민국 법률이 적용되며, 관할 법원은 민사소송법에 따릅니다.`,
   },
   {
     key: 'privacy',
     title: '개인정보 수집·이용 동의',
     required: true,
-    content: `■ 수집하는 개인정보 항목
-  - 소셜 로그인 제공자로부터 수집: 이메일 주소, 이름, 소셜 계정 식별자
-  - 서비스 이용 과정에서 자동 수집: 접속 IP 주소, 서비스 이용 기록
-  - 손님(비회원) 이용 시 수집: 기기 식별 닉네임, 댓글 내용, 접속 IP
+    content: `시행일: 2026년 7월 8일
 
-■ 개인정보 수집·이용 목적
+■ 수집 항목
+  - 소셜 로그인 시: 이메일 주소, 이름, 소셜 계정 식별자
+  - 서비스 이용 과정에서 자동 수집: 접속 IP 주소, 서비스 이용 기록
+  - 손님(비회원) 이용 시: 기기 식별값, 닉네임, 댓글 내용, 접속 IP
+
+■ 수집·이용 목적
   - 회원 가입 및 계정 관리
   - 서비스 제공 및 운영
   - 어뷰징 방지 및 서비스 보안
 
-■ 개인정보 보유 및 이용 기간
-  - 회원 탈퇴 시까지 보유 후 즉시 파기
-  - 단, 관련 법령에 따라 일부 정보는 해당 기간 보관
+■ 보유·이용 기간
+  - 회원 탈퇴 시까지 보유 후 지체 없이 파기
+  - 단, 관련 법령이 정한 기간 동안은 해당 정보를 보관
     · 계약 또는 청약철회 기록: 5년 (전자상거래법)
     · 접속 로그 기록: 3개월 (통신비밀보호법)
 
-■ 개인정보 파기 절차 및 방법
-  - 회원 탈퇴 요청 시 전자적 파일은 복구할 수 없도록 삭제합니다.
+■ 개인정보의 국외 이전
+  - 이전받는 자: Railway Corp. (클라우드 서버 운영)
+  - 이전 국가: 미국
+  - 이전 항목: 위 수집 항목 전체
+  - 이전 일시·방법: 서비스 이용 시점에 네트워크를 통해 전송·보관
+  - 보유 기간: 회원 탈퇴 또는 위탁 계약 종료 시까지
 
-■ 개인정보 처리 위탁
-  - 클라우드 서버 운영: Railway (미국)
+■ 처리 위탁
   - 소셜 로그인 인증: Google, Naver
 
 ■ 개인정보보호 책임자
   - 이메일: sngmng6506@gmail.com
 
-■ 동의 거부 시 불이익
-  동의 거부 시 서비스 이용이 불가합니다.`,
+■ 동의를 거부할 권리
+  동의를 거부할 수 있으나, 본 항목은 서비스 제공에 필수적인 최소한의
+  정보로서 거부 시 회원 가입이 제한됩니다.`,
   },
   {
     key: 'copyright',
-    title: '저작권 안내 및 동의',
+    title: '매장 음악 재생(공연권) 안내 확인',
     required: true,
-    content: `카페 등 공개 장소에서 음악을 재생하는 경우, 저작권법에 따라 한국음악저작권협회(KOMCA) 등 관련 단체에 이용 허락을 받아야 합니다.
+    content: `카페 등 매장에서 음악을 트는 것은 저작권법상 "공연"에 해당하여, 매장 규모에 따라 공연권료 납부 의무가 있을 수 있습니다.
 
-본 서비스는 음악 신청 및 추천 플랫폼으로, 실제 음악 재생 및 저작권 이용 허락 취득의 책임은 전적으로 카페 운영자(회원)에게 있습니다.`,
+알아두면 좋은 내용:
+  - 영업 면적 50㎡(약 15평) 미만 매장은 공연권료가 면제됩니다 (저작권법 시행령).
+  - 50㎡ 이상 매장은 면적 구간에 따라 월 수천 원 수준의 공연권료를 한국음악저작권협회(KOMCA) 등에 납부하게 됩니다. 자세한 기준은 KOMCA 안내를 확인해 주세요.
+
+본 서비스는 음악 신청·추천을 돕는 플랫폼이며, 음악 저작권 이용 허락을 제공하지 않습니다. 매장 내 음악 재생에 따른 공연권 등 저작권 의무의 확인과 이행은 매장 운영자인 회원의 몫임을 확인합니다.
+
+※ 위 안내는 일반 정보이며 법률 자문이 아닙니다.`,
+  },
+  {
+    key: 'marketing',
+    title: '마케팅 정보 수신 동의',
+    required: false,
+    content: `새 기능 소식, 서비스 활용 팁, 이벤트 안내를 이메일로 보내드립니다.
+
+  - 수집·이용 항목: 이메일 주소
+  - 보유 기간: 동의 철회 또는 회원 탈퇴 시까지
+  - 동의하지 않아도 서비스 이용에는 아무런 제한이 없으며,
+    언제든 설정 또는 수신 메일 하단에서 철회할 수 있습니다.`,
   },
 ];
 
@@ -77,14 +102,14 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   const [pendingToken, setPendingToken] = useState(initialPendingToken || '');
   const [cafeName, setCafeName] = useState('');
   const [location, setLocation] = useState(null);
-  const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false });
+  const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false, marketing: false, age: false });
   const [expanded, setExpanded] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(oauthError || '');
   const googleBtnRef = useRef(null);
 
-  const allRequired = agreements.service && agreements.privacy && agreements.copyright;
-  const allChecked  = allRequired;
+  const allRequired = agreements.age && agreements.service && agreements.privacy && agreements.copyright;
+  const allChecked  = allRequired && agreements.marketing;
 
   // Google Identity Services 스크립트 로드
   useEffect(() => {
@@ -155,7 +180,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setPendingToken('');
     setCafeName('');
     setLocation(null);
-    setAgreements({ service: false, privacy: false, copyright: false });
+    setAgreements({ service: false, privacy: false, copyright: false, marketing: false, age: false });
     setExpanded({});
     setError('');
     setStep('login');
@@ -210,7 +235,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
 
   function toggleAll() {
     const next = !allChecked;
-    setAgreements({ service: next, privacy: next, copyright: next });
+    setAgreements({ service: next, privacy: next, copyright: next, marketing: next, age: next });
   }
 
   if (step === 'setup') {
@@ -252,6 +277,11 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
               <span style={styles.allAgreeSub}>(필수 및 선택 항목 포함)</span>
             </label>
             <div style={styles.divider} />
+            <label style={styles.checkLabel}>
+              <input type="checkbox" checked={agreements.age} onChange={() => toggleAgreement('age')} />
+              <span>만 14세 이상입니다</span>
+              <span style={styles.required}>(필수)</span>
+            </label>
             {TERMS.map(term => (
               <div key={term.key} style={styles.termItem}>
                 <div style={styles.termHeader}>
