@@ -2,6 +2,8 @@
 
 Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔드포인트는 `Authorization: Bearer <JWT>` 헤더를 요구한다.
 
+> **코드가 진실이다.** 이 표는 어떤 엔드포인트가 어디 있는지 찾기 위한 인덱스이고, 정확한 동작·한도 수치는 `server/src/routes/`가 기준이다. 라우트를 추가·변경하면 이 표도 함께 갱신한다.
+
 범례: 🔓 공개 · 🔒 사장님 인증(requireAuth) · 🏪 카페 소유자(requireCafeOwner) · ⏱ rate limited
 
 ---
@@ -50,12 +52,12 @@ owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경�
 | Method | Path | 인증 | 설명 |
 | --- | --- | :-: | --- |
 | GET | `/` | 🔓 | 큐 조회 (+ 방문 기록, KST 하루 1회) |
-| POST | `/` | 🔓 ⏱ | 신청. 중복 409, 큐 초과(30) 429. visitor 3/min + IP 10/min |
+| POST | `/` | 🔓 ⏱ | 신청. 중복 409, 큐 초과 429 |
 | GET | `/top10` | 🔓 | 매장 TOP10 (`?offset=`) |
 | DELETE | `/:id/cancel` | 🔓 | 본인 신청 취소 — visitor_id/IP 일치 필요, 불일치 403 |
-| POST | `/:id/vote` | 🔓 ⏱ | 투표. 중복 409. 15/min·IP 40/min |
+| POST | `/:id/vote` | 🔓 ⏱ | 투표. 중복 409 |
 | DELETE | `/:id/vote` | 🔓 ⏱ | 투표 취소 |
-| POST | `/:id/comments` | 🔓 ⏱ | 댓글. 5/min·IP 15/min |
+| POST | `/:id/comments` | 🔓 ⏱ | 댓글 |
 
 ### 사장님 (🏪 requireAuth + requireCafeOwner)
 | Method | Path | 설명 |
@@ -73,7 +75,7 @@ owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경�
 | Method | Path | 인증 | 설명 |
 | --- | --- | :-: | --- |
 | GET | `/` | 🔓 | 곡 댓글 목록 |
-| POST | `/` | 🔓 ⏱ | 댓글 작성 (5/min·IP 15/min) |
+| POST | `/` | 🔓 ⏱ | 댓글 작성 |
 | POST | `/:commentId/replies` | 🔓 ⏱ | 답글 |
 
 ---

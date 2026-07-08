@@ -1,6 +1,6 @@
 # 개발 가이드
 
-로컬 개발 환경 설정, 환경변수, 마이그레이션, 테스트, 배포를 다룬다.
+환경변수, 마이그레이션, 테스트, 배포를 다룬다. 설치·실행 명령은 [README](../README.md#빠른-시작)의 빠른 시작에 있다.
 
 ---
 
@@ -29,25 +29,6 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ---
 
-## 설치 & 실행
-
-```bash
-npm install
-npm install --prefix server
-npm install --prefix customer
-npm install --prefix owner
-
-npm run migrate --prefix server   # DB 스키마
-
-npm run dev:server     # localhost:3001
-npm run dev:customer   # localhost:5173
-npm run dev:owner      # localhost:5174
-
-cd owner && npm run electron:dev   # 데스크톱 개발 모드
-```
-
----
-
 ## 마이그레이션 (Knex)
 
 `server/src/db/migrations/` 아래 번호순 파일. `knex_migrations` 테이블이 적용 상태를 추적한다.
@@ -57,10 +38,7 @@ npm run migrate --prefix server            # 최신까지 적용
 npm run migrate:rollback --prefix server   # 마지막 배치 롤백
 ```
 
-**주의**
-- 공유 DB(Railway 등)에는 로컬에서 `migrate`를 돌리지 않는다. 배포할 때 startCommand가 알아서 실행한다.
-- `recommendations.id`는 UUID다. 집계할 때 `MIN(id)`는 실패하므로 `ROW_NUMBER() OVER (... ORDER BY)`를 쓴다(018 참고).
-- 새 마이그레이션은 up/down을 모두 구현하고, 데이터를 지우거나 바꾸는 작업 전에 기존 데이터를 정리하는 로직을 함께 넣는다.
+마이그레이션 작성 규칙(공유 DB 금지, UUID 집계, up/down, 데이터 보존)은 [../AGENTS.md](../AGENTS.md)의 불변식을 따른다.
 
 ---
 
