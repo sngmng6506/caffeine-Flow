@@ -262,6 +262,7 @@ export default function CafePage({ slug }) {
         />
       )}
       <footer style={styles.footer}>
+        <a href="/privacy.html" target="_blank" rel="noreferrer" style={styles.footerLink}>개인정보 처리방침</a>
         <span style={styles.footerLabel}>dev info</span>
         <span style={styles.footerLink}>github.com/sngmng6506</span>
       </footer>

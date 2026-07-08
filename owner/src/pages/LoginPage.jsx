@@ -68,7 +68,11 @@ const TERMS = [
 
 ■ 동의를 거부할 권리
   동의를 거부할 수 있으나, 본 항목은 서비스 제공에 필수적인 최소한의
-  정보로서 거부 시 회원 가입이 제한됩니다.`,
+  정보로서 거부 시 회원 가입이 제한됩니다.
+
+■ 국외 이전 등 전체 내용
+  개인정보 국외 이전을 포함한 전체 사항은 개인정보 처리방침에서
+  확인하실 수 있습니다: /owner/privacy.html`,
   },
   {
     key: 'copyright',
@@ -296,6 +300,9 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
             {loading ? '처리 중...' : '가입 완료'}
           </button>
         </form>
+        <div style={styles.policyFooter}>
+          <a href="/owner/privacy.html" target="_blank" rel="noreferrer" style={styles.policyLink}>개인정보 처리방침</a>
+        </div>
       </div>
     );
   }
@@ -320,6 +327,10 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
 
       {error && <div style={styles.error}>{error}</div>}
       {loading && <div style={styles.loading}>처리 중...</div>}
+
+      <div style={styles.policyFooter}>
+        <a href="/owner/privacy.html" target="_blank" rel="noreferrer" style={styles.policyLink}>개인정보 처리방침</a>
+      </div>
     </div>
   );
 }
@@ -358,4 +369,6 @@ const styles = {
   btn:          { padding: '12px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15 },
   error:        { fontSize: 13, color: '#e63946', textAlign: 'center' },
   loading:      { fontSize: 13, color: '#888', textAlign: 'center' },
+  policyFooter: { marginTop: 20, textAlign: 'center' },
+  policyLink:   { fontSize: 12, color: '#aaa', textDecoration: 'underline' },
 };
