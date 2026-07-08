@@ -30,6 +30,8 @@ export const updateMe     = (name)   => apiFetch('PUT', '/cafes/me', { name });
 export const updateNotice = (notice) => apiFetch('PUT', '/cafes/me/notice', { notice });
 export const setStatus  = (is_accepting) => apiFetch('PUT', '/cafes/me/status', { is_accepting });
 export const updatePlatforms = (allowed_platforms) => apiFetch('PUT', '/cafes/me/platforms', { allowed_platforms });
+export const updateMusicFilter = ({ enabled, prompt, strictness }) =>
+  apiFetch('PUT', '/cafes/me/music-filter', { enabled, prompt, strictness });
 export const updateMarketing = (marketing_agreed) => apiFetch('PUT', '/cafes/me/marketing', { marketing_agreed });
 
 export const getRecommendations = (slug) => apiFetch('GET',    `/cafes/${slug}/recommendations`);
