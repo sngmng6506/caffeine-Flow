@@ -18,6 +18,7 @@ AI 도구(Claude Code · Codex · Gemini 등)와 사람 기여자가 공통으�
 - [ ] `node --check <file>` 통과
 - [ ] 로직 변경이면 테스트 통과: `npm run test:unit --prefix server` (DB 불필요) / `npm test --prefix server` (통합, Postgres 필요)
 - [ ] 마이그레이션·DB 변경이면 **실제 스키마로 검증** — 과거 `MIN(uuid)` 장애는 정수 PK로 가정한 테스트가 통과해서 놓쳤다
+- [ ] 라우트 추가·변경 시 `docs/API.md` 갱신 — CI의 드리프트 테스트가 누락을 잡는다
 - [ ] `owner/src` 수정 시 `cd owner && npm run build`로 번들 리빌드 포함 — `server/public/owner/`는 Railway fallback으로 커밋되므로 소스와 어긋나면 안 된다
 - [ ] 시크릿·토큰이 코드·커밋·로그에 없음
 
