@@ -165,7 +165,6 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
         ...location,
         roadAddress: location.roadAddress ? `${location.roadAddress}${detail ? ' ' + detail : ''}` : null,
         address:     location.address     ? `${location.address}${detail ? ' ' + detail : ''}`     : null,
-        detailAddress: detail || null,
       };
       const res = await completeRegistration(pendingToken, cafeName.trim(), agreements, payload);
       localStorage.setItem('token', res.token);
@@ -204,10 +203,12 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     new window.daum.Postcode({
       oncomplete(data) {
         setLocation({
-          address: data.jibunAddress,
-          roadAddress: data.roadAddress,
-          region: data.sido,
-          district: data.sigungu,
+          address: data.jibunAddress || null,
+          roadAddress: data.roadAddress || null,
+          region: data.sido || null,
+          district: data.sigungu || null,
+          latitude: null,
+          longitude: null,
         });
         setDetailAddress('');
         // 우편번호 검색 후 상세주소 입력칸으로 포커스 이동
