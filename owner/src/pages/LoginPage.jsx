@@ -95,11 +95,13 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   const [pendingToken, setPendingToken] = useState(initialPendingToken || '');
   const [cafeName, setCafeName] = useState('');
   const [location, setLocation] = useState(null);
+  const [detailAddress, setDetailAddress] = useState('');
   const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false, age: false });
   const [expanded, setExpanded] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(oauthError || '');
   const googleBtnRef = useRef(null);
+  const detailRef = useRef(null);
 
   const allRequired = agreements.age && agreements.service && agreements.privacy && agreements.copyright;
   const allChecked  = allRequired;
@@ -158,7 +160,14 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setLoading(true);
     setError('');
     try {
-      const res = await completeRegistration(pendingToken, cafeName.trim(), agreements, location);
+      const detail = detailAddress.trim();
+      const payload = {
+        ...location,
+        roadAddress: location.roadAddress ? `${location.roadAddress}${detail ? ' ' + detail : ''}` : null,
+        address:     location.address     ? `${location.address}${detail ? ' ' + detail : ''}`     : null,
+        detailAddress: detail || null,
+      };
+      const res = await completeRegistration(pendingToken, cafeName.trim(), agreements, payload);
       localStorage.setItem('token', res.token);
       localStorage.setItem('cafe', JSON.stringify(res.cafe));
       onLogin(res.cafe);
@@ -173,6 +182,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setPendingToken('');
     setCafeName('');
     setLocation(null);
+    setDetailAddress('');
     setAgreements({ service: false, privacy: false, copyright: false, age: false });
     setExpanded({});
     setError('');
@@ -193,31 +203,15 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   function runPostcode() {
     new window.daum.Postcode({
       oncomplete(data) {
-        // 좌표 변환 (카카오 Geocoder)
-        if (window.kakao?.maps?.services) {
-          const geocoder = new window.kakao.maps.services.Geocoder();
-          geocoder.addressSearch(data.roadAddress || data.jibunAddress, (result, status) => {
-            const coords = status === 'OK' && result[0]
-              ? { latitude: parseFloat(result[0].y), longitude: parseFloat(result[0].x) }
-              : { latitude: null, longitude: null };
-            setLocation({
-              address: data.jibunAddress,
-              roadAddress: data.roadAddress,
-              region: data.sido,
-              district: data.sigungu,
-              ...coords,
-            });
-          });
-        } else {
-          setLocation({
-            address: data.jibunAddress,
-            roadAddress: data.roadAddress,
-            region: data.sido,
-            district: data.sigungu,
-            latitude: null,
-            longitude: null,
-          });
-        }
+        setLocation({
+          address: data.jibunAddress,
+          roadAddress: data.roadAddress,
+          region: data.sido,
+          district: data.sigungu,
+        });
+        setDetailAddress('');
+        // 우편번호 검색 후 상세주소 입력칸으로 포커스 이동
+        setTimeout(() => detailRef.current?.focus(), 100);
       },
     }).open();
   }
@@ -249,16 +243,24 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
           />
 
           <div style={styles.addressBox}>
-            <div style={styles.addressLabel}>카페 위치 <span style={styles.required}>(필수)</span></div>
+            <div style={styles.addressLabel}>카페 주소 <span style={styles.required}>(필수)</span></div>
             {location ? (
-              <div style={styles.addressResult}>
-                <div style={styles.addressText}>{location.roadAddress || location.address}</div>
-                <button type="button" onClick={openAddressSearch} style={styles.addressChangeBtn}>변경</button>
-                <button type="button" onClick={() => setLocation(null)} style={styles.addressClearBtn}>삭제</button>
-              </div>
+              <>
+                <div style={styles.addressResult}>
+                  <div style={styles.addressText}>{location.roadAddress || location.address}</div>
+                  <button type="button" onClick={openAddressSearch} style={styles.addressChangeBtn}>변경</button>
+                </div>
+                <input
+                  ref={detailRef}
+                  placeholder="상세주소 (예: 2층, 201호)"
+                  value={detailAddress}
+                  onChange={e => setDetailAddress(e.target.value)}
+                  style={styles.input}
+                />
+              </>
             ) : (
               <button type="button" onClick={openAddressSearch} style={styles.addressSearchBtn}>
-                주소 검색
+                🔍 주소 검색
               </button>
             )}
           </div>
@@ -364,8 +366,7 @@ const styles = {
   addressResult:    { display: 'flex', alignItems: 'center', gap: 8 },
   addressText:      { flex: 1, fontSize: 13, color: '#333', background: '#f8f8f8', padding: '8px 10px', borderRadius: 6 },
   addressChangeBtn: { fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', flexShrink: 0 },
-  addressClearBtn:  { fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer', flexShrink: 0 },
-  addressSearchBtn: { padding: '10px 12px', borderRadius: 8, border: '1px dashed #ccc', background: '#fafafa', color: '#888', cursor: 'pointer', fontSize: 13 },
+  addressSearchBtn: { padding: '11px 12px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#333', cursor: 'pointer', fontSize: 14, fontWeight: 500 },
   btn:          { padding: '12px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 15 },
   error:        { fontSize: 13, color: '#e63946', textAlign: 'center' },
   loading:      { fontSize: 13, color: '#888', textAlign: 'center' },
