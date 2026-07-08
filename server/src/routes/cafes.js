@@ -4,7 +4,7 @@ const cafeService      = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { APP_URL } = require('../config');
-const { validateString, validateBool } = require('../utils/validate');
+const { validateString, validateBool, validateInEnum } = require('../utils/validate');
 const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString } = require('../utils/kst');
 
@@ -47,6 +47,34 @@ router.put('/me/platforms', requireAuth, async (req, res) => {
   const cafe = await cafeService.update(req.owner.cafeId, { allowed_platforms: filtered.join(',') });
   req.app.get('io')?.of('/cafe').to(cafe.slug).emit('platforms_updated', { allowed_platforms: filtered });
   res.json({ allowed_platforms: filtered });
+});
+
+// PUT /api/v1/cafes/me/music-filter  (AI 음악 필터 설정)
+router.put('/me/music-filter', requireAuth, async (req, res) => {
+  const enabledCheck = validateBool(req.body?.enabled, { name: 'enabled' });
+  if (enabledCheck.error) return res.status(400).json({ error: enabledCheck.error });
+
+  const promptCheck = validateString(req.body?.prompt, { max: 1000, allowNull: true, name: 'AI 필터 프롬프트' });
+  if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
+
+  const strictnessCheck = validateInEnum(req.body?.strictness || 'medium', ['low', 'medium', 'high'], { name: 'strictness' });
+  if (strictnessCheck.error) return res.status(400).json({ error: strictnessCheck.error });
+
+  if (enabledCheck.value && !promptCheck.value) {
+    return res.status(400).json({ error: 'AI 필터를 켜려면 매장 분위기 설명을 입력해주세요' });
+  }
+
+  const cafe = await cafeService.update(req.owner.cafeId, {
+    music_filter_enabled: enabledCheck.value,
+    music_filter_prompt: promptCheck.value,
+    music_filter_strictness: strictnessCheck.value,
+  });
+
+  res.json({
+    music_filter_enabled: cafe.music_filter_enabled,
+    music_filter_prompt: cafe.music_filter_prompt,
+    music_filter_strictness: cafe.music_filter_strictness,
+  });
 });
 
 // PUT /api/v1/cafes/me/marketing  (마케팅 수신 동의 변경)
