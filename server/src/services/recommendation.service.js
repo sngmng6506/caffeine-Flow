@@ -36,7 +36,24 @@ async function countActive(cafeId) {
   return parseInt(row.n);
 }
 
-async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, requesterIp, requesterName, platform = 'youtube', visitorId }) {
+async function add(cafeId, {
+  videoId,
+  title,
+  channelTitle,
+  thumbnail,
+  duration,
+  requesterIp,
+  requesterName,
+  platform = 'youtube',
+  visitorId,
+  status = 'pending',
+  filterStatus = 'skipped',
+  filterReason = null,
+  filterConfidence = null,
+  filterModel = null,
+  filterErrorCode = null,
+}) {
+  const hasFilterResult = filterStatus && filterStatus !== 'skipped';
   const [rec] = await db('recommendations')
     .insert({
       cafe_id:        cafeId,
@@ -49,6 +66,13 @@ async function add(cafeId, { videoId, title, channelTitle, thumbnail, duration, 
       requester_name: requesterName,
       platform,
       visitor_id:     visitorId || null,
+      status,
+      filter_status:  filterStatus || 'skipped',
+      filter_reason:  filterReason,
+      filter_confidence: filterConfidence,
+      filter_model:   filterModel,
+      filter_error_code: filterErrorCode,
+      filter_checked_at: hasFilterResult ? db.fn.now() : null,
     })
     .returning('*');
   return rec;
