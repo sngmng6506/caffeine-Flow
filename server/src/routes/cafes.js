@@ -77,17 +77,6 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
   });
 });
 
-// PUT /api/v1/cafes/me/marketing  (마케팅 수신 동의 변경)
-router.put('/me/marketing', requireAuth, async (req, res) => {
-  const { marketing_agreed } = req.body;
-  const data = {
-    marketing_agreed: !!marketing_agreed,
-    marketing_agreed_at: marketing_agreed ? new Date() : null,
-  };
-  const cafe = await cafeService.update(req.owner.cafeId, data);
-  res.json({ marketing_agreed: cafe.marketing_agreed });
-});
-
 // PUT /api/v1/cafes/me/address  (주소 변경)
 router.put('/me/address', requireAuth, async (req, res) => {
   const { address, roadAddress, region, district, latitude, longitude } = req.body;

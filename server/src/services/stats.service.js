@@ -1,5 +1,5 @@
 const db = require('../db/knex');
-const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour, getKstDay } = require('../utils/kst');
+const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour } = require('../utils/kst');
 
 // KST 기준 시간 필드 추출 SQL — 모든 통계의 타임존 기준을 Postgres 단에서 통일
 const KST_HOUR_SQL = `date_part('hour', requested_at AT TIME ZONE 'Asia/Seoul')::int`;

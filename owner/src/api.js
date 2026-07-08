@@ -32,7 +32,6 @@ export const setStatus  = (is_accepting) => apiFetch('PUT', '/cafes/me/status', 
 export const updatePlatforms = (allowed_platforms) => apiFetch('PUT', '/cafes/me/platforms', { allowed_platforms });
 export const updateMusicFilter = ({ enabled, prompt, strictness }) =>
   apiFetch('PUT', '/cafes/me/music-filter', { enabled, prompt, strictness });
-export const updateMarketing = (marketing_agreed) => apiFetch('PUT', '/cafes/me/marketing', { marketing_agreed });
 
 export const getRecommendations = (slug) => apiFetch('GET',    `/cafes/${slug}/recommendations`);
 export const createRec          = (slug, data) => apiFetch('POST', `/cafes/${slug}/recommendations/owner`, data);

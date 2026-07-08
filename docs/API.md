@@ -32,7 +32,6 @@ Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔
 | PUT | `/cafes/me/notice` | 공지 |
 | PUT | `/cafes/me/platforms` | 허용 플랫폼 (youtube/soundcloud/spotify) |
 | PUT | `/cafes/me/music-filter` | AI 음악 필터 설정. 판단 결과는 수락/거절만 사용하며 AI 오류 시 자동 거절 |
-| PUT | `/cafes/me/marketing` | 마케팅 수신 동의 |
 | PUT | `/cafes/me/address` | 주소·좌표 |
 | PUT | `/cafes/me/status` | 신청 ON/OFF |
 | GET | `/cafes/me/history` | 재생 이력 (`?date=` KST 기준 필터) |
