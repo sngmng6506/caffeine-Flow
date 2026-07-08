@@ -15,9 +15,11 @@ export default function StatsPanel() {
   const [selected, setSelected]         = useState(null);
   const [selectedHour, setSelectedHour] = useState(null); // { index, recs, hasMore, loading }
   const [selectedWeekday, setSelectedWeekday] = useState(null); // { index, label, recs, hasMore, loading }
-
+  const [loadError, setLoadError] = useState(false);
+  const [retryKey, setRetryKey]   = useState(0);
 
   useEffect(() => {
+    setLoadError(false);
     const date = new Date().toISOString().slice(0, 10);
     Promise.all([
       getDailyStats(date),
@@ -30,9 +32,20 @@ export default function StatsPanel() {
       setHourly(h);
       setWeekday(w);
       setTopSongs(st.topSongs || []);
-    }).catch(console.error);
-  }, []);
+    }).catch(err => {
+      console.error(err);
+      setLoadError(true);
+    });
+  }, [retryKey]);
 
+  if (loadError) {
+    return (
+      <div style={s.loading}>
+        통계를 불러오지 못했습니다.
+        <button onClick={() => setRetryKey(k => k + 1)} style={s.retryBtn}>다시 시도</button>
+      </div>
+    );
+  }
   if (!today || !hourly || !weekday || !topSongs) return <div style={s.loading}>불러오는 중...</div>;
 
   function handleCardClick(label) {
@@ -309,6 +322,7 @@ function CommentSection({ videoId }) {
 const s = {
   wrap:            { padding: '16px 0', display: 'flex', flexDirection: 'column', gap: 24 },
   loading:         { color: '#888', fontSize: 13, padding: '40px 0', textAlign: 'center' },
+  retryBtn:        { marginLeft: 8, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontSize: 12 },
   section:         { display: 'flex', flexDirection: 'column', gap: 12 },
   sectionHeader:   { display: 'flex', alignItems: 'baseline', gap: 8 },
   sectionTitle:    { fontSize: 15, fontWeight: 700 },
