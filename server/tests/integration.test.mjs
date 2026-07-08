@@ -117,6 +117,39 @@ describe('투표', () => {
   });
 });
 
+describe('통계 — knex raw ? 바인딩 회귀 (split_part 이스케이프)', () => {
+  beforeAll(async () => {
+    // '?si=' 추적 파라미터가 붙은 곡과 원곡이 하나로 병합되는지까지 검증
+    await db('recommendations').insert([
+      { cafe_id: cafe.id, video_id: 'canon_a', title: '병합 곡', status: 'played', vote_count: 2 },
+      { cafe_id: cafe.id, video_id: 'canon_a?si=xyz', title: '병합 곡', status: 'played', vote_count: 1 },
+    ]);
+  });
+
+  const authed = (path) =>
+    request(app).get(path).set({ Authorization: `Bearer ${ownerToken}` });
+
+  it('GET /api/v1/top10 → 200 + 정규화 병합', async () => {
+    const res = await request(app).get('/api/v1/top10');
+    expect(res.status).toBe(200);
+    const merged = res.body.items.find(i => i.video_id === 'canon_a');
+    expect(merged.count).toBe(2);
+  });
+
+  it('GET /cafes/me/stats → 200 (topSongs 집계)', async () => {
+    const res = await authed('/api/v1/cafes/me/stats');
+    expect(res.status).toBe(200);
+    expect(res.body.topSongs.find(s => s.video_id === 'canon_a').count).toBe(2);
+  });
+
+  it('GET /cafes/me/stats/daily·hourly·weekday·hourly-songs → 모두 200', async () => {
+    for (const p of ['/daily?date=2026-07-09', '/hourly', '/weekday', '/hourly-songs?hour=0']) {
+      const res = await authed(`/api/v1/cafes/me/stats${p}`);
+      expect(res.status, p).toBe(200);
+    }
+  });
+});
+
 describe('사장님 상태 변경 — 인증·전이 검증', () => {
   let rec;
   beforeAll(async () => {
