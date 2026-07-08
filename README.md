@@ -56,7 +56,7 @@ cd owner && npm run electron:dev
 | --- | --- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 전체 구조·재생 모드·종료 감지·소켓·DB 스키마 |
 | [docs/API.md](docs/API.md) | REST 엔드포인트 전체 (인증·rate limit 포함) |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 로컬 개발·환경변수·마이그레이션·테스트·배포·트러블슈팅 |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 로컬 개발·환경변수·마이그레이션·테스트·배포 |
 | [AGENTS.md](AGENTS.md) | AI 도구 협업 규칙 (도구 무관 계약) |
 | [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) | 커밋 메시지 형식 |
 

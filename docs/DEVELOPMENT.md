@@ -109,15 +109,3 @@ GH_TOKEN=<github_pat> npm run electron:build -- --publish always
 업데이트는 클라이언트가 `latest.yml`을 polling하다가 새 인스톨러를 내려받고, 재시작할 때 `autoUpdater.quitAndInstall`로 적용하는 방식이다.
 
 버전을 올릴 때는 `owner/package.json`의 `version`을 수정해 커밋한 뒤 빌드한다.
-
----
-
-## 트러블슈팅
-
-| 증상 | 원인·해결 |
-| --- | --- |
-| 부팅 즉시 throw (JWT_SECRET/DATABASE_URL) | `.env` 누락. config.js가 의도적으로 fail-fast |
-| `tenant/user ... not found` | Supabase 등 외부 DB pause·URL 무효. 대시보드에서 확인 |
-| `function min(uuid) does not exist` | 마이그레이션이 uuid PK에 MIN/MAX 사용. ROW_NUMBER로 대체 |
-| 마이그레이션 락 대기 | 구 인스턴스가 트래픽 유지 중. 배포 완료 후 재시도 |
-| 통합 테스트 rate limit 실패 | `NODE_ENV=test` 누락 |
