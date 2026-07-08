@@ -84,17 +84,6 @@ const TERMS = [
 
 ※ 위 안내는 일반 정보이며 법률 자문이 아닙니다.`,
   },
-  {
-    key: 'marketing',
-    title: '마케팅 정보 수신 동의',
-    required: false,
-    content: `새 기능 소식, 서비스 활용 팁, 이벤트 안내를 이메일로 보내드립니다.
-
-  - 수집·이용 항목: 이메일 주소
-  - 보유 기간: 동의 철회 또는 회원 탈퇴 시까지
-  - 동의하지 않아도 서비스 이용에는 아무런 제한이 없으며,
-    언제든 설정 또는 수신 메일 하단에서 철회할 수 있습니다.`,
-  },
 ];
 
 export default function LoginPage({ onLogin, initialPendingToken, oauthError }) {
@@ -102,14 +91,14 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   const [pendingToken, setPendingToken] = useState(initialPendingToken || '');
   const [cafeName, setCafeName] = useState('');
   const [location, setLocation] = useState(null);
-  const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false, marketing: false, age: false });
+  const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false, age: false });
   const [expanded, setExpanded] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(oauthError || '');
   const googleBtnRef = useRef(null);
 
   const allRequired = agreements.age && agreements.service && agreements.privacy && agreements.copyright;
-  const allChecked  = allRequired && agreements.marketing;
+  const allChecked  = allRequired;
 
   // Google Identity Services 스크립트 로드
   useEffect(() => {
@@ -180,7 +169,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setPendingToken('');
     setCafeName('');
     setLocation(null);
-    setAgreements({ service: false, privacy: false, copyright: false, marketing: false, age: false });
+    setAgreements({ service: false, privacy: false, copyright: false, age: false });
     setExpanded({});
     setError('');
     setStep('login');
@@ -235,7 +224,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
 
   function toggleAll() {
     const next = !allChecked;
-    setAgreements({ service: next, privacy: next, copyright: next, marketing: next, age: next });
+    setAgreements({ service: next, privacy: next, copyright: next, age: next });
   }
 
   if (step === 'setup') {
@@ -274,7 +263,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
             <label style={styles.allAgree}>
               <input type="checkbox" checked={allChecked} onChange={toggleAll} />
               <strong>전체 동의</strong>
-              <span style={styles.allAgreeSub}>(필수 및 선택 항목 포함)</span>
+              <span style={styles.allAgreeSub}>(아래 필수 항목 일괄 동의)</span>
             </label>
             <div style={styles.divider} />
             <label style={styles.checkLabel}>
