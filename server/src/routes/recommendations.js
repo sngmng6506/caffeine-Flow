@@ -10,6 +10,7 @@ const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
+const musicFilter   = require('../features/music-filter');
 const db            = require('../db/knex');
 const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
 const { validateString, validateInEnum, validateRecommendationBody } = require('../utils/validate');
@@ -48,6 +49,16 @@ const requestLimiters = [visitorLimiter, ipLimiter];
 // 투표는 토글(추가/취소) UX상 신청보다 여유롭게, 댓글은 신청과 유사하게.
 const voteLimiters    = makeDualLimiter({ visitorMax: 15, ipMax: 40, message: '잠시 후 다시 시도해주세요 (투표 한도 초과)' });
 const commentLimiters = makeDualLimiter({ visitorMax: 5,  ipMax: 15, message: '잠시 후 다시 댓글을 남겨주세요 (1분에 5개 제한)' });
+
+function filterPayload(filterResult) {
+  return {
+    filterStatus: filterResult.filterStatus,
+    filterReason: filterResult.reason,
+    filterConfidence: filterResult.confidence,
+    filterModel: filterResult.model,
+    filterErrorCode: filterResult.errorCode,
+  };
+}
 
 // GET /api/v1/cafes/:slug/recommendations
 router.get('/', async (req, res) => {
@@ -100,15 +111,47 @@ router.post('/', requestLimiters, async (req, res) => {
   if (queueCount >= MAX_QUEUE_SIZE)
     return res.status(429).json({ error: `대기열이 가득 찼습니다 (최대 ${MAX_QUEUE_SIZE}곡)` });
 
+  const filterResult = await musicFilter.evaluateRecommendation({
+    cafe,
+    track: { videoId, title, channelTitle, thumbnail, duration, platform, requesterName },
+  });
+
   const ip  = getClientIp(req);
   const visitorId = safeVisitorId(req);
   let rec;
   try {
-    rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform, visitorId });
+    rec = await recService.add(cafe.id, {
+      videoId,
+      title,
+      channelTitle,
+      thumbnail,
+      duration,
+      requesterIp: ip,
+      requesterName,
+      platform,
+      visitorId,
+      status: filterResult.action === 'reject' ? 'rejected' : 'pending',
+      ...filterPayload(filterResult),
+    });
   } catch (err) {
     // partial unique index(018) — 사전 중복 체크와 insert 사이 race를 DB가 확정 차단
     if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
     throw err;
+  }
+
+  if (filterResult.action === 'reject') {
+    if (filterResult.filterStatus === 'error_rejected') {
+      broadcast(req, req.params.slug, 'music_filter_error', {
+        title,
+        platform,
+        reason: filterResult.reason,
+        errorCode: filterResult.errorCode,
+        occurredAt: new Date().toISOString(),
+      });
+      return res.status(503).json({ error: 'AI 필터 확인 중 문제가 발생해 신청할 수 없습니다. 잠시 후 다시 시도해주세요.' });
+    }
+
+    return res.status(403).json({ error: '이 곡은 매장 분위기와 맞지 않아 신청할 수 없습니다.' });
   }
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });
