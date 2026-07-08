@@ -7,7 +7,14 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.e
 //   'disable'          — TLS 없음. Railway internal 네트워크(*.railway.internal)처럼
 //                        사설망 직결일 때만.
 function sslConfig() {
-  const mode = (process.env.DATABASE_SSL || 'no-verify').trim();
+  const rawMode = process.env.DATABASE_SSL;
+  const mode = (rawMode || 'no-verify').trim();
+
+  // GitHub Actions와 로컬 테스트의 Postgres 서비스는 SSL을 지원하지 않는다.
+  // 운영에서는 DATABASE_SSL 기본값(no-verify)을 유지하되, 테스트 환경에서는
+  // 명시적으로 DATABASE_SSL을 준 경우가 아니면 SSL을 끈다.
+  if (process.env.NODE_ENV === 'test' && !rawMode) return false;
+
   if (mode === 'disable') return false;
   if (mode === 'verify')  return { rejectUnauthorized: true };
   return { rejectUnauthorized: false };
