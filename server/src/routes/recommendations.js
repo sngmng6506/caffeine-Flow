@@ -6,7 +6,6 @@
 // DELETE /:id가 인증을 통과한 뒤에만 처리되게 한다. 여기서는 /:id
 // 자체를 사용하지 않으므로 충돌 가능성 없음.
 const router    = require('express').Router({ mergeParams: true });
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
@@ -17,39 +16,28 @@ const { validateString, validateInEnum, validateRecommendationBody } = require('
 const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_ACTION, FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM, VALID_PLATFORMS, parseAllowedPlatforms, platformLabel } = require('../constants/platforms');
+const { RECOMMENDATION_REQUEST_LIMIT, VOTE_LIMIT, COMMENT_LIMIT } = require('../constants/limits');
 
 // 신청 한도는 두 차원으로 적용:
 //  (1) visitor_id (클라이언트 localStorage UUID) — 같은 브라우저 식별
 //  (2) IP — 헤더가 위조돼도 우회 불가한 최후 방어선
 // visitor_id 헤더는 사용자가 매 요청마다 새로 생성해 위조할 수 있으므로
 // 단독으로 쓰면 무력화됨. 둘 다 통과해야만 신청 허용.
-const REQUEST_MESSAGE = { error: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' };
-
-const visitorLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 3,
-  keyGenerator: (req) => req.headers['x-visitor-id'] || `ip:${ipKeyGenerator(req.ip)}`,
-  message: REQUEST_MESSAGE,
-  skip: () => process.env.NODE_ENV === 'test',
+const requestLimiters = makeDualLimiter({
+  ...RECOMMENDATION_REQUEST_LIMIT,
+  message: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)',
 });
-
-// IP 단독 제한은 visitor 한도(3)보다 살짝 여유롭게 — 같은 매장에서 가족·일행이
-// 동일 NAT IP로 동시에 신청하는 정상 케이스 허용. 단, 한 IP에서 분당 10건은
-// 정상 사용으로 보기 어려움.
-const ipLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 10,
-  keyGenerator: (req) => ipKeyGenerator(req.ip),
-  message: REQUEST_MESSAGE,
-  skip: () => process.env.NODE_ENV === 'test',
-});
-
-const requestLimiters = [visitorLimiter, ipLimiter];
 
 // 투표·댓글도 익명 쓰기 API — 전역 분당 120에만 의존하면 도배 가능.
 // 투표는 토글(추가/취소) UX상 신청보다 여유롭게, 댓글은 신청과 유사하게.
-const voteLimiters    = makeDualLimiter({ visitorMax: 15, ipMax: 40, message: '잠시 후 다시 시도해주세요 (투표 한도 초과)' });
-const commentLimiters = makeDualLimiter({ visitorMax: 5,  ipMax: 15, message: '잠시 후 다시 댓글을 남겨주세요 (1분에 5개 제한)' });
+const voteLimiters = makeDualLimiter({
+  ...VOTE_LIMIT,
+  message: '잠시 후 다시 시도해주세요 (투표 한도 초과)',
+});
+const commentLimiters = makeDualLimiter({
+  ...COMMENT_LIMIT,
+  message: '잠시 후 다시 댓글을 남겨주세요 (1분에 5개 제한)',
+});
 
 function filterPayload(filterResult) {
   return {
