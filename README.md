@@ -1,7 +1,6 @@
 # Caffeine Flow
 
-
-YouTube · SoundCloud · Spotify 세 플랫폼을 한 화면에서 **매장 BGM(고정) + 신청곡(임시 오버레이)** 구조로 재생한다.
+Caffeine Flow는 카페에서 손님 신청곡을 QR로 받고, 사장님이 데스크톱에서 안전하게 큐를 관리·재생하는 실시간 BGM 운영 도구다. YouTube · SoundCloud · Spotify 세 플랫폼을 한 화면에서 **매장 BGM(고정) + 신청곡(임시 오버레이)** 구조로 재생한다.
 
 | | |
 | --- | --- |
@@ -10,6 +9,14 @@ YouTube · SoundCloud · Spotify 세 플랫폼을 한 화면에서 **매장 BGM(
 | **백엔드** | Express + Postgres, Socket.IO 실시간 큐, Railway 배포 |
 | **재생** | BrowserView 2개 (BGM 고정 / 신청곡 오버레이), 곡 종료 자동 감지 |
 | **AI** | 사장님이 설정한 매장 분위기 정책을 기반으로 손님 신청곡을 LLM이 수락/거절 |
+
+## 핵심 기능
+
+- QR 기반 손님 신청곡 접수, 투표, 댓글
+- 사장님 데스크톱 큐 관리와 BGM/신청곡 오버레이 재생
+- YouTube · SoundCloud · Spotify 링크 메타데이터 자동 추출
+- 매장 분위기 프롬프트 기반 AI 음악 필터: `accept` / `reject`만 사용, 오류 시 fail-closed
+- Postgres + Socket.IO 기반 실시간 큐 동기화
 
 ## 기술 스택
 
@@ -22,7 +29,9 @@ React 18 · Vite 5 (손님·사장님 SPA) · Node.js · Express 4 · Knex 3 · 
 npm install && npm install --prefix server \
   && npm install --prefix customer && npm install --prefix owner
 
-# 2) 루트에 .env 작성 (DATABASE_URL·JWT_SECRET 필수)
+# 2) 루트에 .env 작성
+# 필수: DATABASE_URL, JWT_SECRET
+# AI 필터 사용 시: OPENAI_API_KEY
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # JWT_SECRET 생성
 
 # 3) DB 마이그레이션
@@ -36,6 +45,8 @@ npm run dev:owner      # localhost:5174
 # 5) 사장님 데스크톱 개발 모드
 cd owner && npm run electron:dev
 ```
+
+환경변수 전체 목록과 테스트·배포 명령은 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)를 참고한다.
 
 ## 프로젝트 구조
 
@@ -67,6 +78,6 @@ CI는 신규 커밋 메시지, 서버 테스트, customer/owner Vite build를 �
 
 > AI 도구별 어댑터인 `CLAUDE.md` · `GEMINI.md` · `.cursor/rules`는 모두 `AGENTS.md`와 `docs/AI_CHANGE_GUARDRAILS.md` 계약을 참조한다.
 
-## 라이센스
+## 라이선스
 
 BSL 1.1
