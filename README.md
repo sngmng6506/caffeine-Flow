@@ -63,7 +63,9 @@ cd owner && npm run electron:dev
 | [AGENTS.md](AGENTS.md) | AI 도구 협업 규칙 (도구 무관 계약) |
 | [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) | 커밋 메시지 형식 |
 
-> AI 도구별 어댑터인 `CLAUDE.md` · `GEMINI.md` · `.cursor/rules`는 모두 `AGENTS.md` 계약을 참조한다.
+CI는 신규 커밋 메시지, 서버 테스트, customer/owner Vite build를 검사한다. 상세 명령은 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)를 따른다.
+
+> AI 도구별 어댑터인 `CLAUDE.md` · `GEMINI.md` · `.cursor/rules`는 모두 `AGENTS.md`와 `docs/AI_CHANGE_GUARDRAILS.md` 계약을 참조한다.
 
 ## 라이센스
 
