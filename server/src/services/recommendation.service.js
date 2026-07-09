@@ -1,5 +1,6 @@
 const db = require('../db/knex');
 const { kstStartOfDay } = require('../utils/kst');
+const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES } = require('../constants/recommendation-status');
 
 // 최근 7일: KST 기준 6일 전 00:00 ~ 오늘 23:59:59.999
 function lastSevenDaysRange() {
@@ -11,6 +12,7 @@ function lastSevenDaysRange() {
 async function getRecommendations(cafeId) {
   return db('recommendations')
     .where({ cafe_id: cafeId })
+    .whereIn('status', ACTIVE_STATUSES)
     .whereBetween('requested_at', lastSevenDaysRange())
     .orderBy('vote_count', 'desc')
     .orderBy('requested_at', 'asc');
@@ -23,14 +25,14 @@ async function findById(id) {
 async function findActiveByVideoId(cafeId, videoId) {
   return db('recommendations')
     .where({ cafe_id: cafeId, video_id: videoId })
-    .whereIn('status', ['pending', 'accepted', 'playing'])
+    .whereIn('status', ACTIVE_STATUSES)
     .first();
 }
 
 async function countActive(cafeId) {
   const row = await db('recommendations')
     .where({ cafe_id: cafeId })
-    .whereIn('status', ['pending', 'accepted', 'playing'])
+    .whereIn('status', ACTIVE_STATUSES)
     .count('id as n')
     .first();
   return parseInt(row.n);
@@ -46,7 +48,7 @@ async function add(cafeId, {
   requesterName,
   platform = 'youtube',
   visitorId,
-  status = 'pending',
+  status = REC_STATUS.PENDING,
   filterStatus = 'skipped',
   filterReason = null,
   filterConfidence = null,
@@ -81,8 +83,6 @@ async function add(cafeId, {
 // 종료 상태(played/skipped/rejected)에서는 어떤 전이도 불가.
 // pending↔accepted↔playing 사이는 사장님 드래그 UI가 양방향 이동을
 // 허용하므로 자유 전이. (playing→accepted 되돌리기 등)
-const TERMINAL_STATUSES = ['played', 'skipped', 'rejected'];
-
 function isValidTransition(from, to) {
   if (from === to) return true;
   return !TERMINAL_STATUSES.includes(from);
@@ -101,11 +101,11 @@ async function updateStatus(id, status) {
 
   const updates = { status };
 
-  if (status === 'playing') {
+  if (status === REC_STATUS.PLAYING) {
     updates.playing_started_at = now;
   }
 
-  if (status === 'played' || status === 'skipped') {
+  if (status === REC_STATUS.PLAYED || status === REC_STATUS.SKIPPED) {
     updates.played_at = now;
     // 재생 시작 시각이 있으면 재생 시간 계산
     if (current.playing_started_at) {
@@ -120,14 +120,14 @@ async function updateStatus(id, status) {
 // playing으로 변경 전 기존 playing 곡을 played로 일괄 처리 (except 제외)
 async function clearPlaying(cafeId, exceptId) {
   const now = new Date();
-  let query = db('recommendations').where({ cafe_id: cafeId, status: 'playing' });
+  let query = db('recommendations').where({ cafe_id: cafeId, status: REC_STATUS.PLAYING });
   if (exceptId) query = query.whereNot({ id: exceptId });
 
   // 각 곡의 재생 시간을 개별 계산
   const playingRecs = await query.clone().select('id', 'playing_started_at');
   const results = [];
   for (const r of playingRecs) {
-    const updates = { status: 'played', played_at: now };
+    const updates = { status: REC_STATUS.PLAYED, played_at: now };
     if (r.playing_started_at) {
       updates.play_duration_seconds = Math.round((now - new Date(r.playing_started_at)) / 1000);
     }
@@ -171,4 +171,4 @@ async function addComment(recommendationId, { commenterIp, commenterName, body }
   return comment;
 }
 
-module.exports = { getRecommendations, findById, findActiveByVideoId, countActive, add, updateStatus, clearPlaying, remove, vote, unvote, addComment, isValidTransition, TERMINAL_STATUSES };
+module.exports = { getRecommendations, findById, findActiveByVideoId, countActive, add, updateStatus, clearPlaying, remove, vote, unvote, addComment, isValidTransition, ACTIVE_STATUSES, TERMINAL_STATUSES };
