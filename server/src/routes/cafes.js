@@ -9,6 +9,7 @@ const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
 const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
 const { TERMINAL_STATUSES } = require('../constants/recommendation-status');
+const { DEFAULT_MUSIC_FILTER_STRICTNESS, VALID_MUSIC_FILTER_STRICTNESS } = require('../constants/music-filter-policy');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -58,7 +59,7 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
   const promptCheck = validateString(req.body?.prompt, { max: 1000, allowNull: true, name: 'AI 필터 프롬프트' });
   if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
 
-  const strictnessCheck = validateInEnum(req.body?.strictness || 'medium', ['low', 'medium', 'high'], { name: 'strictness' });
+  const strictnessCheck = validateInEnum(req.body?.strictness || DEFAULT_MUSIC_FILTER_STRICTNESS, VALID_MUSIC_FILTER_STRICTNESS, { name: 'strictness' });
   if (strictnessCheck.error) return res.status(400).json({ error: strictnessCheck.error });
 
   if (enabledCheck.value && !promptCheck.value) {
