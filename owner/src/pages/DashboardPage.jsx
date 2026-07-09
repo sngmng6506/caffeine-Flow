@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe } from '../api';
 import { getSocket, disconnectSocket } from '../socket';
+import { VALID_PLATFORMS, parseAllowedPlatforms } from '../constants/platforms';
+import { REC_STATUS } from '../constants/recommendationStatus';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
 import DefaultSection from './dashboard/DefaultSection';
@@ -10,6 +12,8 @@ import ContactTab from './dashboard/ContactTab';
 import OwnerCommentSection from './dashboard/OwnerCommentSection';
 import ShortcutsTab from './dashboard/ShortcutsTab';
 
+const DEFAULT_DROP_TARGET = 'default';
+
 // 저장된 default 정보 → BGM URL 변환 (구버전 데이터 호환: videoId only도 처리)
 function savedToBgmUrl(info) {
   if (!info) return null;
@@ -18,19 +22,20 @@ function savedToBgmUrl(info) {
   return `https://www.youtube.com/watch?v=${info.videoId}`;
 }
 
-
+function todayKstString(date = new Date()) {
+  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [cafe, setCafe]         = useState(initialCafe);
   const [recs, setRecs]         = useState([]);
   const recsRef = useRef([]);
   const [isAccepting, setIsAccepting] = useState(true);
-  const [dragOver, setDragOver]           = useState(null); // 'playing' | 'accepted' | 'pending' | null
+  const [dragOver, setDragOver]           = useState(null); // 'default' | REC_STATUS.PLAYING | REC_STATUS.ACCEPTED | REC_STATUS.PENDING | null
   const [nowPlaying, setNowPlaying]       = useState(null);
   const [defaultVideo, setDefaultVideo] = useState(() => {
     try { return JSON.parse(localStorage.getItem('cf_default_video')); } catch { return null; }
   });
-  const videoEndingRef = useRef(false);
   const [tab, setTab]           = useState('queue');
   const [loading, setLoading]   = useState(true);
   const [history, setHistory]           = useState([]);
@@ -43,12 +48,11 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const [editingNotice, setEditingNotice]   = useState(false);
   const [noticeInput, setNoticeInput]       = useState('');
   const [noticeLoading, setNoticeLoading]   = useState(false);
-  const [allowedPlatforms, setAllowedPlatforms] = useState(['youtube', 'soundcloud', 'spotify']);
+  const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [platformSaving, setPlatformSaving] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(null);
 
   recsRef.current = recs;
-  const queue = recs.filter(r => r.status === 'pending' || r.status === 'accepted' || r.status === 'playing');
 
   const [customerUrl, setCustomerUrl] = useState('');
   const [widevineStatus, setWidevineStatus] = useState(null);
@@ -71,10 +75,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     getRecommendations(cafe.slug)
       .then(async ({ recommendations, is_accepting }) => {
         // 앱 재시작 시 playing 상태 곡들을 accepted(대기 중)로 리셋
-        const playingRecs = recommendations.filter(r => r.status === 'playing');
+        const playingRecs = recommendations.filter(r => r.status === REC_STATUS.PLAYING);
         if (playingRecs.length > 0) {
           const reset = await Promise.all(
-            playingRecs.map(r => updateRec(cafe.slug, r.id, 'accepted').catch(() => r))
+            playingRecs.map(r => updateRec(cafe.slug, r.id, REC_STATUS.ACCEPTED).catch(() => r))
           );
           const resetMap = Object.fromEntries(reset.map(r => [r.id, r]));
           setRecs(recommendations.map(r => resetMap[r.id] ?? r));
@@ -94,7 +98,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         return updated;
       });
       if (latest.allowed_platforms) {
-        setAllowedPlatforms(latest.allowed_platforms.split(','));
+        setAllowedPlatforms(parseAllowedPlatforms(latest.allowed_platforms));
       }
       if (latest.customer_url) {
         setCustomerUrl(latest.customer_url);
@@ -117,15 +121,15 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     socket.on('recommendations_update', ({ action, rec, id }) => {
       if (action === 'add') {
         if (autoAcceptRef.current) {
-          updateRec(cafe.slug, rec.id, 'accepted')
+          updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED)
             .then(updated => {
               setRecs(prev => prev.some(r => r.id === updated.id)
                 ? prev.map(r => r.id === updated.id ? updated : r)
                 : [...prev, updated]
               );
-              const hasPlaying = recsRef.current.some(r => r.status === 'playing');
+              const hasPlaying = recsRef.current.some(r => r.status === REC_STATUS.PLAYING);
               if (!hasPlaying) {
-                updateRec(cafe.slug, updated.id, 'playing')
+                updateRec(cafe.slug, updated.id, REC_STATUS.PLAYING)
                   .then(playing => {
                     setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
                     window.electronAPI?.playRec(playing.video_id);
@@ -158,17 +162,17 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     // 2) 대기곡(accepted) 1순위 있으면 playRec으로 이어 재생
     // 3) 대기곡 없으면 endRec — bgmView 음소거 해제만 (BGM은 백그라운드에서 계속 재생 중)
     window.electronAPI?.onVideoEnded(() => {
-      const playing = recsRef.current.find(r => r.status === 'playing');
+      const playing = recsRef.current.find(r => r.status === REC_STATUS.PLAYING);
       if (!playing) return;
-      updateRec(cafe.slug, playing.id, 'played')
+      updateRec(cafe.slug, playing.id, REC_STATUS.PLAYED)
         .then(updated => {
           setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
           const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
           const nextAccepted = latest
-            .filter(r => r.status === 'accepted')
+            .filter(r => r.status === REC_STATUS.ACCEPTED)
             .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
           if (nextAccepted) {
-            updateRec(cafe.slug, nextAccepted.id, 'playing')
+            updateRec(cafe.slug, nextAccepted.id, REC_STATUS.PLAYING)
               .then(acc => {
                 setRecs(prev => prev.map(r => r.id === acc.id ? acc : r));
                 window.electronAPI?.playRec(acc.video_id);
@@ -187,9 +191,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     // 메서드 호출에도 ?. — 구버전 Electron(preload에 onCleanupBeforeQuit 없음)에서 TypeError 방지.
     window.electronAPI?.onCleanupBeforeQuit?.(async () => {
       try {
-        const playing = recsRef.current.filter(r => r.status === 'playing');
+        const playing = recsRef.current.filter(r => r.status === REC_STATUS.PLAYING);
         await Promise.all(
-          playing.map(r => updateRec(cafe.slug, r.id, 'played').catch(() => null))
+          playing.map(r => updateRec(cafe.slug, r.id, REC_STATUS.PLAYED).catch(() => null))
         );
       } catch {}
       window.electronAPI?.cleanupDone?.();
@@ -216,26 +220,26 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
     // ON 전환: 추천곡 → 대기곡 일괄 이동 + 재생 중 없으면 첫 대기곡 자동 재생
     let snapshot = recsRef.current;
-    const pending = snapshot.filter(r => r.status === 'pending');
+    const pending = snapshot.filter(r => r.status === REC_STATUS.PENDING);
     if (pending.length > 0) {
       const updates = (await Promise.all(
-        pending.map(r => updateRec(cafe.slug, r.id, 'accepted').catch(() => null))
+        pending.map(r => updateRec(cafe.slug, r.id, REC_STATUS.ACCEPTED).catch(() => null))
       )).filter(Boolean);
       const updateMap = Object.fromEntries(updates.map(u => [u.id, u]));
       snapshot = snapshot.map(r => updateMap[r.id] || r);
       setRecs(snapshot);
     }
 
-    const hasPlaying = snapshot.some(r => r.status === 'playing');
+    const hasPlaying = snapshot.some(r => r.status === REC_STATUS.PLAYING);
     if (hasPlaying) return;
 
     const firstAccepted = snapshot
-      .filter(r => r.status === 'accepted')
+      .filter(r => r.status === REC_STATUS.ACCEPTED)
       .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
     if (!firstAccepted) return;
 
     try {
-      const playing = await updateRec(cafe.slug, firstAccepted.id, 'playing');
+      const playing = await updateRec(cafe.slug, firstAccepted.id, REC_STATUS.PLAYING);
       setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
       window.electronAPI?.playRec(playing.video_id);
     } catch (e) { console.error(e); }
@@ -316,23 +320,23 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
       // 추천 재생 중으로 이동 시 기존 playing 곡을 played로 처리
       // (handleUpdate 대신 setRecs 직접 호출 — handleUpdate는 playNextOrStop을 트리거하므로 두 곡이 동시에 playing 되는 버그 방지)
-      if (targetStatus === 'playing') {
-        const currentPlaying = recsRef.current.find(r => r.status === 'playing');
+      if (targetStatus === REC_STATUS.PLAYING) {
+        const currentPlaying = recsRef.current.find(r => r.status === REC_STATUS.PLAYING);
         if (currentPlaying && currentPlaying.id !== data.id) {
-          const ended = await updateRec(cafe.slug, currentPlaying.id, 'played');
+          const ended = await updateRec(cafe.slug, currentPlaying.id, REC_STATUS.PLAYED);
           setRecs(prev => prev.map(r => r.id === ended.id ? ended : r));
         }
       }
 
       // 기본 카드 → rec으로 변환하여 해당 섹션에 추가
-      if (data.type === 'default') {
+      if (data.type === DEFAULT_DROP_TARGET) {
         const rec = await createRec(cafe.slug, {
           videoId: data.videoId, title: data.title,
           thumbnail: data.thumbnail, status: targetStatus,
         });
         setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [...prev, rec]);
         handleClearDefault();
-        if (targetStatus === 'playing') window.electronAPI?.playRec(data.videoId);
+        if (targetStatus === REC_STATUS.PLAYING) window.electronAPI?.playRec(data.videoId);
         return;
       }
 
@@ -342,7 +346,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       if (!rec) return;
       const updated = await updateRec(cafe.slug, id, targetStatus);
       handleUpdate(updated);
-      if (targetStatus === 'playing') window.electronAPI?.playRec(rec.video_id);
+      if (targetStatus === REC_STATUS.PLAYING) window.electronAPI?.playRec(rec.video_id);
     } catch (err) { console.error(err); }
   }
 
@@ -351,39 +355,20 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     setDragOver(null);
     try {
       const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-      if (data.type === 'default') return;
+      if (data.type === DEFAULT_DROP_TARGET) return;
       const rec = recs.find(r => r.id === data.id);
       if (!rec) return;
       handleSetDefault({ videoId: rec.video_id, title: rec.title, thumbnail: rec.thumbnail });
     } catch (err) { console.error(err); }
   }
 
-  // [자동재생 비활성화] 큐 자동 진행 함수
-  // function playNextOrStop(currentRecs) {
-  //   const accepted = currentRecs.filter(r => r.status === 'accepted')
-  //     .sort((a, b) => new Date(a.requested_at) - new Date(b.requested_at));
-  //   const pending  = currentRecs.filter(r => r.status === 'pending')
-  //     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-  //   const nextSong = accepted[0] || pending[0];
-  //   if (nextSong) {
-  //     updateRec(cafe.slug, nextSong.id, 'playing')
-  //       .then(played => {
-  //         setRecs(prev => prev.map(r => r.id === played.id ? played : r));
-  //         window.electronAPI?.playVideo(played.video_id);
-  //       })
-  //       .catch(console.error);
-  //   } else {
-  //     window.electronAPI?.stopVideo();
-  //   }
-  // }
-
   function handleUpdate(updated) {
     setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
     // 수락 시 재생 중인 곡 없으면 즉시 재생
-    if (updated.status === 'accepted') {
-      const hasPlaying = recsRef.current.some(r => r.status === 'playing');
+    if (updated.status === REC_STATUS.ACCEPTED) {
+      const hasPlaying = recsRef.current.some(r => r.status === REC_STATUS.PLAYING);
       if (!hasPlaying) {
-        updateRec(cafe.slug, updated.id, 'playing')
+        updateRec(cafe.slug, updated.id, REC_STATUS.PLAYING)
           .then(playing => {
             setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
             window.electronAPI?.playRec(playing.video_id);
@@ -517,7 +502,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
       <div style={styles.tabs}>
         <button onClick={() => handleTabChange('queue')}   style={{ ...styles.tab, ...(tab === 'queue'   ? styles.tabActive : {}) }}>
-          신청 목록 {recs.filter(r => r.status === 'pending').length > 0 && <span style={styles.badge}>{recs.filter(r => r.status === 'pending').length}</span>}
+          신청 목록 {recs.filter(r => r.status === REC_STATUS.PENDING).length > 0 && <span style={styles.badge}>{recs.filter(r => r.status === REC_STATUS.PENDING).length}</span>}
         </button>
         <button onClick={() => handleTabChange('history')} style={{ ...styles.tab, ...(tab === 'history' ? styles.tabActive : {}) }}>이력</button>
         <button onClick={() => handleTabChange('stats')}   style={{ ...styles.tab, ...(tab === 'stats'   ? styles.tabActive : {}) }}>통계</button>
@@ -528,18 +513,18 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       </div>
 
       {tab === 'queue' && (() => {
-        const playing = recs.filter(r => r.status === 'playing');
-        const accepted = recs.filter(r => r.status === 'accepted')
+        const playing = recs.filter(r => r.status === REC_STATUS.PLAYING);
+        const accepted = recs.filter(r => r.status === REC_STATUS.ACCEPTED)
           .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-        const pending  = recs.filter(r => r.status === 'pending')
+        const pending  = recs.filter(r => r.status === REC_STATUS.PENDING)
           .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
         const hasPlaying = playing.length > 0;
         return (
           <div>
             {/* 기본 */}
             <div
-              style={{ ...styles.section, ...(dragOver === 'default' ? styles.sectionDragOver : {}) }}
-              onDragOver={e => { e.preventDefault(); setDragOver('default'); }}
+              style={{ ...styles.section, ...(dragOver === DEFAULT_DROP_TARGET ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver(DEFAULT_DROP_TARGET); }}
               onDragLeave={() => setDragOver(null)}
               onDrop={handleDropToDefault}
             >
@@ -555,10 +540,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
             {/* 추천 재생 중 */}
             <div
-              style={{ ...styles.section, ...(dragOver === 'playing' ? styles.sectionDragOver : {}) }}
-              onDragOver={e => { e.preventDefault(); setDragOver('playing'); }}
+              style={{ ...styles.section, ...(dragOver === REC_STATUS.PLAYING ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver(REC_STATUS.PLAYING); }}
               onDragLeave={() => setDragOver(null)}
-              onDrop={e => handleDrop(e, 'playing')}
+              onDrop={e => handleDrop(e, REC_STATUS.PLAYING)}
             >
               <div style={styles.sectionTitle}>수락</div>
               {loading
@@ -566,7 +551,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
                 : playing.length > 0
                   ? playing.map(r => (
                       <RecommendCard key={r.id} slug={cafe.slug} rec={r}
-                        onUpdate={handleUpdate} onDelete={handleDelete} context="playing" />
+                        onUpdate={handleUpdate} onDelete={handleDelete} context={REC_STATUS.PLAYING} />
                     ))
                   : <div style={styles.emptySlot}>재생 중인 신청곡 없음</div>
               }
@@ -574,10 +559,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
             {/* 대기 곡 */}
             <div
-              style={{ ...styles.section, ...(dragOver === 'accepted' ? styles.sectionDragOver : {}) }}
-              onDragOver={e => { e.preventDefault(); setDragOver('accepted'); }}
+              style={{ ...styles.section, ...(dragOver === REC_STATUS.ACCEPTED ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver(REC_STATUS.ACCEPTED); }}
               onDragLeave={() => setDragOver(null)}
-              onDrop={e => handleDrop(e, 'accepted')}
+              onDrop={e => handleDrop(e, REC_STATUS.ACCEPTED)}
             >
               <div style={styles.sectionTitle}>대기 곡</div>
               {loading
@@ -585,7 +570,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
                 : accepted.length > 0
                   ? accepted.map((r, i) => (
                       <RecommendCard key={r.id} slug={cafe.slug} rec={r} position={i + 1}
-                        onUpdate={handleUpdate} onDelete={handleDelete} context="accepted" />
+                        onUpdate={handleUpdate} onDelete={handleDelete} context={REC_STATUS.ACCEPTED} />
                     ))
                   : <div style={styles.emptySlot}>대기 중인 곡 없음</div>
               }
@@ -593,10 +578,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
             {/* 추천 곡 */}
             <div
-              style={{ ...styles.section, ...(dragOver === 'pending' ? styles.sectionDragOver : {}) }}
-              onDragOver={e => { e.preventDefault(); setDragOver('pending'); }}
+              style={{ ...styles.section, ...(dragOver === REC_STATUS.PENDING ? styles.sectionDragOver : {}) }}
+              onDragOver={e => { e.preventDefault(); setDragOver(REC_STATUS.PENDING); }}
               onDragLeave={() => setDragOver(null)}
-              onDrop={e => handleDrop(e, 'pending')}
+              onDrop={e => handleDrop(e, REC_STATUS.PENDING)}
             >
               <div style={styles.sectionTitle}>
                 신청곡 {pending.length > 0 && <span style={styles.badge}>{pending.length}</span>}
@@ -606,7 +591,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
                 : pending.length > 0
                   ? pending.map((r, i) => (
                       <RecommendCard key={r.id} slug={cafe.slug} rec={r} position={i + 1}
-                        onUpdate={handleUpdate} onDelete={handleDelete} context="pending" hasPlaying={hasPlaying} />
+                        onUpdate={handleUpdate} onDelete={handleDelete} context={REC_STATUS.PENDING} hasPlaying={hasPlaying} />
                     ))
                   : <div style={styles.emptySlot}>신청된 곡 없음</div>
               }
@@ -621,7 +606,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
             <input
               type="date"
               value={historyDate}
-              max={new Date().toISOString().slice(0, 10)}
+              max={todayKstString()}
               onChange={e => handleHistoryDateChange(e.target.value)}
               style={styles.dateInput}
             />
@@ -668,7 +653,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     </div>
   );
 }
-
 
 const styles = {
   page:              { padding: '16px', fontFamily: 'sans-serif' },
