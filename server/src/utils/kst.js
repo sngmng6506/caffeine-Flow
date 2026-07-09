@@ -1,5 +1,5 @@
 // 모든 통계의 시간 경계를 한국 시간(KST, UTC+9) 기준으로 통일
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const { KST_OFFSET_MS, MS_PER_DAY } = require('../constants/time-policy');
 
 // "2026-04-25" 같은 날짜 문자열 → KST 자정 (UTC Date 객체로 반환)
 function kstStartOfDateString(dateStr) {
@@ -12,8 +12,8 @@ function kstEndOfDateString(dateStr) {
 
 // 오늘로부터 N일 전 KST 자정 (UTC Date)
 function kstStartOfDay(daysAgo = 0) {
-  const todayKstMs = Math.floor((Date.now() + KST_OFFSET_MS) / 86400000) * 86400000;
-  return new Date(todayKstMs - daysAgo * 86400000 - KST_OFFSET_MS);
+  const todayKstMs = Math.floor((Date.now() + KST_OFFSET_MS) / MS_PER_DAY) * MS_PER_DAY;
+  return new Date(todayKstMs - daysAgo * MS_PER_DAY - KST_OFFSET_MS);
 }
 
 // UTC Date → 그 시점의 KST 시(0~23)
