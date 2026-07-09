@@ -17,6 +17,7 @@ const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_ACTION, FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM, VALID_PLATFORMS, parseAllowedPlatforms, platformLabel } = require('../constants/platforms');
 const { RECOMMENDATION_REQUEST_LIMIT, VOTE_LIMIT, COMMENT_LIMIT } = require('../constants/limits');
+const { KST_VISIT_DATE_SQL } = require('../db/sql-fragments');
 
 // 신청 한도는 두 차원으로 적용:
 //  (1) visitor_id (클라이언트 localStorage UUID) — 같은 브라우저 식별
@@ -63,7 +64,7 @@ router.get('/', async (req, res) => {
       cafe_id:    cafe.id,
       visitor_ip: ip,
       visitor_id: visitorId,
-      visit_date: db.raw(`(now() AT TIME ZONE 'Asia/Seoul')::date`),
+      visit_date: db.raw(KST_VISIT_DATE_SQL),
     })
     .onConflict(['cafe_id', 'visitor_ip', 'visit_date'])
     .ignore()
