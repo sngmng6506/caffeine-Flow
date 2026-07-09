@@ -1,6 +1,7 @@
 const db = require('../db/knex');
 const { kstStartOfDay } = require('../utils/kst');
 const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES } = require('../constants/recommendation-status');
+const { FILTER_STATUS } = require('../constants/music-filter-status');
 
 // 최근 7일: KST 기준 6일 전 00:00 ~ 오늘 23:59:59.999
 function lastSevenDaysRange() {
@@ -49,13 +50,13 @@ async function add(cafeId, {
   platform = 'youtube',
   visitorId,
   status = REC_STATUS.PENDING,
-  filterStatus = 'skipped',
+  filterStatus = FILTER_STATUS.SKIPPED,
   filterReason = null,
   filterConfidence = null,
   filterModel = null,
   filterErrorCode = null,
 }) {
-  const hasFilterResult = filterStatus && filterStatus !== 'skipped';
+  const hasFilterResult = filterStatus && filterStatus !== FILTER_STATUS.SKIPPED;
   const [rec] = await db('recommendations')
     .insert({
       cafe_id:        cafeId,
@@ -69,7 +70,7 @@ async function add(cafeId, {
       platform,
       visitor_id:     visitorId || null,
       status,
-      filter_status:  filterStatus || 'skipped',
+      filter_status:  filterStatus || FILTER_STATUS.SKIPPED,
       filter_reason:  filterReason,
       filter_confidence: filterConfidence,
       filter_model:   filterModel,
@@ -153,7 +154,7 @@ async function vote(recommendationId, voterIp, visitorId) {
 
 async function unvote(recommendationId, voterIp) {
   const deleted = await db('votes')
-    .where({ recommendation_id: recommendationId, voter_ip: voterIp })
+    .where({ recommendation_id: voterIp ? recommendationId : recommendationId, voter_ip: voterIp })
     .delete();
   if (!deleted) throw Object.assign(new Error('투표 기록이 없습니다'), { status: 404 });
   const [rec] = await db('recommendations')
