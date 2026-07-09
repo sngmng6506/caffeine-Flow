@@ -95,13 +95,11 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   const [pendingToken, setPendingToken] = useState(initialPendingToken || '');
   const [cafeName, setCafeName] = useState('');
   const [location, setLocation] = useState(null);
-  const [detailAddress, setDetailAddress] = useState('');
   const [agreements, setAgreements] = useState({ service: false, privacy: false, copyright: false, age: false });
   const [expanded, setExpanded] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(oauthError || '');
   const googleBtnRef = useRef(null);
-  const detailRef = useRef(null);
 
   const allRequired = agreements.age && agreements.service && agreements.privacy && agreements.copyright;
   const allChecked  = allRequired;
@@ -160,13 +158,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setLoading(true);
     setError('');
     try {
-      const detail = detailAddress.trim();
-      const payload = {
-        ...location,
-        roadAddress: location.roadAddress ? `${location.roadAddress}${detail ? ' ' + detail : ''}` : null,
-        address:     location.address     ? `${location.address}${detail ? ' ' + detail : ''}`     : null,
-      };
-      const res = await completeRegistration(pendingToken, cafeName.trim(), agreements, payload);
+      const res = await completeRegistration(pendingToken, cafeName.trim(), agreements, location);
       localStorage.setItem('token', res.token);
       localStorage.setItem('cafe', JSON.stringify(res.cafe));
       onLogin(res.cafe);
@@ -181,7 +173,6 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
     setPendingToken('');
     setCafeName('');
     setLocation(null);
-    setDetailAddress('');
     setAgreements({ service: false, privacy: false, copyright: false, age: false });
     setExpanded({});
     setError('');
@@ -202,17 +193,13 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   function runPostcode() {
     new window.daum.Postcode({
       oncomplete(data) {
+        // 손님 지역 탐색 목적 — 시/구/동만 저장한다. 정밀 도로명·상세주소는
+        // 발견 목적에 불필요하고 최소수집 원칙에도 어긋나므로 받지 않는다.
         setLocation({
-          address: data.jibunAddress || null,
-          roadAddress: data.roadAddress || null,
-          region: data.sido || null,
-          district: data.sigungu || null,
-          latitude: null,
-          longitude: null,
+          region: data.sido || null,      // 시/도
+          district: data.sigungu || null, // 시/군/구
+          dong: data.bname || null,       // 동
         });
-        setDetailAddress('');
-        // 우편번호 검색 후 상세주소 입력칸으로 포커스 이동
-        setTimeout(() => detailRef.current?.focus(), 100);
       },
     }).open();
   }
@@ -244,21 +231,15 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
           />
 
           <div style={styles.addressBox}>
-            <div style={styles.addressLabel}>카페 주소 <span style={styles.required}>(필수)</span></div>
+            <div style={styles.addressLabel}>카페 동네 <span style={styles.required}>(필수)</span></div>
+            <div style={styles.addressHint}>손님에게 보여질 지역입니다 (동 단위까지만)</div>
             {location ? (
-              <>
-                <div style={styles.addressResult}>
-                  <div style={styles.addressText}>{location.roadAddress || location.address}</div>
-                  <button type="button" onClick={openAddressSearch} style={styles.addressChangeBtn}>변경</button>
+              <div style={styles.addressResult}>
+                <div style={styles.addressText}>
+                  {[location.region, location.district, location.dong].filter(Boolean).join(' ')}
                 </div>
-                <input
-                  ref={detailRef}
-                  placeholder="상세주소 (예: 2층, 201호)"
-                  value={detailAddress}
-                  onChange={e => setDetailAddress(e.target.value)}
-                  style={styles.input}
-                />
-              </>
+                <button type="button" onClick={openAddressSearch} style={styles.addressChangeBtn}>변경</button>
+              </div>
             ) : (
               <button type="button" onClick={openAddressSearch} style={styles.addressSearchBtn}>
                 🔍 주소 검색
@@ -370,6 +351,7 @@ const styles = {
   expandBtn:    { fontSize: 11, color: '#888', background: 'none', border: '1px solid #ddd', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' },
   termContent:  { fontSize: 12, color: '#666', background: '#f8f8f8', borderRadius: 6, padding: '10px 12px', whiteSpace: 'pre-line', lineHeight: 1.7, maxHeight: 150, overflowY: 'auto' },
   addressBox:       { display: 'flex', flexDirection: 'column', gap: 6 },
+  addressHint:  { fontSize: 12, color: "#999", marginBottom: 8 },
   addressLabel:     { fontSize: 13, color: '#888' },
   addressResult:    { display: 'flex', alignItems: 'center', gap: 8 },
   addressText:      { flex: 1, fontSize: 13, color: '#333', background: '#f8f8f8', padding: '8px 10px', borderRadius: 6 },

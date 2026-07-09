@@ -161,9 +161,9 @@ router.post('/complete', async (req, res) => {
   if (!agreements?.service || !agreements?.privacy || !agreements?.copyright)
     return res.status(400).json({ error: '필수 약관에 모두 동의해야 합니다' });
 
-  // 카페 위치 필수
-  if (!location?.address && !location?.roadAddress)
-    return res.status(400).json({ error: '카페 위치를 입력해주세요' });
+  // 카페 동네 필수 (시/구/동)
+  if (!location?.region || !location?.district)
+    return res.status(400).json({ error: '카페 동네를 선택해주세요' });
 
   let pending;
   try {

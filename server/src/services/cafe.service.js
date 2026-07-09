@@ -53,10 +53,9 @@ async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedA
       age_confirmed_at:       agreements?.age        ? now : null,
       marketing_agreed:       !!agreements?.marketing,
       marketing_agreed_at:    agreements?.marketing  ? now : null,
-      address:                location?.address      || null,
-      road_address:           location?.roadAddress  || null,
       region:                 location?.region       || null,
       district:               location?.district     || null,
+      dong:                   location?.dong         || null,
       latitude:               location?.latitude     || null,
       longitude:              location?.longitude    || null,
     })
