@@ -7,8 +7,8 @@ const KST_DOW_SQL  = `date_part('dow',  requested_at AT TIME ZONE 'Asia/Seoul'):
 
 // Spotify ?si=, YouTube &t= 등 추적 파라미터로 같은 곡이 여러 video_id로
 // 저장된 과거 데이터 병합용 — '?' 앞부분을 정규 ID로 사용.
-// knex.raw는 문자열 리터럴 안의 ?도 바인딩 자리로 해석하므로 \\?로 이스케이프 필수.
-const CANONICAL_ID_SQL = `split_part(video_id, '\\?', 1)`;
+// knex.raw는 문자열 리터럴 안의 ?도 바인딩 자리로 해석하므로 \?로 이스케이프 필수.
+const CANONICAL_ID_SQL = `split_part(video_id, '\?', 1)`;
 
 async function getStats(cafeId) {
   const [total, played, skipped] = await Promise.all([
@@ -100,6 +100,75 @@ function since30Days() {
   return kstStartOfDay(30);
 }
 
+// 최근 7일 시작점 (KST 기준 6일 전 자정 — 오늘 포함 7일)
+function since7Days() {
+  return kstStartOfDay(6);
+}
+
+async function getMusicFilterStats(cafeId) {
+  const since = since7Days();
+
+  const rows = await db('recommendations')
+    .where({ cafe_id: cafeId })
+    .where('requested_at', '>=', since)
+    .select('filter_status')
+    .count('id as count')
+    .groupBy('filter_status');
+
+  const byStatus = Object.fromEntries(rows.map(r => [r.filter_status || 'skipped', Number(r.count)]));
+  const accepted = byStatus.accepted || 0;
+  const rejected = byStatus.rejected || 0;
+  const errorRejected = byStatus.error_rejected || 0;
+  const skipped = byStatus.skipped || 0;
+  const processed = accepted + rejected + errorRejected;
+  const safeRate = n => processed > 0 ? Number((n / processed).toFixed(3)) : 0;
+
+  const recentRejections = await db('recommendations')
+    .where({ cafe_id: cafeId })
+    .where('requested_at', '>=', since)
+    .whereIn('filter_status', ['rejected', 'error_rejected'])
+    .select('id', 'title', 'channel_title', 'thumbnail', 'platform', 'filter_status', 'filter_reason', 'filter_error_code', 'requested_at')
+    .orderBy('requested_at', 'desc')
+    .limit(8);
+
+  const recentErrors = recentRejections
+    .filter(r => r.filter_status === 'error_rejected')
+    .slice(0, 5)
+    .map(r => ({
+      id: r.id,
+      title: r.title,
+      platform: r.platform,
+      filterErrorCode: r.filter_error_code,
+      filterReason: r.filter_reason,
+      requestedAt: r.requested_at,
+    }));
+
+  return {
+    range: 'last_7_days',
+    since,
+    processed,
+    accepted,
+    rejected,
+    errorRejected,
+    skipped,
+    acceptRate: safeRate(accepted),
+    rejectRate: safeRate(rejected),
+    errorRate: safeRate(errorRejected),
+    recentRejections: recentRejections.map(r => ({
+      id: r.id,
+      title: r.title,
+      channelTitle: r.channel_title,
+      thumbnail: r.thumbnail,
+      platform: r.platform,
+      filterStatus: r.filter_status,
+      filterReason: r.filter_reason,
+      filterErrorCode: r.filter_error_code,
+      requestedAt: r.requested_at,
+    })),
+    recentErrors,
+  };
+}
+
 async function getHourlyPattern(cafeId) {
   const rows = await db('recommendations')
     .where({ cafe_id: cafeId })
@@ -156,4 +225,14 @@ async function getSongsByHour(cafeId, hour, offset = 0, limit = 10) {
   return songsByKstField(cafeId, KST_HOUR_SQL, hour, offset, limit);
 }
 
-module.exports = { getStats, getDailyStats, getCafeTop10, getGlobalTop10, getHourlyPattern, getDayOfWeekPattern, getSongsByWeekday, getSongsByHour };
+module.exports = {
+  getStats,
+  getDailyStats,
+  getCafeTop10,
+  getGlobalTop10,
+  getHourlyPattern,
+  getDayOfWeekPattern,
+  getMusicFilterStats,
+  getSongsByWeekday,
+  getSongsByHour,
+};
