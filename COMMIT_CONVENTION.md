@@ -34,4 +34,24 @@ Decision: <여러 선택지 중 이 방식을 택한 이유. 기각한 대안과
 7. **논리적 변경 1개 = 커밋 1개.** 보안 수정 + UI 수정을 한 커밋에 섞지 않는다.
 8. 제목은 72자 이내, 본문은 자연 줄바꿈.
 
+## CI 검사
 
+`.github/workflows/ci.yml`의 `commit-message` job이 신규 커밋 메시지를 검사한다.
+
+검사 범위:
+
+```txt
+push        → github.event.before..github.sha
+pull_request → base.sha..head.sha
+```
+
+즉, 과거 전체 히스토리를 검사하지 않고 이번 push 또는 PR에 포함된 신규 커밋만 검사한다.
+기존 main에 이미 들어간 비준수 커밋은 rewrite하지 않고 `docs/COMMIT_MESSAGE_LEGACY_EXCEPTIONS.md`에 기록한다.
+
+검사 스크립트:
+
+```txt
+.github/scripts/validate-commit-messages.mjs
+```
+
+자동 merge/revert 커밋은 검사에서 제외한다.
