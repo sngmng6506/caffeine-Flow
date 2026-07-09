@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { vote, unvote, cancelRecommendation } from '../api';
 import { hasVoted, markVoted, removeVote } from '../votedSongs';
-
-const statusLabel = { pending: '대기', accepted: '수락', playing: '재생 중', played: '완료', rejected: '거절', skipped: '스킵' };
-const statusColor = { pending: '#888', accepted: '#4caf50', playing: '#2196f3', played: '#9e9e9e', rejected: '#f44336', skipped: '#ff9800' };
-const platformBadge = { youtube: { label: 'YT', bg: '#ff0000' }, soundcloud: { label: 'SC', bg: '#ff5500' }, spotify: { label: 'SP', bg: '#1db954' } };
+import {
+  CANCELLABLE_STATUSES,
+  REC_STATUS,
+  REC_STATUS_COLORS,
+  REC_STATUS_LABELS,
+} from '../constants/recommendationStatus';
+import { COMPACT_PLATFORM_BADGE } from '../constants/platforms';
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, position, isMyRequest, hideStatus, expanded }) {
   const [error, setError] = useState('');
   const voted = hasVoted(slug, rec.id);
-  const cancellable = isMyRequest && (rec.status === 'pending' || rec.status === 'accepted');
+  const cancellable = isMyRequest && CANCELLABLE_STATUSES.includes(rec.status);
+  const platformBadge = rec.platform && rec.platform !== REC_STATUS.YOUTUBE ? COMPACT_PLATFORM_BADGE[rec.platform] : null;
 
   async function handleCancel() {
     if (!window.confirm('신청을 취소하시겠습니까?')) return;
@@ -49,12 +53,9 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, posi
       <div style={styles.body}>
         <div style={styles.title}>{rec.title}</div>
         <div style={styles.meta}>
-          {rec.platform && rec.platform !== 'youtube' && (() => {
-            const b = platformBadge[rec.platform];
-            return b ? <span style={{ ...styles.platformBadge, background: b.bg }}>{b.label}</span> : null;
-          })()}
+          {platformBadge && <span style={{ ...styles.platformBadge, background: platformBadge.bg }}>{platformBadge.label}</span>}
           {rec.channel_title} {rec.duration && `· ${rec.duration}`}
-          {!hideStatus && <span style={{ ...styles.status, color: statusColor[rec.status] }}> · {statusLabel[rec.status]}</span>}
+          {!hideStatus && <span style={{ ...styles.status, color: REC_STATUS_COLORS[rec.status] }}> · {REC_STATUS_LABELS[rec.status]}</span>}
         </div>
         {showDate && rec.requested_at && (
           <div style={styles.date}>
