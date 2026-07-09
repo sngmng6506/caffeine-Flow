@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getHourlySongs, getStats, getSongComments } from '../api';
+import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getHourlySongs, getStats, getMusicFilterStats, getSongComments } from '../api';
 
 const STATUS_FILTER = {
   재생: r => r.status === 'played',
@@ -12,6 +12,7 @@ export default function StatsPanel() {
   const [hourly, setHourly]       = useState(null);
   const [weekday, setWeekday]     = useState(null);
   const [topSongs, setTopSongs]   = useState(null);
+  const [musicFilter, setMusicFilter] = useState(null);
   const [selected, setSelected]         = useState(null);
   const [selectedHour, setSelectedHour] = useState(null); // { index, recs, hasMore, loading }
   const [selectedWeekday, setSelectedWeekday] = useState(null); // { index, label, recs, hasMore, loading }
@@ -26,12 +27,14 @@ export default function StatsPanel() {
       getHourlyStats(),
       getWeekdayStats(),
       getStats(),
-    ]).then(([t, h, w, st]) => {
+      getMusicFilterStats(),
+    ]).then(([t, h, w, st, mf]) => {
       setTodayRecs(t.byHour.flat());
       setToday(t);
       setHourly(h);
       setWeekday(w);
       setTopSongs(st.topSongs || []);
+      setMusicFilter(mf);
     }).catch(err => {
       console.error(err);
       setLoadError(true);
@@ -46,7 +49,7 @@ export default function StatsPanel() {
       </div>
     );
   }
-  if (!today || !hourly || !weekday || !topSongs) return <div style={s.loading}>불러오는 중...</div>;
+  if (!today || !hourly || !weekday || !topSongs || !musicFilter) return <div style={s.loading}>불러오는 중...</div>;
 
   function handleCardClick(label) {
     setSelected(prev => prev === label ? null : label);
@@ -77,6 +80,11 @@ export default function StatsPanel() {
         {selected && (
           <SongList recs={filteredRecs} label={`오늘 ${selected}`} />
         )}
+      </Section>
+
+      {/* ── AI 음악 필터 ── */}
+      <Section title="AI 음악 필터" sub="최근 7일 기준">
+        <MusicFilterStats stats={musicFilter} />
       </Section>
 
       {/* ── 시간대별 추천 패턴 ── */}
@@ -157,6 +165,77 @@ export default function StatsPanel() {
           : <TopSongsList songs={topSongs} />
         }
       </Section>
+    </div>
+  );
+}
+
+function MusicFilterStats({ stats }) {
+  const pct = value => `${Math.round((value || 0) * 1000) / 10}%`;
+  const hasProcessed = stats.processed > 0;
+
+  return (
+    <div style={s.aiPanel}>
+      <div style={s.aiMetricGrid}>
+        <MetricCard label="AI 처리 곡" value={stats.processed} sub={`필터 미적용 ${stats.skipped}건`} />
+        <MetricCard label="AI 통과" value={stats.accepted} sub={pct(stats.acceptRate)} tone="ok" />
+        <MetricCard label="AI 거절" value={stats.rejected} sub={pct(stats.rejectRate)} tone="danger" />
+        <MetricCard label="오류 거절" value={stats.errorRejected} sub={pct(stats.errorRate)} tone="warn" />
+      </div>
+
+      {!hasProcessed && (
+        <div style={s.aiEmpty}>최근 7일간 AI 필터가 처리한 신청곡이 없습니다.</div>
+      )}
+
+      {hasProcessed && (
+        <div style={s.aiSplit}>
+          <div>
+            <div style={s.aiListTitle}>최근 거절 사유</div>
+            {stats.recentRejections.length === 0
+              ? <div style={s.aiSmallEmpty}>최근 거절된 곡이 없습니다.</div>
+              : <div style={s.reasonList}>
+                  {stats.recentRejections.slice(0, 5).map(item => (
+                    <div key={item.id} style={s.reasonItem}>
+                      <div style={s.reasonTop}>
+                        <span style={item.filterStatus === 'error_rejected' ? s.reasonBadgeWarn : s.reasonBadgeReject}>
+                          {item.filterStatus === 'error_rejected' ? '오류 거절' : 'AI 거절'}
+                        </span>
+                        <span style={s.reasonTitle}>{item.title}</span>
+                      </div>
+                      <div style={s.reasonText}>{item.filterReason || '거절 사유 없음'}</div>
+                      <div style={s.reasonMeta}>{item.channelTitle || item.platform} · {new Date(item.requestedAt).toLocaleDateString('ko-KR')}</div>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+
+          <div>
+            <div style={s.aiListTitle}>최근 오류</div>
+            {stats.recentErrors.length === 0
+              ? <div style={s.aiSmallEmpty}>최근 AI 오류가 없습니다.</div>
+              : <div style={s.errorList}>
+                  {stats.recentErrors.map(item => (
+                    <div key={item.id} style={s.errorItem}>
+                      <span style={s.errorCode}>{item.filterErrorCode || 'LLM_ERROR'}</span>
+                      <span style={s.errorTitle}>{item.title}</span>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MetricCard({ label, value, sub, tone }) {
+  const color = tone === 'ok' ? '#4caf50' : tone === 'danger' ? '#e63946' : tone === 'warn' ? '#ff9800' : '#1a1a2e';
+  return (
+    <div style={s.metricCard}>
+      <div style={{ ...s.metricValue, color }}>{value}</div>
+      <div style={s.metricLabel}>{label}</div>
+      {sub && <div style={s.metricSub}>{sub}</div>}
     </div>
   );
 }
@@ -333,6 +412,29 @@ const s = {
   summaryCardActive: { background: '#fff', border: '2px solid' },
   summaryValue:    { fontSize: 28, fontWeight: 800 },
   summaryLabel:    { fontSize: 12, color: '#888', marginTop: 4 },
+
+  aiPanel:         { background: '#f8f8f8', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 14 },
+  aiMetricGrid:    { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 },
+  metricCard:      { background: '#fff', borderRadius: 10, padding: '14px 10px', border: '1px solid #eee' },
+  metricValue:     { fontSize: 24, fontWeight: 900, lineHeight: 1.1 },
+  metricLabel:     { fontSize: 12, color: '#555', fontWeight: 700, marginTop: 5 },
+  metricSub:       { fontSize: 11, color: '#aaa', marginTop: 3 },
+  aiEmpty:         { background: '#fff', borderRadius: 10, padding: 16, color: '#aaa', fontSize: 13, textAlign: 'center' },
+  aiSplit:         { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 },
+  aiListTitle:     { fontSize: 13, fontWeight: 800, marginBottom: 8, color: '#444' },
+  aiSmallEmpty:    { background: '#fff', borderRadius: 10, padding: 12, color: '#aaa', fontSize: 12 },
+  reasonList:      { display: 'flex', flexDirection: 'column', gap: 8 },
+  reasonItem:      { background: '#fff', borderRadius: 10, padding: 12, border: '1px solid #eee' },
+  reasonTop:       { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 },
+  reasonBadgeReject: { fontSize: 10, fontWeight: 800, color: '#c62828', background: '#ffebee', borderRadius: 999, padding: '2px 7px', flexShrink: 0 },
+  reasonBadgeWarn: { fontSize: 10, fontWeight: 800, color: '#ef6c00', background: '#fff3e0', borderRadius: 999, padding: '2px 7px', flexShrink: 0 },
+  reasonTitle:     { fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  reasonText:      { fontSize: 12, color: '#666', lineHeight: 1.45 },
+  reasonMeta:      { fontSize: 11, color: '#aaa', marginTop: 5 },
+  errorList:       { display: 'flex', flexDirection: 'column', gap: 8 },
+  errorItem:       { background: '#fff', borderRadius: 10, padding: 10, border: '1px solid #eee', display: 'flex', flexDirection: 'column', gap: 4 },
+  errorCode:       { fontSize: 11, fontWeight: 800, color: '#ef6c00' },
+  errorTitle:      { fontSize: 12, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 
   songList:        { marginTop: 8, borderRadius: 10, border: '1px solid #eee', overflow: 'hidden' },
   songItem:        { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid #f0f0f0' },
