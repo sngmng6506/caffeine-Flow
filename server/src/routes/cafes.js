@@ -6,8 +6,9 @@ const { safeCafe } = require('../utils/cafe-sanitize');
 const { APP_URL } = require('../config');
 const { validateString, validateBool, validateInEnum } = require('../utils/validate');
 const db = require('../db/knex');
-const { kstStartOfDateString, kstEndOfDateString } = require('../utils/kst');
+const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
 const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
+const { TERMINAL_STATUSES } = require('../constants/recommendation-status');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -107,7 +108,7 @@ router.get('/me/history', requireAuth, async (req, res) => {
   const limit  = 20;
   let query = db('recommendations')
     .where({ cafe_id: req.owner.cafeId })
-    .whereIn('status', ['played', 'skipped', 'rejected'])
+    .whereIn('status', TERMINAL_STATUSES)
     .orderBy('requested_at', 'desc');
 
   if (req.query.date) {
@@ -134,7 +135,7 @@ router.get('/me/stats/music-filter', requireAuth, async (req, res) => {
 
 // GET /api/v1/cafes/me/stats/daily?date=YYYY-MM-DD
 router.get('/me/stats/daily', requireAuth, async (req, res) => {
-  const date = req.query.date || new Date().toISOString().slice(0, 10);
+  const date = req.query.date || kstTodayString();
   res.json(await statsService.getDailyStats(req.owner.cafeId, date));
 });
 
