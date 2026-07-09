@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getMe, updateMusicFilter } from '../../api';
-
-const DEFAULT_PROMPT = '조용한 작업 카페입니다. 잔잔한 재즈, 로파이, 어쿠스틱, 부드러운 팝은 허용하고, 욕설이 많은 곡, 클럽 음악, 과하게 시끄러운 힙합/EDM은 거절해주세요.';
-
-const STRICTNESS = [
-  { id: 'low', label: '느슨하게' },
-  { id: 'medium', label: '보통' },
-  { id: 'high', label: '엄격' },
-];
+import {
+  DEFAULT_MUSIC_FILTER_PROMPT,
+  DEFAULT_MUSIC_FILTER_STRICTNESS,
+  MUSIC_FILTER_STRICTNESS_OPTIONS,
+} from '../../constants/musicFilterPolicy';
 
 function normalize(latest = {}) {
   return {
     enabled: !!latest.music_filter_enabled,
     prompt: latest.music_filter_prompt || '',
-    strictness: latest.music_filter_strictness || 'medium',
+    strictness: latest.music_filter_strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
   };
 }
 
@@ -87,7 +84,7 @@ export default function MusicFilterSettings() {
       <textarea
         value={form.prompt}
         onChange={e => setForm(prev => ({ ...prev, prompt: e.target.value }))}
-        placeholder={DEFAULT_PROMPT}
+        placeholder={DEFAULT_MUSIC_FILTER_PROMPT}
         maxLength={1000}
         rows={6}
         style={styles.textarea}
@@ -99,7 +96,7 @@ export default function MusicFilterSettings() {
 
       <label style={styles.label}>필터 강도</label>
       <div style={styles.strictnessRow}>
-        {STRICTNESS.map(item => {
+        {MUSIC_FILTER_STRICTNESS_OPTIONS.map(item => {
           const active = form.strictness === item.id;
           return (
             <button
