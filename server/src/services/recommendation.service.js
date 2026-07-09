@@ -2,11 +2,12 @@ const db = require('../db/knex');
 const { kstStartOfDay } = require('../utils/kst');
 const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
+const { ACTIVE_QUEUE_LOOKBACK_DAYS, MS_PER_DAY } = require('../constants/time-policy');
 
 // 최근 7일: KST 기준 6일 전 00:00 ~ 오늘 23:59:59.999
 function lastSevenDaysRange() {
-  const start = kstStartOfDay(6);
-  const end   = new Date(kstStartOfDay(0).getTime() + 86400000 - 1);
+  const start = kstStartOfDay(ACTIVE_QUEUE_LOOKBACK_DAYS);
+  const end   = new Date(kstStartOfDay(0).getTime() + MS_PER_DAY - 1);
   return [start, end];
 }
 
