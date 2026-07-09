@@ -1,6 +1,7 @@
 # Cursor Rules — caffeine-Flow
 
 이 저장소의 규칙은 전부 `AGENTS.md`에 있다. 세션 시작 시 AGENTS.md를 읽고 그대로 따른다.
+상태값·라우터 순서·KST·SQL raw·LLM 동작을 건드리는 작업은 `docs/AI_CHANGE_GUARDRAILS.md`도 먼저 확인한다.
 커밋 형식은 `COMMIT_CONVENTION.md`, 구조·API·개발 상세는 `docs/`.
 
 - 한국어로 응답한다.
