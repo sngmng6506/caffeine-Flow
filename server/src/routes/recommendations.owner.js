@@ -7,8 +7,9 @@ const router = require('express').Router({ mergeParams: true });
 const { requireAuth, requireCafeOwner } = require('../middleware/auth');
 const cafeService = require('../services/cafe.service');
 const recService  = require('../services/recommendation.service');
-const { broadcast } = require('./_recommendations.shared');
+const { broadcast, getClientIp } = require('./_recommendations.shared');
 const { validateRecommendationBody } = require('../utils/validate');
+const { REC_STATUS, ACTIVE_STATUSES, OWNER_MUTABLE_STATUSES } = require('../constants/recommendation-status');
 
 const ownerOnly = [requireAuth, requireCafeOwner];
 
@@ -25,10 +26,9 @@ router.post('/owner', ownerOnly, async (req, res) => {
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
   if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
 
-  const validStatuses = ['pending', 'accepted', 'playing'];
-  const recStatus = validStatuses.includes(body.status) ? body.status : 'pending';
+  const recStatus = ACTIVE_STATUSES.includes(body.status) ? body.status : REC_STATUS.PENDING;
 
-  if (recStatus === 'playing') {
+  if (recStatus === REC_STATUS.PLAYING) {
     const cleared = await recService.clearPlaying(cafe.id, null);
     for (const r of cleared) {
       broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
@@ -37,12 +37,20 @@ router.post('/owner', ownerOnly, async (req, res) => {
 
   let rec;
   try {
-    rec = await recService.add(cafe.id, { videoId, title, channelTitle, thumbnail, duration, requesterIp: '127.0.0.1', requesterName: null });
+    rec = await recService.add(cafe.id, {
+      videoId,
+      title,
+      channelTitle,
+      thumbnail,
+      duration,
+      requesterIp: getClientIp(req),
+      requesterName: null,
+    });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
     throw err;
   }
-  const updated = recStatus !== 'pending' ? await recService.updateStatus(rec.id, recStatus) : rec;
+  const updated = recStatus !== REC_STATUS.PENDING ? await recService.updateStatus(rec.id, recStatus) : rec;
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec: updated });
   res.status(201).json(updated);
@@ -51,11 +59,10 @@ router.post('/owner', ownerOnly, async (req, res) => {
 // PUT /api/v1/cafes/:slug/recommendations/:id  (사장님: 상태 변경)
 router.put('/:id', ownerOnly, async (req, res) => {
   const { status } = req.body;
-  const valid = ['accepted', 'rejected', 'playing', 'played', 'skipped'];
-  if (!valid.includes(status)) return res.status(400).json({ error: '유효하지 않은 status' });
+  if (!OWNER_MUTABLE_STATUSES.includes(status)) return res.status(400).json({ error: '유효하지 않은 status' });
 
   // playing으로 바꿀 때 기존 playing 곡을 서버 단에서 played로 처리
-  if (status === 'playing') {
+  if (status === REC_STATUS.PLAYING) {
     const cleared = await recService.clearPlaying(req.owner.cafeId, req.params.id);
     for (const r of cleared) {
       broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
