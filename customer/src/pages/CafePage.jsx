@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { getRecommendations, getCafeTop10, getGlobalTop10, getSongComments, postSongComment, postSongReply } from '../api';
 import { getDeviceName } from '../deviceName';
 import { getSocket, disconnectSocket } from '../socket';
+import { VALID_PLATFORMS } from '../constants/platforms';
+import { ACTIVE_STATUSES, HISTORY_STATUSES, REC_STATUS } from '../constants/recommendationStatus';
 import NowPlaying from './NowPlaying';
 import RecommendForm from './RecommendForm';
 import SongCard from './SongCard';
@@ -29,7 +31,7 @@ export default function CafePage({ slug }) {
   const [globalTopHasMore, setGlobalTopHasMore] = useState(false);
   const [topLoading, setTopLoading] = useState(false);
   const [topLoaded, setTopLoaded]   = useState({ cafeTop: false, globalTop: false });
-  const [allowedPlatforms, setAllowedPlatforms] = useState(['youtube', 'soundcloud', 'spotify']);
+  const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [successMsg, setSuccessMsg]     = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
   const [historyLimit, setHistoryLimit] = useState(10);
@@ -37,15 +39,15 @@ export default function CafePage({ slug }) {
   const [queueExpanded, setQueueExpanded]     = useState(null);
   const deviceName = getDeviceName();
 
-  const nowPlaying = recs.find(r => r.status === 'playing') || null;
+  const nowPlaying = recs.find(r => r.status === REC_STATUS.PLAYING) || null;
   const waitingQueue = recs
-    .filter(r => r.status === 'accepted')
+    .filter(r => r.status === REC_STATUS.ACCEPTED)
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
   const pendingQueue = recs
-    .filter(r => r.status === 'pending')
+    .filter(r => r.status === REC_STATUS.PENDING)
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-  const queue = [...waitingQueue, ...pendingQueue];
-  const history = recs.filter(r => r.status === 'played' || r.status === 'skipped')
+  const history = recs
+    .filter(r => HISTORY_STATUSES.includes(r.status))
     .sort((a, b) => new Date(b.played_at || b.requested_at) - new Date(a.played_at || a.requested_at));
 
   useEffect(() => {
@@ -134,7 +136,7 @@ export default function CafePage({ slug }) {
 
   function handleAdded(rec) {
     setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
-    const position = recs.filter(r => r.status === 'pending' || r.status === 'accepted').length + 1;
+    const position = recs.filter(r => [REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(r.status)).length + 1;
     setSuccessMsg(`${position}번째로 대기 중이에요!`);
     if (successTimer) clearTimeout(successTimer);
     setSuccessTimer(setTimeout(() => setSuccessMsg(''), 4000));
@@ -157,7 +159,7 @@ export default function CafePage({ slug }) {
           onAdded={handleAdded}
           playingVideoId={nowPlaying?.video_id}
           activeVideoIds={recs
-            .filter(r => ['pending', 'accepted', 'playing'].includes(r.status))
+            .filter(r => ACTIVE_STATUSES.includes(r.status))
             .map(r => r.video_id)}
           allowedPlatforms={allowedPlatforms}
         />
@@ -281,10 +283,9 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
     if (sortBy === 'votes') {
       const diff = (b.total_votes || 0) - (a.total_votes || 0);
       return diff !== 0 ? diff : b.count - a.count;
-    } else {
-      const diff = b.count - a.count;
-      return diff !== 0 ? diff : (b.total_votes || 0) - (a.total_votes || 0);
     }
+    const diff = b.count - a.count;
+    return diff !== 0 ? diff : (b.total_votes || 0) - (a.total_votes || 0);
   });
 
   return (
@@ -293,35 +294,35 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
         <button onClick={() => setSortBy('count')} style={{ ...styles.sortBtn, ...(sortBy === 'count' ? styles.sortActive : {}) }}>신청순</button>
         <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>좋아요순</button>
       </div>
-    <ol style={styles.rankList}>
-      {sorted.map((item, i) => {
-        const rowKey = `${item.video_id}__${i}`;
-        return (
-          <li key={rowKey} style={styles.rankItem}>
-            <div
-              style={styles.rankRow}
-              onClick={() => setExpanded(v => v === rowKey ? null : rowKey)}
-            >
-              <span style={styles.rank}>{i + 1}</span>
-              <img src={item.thumbnail} alt="" style={styles.thumb} />
-              <div style={styles.rankInfo}>
-                <div style={styles.rankTitle}>{item.title}</div>
-                <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 신청 · 👍 {item.total_votes || 0}</div>
+      <ol style={styles.rankList}>
+        {sorted.map((item, i) => {
+          const rowKey = `${item.video_id}__${i}`;
+          return (
+            <li key={rowKey} style={styles.rankItem}>
+              <div
+                style={styles.rankRow}
+                onClick={() => setExpanded(v => v === rowKey ? null : rowKey)}
+              >
+                <span style={styles.rank}>{i + 1}</span>
+                <img src={item.thumbnail} alt="" style={styles.thumb} />
+                <div style={styles.rankInfo}>
+                  <div style={styles.rankTitle}>{item.title}</div>
+                  <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 신청 · 👍 {item.total_votes || 0}</div>
+                </div>
+                <span style={styles.chevron}>{expanded === rowKey ? '▲' : '▼'}</span>
               </div>
-              <span style={styles.chevron}>{expanded === rowKey ? '▲' : '▼'}</span>
-            </div>
-            {expanded === rowKey && (
-              <CommentSection videoId={item.video_id} slug={slug} isGlobal={!slug} />
-            )}
-          </li>
-        );
-      })}
-    </ol>
-    {hasMore && (
-      <button onClick={onLoadMore} disabled={loading} style={styles.loadMoreBtn}>
-        {loading ? '불러오는 중...' : '더 보기'}
-      </button>
-    )}
+              {expanded === rowKey && (
+                <CommentSection videoId={item.video_id} slug={slug} isGlobal={!slug} />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {hasMore && (
+        <button onClick={onLoadMore} disabled={loading} style={styles.loadMoreBtn}>
+          {loading ? '불러오는 중...' : '더 보기'}
+        </button>
+      )}
     </>
   );
 }
@@ -437,7 +438,7 @@ function CommentItem({ comment: c, videoId, slug, deviceName, isGlobal, onReplyA
             <div key={r.id} style={styles.replyItem}>
               <div style={styles.commentMeta}>
                 <span style={styles.commenterName}>
-                  {r.commenter_name || '익명'}{r.cafe_name ? <span style={styles.cafeName}> in {r.cafe_name}</span> : ''}
+                  {r.commenter_name || '익명'}{r.cafe_name ? <span style={styles.cafeTag}> in {r.cafe_name}</span> : ''}
                 </span>
                 <span style={styles.commentDate}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
               </div>
