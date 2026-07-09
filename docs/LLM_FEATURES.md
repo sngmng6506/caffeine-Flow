@@ -342,20 +342,4 @@ music_filter_cache
 
 현재도 중복곡, 큐 초과, 플랫폼 제한을 먼저 검사한 뒤 LLM을 호출하여 불필요한 비용을 줄인다.
 
----
 
-## 12. Portfolio Summary
-
-이 기능은 단순히 LLM API를 호출하는 기능이 아니다.
-
-```txt
-Owner-defined natural language policy
-Structured LLM output
-Fail-closed safety policy
-Audit logging
-Real-time owner alert
-Operational dashboard
-Future evaluation loop
-```
-
-즉, Caffeine Flow의 AI 음악 필터는 **운영자가 제어 가능한 LLM 기반 정책 의사결정 시스템**으로 설계되었다.
