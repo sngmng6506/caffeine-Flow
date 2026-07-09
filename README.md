@@ -9,6 +9,7 @@ YouTube · SoundCloud · Spotify 세 플랫폼을 한 화면에서 **매장 BGM(
 | **사장님** | Electron 데스크톱 앱에서 큐 관리 + 실제 재생, 또는 웹 대시보드 |
 | **백엔드** | Express + Postgres, Socket.IO 실시간 큐, Railway 배포 |
 | **재생** | BrowserView 2개 (BGM 고정 / 신청곡 오버레이), 곡 종료 자동 감지 |
+| **AI** | 사장님이 설정한 매장 분위기 정책을 기반으로 손님 신청곡을 LLM이 수락/거절 |
 
 ## 기술 스택
 
@@ -56,6 +57,7 @@ cd owner && npm run electron:dev
 | --- | --- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 설계 배경 — 재생 모드·종료 감지·소켓·DB 불변식 |
 | [docs/API.md](docs/API.md) | REST 엔드포인트 전체 (인증·rate limit 포함) |
+| [docs/LLM_FEATURES.md](docs/LLM_FEATURES.md) | LLM 기반 AI 음악 필터 설계 — 정책 설정·판단 흐름·실패 처리·통계 대시보드 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 로컬 개발·환경변수·마이그레이션·테스트·배포 |
 | [AGENTS.md](AGENTS.md) | AI 도구 협업 규칙 (도구 무관 계약) |
 | [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) | 커밋 메시지 형식 |
