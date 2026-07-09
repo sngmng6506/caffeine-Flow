@@ -36,6 +36,7 @@ Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔
 | PUT | `/cafes/me/status` | 신청 ON/OFF |
 | GET | `/cafes/me/history` | 재생 이력 (`?date=` KST 기준 필터) |
 | GET | `/cafes/me/stats` | 종합 통계 + TOP10 |
+| GET | `/cafes/me/stats/music-filter` | 최근 7일 AI 음악 필터 처리 현황·거절 사유·오류 목록 |
 | GET | `/cafes/me/stats/daily` | 일별 (`?date=`) |
 | GET | `/cafes/me/stats/hourly` | 시간대별 패턴 (최근 30일) |
 | GET | `/cafes/me/stats/weekday` | 요일별 패턴 (최근 30일) |
