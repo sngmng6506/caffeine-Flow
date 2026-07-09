@@ -8,8 +8,9 @@ const { requireAuth, requireCafeOwner } = require('../middleware/auth');
 const cafeService = require('../services/cafe.service');
 const recService  = require('../services/recommendation.service');
 const { broadcast, getClientIp } = require('./_recommendations.shared');
-const { validateRecommendationBody } = require('../utils/validate');
+const { validateInEnum, validateRecommendationBody } = require('../utils/validate');
 const { REC_STATUS, ACTIVE_STATUSES, OWNER_MUTABLE_STATUSES } = require('../constants/recommendation-status');
+const { PLATFORM, VALID_PLATFORMS } = require('../constants/platforms');
 
 const ownerOnly = [requireAuth, requireCafeOwner];
 
@@ -21,7 +22,10 @@ router.post('/owner', ownerOnly, async (req, res) => {
   const body = req.body || {};
   const bodyCheck = validateRecommendationBody(body);
   if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
+  const platformCheck = validateInEnum(body.platform || PLATFORM.YOUTUBE, VALID_PLATFORMS, { name: 'platform' });
+  if (platformCheck.error) return res.status(400).json({ error: platformCheck.error });
   const { videoId, title, channelTitle, thumbnail, duration } = bodyCheck.value;
+  const platform = platformCheck.value;
 
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
   if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
@@ -45,6 +49,7 @@ router.post('/owner', ownerOnly, async (req, res) => {
       duration,
       requesterIp: getClientIp(req),
       requesterName: null,
+      platform,
     });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
