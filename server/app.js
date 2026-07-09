@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 
 const { APP_URL } = require('./src/config');
 const statsService = require('./src/services/stats.service');
+const { GLOBAL_API_RATE_LIMIT } = require('./src/constants/limits');
 
 // app 생성을 server.js(리슨·소켓)와 분리 — supertest가 포트 없이
 // app만 import해 통합 테스트를 돌릴 수 있게 한다.
@@ -38,7 +39,7 @@ app.set('trust proxy', 1); // Railway 등 리버스 프록시 뒤에서 실제 I
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 app.use(cookieParser());
 app.use(express.json({ limit: '64kb' })); // body 크기 상한 — DoS 방어
-app.use(rateLimit({ windowMs: 60_000, max: 120 })); // 전체 API 분당 120회
+app.use(rateLimit(GLOBAL_API_RATE_LIMIT)); // 전체 API 분당 120회
 
 // 손님 앱 정적 파일 서빙
 const staticPath = path.join(__dirname, 'public');
