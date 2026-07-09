@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { getDailyStats, getHourlyStats, getWeekdayStats, getWeekdaySongs, getHourlySongs, getStats, getMusicFilterStats, getSongComments } from '../api';
+import { FILTER_STATUS } from '../constants/musicFilterStatus';
+import { REC_STATUS } from '../constants/recommendationStatus';
+import { kstTodayString } from '../utils/kst';
 
 const STATUS_FILTER = {
-  재생: r => r.status === 'played',
-  스킵: r => r.status === 'skipped',
+  재생: r => r.status === REC_STATUS.PLAYED,
+  스킵: r => r.status === REC_STATUS.SKIPPED,
 };
 
 export default function StatsPanel() {
@@ -21,7 +24,7 @@ export default function StatsPanel() {
 
   useEffect(() => {
     setLoadError(false);
-    const date = new Date().toISOString().slice(0, 10);
+    const date = kstTodayString();
     Promise.all([
       getDailyStats(date),
       getHourlyStats(),
@@ -193,18 +196,21 @@ function MusicFilterStats({ stats }) {
             {stats.recentRejections.length === 0
               ? <div style={s.aiSmallEmpty}>최근 거절된 곡이 없습니다.</div>
               : <div style={s.reasonList}>
-                  {stats.recentRejections.slice(0, 5).map(item => (
-                    <div key={item.id} style={s.reasonItem}>
-                      <div style={s.reasonTop}>
-                        <span style={item.filterStatus === 'error_rejected' ? s.reasonBadgeWarn : s.reasonBadgeReject}>
-                          {item.filterStatus === 'error_rejected' ? '오류 거절' : 'AI 거절'}
-                        </span>
-                        <span style={s.reasonTitle}>{item.title}</span>
+                  {stats.recentRejections.slice(0, 5).map(item => {
+                    const isErrorRejected = item.filterStatus === FILTER_STATUS.ERROR_REJECTED;
+                    return (
+                      <div key={item.id} style={s.reasonItem}>
+                        <div style={s.reasonTop}>
+                          <span style={isErrorRejected ? s.reasonBadgeWarn : s.reasonBadgeReject}>
+                            {isErrorRejected ? '오류 거절' : 'AI 거절'}
+                          </span>
+                          <span style={s.reasonTitle}>{item.title}</span>
+                        </div>
+                        <div style={s.reasonText}>{item.filterReason || '거절 사유 없음'}</div>
+                        <div style={s.reasonMeta}>{item.channelTitle || item.platform} · {new Date(item.requestedAt).toLocaleDateString('ko-KR')}</div>
                       </div>
-                      <div style={s.reasonText}>{item.filterReason || '거절 사유 없음'}</div>
-                      <div style={s.reasonMeta}>{item.channelTitle || item.platform} · {new Date(item.requestedAt).toLocaleDateString('ko-KR')}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
             }
           </div>
