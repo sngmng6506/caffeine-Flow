@@ -3,17 +3,16 @@ import { vote, unvote, cancelRecommendation } from '../api';
 import { hasVoted, markVoted, removeVote } from '../votedSongs';
 import {
   CANCELLABLE_STATUSES,
-  REC_STATUS,
   REC_STATUS_COLORS,
   REC_STATUS_LABELS,
 } from '../constants/recommendationStatus';
-import { COMPACT_PLATFORM_BADGE } from '../constants/platforms';
+import { COMPACT_PLATFORM_BADGE, PLATFORM } from '../constants/platforms';
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, showDate, position, isMyRequest, hideStatus, expanded }) {
   const [error, setError] = useState('');
   const voted = hasVoted(slug, rec.id);
   const cancellable = isMyRequest && CANCELLABLE_STATUSES.includes(rec.status);
-  const platformBadge = rec.platform && rec.platform !== REC_STATUS.YOUTUBE ? COMPACT_PLATFORM_BADGE[rec.platform] : null;
+  const platformBadge = rec.platform && rec.platform !== PLATFORM.YOUTUBE ? COMPACT_PLATFORM_BADGE[rec.platform] : null;
 
   async function handleCancel() {
     if (!window.confirm('신청을 취소하시겠습니까?')) return;
@@ -96,7 +95,6 @@ const styles = {
   voteBtn:     { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer' },
   votedBtn:    { background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', fontWeight: 700 },
   cancelBtn:    { fontSize: 13, padding: '4px 10px', borderRadius: 6, border: '1px solid #fcc', background: '#fff', color: '#e63946', cursor: 'pointer' },
-  acceptedBadge:{ fontSize: 11, color: '#2e7d32', fontWeight: 600, marginTop: 2 },
   platformBadge:{ fontSize: 10, fontWeight: 700, color: '#fff', padding: '1px 5px', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' },
   commentHint:  { fontSize: 11, color: '#aaa', flexShrink: 0, alignSelf: 'center' },
   error:        { fontSize: 12, color: '#e63946', marginTop: 4 },
