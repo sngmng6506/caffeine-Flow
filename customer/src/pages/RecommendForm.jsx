@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
-
-const PLATFORM_BADGE = {
-  youtube:    { label: 'YouTube',     bg: '#ff0000', color: '#fff' },
-  soundcloud: { label: 'SoundCloud',  bg: '#ff5500', color: '#fff' },
-  spotify:    { label: 'Spotify',     bg: '#1db954', color: '#fff' },
-};
+import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
 
 function YouTubeIcon() {
   return (
@@ -40,7 +35,13 @@ function SoundCloudIcon() {
   );
 }
 
-export default function RecommendForm({ slug, onAdded, activeVideoIds = [], playingVideoId, allowedPlatforms = ['youtube', 'soundcloud', 'spotify'] }) {
+const PLATFORM_ICONS = Object.freeze({
+  [PLATFORM.YOUTUBE]: <YouTubeIcon />,
+  [PLATFORM.SPOTIFY]: <SpotifyIcon />,
+  [PLATFORM.SOUNDCLOUD]: <SoundCloudIcon />,
+});
+
+export default function RecommendForm({ slug, onAdded, activeVideoIds = [], playingVideoId, allowedPlatforms = VALID_PLATFORMS }) {
   const [url, setUrl] = useState('');
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -55,8 +56,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     try {
       const data = await getOembed(url.trim());
       if (data.platform && !allowedPlatforms.includes(data.platform)) {
-        const names = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify' };
-        setError(`이 카페에서는 ${names[data.platform] || data.platform} 신청을 받지 않습니다.`);
+        setError(`이 카페에서는 ${platformLabel(data.platform)} 신청을 받지 않습니다.`);
         setUrl('');
         return;
       }
@@ -106,7 +106,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   }
 
   if (step === 'preview' && preview) {
-    const badge = PLATFORM_BADGE[preview.platform] || PLATFORM_BADGE.youtube;
+    const badge = PLATFORM_BADGE[preview.platform] || PLATFORM_BADGE[PLATFORM.YOUTUBE];
     return (
       <div style={styles.wrap}>
         <div style={styles.previewCard}>
@@ -133,18 +133,13 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     );
   }
 
-  const PLATFORM_LINKS = [
-    { id: 'youtube',    icon: <YouTubeIcon />,    href: 'https://www.youtube.com' },
-    { id: 'spotify',    icon: <SpotifyIcon />,    href: 'https://open.spotify.com' },
-    { id: 'soundcloud', icon: <SoundCloudIcon />, href: 'https://soundcloud.com' },
-  ];
-
   return (
     <form onSubmit={handlePreview} style={styles.wrap}>
       <div style={styles.platformRow}>
         <div style={styles.platformIcons}>
-          {PLATFORM_LINKS.map(({ id, icon, href }) => {
+          {PLATFORM_LINKS.map(({ id, href }) => {
             const allowed = allowedPlatforms.includes(id);
+            const icon = PLATFORM_ICONS[id];
             return allowed ? (
               <a
                 key={id}
