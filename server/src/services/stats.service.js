@@ -1,5 +1,7 @@
 const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour } = require('../utils/kst');
+const { REC_STATUS } = require('../constants/recommendation-status');
+const { FILTER_STATUS, FILTER_REJECT_STATUSES } = require('../constants/music-filter-status');
 
 // KST 기준 시간 필드 추출 SQL — 모든 통계의 타임존 기준을 Postgres 단에서 통일
 const KST_HOUR_SQL = `date_part('hour', requested_at AT TIME ZONE 'Asia/Seoul')::int`;
@@ -14,12 +16,12 @@ const CANONICAL_ID_SQL = `split_part(video_id, chr(63), 1)`;
 async function getStats(cafeId) {
   const [total, played, skipped] = await Promise.all([
     db('recommendations').where({ cafe_id: cafeId }).count('id as n').first(),
-    db('recommendations').where({ cafe_id: cafeId, status: 'played' }).count('id as n').first(),
-    db('recommendations').where({ cafe_id: cafeId, status: 'skipped' }).count('id as n').first(),
+    db('recommendations').where({ cafe_id: cafeId, status: REC_STATUS.PLAYED }).count('id as n').first(),
+    db('recommendations').where({ cafe_id: cafeId, status: REC_STATUS.SKIPPED }).count('id as n').first(),
   ]);
 
   const topSongs = await db('recommendations')
-    .where({ cafe_id: cafeId, status: 'played' })
+    .where({ cafe_id: cafeId, status: REC_STATUS.PLAYED })
     .select(db.raw(`${CANONICAL_ID_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
@@ -52,8 +54,8 @@ async function getDailyStats(cafeId, dateStr) {
   return {
     date:    dateStr,
     total:   recs.length,
-    played:  recs.filter(r => r.status === 'played').length,
-    skipped: recs.filter(r => r.status === 'skipped').length,
+    played:  recs.filter(r => r.status === REC_STATUS.PLAYED).length,
+    skipped: recs.filter(r => r.status === REC_STATUS.SKIPPED).length,
     byHour,
   };
 }
@@ -116,24 +118,24 @@ async function getMusicFilterStats(cafeId) {
     .count('id as count')
     .groupBy('filter_status');
 
-  const byStatus = Object.fromEntries(rows.map(r => [r.filter_status || 'skipped', Number(r.count)]));
-  const accepted = byStatus.accepted || 0;
-  const rejected = byStatus.rejected || 0;
-  const errorRejected = byStatus.error_rejected || 0;
-  const skipped = byStatus.skipped || 0;
+  const byStatus = Object.fromEntries(rows.map(r => [r.filter_status || FILTER_STATUS.SKIPPED, Number(r.count)]));
+  const accepted = byStatus[FILTER_STATUS.ACCEPTED] || 0;
+  const rejected = byStatus[FILTER_STATUS.REJECTED] || 0;
+  const errorRejected = byStatus[FILTER_STATUS.ERROR_REJECTED] || 0;
+  const skipped = byStatus[FILTER_STATUS.SKIPPED] || 0;
   const processed = accepted + rejected + errorRejected;
   const safeRate = n => processed > 0 ? Number((n / processed).toFixed(3)) : 0;
 
   const recentRejections = await db('recommendations')
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since)
-    .whereIn('filter_status', ['rejected', 'error_rejected'])
+    .whereIn('filter_status', FILTER_REJECT_STATUSES)
     .select('id', 'title', 'channel_title', 'thumbnail', 'platform', 'filter_status', 'filter_reason', 'filter_error_code', 'requested_at')
     .orderBy('requested_at', 'desc')
     .limit(8);
 
   const recentErrors = recentRejections
-    .filter(r => r.filter_status === 'error_rejected')
+    .filter(r => r.filter_status === FILTER_STATUS.ERROR_REJECTED)
     .slice(0, 5)
     .map(r => ({
       id: r.id,
