@@ -2,6 +2,7 @@ const db = require('../db/knex');
 const { kstStartOfDay } = require('../utils/kst');
 const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
+const { PLATFORM } = require('../constants/platforms');
 const { ACTIVE_QUEUE_LOOKBACK_DAYS, MS_PER_DAY } = require('../constants/time-policy');
 
 // 최근 7일: KST 기준 6일 전 00:00 ~ 오늘 23:59:59.999
@@ -48,7 +49,7 @@ async function add(cafeId, {
   duration,
   requesterIp,
   requesterName,
-  platform = 'youtube',
+  platform = PLATFORM.YOUTUBE,
   visitorId,
   status = REC_STATUS.PENDING,
   filterStatus = FILTER_STATUS.SKIPPED,
