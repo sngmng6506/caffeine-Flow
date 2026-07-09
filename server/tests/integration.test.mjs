@@ -29,6 +29,13 @@ async function postRec(videoId, visitorId, overrides = {}) {
     .send({ videoId, title: `곡 ${videoId}`, platform: 'youtube', ...overrides });
 }
 
+function ownerPostRec(body) {
+  return request(app)
+    .post(`/api/v1/cafes/${cafe.slug}/recommendations/owner`)
+    .set({ Authorization: `Bearer ${ownerToken}` })
+    .send(body);
+}
+
 beforeAll(async () => {
   // knexfile은 CLI(cwd=src/db) 기준이라 프로그래매틱 호출엔 경로 명시 필요
   const migrationsDir = new URL('../src/db/migrations', import.meta.url).pathname;
@@ -93,6 +100,27 @@ describe('추천곡 신청', () => {
     expect(ids).not.toContain('hidden_played');
     expect(ids).not.toContain('hidden_skipped');
     expect(ids).not.toContain('hidden_rejected');
+  });
+});
+
+describe('사장님 직접 추가', () => {
+  it('platform을 그대로 저장한다', async () => {
+    const res = await ownerPostRec({
+      videoId: 'spotify_owner_track',
+      title: '사장님 추가 Spotify 곡',
+      platform: 'spotify',
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.platform).toBe('spotify');
+  });
+
+  it('유효하지 않은 platform은 거절한다', async () => {
+    const res = await ownerPostRec({
+      videoId: 'invalid_owner_platform',
+      title: '잘못된 플랫폼 곡',
+      platform: 'melon',
+    });
+    expect(res.status).toBe(400);
   });
 });
 
