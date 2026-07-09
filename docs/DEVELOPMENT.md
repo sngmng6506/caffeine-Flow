@@ -19,6 +19,10 @@
 | `APP_URL` | | OAuth redirect·socket CORS allowlist (기본 `http://localhost:5174`) |
 | `SERVER_URL` | | Naver callback URI |
 | `YOUTUBE_API_KEY` | | 길이·라이브 체크. 미설정 시 해당 기능 비활성 |
+| `OPENAI_API_KEY` | AI 필터 사용 시 | AI 음악 필터 LLM 호출용. 누락 상태에서 필터가 켜지면 fail-closed로 자동 거절 |
+| `OPENAI_BASE_URL` | | 기본 `https://api.openai.com/v1` |
+| `MUSIC_FILTER_MODEL` | | 기본 `gpt-4.1-mini` |
+| `MUSIC_FILTER_TIMEOUT_MS` | | 기본 `8000` |
 
 owner SPA 빌드용 (Vite `VITE_*`): `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_ENABLED`.
 
@@ -42,11 +46,20 @@ npm run migrate:rollback --prefix server   # 마지막 배치 롤백
 
 ---
 
-## 테스트
+## 테스트·빌드
+
+서버:
 
 ```bash
-npm test --prefix server        # 단위 + 통합
-npm run test:unit --prefix server   # 단위만 (DB 불필요)
+npm test --prefix server             # 단위 + 통합
+npm run test:unit --prefix server    # 단위만 (DB 불필요)
+```
+
+프론트:
+
+```bash
+npm run build --prefix customer
+npm run build --prefix owner
 ```
 
 - **단위** (`tests/*.test.mjs`) — 검증 헬퍼, KST, 상태 전이처럼 DB가 필요 없는 순수 로직을 다룬다.
@@ -59,29 +72,53 @@ npm run test:unit --prefix server   # 단위만 (DB 불필요)
   ```
 - `NODE_ENV=test`이면 rate limiter를 건너뛴다. 테스트가 같은 IP에서 연속으로 요청을 보내기 때문이다.
 
-CI(`.github/workflows/ci.yml`)는 push와 PR마다 postgres:16 서비스 컨테이너를 띄워 전체 파일 구문 검사와 테스트를 실행한다.
+CI(`.github/workflows/ci.yml`)는 push와 PR마다 아래 job을 실행한다.
+
+```txt
+commit-message  → 신규 커밋 메시지가 COMMIT_CONVENTION.md 형식인지 검사
+server-test     → postgres:16 서비스 컨테이너 + node --check + npm test --prefix server
+frontend-build  → npm run build --prefix customer + npm run build --prefix owner
+```
 
 ---
 
 ## 배포
 
 ### 서버 (Railway)
+
 `railway.json` 설정에 따라 git push하면 자동으로 빌드된다:
-```
+
+```txt
 build: customer 빌드 → owner 빌드(VITE env inject) → server 설치
 start: npm run migrate --prefix server && node server/server.js
 ```
 
-빌드 산출물:
-- `server/public/` — 손님 SPA. gitignore 대상이며 배포할 때마다 새로 빌드된다.
-- `server/public/owner/` — 사장님 SPA. 저장소에 **커밋**되며 Railway 빌드 실패 시 fallback으로 쓰인다. owner 소스를 고치면 로컬에서 빌드한 뒤 commit·push해야 반영된다.
+Vite 산출물 경로:
+
+```txt
+customer/vite.config.js → build.outDir = ../server/public
+owner/vite.config.js    → build.outDir = ../server/public/owner, base = /owner/
+```
+
+서버 정적 서빙:
+
+```txt
+server/app.js
+- express.static(server/public)       → 손님 SPA
+- /owner/* fallback                   → server/public/owner/index.html
+- 그 외 fallback                      → server/public/index.html
+```
+
+Railway 빌드는 customer를 먼저 빌드해 `server/public`을 비우고, 그 다음 owner를 `server/public/owner`에 빌드한다. 따라서 두 SPA 산출물이 같은 정적 루트 아래 공존한다.
 
 ### 사장님 데스크톱 (GitHub Releases)
+
 코드 서명과 바이너리 업로드가 로컬 환경에 의존하므로, 로컬에서 직접 실행한다:
 ```bash
 cd owner
 GH_TOKEN=<github_pat> npm run electron:build -- --publish always
 ```
+
 빌드 흐름은 Vite → electron-rebuild → packaging → CastLabs EVS 서명 → NSIS 인스톨러 → signtool 서명 → blockmap → GitHub Release + `latest.yml` 순이다. 한 번에 5~15분 걸린다.
 
 업데이트는 클라이언트가 `latest.yml`을 polling하다가 새 인스톨러를 내려받고, 재시작할 때 `autoUpdater.quitAndInstall`로 적용하는 방식이다.
