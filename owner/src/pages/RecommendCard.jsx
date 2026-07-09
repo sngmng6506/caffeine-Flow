@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { updateRec, deleteRec } from '../api';
+import { REC_STATUS, OWNER_ACTION_STATUS } from '../constants/recommendationStatus';
+import { FILTER_STATUS } from '../constants/musicFilterStatus';
+import { PLATFORM_BADGE } from '../constants/platforms';
 
 function filterLabel(rec) {
-  if (!rec.filter_status || rec.filter_status === 'skipped') return null;
-  if (rec.filter_status === 'accepted') return { text: 'AI 통과', style: styles.filterAccepted };
-  if (rec.filter_status === 'rejected') return { text: 'AI 거절', style: styles.filterRejected };
-  if (rec.filter_status === 'error_rejected') return { text: 'AI 오류 거절', style: styles.filterError };
+  if (!rec.filter_status || rec.filter_status === FILTER_STATUS.SKIPPED) return null;
+  if (rec.filter_status === FILTER_STATUS.ACCEPTED) return { text: 'AI 통과', style: styles.filterAccepted };
+  if (rec.filter_status === FILTER_STATUS.REJECTED) return { text: 'AI 거절', style: styles.filterRejected };
+  if (rec.filter_status === FILTER_STATUS.ERROR_REJECTED) return { text: 'AI 오류 거절', style: styles.filterError };
   return null;
 }
 
 export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, position, expanded }) {
   const [loading, setLoading] = useState(false);
   const filter = filterLabel(rec);
+  const platformBadge = PLATFORM_BADGE[rec.platform];
 
   async function handle(action) {
     setLoading(true);
@@ -44,8 +48,7 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
       <div style={styles.body}>
         <div style={styles.title}>{rec.title}</div>
         <div style={styles.meta}>
-          {rec.platform === 'soundcloud' && <span style={{ ...styles.platformBadge, background: '#ff5500' }}>SC</span>}
-          {rec.platform === 'spotify'    && <span style={{ ...styles.platformBadge, background: '#1db954' }}>SP</span>}
+          {platformBadge && <span style={{ ...styles.platformBadge, background: platformBadge.color }}>{platformBadge.text}</span>}
           {rec.channel_title}{rec.duration && ` · ${rec.duration}`}
           {rec.requester_name && ` · 신청: ${rec.requester_name}`}
         </div>
@@ -58,32 +61,32 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
         )}
 
         {/* 추천 재생 중 섹션 */}
-        {context === 'playing' && (
+        {context === REC_STATUS.PLAYING && (
           <div style={styles.playingRow}>
             <span style={styles.nowPlaying}>🎵 재생 중</span>
-            <button onClick={() => handle('skipped')} disabled={loading} style={styles.skipBtn}>스킵</button>
+            <button onClick={() => handle(OWNER_ACTION_STATUS.SKIPPED)} disabled={loading} style={styles.skipBtn}>스킵</button>
           </div>
         )}
 
         {/* 대기 곡 섹션 */}
-        {context === 'accepted' && (
+        {context === REC_STATUS.ACCEPTED && (
           <div style={styles.actions}>
             <span style={styles.queuedLabel}>⏳ 대기 중</span>
-            <button onClick={() => handle('skipped')} disabled={loading} style={styles.skipBtn}>스킵</button>
+            <button onClick={() => handle(OWNER_ACTION_STATUS.SKIPPED)} disabled={loading} style={styles.skipBtn}>스킵</button>
           </div>
         )}
 
         {/* 추천 곡 섹션 */}
-        {context === 'pending' && (
+        {context === REC_STATUS.PENDING && (
           <div style={styles.actions}>
             <button
-              onClick={() => handle('accepted')}
+              onClick={() => handle(OWNER_ACTION_STATUS.ACCEPTED)}
               disabled={loading}
               style={{ ...styles.btn, background: '#4caf50' }}
             >
               수락
             </button>
-            <button onClick={() => handle('skipped')} disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
+            <button onClick={() => handle(OWNER_ACTION_STATUS.SKIPPED)} disabled={loading} style={{ ...styles.btn, background: '#ff9800' }}>스킵</button>
           </div>
         )}
 
