@@ -23,10 +23,17 @@ AI로 코드를 수정할 때는 아래 순서를 지킨다.
 ```txt
 server/src/constants/recommendation-status.js
 server/src/constants/music-filter-status.js
+server/src/constants/music-filter-policy.js
 server/src/constants/platforms.js
 server/src/constants/limits.js
 server/src/constants/time-policy.js
 server/src/db/sql-fragments.js
+owner/src/constants/recommendationStatus.js
+owner/src/constants/musicFilterStatus.js
+owner/src/constants/musicFilterPolicy.js
+owner/src/constants/platforms.js
+customer/src/constants/recommendationStatus.js
+customer/src/constants/platforms.js
 ```
 
 ---
@@ -46,10 +53,17 @@ skipped
 rejected
 ```
 
-상태값은 직접 문자열로 쓰지 말고 다음 파일의 상수를 사용한다.
+서버 상태값은 직접 문자열로 쓰지 말고 다음 파일의 상수를 사용한다.
 
 ```txt
 server/src/constants/recommendation-status.js
+```
+
+프론트 상태 표시·필터링도 직접 문자열로 쓰지 말고 앱별 상수를 사용한다.
+
+```txt
+owner/src/constants/recommendationStatus.js
+customer/src/constants/recommendationStatus.js
 ```
 
 의미별 그룹:
@@ -95,10 +109,31 @@ rejected
 error_rejected
 ```
 
-상태값은 직접 문자열로 쓰지 말고 다음 파일의 상수를 사용한다.
+서버 상태값은 직접 문자열로 쓰지 말고 다음 파일의 상수를 사용한다.
 
 ```txt
 server/src/constants/music-filter-status.js
+```
+
+owner UI의 필터 배지도 직접 문자열 비교 대신 다음 파일의 상수를 사용한다.
+
+```txt
+owner/src/constants/musicFilterStatus.js
+```
+
+필터 강도 정책은 다음 파일에서 관리한다.
+
+```txt
+server/src/constants/music-filter-policy.js
+owner/src/constants/musicFilterPolicy.js
+```
+
+현재 허용 강도:
+
+```txt
+low
+medium
+high
 ```
 
 중요 계약:
@@ -134,6 +169,7 @@ review / pending / maybe / unknown 같은 중간 판단값을 만들지 않는�
 LLM 실패 시 신청곡을 일단 받는 fail-open 동작으로 바꾸지 않는다.
 filter_status만 rejected로 만들고 status를 pending으로 남기지 않는다.
 status만 rejected로 만들고 filter_status를 누락하지 않는다.
+low/medium/high 문자열을 라우트나 UI 컴포넌트에 새로 박지 않는다.
 ```
 
 관련 테스트:
@@ -193,10 +229,12 @@ server/src/routes/recommendations.owner.js
 
 ## 5. Platform Contract
 
-지원 플랫폼은 한 곳에서 관리한다.
+지원 플랫폼은 상수 파일에서 관리한다.
 
 ```txt
 server/src/constants/platforms.js
+owner/src/constants/platforms.js
+customer/src/constants/platforms.js
 ```
 
 현재 지원 플랫폼:
@@ -207,7 +245,7 @@ soundcloud
 spotify
 ```
 
-플랫폼 관련 로직은 다음 상수/유틸을 사용한다.
+서버 플랫폼 관련 로직은 다음 상수/유틸을 사용한다.
 
 ```txt
 PLATFORM
@@ -218,10 +256,18 @@ formatAllowedPlatforms()
 platformLabel()
 ```
 
+프론트 플랫폼 표시·링크·배지는 각 앱의 constants를 사용한다.
+
+```txt
+owner/src/constants/platforms.js
+customer/src/constants/platforms.js
+```
+
 금지 사항:
 
 ```txt
 라우트 파일마다 ['youtube', 'soundcloud', 'spotify']를 새로 만들지 않는다.
+프론트 컴포넌트 안에 플랫폼 표시명/색상/배지를 다시 만들지 않는다.
 표시명 매핑 { youtube: 'YouTube', ... }을 라우트 안에 다시 만들지 않는다.
 새 플랫폼을 추가할 때 일부 파일만 수정하지 않는다.
 ```
@@ -231,7 +277,9 @@ platformLabel()
 ```txt
 server/src/constants/platforms.js
 server/src/routes/tracks.js
+owner/src/constants/platforms.js
 owner/src 관련 플랫폼 설정 UI
+customer/src/constants/platforms.js
 customer/src 관련 신청 UI
 docs/API.md
 관련 테스트
@@ -297,6 +345,7 @@ server/tests/limits.test.mjs
 ```txt
 server/src/constants/time-policy.js
 server/src/utils/kst.js
+owner/src/utils/kst.js
 ```
 
 현재 정책:
@@ -328,6 +377,7 @@ STATS_PATTERN_LOOKBACK_DAYS = 30
 통계 날짜 경계를 new Date().toISOString() UTC 기준으로 단순화하지 않는다.
 Asia/Seoul 문자열을 여러 파일에 직접 복사하지 않는다.
 KST 기준 통계와 이력 날짜 필터가 서로 다른 하루를 보게 만들지 않는다.
+owner 통계 화면의 오늘 날짜도 owner/src/utils/kst.js를 경유한다.
 ```
 
 관련 테스트:
@@ -452,16 +502,19 @@ AI로 코드를 수정하기 전 아래를 확인한다.
 
 ```txt
 상태값을 바꾸는가?
-→ recommendation-status.js / music-filter-status.js 확인
+→ server/src/constants/recommendation-status.js / music-filter-status.js 확인
+→ owner/src/constants/* / customer/src/constants/* 확인
 
 플랫폼을 바꾸는가?
-→ platforms.js 확인
+→ server/src/constants/platforms.js 확인
+→ owner/src/constants/platforms.js / customer/src/constants/platforms.js 확인
 
 rate limit이나 큐 한도를 바꾸는가?
 → limits.js 확인
 
 날짜/통계를 바꾸는가?
-→ time-policy.js / kst.js / sql-fragments.js 확인
+→ server time-policy.js / kst.js / sql-fragments.js 확인
+→ owner/src/utils/kst.js 확인
 
 raw SQL을 바꾸는가?
 → sql-fragments.js 확인, integration test 유지
@@ -480,10 +533,12 @@ DB 컬럼을 추가하는가?
 
 ## 12. Minimum Test Expectations
 
-AI 수정 후 최소한 아래 테스트를 통과해야 한다.
+AI 수정 후 최소한 아래 테스트/빌드를 통과해야 한다.
 
 ```bash
 npm test --prefix server
+npm run build --prefix customer
+npm run build --prefix owner
 ```
 
 계약별 주요 테스트:
@@ -498,3 +553,5 @@ limits.test.mjs         → rate limit/queue limit 정책
 kst.test.mjs            → KST 날짜 계산
 time-policy.test.mjs    → KST/SQL fragment 계약
 ```
+
+CI는 위 서버 테스트와 customer/owner build 외에 신규 커밋 메시지도 `COMMIT_CONVENTION.md` 형식으로 검사한다.
