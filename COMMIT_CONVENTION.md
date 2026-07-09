@@ -46,7 +46,7 @@ pull_request → base.sha..head.sha
 ```
 
 즉, 과거 전체 히스토리를 검사하지 않고 이번 push 또는 PR에 포함된 신규 커밋만 검사한다.
-기존 main에 이미 들어간 비준수 커밋은 rewrite하지 않고 `docs/COMMIT_MESSAGE_LEGACY_EXCEPTIONS.md`에 기록한다.
+기존 main에 이미 들어간 비준수 커밋을 고치려면 로컬에서 `git rebase -i` 또는 `git filter-repo`로 history를 rewrite한 뒤 force-push해야 한다.
 
 검사 스크립트:
 
