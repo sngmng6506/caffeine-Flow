@@ -12,6 +12,11 @@ export const PLATFORM_OPTIONS = Object.freeze([
   { id: PLATFORM.SPOTIFY, label: 'Spotify', color: '#1db954' },
 ]);
 
+export const PLATFORM_BADGE = Object.freeze({
+  [PLATFORM.SOUNDCLOUD]: { text: 'SC', color: '#ff5500' },
+  [PLATFORM.SPOTIFY]: { text: 'SP', color: '#1db954' },
+});
+
 export function parseAllowedPlatforms(value) {
   if (!value) return [...VALID_PLATFORMS];
   if (Array.isArray(value)) return value.filter(p => VALID_PLATFORMS.includes(p));
