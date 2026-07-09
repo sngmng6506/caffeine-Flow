@@ -41,6 +41,7 @@ export const deleteRec          = (slug, id) => apiFetch('DELETE', `/cafes/${slu
 export const getHistory      = (offset = 0, date = null) =>
   apiFetch('GET', `/cafes/me/history?offset=${offset}${date ? `&date=${date}` : ''}`);
 export const getStats        = () => apiFetch('GET', '/cafes/me/stats');
+export const getMusicFilterStats = () => apiFetch('GET', '/cafes/me/stats/music-filter');
 export const getDailyStats   = (date) => apiFetch('GET', `/cafes/me/stats/daily?date=${date}`);
 export const getHourlyStats     = () => apiFetch('GET', '/cafes/me/stats/hourly');
 export const getWeekdayStats    = () => apiFetch('GET', '/cafes/me/stats/weekday');
