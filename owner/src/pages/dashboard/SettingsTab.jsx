@@ -1,11 +1,6 @@
 import { useState, useEffect } from 'react';
 import MusicFilterSettings from './MusicFilterSettings';
-
-const PLATFORMS = [
-  { id: 'youtube',    label: 'YouTube',    color: '#ff0000' },
-  { id: 'soundcloud', label: 'SoundCloud', color: '#ff5500' },
-  { id: 'spotify',    label: 'Spotify',    color: '#1db954' },
-];
+import { PLATFORM_OPTIONS } from '../../constants/platforms';
 
 export default function SettingsTab({ allowedPlatforms, saving, onSave }) {
   const [selected, setSelected] = useState(allowedPlatforms);
@@ -30,7 +25,7 @@ export default function SettingsTab({ allowedPlatforms, saving, onSave }) {
         <div style={settingsStyles.title}>허용 플랫폼</div>
         <div style={settingsStyles.desc}>손님이 신청할 수 있는 음악 플랫폼을 선택하세요.</div>
         <div style={settingsStyles.platforms}>
-          {PLATFORMS.map(p => {
+          {PLATFORM_OPTIONS.map(p => {
             const active = selected.includes(p.id);
             return (
               <button
