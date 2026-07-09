@@ -77,6 +77,23 @@ describe('추천곡 신청', () => {
     expect(res.status).toBe(429);
     await db('recommendations').whereIn('video_id', rows.map(r => r.video_id)).del();
   });
+
+  it('손님 큐 조회는 active 상태만 노출한다', async () => {
+    await db('recommendations').insert([
+      { cafe_id: cafe.id, video_id: 'visible_pending', title: '보이는 곡', status: 'pending' },
+      { cafe_id: cafe.id, video_id: 'hidden_played', title: '재생 완료 곡', status: 'played' },
+      { cafe_id: cafe.id, video_id: 'hidden_skipped', title: '스킵 곡', status: 'skipped' },
+      { cafe_id: cafe.id, video_id: 'hidden_rejected', title: '거절 곡', status: 'rejected' },
+    ]);
+
+    const res = await request(app).get(`/api/v1/cafes/${cafe.slug}/recommendations`);
+    expect(res.status).toBe(200);
+    const ids = res.body.recommendations.map(r => r.video_id);
+    expect(ids).toContain('visible_pending');
+    expect(ids).not.toContain('hidden_played');
+    expect(ids).not.toContain('hidden_skipped');
+    expect(ids).not.toContain('hidden_rejected');
+  });
 });
 
 describe('손님 취소 — 소유권 검증', () => {
