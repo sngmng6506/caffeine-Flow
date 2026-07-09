@@ -63,8 +63,8 @@ owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경�
 ### 사장님 (🏪 requireAuth + requireCafeOwner)
 | Method | Path | 설명 |
 | --- | --- | --- |
-| POST | `/owner` | 사장님 직접 신청 |
-| PUT | `/:id` | 상태 변경 (accept/skip/play 등). 종료 상태 역전이 409 |
+| POST | `/owner` | 사장님 직접 신청. AI 필터를 우회하며 `platform`은 youtube/soundcloud/spotify 중 하나 |
+| PUT | `/:id` | 상태 변경. 허용값: `accepted`, `rejected`, `playing`, `played`, `skipped`. 종료 상태 역전이 409 |
 | DELETE | `/:id` | 삭제 |
 
 ---
