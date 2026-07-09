@@ -2,16 +2,8 @@ const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour } = require('../utils/kst');
 const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_STATUS, FILTER_REJECT_STATUSES } = require('../constants/music-filter-status');
-
-// KST 기준 시간 필드 추출 SQL — 모든 통계의 타임존 기준을 Postgres 단에서 통일
-const KST_HOUR_SQL = `date_part('hour', requested_at AT TIME ZONE 'Asia/Seoul')::int`;
-const KST_DOW_SQL  = `date_part('dow',  requested_at AT TIME ZONE 'Asia/Seoul')::int`;
-
-// Spotify ?si=, YouTube &t= 등 추적 파라미터로 같은 곡이 여러 video_id로
-// 저장된 과거 데이터 병합용 — '?' 앞부분을 정규 ID로 사용.
-// knex.raw는 문자열 리터럴 안의 ?도 바인딩 자리로 해석하므로 chr(63)을 사용해
-// placeholder가 생기지 않게 한다. SELECT와 GROUP BY 표현식이 완전히 같아야 함.
-const CANONICAL_ID_SQL = `split_part(video_id, chr(63), 1)`;
+const { MUSIC_FILTER_STATS_LOOKBACK_DAYS, STATS_PATTERN_LOOKBACK_DAYS } = require('../constants/time-policy');
+const { CANONICAL_VIDEO_ID_SQL, KST_HOUR_SQL, KST_DOW_SQL } = require('../db/sql-fragments');
 
 async function getStats(cafeId) {
   const [total, played, skipped] = await Promise.all([
@@ -22,12 +14,12 @@ async function getStats(cafeId) {
 
   const topSongs = await db('recommendations')
     .where({ cafe_id: cafeId, status: REC_STATUS.PLAYED })
-    .select(db.raw(`${CANONICAL_ID_SQL} as video_id`))
+    .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
     .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
-    .groupBy(db.raw(CANONICAL_ID_SQL))
+    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL))
     .orderBy('count', 'desc')
     .limit(10);
 
@@ -67,13 +59,13 @@ const TOP_PAGE_SIZE = 10;
 // 무인증 공개 엔드포인트(/api/v1/top10)라 데이터 누적 시 요청당 풀스캔이었음.
 function topQuery(builder, offset) {
   return builder
-    .select(db.raw(`${CANONICAL_ID_SQL} as video_id`))
+    .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
     .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
     .sum('vote_count as total_votes')
-    .groupBy(db.raw(CANONICAL_ID_SQL))
+    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL))
     .orderBy('count', 'desc')
     .limit(TOP_PAGE_SIZE + 1)
     .offset(offset);
@@ -98,14 +90,14 @@ async function getGlobalTop10(offset = 0) {
   return pageRows(rows);
 }
 
-// 최근 30일 시작점 (KST 기준 30일 전 자정)
+// 최근 30일 시작점 (기존 동작 유지: KST 기준 30일 전 자정)
 function since30Days() {
-  return kstStartOfDay(30);
+  return kstStartOfDay(STATS_PATTERN_LOOKBACK_DAYS);
 }
 
 // 최근 7일 시작점 (KST 기준 6일 전 자정 — 오늘 포함 7일)
 function since7Days() {
-  return kstStartOfDay(6);
+  return kstStartOfDay(MUSIC_FILTER_STATS_LOOKBACK_DAYS);
 }
 
 async function getMusicFilterStats(cafeId) {
@@ -206,12 +198,12 @@ async function songsByKstField(cafeId, fieldSql, value, offset, limit) {
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
     .whereRaw(`${fieldSql} = ?`, [value])
-    .select(db.raw(`${CANONICAL_ID_SQL} as video_id`))
+    .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
     .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
-    .groupBy(db.raw(CANONICAL_ID_SQL))
+    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL))
     .orderBy('count', 'desc')
     .limit(limit + 1)
     .offset(offset);
