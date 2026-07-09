@@ -1,5 +1,6 @@
 // recommendations.public.js와 recommendations.owner.js가 공유하는 유틸.
-const MAX_QUEUE_SIZE = 30;
+const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { ONE_MINUTE_MS, QUEUE_MAX_SIZE, VISITOR_ID_MAX_LENGTH } = require('../constants/limits');
 
 function broadcast(req, slug, event, data) {
   req.app.get('io')?.of('/cafe').to(slug).emit(event, data);
@@ -16,19 +17,18 @@ function getClientIp(req) {
 // x-visitor-id 헤더 정규화 — 문자열이 아니거나 과도하게 길면 무시
 function safeVisitorId(req) {
   const v = req.headers['x-visitor-id'];
-  return typeof v === 'string' && v.length <= 64 ? v : null;
+  return typeof v === 'string' && v.length <= VISITOR_ID_MAX_LENGTH ? v : null;
 }
 
 // visitor_id + IP 이중 rate limiter 생성기 — 신청 라우트에서 검증된 패턴을
 // 댓글·투표 등 다른 익명 쓰기 API에도 재사용하기 위한 팩토리.
 // visitor_id는 위조 가능하므로 IP 한도가 최후 방어선 (신청 라우트 주석 참조).
-const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 
 // NODE_ENV=test에서는 스킵 — 통합 테스트가 같은 IP(127.0.0.1)에서
 // 연속 요청을 보내므로 한도에 걸려 시나리오 검증이 불가능해짐
 const skipInTest = () => process.env.NODE_ENV === 'test';
 
-function makeDualLimiter({ windowMs = 60_000, visitorMax, ipMax, message }) {
+function makeDualLimiter({ windowMs = ONE_MINUTE_MS, visitorMax, ipMax, message }) {
   const msg = { error: message };
   return [
     rateLimit({
@@ -48,4 +48,4 @@ function makeDualLimiter({ windowMs = 60_000, visitorMax, ipMax, message }) {
   ];
 }
 
-module.exports = { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter };
+module.exports = { MAX_QUEUE_SIZE: QUEUE_MAX_SIZE, QUEUE_MAX_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter };
