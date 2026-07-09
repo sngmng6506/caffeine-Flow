@@ -7,6 +7,7 @@ const { APP_URL } = require('../config');
 const { validateString, validateBool, validateInEnum } = require('../utils/validate');
 const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString } = require('../utils/kst');
+const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -40,11 +41,10 @@ router.put('/me/platforms', requireAuth, async (req, res) => {
   if (!Array.isArray(allowed_platforms) || allowed_platforms.length === 0) {
     return res.status(400).json({ error: '최소 1개 플랫폼을 선택해주세요' });
   }
-  const valid = ['youtube', 'soundcloud', 'spotify'];
-  const filtered = allowed_platforms.filter(p => valid.includes(p));
+  const filtered = allowed_platforms.filter(p => VALID_PLATFORMS.includes(p));
   if (filtered.length === 0) return res.status(400).json({ error: '유효한 플랫폼이 없습니다' });
 
-  const cafe = await cafeService.update(req.owner.cafeId, { allowed_platforms: filtered.join(',') });
+  const cafe = await cafeService.update(req.owner.cafeId, { allowed_platforms: formatAllowedPlatforms(filtered) });
   req.app.get('io')?.of('/cafe').to(cafe.slug).emit('platforms_updated', { allowed_platforms: filtered });
   res.json({ allowed_platforms: filtered });
 });
