@@ -2,6 +2,7 @@ const router = require('express').Router();
 const axios  = require('axios');
 const dns    = require('dns');
 const net    = require('net');
+const { PLATFORM } = require('../constants/platforms');
 
 // SSRF 차단 — axios가 요청 직전 호스트 DNS 결과를 검사해 private/loopback/link-local IP를
 // 가리키면 즉시 reject. SoundCloud 단축 URL이 리다이렉트 추적 중에 내부망 호스트로
@@ -53,9 +54,9 @@ async function safeAxiosGet(url, options = {}) {
 function detectPlatform(url) {
   try {
     const u = new URL(url);
-    if (u.hostname === 'youtu.be' || u.hostname.includes('youtube.com')) return 'youtube';
-    if (u.hostname.includes('soundcloud.com')) return 'soundcloud';
-    if (u.hostname.includes('spotify.com') || u.hostname === 'spotify.link') return 'spotify';
+    if (u.hostname === 'youtu.be' || u.hostname.includes('youtube.com')) return PLATFORM.YOUTUBE;
+    if (u.hostname.includes('soundcloud.com')) return PLATFORM.SOUNDCLOUD;
+    if (u.hostname.includes('spotify.com') || u.hostname === 'spotify.link') return PLATFORM.SPOTIFY;
   } catch {}
   return null;
 }
@@ -96,7 +97,7 @@ router.get('/oembed', async (req, res) => {
     return res.status(400).json({ error: 'YouTube, SoundCloud, Spotify URL을 입력해주세요' });
   }
 
-  if (platform === 'youtube') {
+  if (platform === PLATFORM.YOUTUBE) {
     const videoId = extractYoutubeId(rawUrl);
     if (!videoId) return res.status(400).json({ error: '유효한 YouTube URL이 아닙니다' });
     try {
@@ -115,7 +116,7 @@ router.get('/oembed', async (req, res) => {
     }
   }
 
-  if (platform === 'soundcloud') {
+  if (platform === PLATFORM.SOUNDCLOUD) {
     let trackUrl = normalizeSoundCloudUrl(rawUrl);
     if (!trackUrl) return res.status(400).json({ error: '유효한 SoundCloud URL이 아닙니다' });
 
@@ -221,7 +222,7 @@ router.get('/oembed', async (req, res) => {
     }
   }
 
-  if (platform === 'spotify') {
+  if (platform === PLATFORM.SPOTIFY) {
     const trackUrl = normalizeSpotifyUrl(rawUrl);
     try {
       const { data } = await axios.get('https://open.spotify.com/oembed', {
