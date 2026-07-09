@@ -127,6 +127,11 @@ router.get('/me/stats', requireAuth, async (req, res) => {
   res.json(await statsService.getStats(req.owner.cafeId));
 });
 
+// GET /api/v1/cafes/me/stats/music-filter  (최근 7일 AI 필터 현황)
+router.get('/me/stats/music-filter', requireAuth, async (req, res) => {
+  res.json(await statsService.getMusicFilterStats(req.owner.cafeId));
+});
+
 // GET /api/v1/cafes/me/stats/daily?date=YYYY-MM-DD
 router.get('/me/stats/daily', requireAuth, async (req, res) => {
   const date = req.query.date || new Date().toISOString().slice(0, 10);
