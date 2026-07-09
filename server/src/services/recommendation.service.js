@@ -154,7 +154,7 @@ async function vote(recommendationId, voterIp, visitorId) {
 
 async function unvote(recommendationId, voterIp) {
   const deleted = await db('votes')
-    .where({ recommendation_id: voterIp ? recommendationId : recommendationId, voter_ip: voterIp })
+    .where({ recommendation_id: recommendationId, voter_ip: voterIp })
     .delete();
   if (!deleted) throw Object.assign(new Error('투표 기록이 없습니다'), { status: 404 });
   const [rec] = await db('recommendations')
