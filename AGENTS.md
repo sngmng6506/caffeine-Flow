@@ -16,12 +16,14 @@ AI 도구(Claude Code · Codex · Gemini 등)와 사람 기여자가 공통으�
 
 ## 커밋 전 체크리스트
 
+- [ ] 커밋 메시지는 `COMMIT_CONVENTION.md` 형식: `type(scope): 제목` + `Why:` + bullet + `Decision:` + `🤖 Generated with ...`
 - [ ] `node --check <file>` 통과
 - [ ] 로직 변경이면 테스트 통과: `npm run test:unit --prefix server` (DB 불필요) / `npm test --prefix server` (통합, Postgres 필요)
+- [ ] `customer/src` 수정 시 `npm run build --prefix customer` 통과
+- [ ] `owner/src` 또는 `owner/electron` 수정 시 `npm run build --prefix owner` 통과
 - [ ] 상태값·라우터 순서·KST·SQL raw·LLM 동작을 바꿨다면 [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md)의 관련 계약과 테스트를 갱신
 - [ ] 마이그레이션·DB 변경이면 **실제 스키마로 검증** — 과거 `MIN(uuid)` 장애는 정수 PK로 가정한 테스트가 통과해서 놓쳤다
 - [ ] 라우트 추가·변경 시 `docs/API.md` 갱신 — CI의 드리프트 테스트가 누락을 잡는다
-- [ ] `owner/src` 수정 시 `cd owner && npm run build`로 번들 리빌드 포함 — `server/public/owner/`는 Railway fallback으로 커밋되므로 소스와 어긋나면 안 된다
 - [ ] 시크릿·토큰이 코드·커밋·로그에 없음
 
 ## 저장소 불변식 (바꾸지 말 것)
@@ -31,9 +33,10 @@ AI 도구(Claude Code · Codex · Gemini 등)와 사람 기여자가 공통으�
 - **클라이언트 IP는 `req.ip`** — X-Forwarded-For 직접 파싱 금지.
 - **사용자 입력 URL fetch는 `safeAxiosGet` 경유** (SSRF 방어). 익명 쓰기 엔드포인트에는 visitor+IP rate limiter를 붙인다.
 - **라우트 마운트 순서** — owner 라우터가 public보다 먼저여야 인증 핸들러가 경로를 가져간다 (`server/app.js`).
-- **상태값·플랫폼·한도·시간 정책은 constants 경유** — `server/src/constants/*`와 `server/src/db/sql-fragments.js`를 먼저 확인한다.
+- **서버 상태값·플랫폼·한도·시간 정책은 constants 경유** — `server/src/constants/*`와 `server/src/db/sql-fragments.js`를 먼저 확인한다.
+- **프론트 상태값·플랫폼 표시도 constants 경유** — `owner/src/constants/*`, `customer/src/constants/*`를 먼저 확인한다.
 - **LLM 음악 필터는 fail-closed** — LLM 실패 시 신청곡을 통과시키지 않고 `error_rejected`로 기록한다.
 - **app.js / server.js 분리 유지** — 테스트가 `app.js`를 import한다.
-- **날짜·시간대 집계는 `utils/kst.js`와 `constants/time-policy.js`** — UTC 자정을 직접 계산하지 않는다.
+- **날짜·시간대 집계는 KST 유틸 경유** — 서버는 `utils/kst.js`와 `constants/time-policy.js`, owner 화면은 `owner/src/utils/kst.js`를 사용한다. UTC 자정을 직접 계산하지 않는다.
 - **한국어 커밋·주석, 영어 식별자.**
 - **화면 검증이 불가능한 환경에서 UI 스타일 대량 일괄 변경 금지** — 컴포넌트 단위로 나눠 확인하며 진행한다.
