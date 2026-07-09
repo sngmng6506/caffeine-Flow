@@ -14,6 +14,8 @@ const musicFilter   = require('../features/music-filter');
 const db            = require('../db/knex');
 const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
 const { validateString, validateInEnum, validateRecommendationBody } = require('../utils/validate');
+const { REC_STATUS } = require('../constants/recommendation-status');
+const { FILTER_ACTION, FILTER_STATUS } = require('../constants/music-filter-status');
 
 const VALID_PLATFORMS = ['youtube', 'soundcloud', 'spotify'];
 
@@ -130,7 +132,7 @@ router.post('/', requestLimiters, async (req, res) => {
       requesterName,
       platform,
       visitorId,
-      status: filterResult.action === 'reject' ? 'rejected' : 'pending',
+      status: filterResult.action === FILTER_ACTION.REJECT ? REC_STATUS.REJECTED : REC_STATUS.PENDING,
       ...filterPayload(filterResult),
     });
   } catch (err) {
@@ -139,8 +141,8 @@ router.post('/', requestLimiters, async (req, res) => {
     throw err;
   }
 
-  if (filterResult.action === 'reject') {
-    if (filterResult.filterStatus === 'error_rejected') {
+  if (filterResult.action === FILTER_ACTION.REJECT) {
+    if (filterResult.filterStatus === FILTER_STATUS.ERROR_REJECTED) {
       broadcast(req, req.params.slug, 'music_filter_error', {
         title,
         platform,
@@ -170,7 +172,7 @@ router.get('/top10', async (req, res) => {
 router.delete('/:id/cancel', async (req, res) => {
   const rec = await recService.findById(req.params.id);
   if (!rec) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
-  if (!['pending', 'accepted'].includes(rec.status))
+  if (![REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(rec.status))
     return res.status(409).json({ error: '이미 처리된 추천곡은 취소할 수 없습니다' });
 
   // 본인 신청만 취소 가능 — rec.id는 소켓으로 모든 손님에게 브로드캐스트되므로
