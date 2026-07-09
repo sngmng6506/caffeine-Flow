@@ -1,15 +1,14 @@
-const STRICTNESS_LABELS = {
-  low: '느슨하게: 명확히 매장 분위기를 해치는 곡만 거절합니다.',
-  medium: '보통: 매장 분위기와 잘 맞지 않는 곡은 거절합니다.',
-  high: '엄격하게: 매장 분위기와 조금이라도 충돌할 가능성이 크면 거절합니다.',
-};
+const {
+  DEFAULT_MUSIC_FILTER_STRICTNESS,
+  MUSIC_FILTER_STRICTNESS_GUIDES,
+} = require('../../constants/music-filter-policy');
 
 function compact(value, fallback = '') {
   return String(value || fallback).trim();
 }
 
-function buildMusicFilterMessages({ cafePrompt, strictness = 'medium', track }) {
-  const strictnessGuide = STRICTNESS_LABELS[strictness] || STRICTNESS_LABELS.medium;
+function buildMusicFilterMessages({ cafePrompt, strictness = DEFAULT_MUSIC_FILTER_STRICTNESS, track }) {
+  const strictnessGuide = MUSIC_FILTER_STRICTNESS_GUIDES[strictness] || MUSIC_FILTER_STRICTNESS_GUIDES[DEFAULT_MUSIC_FILTER_STRICTNESS];
   const storePrompt = compact(cafePrompt, '이 매장의 분위기를 해치지 않는 곡만 허용합니다.');
 
   return [
