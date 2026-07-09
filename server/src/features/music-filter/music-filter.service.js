@@ -1,12 +1,13 @@
 const { buildMusicFilterMessages } = require('./prompt.builder');
 const { callMusicFilterLlm } = require('./llm.client');
 const { normalizeLlmDecision, rejectionFromError } = require('./decision.policy');
+const { FILTER_ACTION, FILTER_STATUS } = require('../../constants/music-filter-status');
 
 async function evaluateRecommendation({ cafe, track }) {
   if (!cafe.music_filter_enabled) {
     return {
-      action: 'accept',
-      filterStatus: 'skipped',
+      action: FILTER_ACTION.ACCEPT,
+      filterStatus: FILTER_STATUS.SKIPPED,
       reason: null,
       confidence: null,
       model: null,
