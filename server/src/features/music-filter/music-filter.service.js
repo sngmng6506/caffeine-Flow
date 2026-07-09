@@ -2,6 +2,7 @@ const { buildMusicFilterMessages } = require('./prompt.builder');
 const { callMusicFilterLlm } = require('./llm.client');
 const { normalizeLlmDecision, rejectionFromError } = require('./decision.policy');
 const { FILTER_ACTION, FILTER_STATUS } = require('../../constants/music-filter-status');
+const { DEFAULT_MUSIC_FILTER_STRICTNESS } = require('../../constants/music-filter-policy');
 
 async function evaluateRecommendation({ cafe, track }) {
   if (!cafe.music_filter_enabled) {
@@ -17,7 +18,7 @@ async function evaluateRecommendation({ cafe, track }) {
 
   const messages = buildMusicFilterMessages({
     cafePrompt: cafe.music_filter_prompt,
-    strictness: cafe.music_filter_strictness || 'medium',
+    strictness: cafe.music_filter_strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
     track,
   });
 
