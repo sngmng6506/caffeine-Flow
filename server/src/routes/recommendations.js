@@ -16,8 +16,7 @@ const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter }
 const { validateString, validateInEnum, validateRecommendationBody } = require('../utils/validate');
 const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_ACTION, FILTER_STATUS } = require('../constants/music-filter-status');
-
-const VALID_PLATFORMS = ['youtube', 'soundcloud', 'spotify'];
+const { PLATFORM, VALID_PLATFORMS, parseAllowedPlatforms, platformLabel } = require('../constants/platforms');
 
 // 신청 한도는 두 차원으로 적용:
 //  (1) visitor_id (클라이언트 localStorage UUID) — 같은 브라우저 식별
@@ -82,7 +81,7 @@ router.get('/', async (req, res) => {
     .ignore()
     .catch(() => {});
 
-  const allowed_platforms = cafe.allowed_platforms ? cafe.allowed_platforms.split(',') : ['youtube', 'soundcloud', 'spotify'];
+  const allowed_platforms = parseAllowedPlatforms(cafe.allowed_platforms);
   res.json({ recommendations: recs, is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name, allowed_platforms });
 });
 
@@ -95,15 +94,14 @@ router.post('/', requestLimiters, async (req, res) => {
   const body = req.body || {};
   const bodyCheck = validateRecommendationBody(body);
   if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
-  const platformCheck = validateInEnum(body.platform || 'youtube', VALID_PLATFORMS, { name: 'platform' });
+  const platformCheck = validateInEnum(body.platform || PLATFORM.YOUTUBE, VALID_PLATFORMS, { name: 'platform' });
   if (platformCheck.error) return res.status(400).json({ error: platformCheck.error });
   const { videoId, title, channelTitle, thumbnail, duration, requesterName } = bodyCheck.value;
   const platform = platformCheck.value;
 
-  const allowed = cafe.allowed_platforms ? cafe.allowed_platforms.split(',') : VALID_PLATFORMS;
+  const allowed = parseAllowedPlatforms(cafe.allowed_platforms);
   if (!allowed.includes(platform)) {
-    const platformNames = { youtube: 'YouTube', soundcloud: 'SoundCloud', spotify: 'Spotify' };
-    return res.status(403).json({ error: `이 카페에서는 ${platformNames[platform] || platform} 신청을 받지 않습니다` });
+    return res.status(403).json({ error: `이 카페에서는 ${platformLabel(platform)} 신청을 받지 않습니다` });
   }
 
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
