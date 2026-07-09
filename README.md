@@ -58,6 +58,7 @@ cd owner && npm run electron:dev
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 설계 배경 — 재생 모드·종료 감지·소켓·DB 불변식 |
 | [docs/API.md](docs/API.md) | REST 엔드포인트 전체 (인증·rate limit 포함) |
 | [docs/LLM_FEATURES.md](docs/LLM_FEATURES.md) | LLM 기반 AI 음악 필터 설계 — 정책 설정·판단 흐름·실패 처리·통계 대시보드 |
+| [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) | AI 코드 수정 시 깨지면 안 되는 상태·라우터·KST·SQL·LLM 계약 |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 로컬 개발·환경변수·마이그레이션·테스트·배포 |
 | [AGENTS.md](AGENTS.md) | AI 도구 협업 규칙 (도구 무관 계약) |
 | [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) | 커밋 메시지 형식 |
