@@ -164,6 +164,12 @@ router.post('/complete', async (req, res) => {
   // 카페 동네 필수 (시/구/동)
   if (!location?.region || !location?.district)
     return res.status(400).json({ error: '카페 동네를 선택해주세요' });
+  // 위치 문자열 검증 — 주소 위젯을 우회한 직접 호출로 비정상 값이 저장되는 것 방지
+  for (const [key, label] of [['region', '시/도'], ['district', '시/군/구'], ['dong', '동']]) {
+    if (location[key] == null) continue;
+    const check = validateString(location[key], { max: 50, allowNull: true, name: label });
+    if (check.error) return res.status(400).json({ error: check.error });
+  }
 
   let pending;
   try {
