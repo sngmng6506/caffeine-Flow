@@ -7,8 +7,9 @@ const KST_DOW_SQL  = `date_part('dow',  requested_at AT TIME ZONE 'Asia/Seoul'):
 
 // Spotify ?si=, YouTube &t= 등 추적 파라미터로 같은 곡이 여러 video_id로
 // 저장된 과거 데이터 병합용 — '?' 앞부분을 정규 ID로 사용.
-// knex.raw는 문자열 리터럴 안의 ?도 바인딩 자리로 해석하므로 \?로 이스케이프 필수.
-const CANONICAL_ID_SQL = `split_part(video_id, '\?', 1)`;
+// knex.raw는 문자열 리터럴 안의 ?도 바인딩 자리로 해석하므로 chr(63)을 사용해
+// placeholder가 생기지 않게 한다. SELECT와 GROUP BY 표현식이 완전히 같아야 함.
+const CANONICAL_ID_SQL = `split_part(video_id, chr(63), 1)`;
 
 async function getStats(cafeId) {
   const [total, played, skipped] = await Promise.all([
