@@ -37,7 +37,7 @@ describe('KST 시간 정책 계약', () => {
 describe('DB SQL fragment 계약', () => {
   it('canonical video id SQL은 Knex ? placeholder를 피하기 위해 chr(63)을 사용한다', () => {
     expect(CANONICAL_VIDEO_ID_SQL).toBe('split_part(video_id, chr(63), 1)');
-    expect(CANONICAL_VIDEO_ID_SQL).not.toContain("'?' ");
+    expect(CANONICAL_VIDEO_ID_SQL).not.toContain("'?'");
   });
 
   it('KST date_part SQL은 Asia/Seoul 기준이다', () => {
