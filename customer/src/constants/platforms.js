@@ -12,6 +12,12 @@ export const PLATFORM_BADGE = Object.freeze({
   [PLATFORM.SPOTIFY]: { label: 'Spotify', bg: '#1db954', color: '#fff' },
 });
 
+export const COMPACT_PLATFORM_BADGE = Object.freeze({
+  [PLATFORM.YOUTUBE]: { label: 'YT', bg: '#ff0000' },
+  [PLATFORM.SOUNDCLOUD]: { label: 'SC', bg: '#ff5500' },
+  [PLATFORM.SPOTIFY]: { label: 'SP', bg: '#1db954' },
+});
+
 export const PLATFORM_LINKS = Object.freeze([
   { id: PLATFORM.YOUTUBE, href: 'https://www.youtube.com' },
   { id: PLATFORM.SPOTIFY, href: 'https://open.spotify.com' },
