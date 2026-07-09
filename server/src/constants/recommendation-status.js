@@ -1,0 +1,35 @@
+const REC_STATUS = Object.freeze({
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  PLAYING: 'playing',
+  PLAYED: 'played',
+  SKIPPED: 'skipped',
+  REJECTED: 'rejected',
+});
+
+const ACTIVE_STATUSES = Object.freeze([
+  REC_STATUS.PENDING,
+  REC_STATUS.ACCEPTED,
+  REC_STATUS.PLAYING,
+]);
+
+const TERMINAL_STATUSES = Object.freeze([
+  REC_STATUS.PLAYED,
+  REC_STATUS.SKIPPED,
+  REC_STATUS.REJECTED,
+]);
+
+const OWNER_MUTABLE_STATUSES = Object.freeze([
+  REC_STATUS.ACCEPTED,
+  REC_STATUS.REJECTED,
+  REC_STATUS.PLAYING,
+  REC_STATUS.PLAYED,
+  REC_STATUS.SKIPPED,
+]);
+
+module.exports = {
+  REC_STATUS,
+  ACTIVE_STATUSES,
+  TERMINAL_STATUSES,
+  OWNER_MUTABLE_STATUSES,
+};
