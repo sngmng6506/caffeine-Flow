@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getMe, updateMusicFilter } from '../../api';
+import { getMe, testMusicFilter, updateMusicFilter } from '../../api';
 import {
   DEFAULT_MUSIC_FILTER_PROMPT,
   DEFAULT_MUSIC_FILTER_STRICTNESS,
@@ -23,7 +23,7 @@ function TestResultCard({ result }) {
   if (!result) {
     return (
       <div style={styles.testEmpty}>
-        테스트를 실행하면 AI 판단 결과가 여기에 표시됩니다. 결과 영역은 백엔드 테스트 API 연결 후 실제 값으로 채워집니다.
+        테스트를 실행하면 현재 화면의 매장 분위기 설명과 필터 강도를 기준으로 AI 판단 결과가 표시됩니다.
       </div>
     );
   }
@@ -43,6 +43,7 @@ function TestResultCard({ result }) {
           {[result.track.platform, result.track.title, result.track.channelTitle].filter(Boolean).join(' · ')}
         </div>
       )}
+      {result.model && <div style={styles.modelMeta}>모델: {result.model}</div>}
     </div>
   );
 }
@@ -87,8 +88,8 @@ export default function MusicFilterSettings() {
       setInitial(next);
       setForm(next);
       setMessage('AI 음악 필터 설정을 저장했습니다.');
-    } catch (e) {
-      setMessage(e.message || '저장 실패');
+    } catch (error) {
+      setMessage(error.message || '저장 실패');
     } finally {
       setSaving(false);
     }
@@ -100,16 +101,18 @@ export default function MusicFilterSettings() {
     setTestMessage('');
     setTestResult(null);
 
-    // TODO: 백엔드 API가 추가되면 아래 형태로 연결한다.
-    // const result = await testMusicFilter({
-    //   url: testUrl.trim(),
-    //   prompt: form.prompt.trim(),
-    //   strictness: form.strictness,
-    // });
-    // setTestResult(result);
-
-    setTestMessage('AI 필터 테스트 API가 아직 연결되지 않았습니다. 백엔드 연동 후 이 버튼에서 실제 accept/reject 결과를 표시합니다.');
-    setTestLoading(false);
+    try {
+      const result = await testMusicFilter({
+        url: testUrl.trim(),
+        prompt: form.prompt.trim(),
+        strictness: form.strictness,
+      });
+      setTestResult(result);
+    } catch (error) {
+      setTestMessage(error.message || 'AI 필터 테스트에 실패했습니다.');
+    } finally {
+      setTestLoading(false);
+    }
   }
 
   if (loading) {
@@ -140,7 +143,7 @@ export default function MusicFilterSettings() {
         <label style={styles.label}>매장 분위기 설명</label>
         <textarea
           value={form.prompt}
-          onChange={e => setForm(prev => ({ ...prev, prompt: e.target.value }))}
+          onChange={event => setForm(prev => ({ ...prev, prompt: event.target.value }))}
           placeholder={DEFAULT_MUSIC_FILTER_PROMPT}
           maxLength={1000}
           rows={6}
@@ -186,7 +189,7 @@ export default function MusicFilterSettings() {
             <div style={styles.title}>AI 필터 테스트</div>
             <div style={styles.desc}>곡 URL을 입력하면 현재 화면의 매장 분위기 설명과 필터 강도로 수락/거절 판단을 미리 확인합니다.</div>
           </div>
-          <span style={styles.badge}>연동 예정</span>
+          <span style={styles.badge}>OpenRouter</span>
         </div>
 
         <label style={styles.label}>테스트 곡 URL</label>
@@ -194,9 +197,10 @@ export default function MusicFilterSettings() {
           <input
             type="url"
             value={testUrl}
-            onChange={e => {
-              setTestUrl(e.target.value);
+            onChange={event => {
+              setTestUrl(event.target.value);
               setTestMessage('');
+              setTestResult(null);
             }}
             placeholder="https://www.youtube.com/watch?v=..."
             style={styles.input}
@@ -244,7 +248,7 @@ const styles = {
   testInputRow: { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8 },
   input: { width: '100%', boxSizing: 'border-box', fontSize: 13, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', background: '#fff' },
   testBtn: { padding: '10px 16px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' },
-  testNotice: { marginTop: 10, padding: 10, borderRadius: 8, background: '#eef4ff', color: '#315a9d', fontSize: 12, lineHeight: 1.45 },
+  testNotice: { marginTop: 10, padding: 10, borderRadius: 8, background: '#fff1f1', color: '#b42318', fontSize: 12, lineHeight: 1.45 },
   testEmpty: { marginTop: 12, padding: 14, borderRadius: 10, border: '1px dashed #ddd', background: '#fff', color: '#999', fontSize: 12, lineHeight: 1.45 },
   testResult: { marginTop: 12, padding: 14, borderRadius: 10, border: '1px solid #ddd', background: '#fff', fontSize: 13 },
   acceptResult: { borderColor: '#b7dfb9', background: '#f3fbf3' },
@@ -254,4 +258,5 @@ const styles = {
   confidence: { fontSize: 12, color: '#777', fontWeight: 700 },
   reason: { color: '#333', lineHeight: 1.5 },
   trackMeta: { marginTop: 8, color: '#888', fontSize: 12, lineHeight: 1.4 },
+  modelMeta: { marginTop: 4, color: '#aaa', fontSize: 11, lineHeight: 1.4 },
 };
