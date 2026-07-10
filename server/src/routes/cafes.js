@@ -1,7 +1,9 @@
 const router = require('express').Router();
-const { requireAuth }  = require('../middleware/auth');
-const cafeService      = require('../services/cafe.service');
+const { requireAuth } = require('../middleware/auth');
+const cafeService = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
+const musicFilter = require('../features/music-filter');
+const { getTrackMetadata } = require('../services/track-metadata.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { APP_URL } = require('../config');
 const { validateString, validateBool, validateInEnum } = require('../utils/validate');
@@ -9,7 +11,11 @@ const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
 const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
 const { TERMINAL_STATUSES } = require('../constants/recommendation-status');
-const { DEFAULT_MUSIC_FILTER_STRICTNESS, VALID_MUSIC_FILTER_STRICTNESS } = require('../constants/music-filter-policy');
+const { FILTER_STATUS } = require('../constants/music-filter-status');
+const {
+  DEFAULT_MUSIC_FILTER_STRICTNESS,
+  VALID_MUSIC_FILTER_STRICTNESS,
+} = require('../constants/music-filter-policy');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -43,11 +49,15 @@ router.put('/me/platforms', requireAuth, async (req, res) => {
   if (!Array.isArray(allowed_platforms) || allowed_platforms.length === 0) {
     return res.status(400).json({ error: '최소 1개 플랫폼을 선택해주세요' });
   }
-  const filtered = allowed_platforms.filter(p => VALID_PLATFORMS.includes(p));
+  const filtered = allowed_platforms.filter(platform => VALID_PLATFORMS.includes(platform));
   if (filtered.length === 0) return res.status(400).json({ error: '유효한 플랫폼이 없습니다' });
 
-  const cafe = await cafeService.update(req.owner.cafeId, { allowed_platforms: formatAllowedPlatforms(filtered) });
-  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('platforms_updated', { allowed_platforms: filtered });
+  const cafe = await cafeService.update(req.owner.cafeId, {
+    allowed_platforms: formatAllowedPlatforms(filtered),
+  });
+  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('platforms_updated', {
+    allowed_platforms: filtered,
+  });
   res.json({ allowed_platforms: filtered });
 });
 
@@ -56,10 +66,18 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
   const enabledCheck = validateBool(req.body?.enabled, { name: 'enabled' });
   if (enabledCheck.error) return res.status(400).json({ error: enabledCheck.error });
 
-  const promptCheck = validateString(req.body?.prompt, { max: 1000, allowNull: true, name: 'AI 필터 프롬프트' });
+  const promptCheck = validateString(req.body?.prompt, {
+    max: 1000,
+    allowNull: true,
+    name: 'AI 필터 프롬프트',
+  });
   if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
 
-  const strictnessCheck = validateInEnum(req.body?.strictness || DEFAULT_MUSIC_FILTER_STRICTNESS, VALID_MUSIC_FILTER_STRICTNESS, { name: 'strictness' });
+  const strictnessCheck = validateInEnum(
+    req.body?.strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
+    VALID_MUSIC_FILTER_STRICTNESS,
+    { name: 'strictness' }
+  );
   if (strictnessCheck.error) return res.status(400).json({ error: strictnessCheck.error });
 
   if (enabledCheck.value && !promptCheck.value) {
@@ -79,19 +97,75 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
   });
 });
 
+// POST /api/v1/cafes/me/music-filter/test  (현재 화면 설정으로 실제 저장 없이 테스트)
+router.post('/me/music-filter/test', requireAuth, async (req, res) => {
+  const urlCheck = validateString(req.body?.url, { max: 2000, name: '곡 URL' });
+  if (urlCheck.error) return res.status(400).json({ error: urlCheck.error });
+
+  const promptCheck = validateString(req.body?.prompt, {
+    max: 1000,
+    name: 'AI 필터 프롬프트',
+  });
+  if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
+
+  const strictnessCheck = validateInEnum(
+    req.body?.strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
+    VALID_MUSIC_FILTER_STRICTNESS,
+    { name: 'strictness' }
+  );
+  if (strictnessCheck.error) return res.status(400).json({ error: strictnessCheck.error });
+
+  let track;
+  try {
+    track = await getTrackMetadata(urlCheck.value);
+  } catch (error) {
+    return res.status(error.status || 400).json({
+      error: error.message || '트랙 정보를 가져올 수 없습니다',
+    });
+  }
+
+  const result = await musicFilter.evaluateTrack({
+    cafePrompt: promptCheck.value,
+    strictness: strictnessCheck.value,
+    track,
+  });
+
+  if (result.filterStatus === FILTER_STATUS.ERROR_REJECTED) {
+    return res.status(503).json({
+      error: 'OpenRouter가 곡을 판단하지 못했습니다. 잠시 후 다시 시도해주세요.',
+      errorCode: result.errorCode,
+    });
+  }
+
+  res.json({
+    decision: result.action,
+    confidence: result.confidence,
+    reason: result.reason,
+    model: result.model,
+    track,
+  });
+});
+
 // PUT /api/v1/cafes/me/address  (주소 변경)
 router.put('/me/address', requireAuth, async (req, res) => {
   const { address, roadAddress, region, district, latitude, longitude } = req.body;
   if (!address && !roadAddress) return res.status(400).json({ error: '주소를 입력해주세요' });
   const cafe = await cafeService.update(req.owner.cafeId, {
-    address:      address      || null,
-    road_address: roadAddress  || null,
-    region:       region       || null,
-    district:     district     || null,
-    latitude:     latitude     || null,
-    longitude:    longitude    || null,
+    address: address || null,
+    road_address: roadAddress || null,
+    region: region || null,
+    district: district || null,
+    latitude: latitude || null,
+    longitude: longitude || null,
   });
-  res.json({ address: cafe.address, road_address: cafe.road_address, region: cafe.region, district: cafe.district, latitude: cafe.latitude, longitude: cafe.longitude });
+  res.json({
+    address: cafe.address,
+    road_address: cafe.road_address,
+    region: cafe.region,
+    district: cafe.district,
+    latitude: cafe.latitude,
+    longitude: cafe.longitude,
+  });
 });
 
 // PUT /api/v1/cafes/me/status  (신청 ON/OFF 토글)
@@ -99,14 +173,16 @@ router.put('/me/status', requireAuth, async (req, res) => {
   const check = validateBool(req.body?.is_accepting, { name: 'is_accepting' });
   if (check.error) return res.status(400).json({ error: check.error });
   const cafe = await cafeService.update(req.owner.cafeId, { is_accepting: check.value });
-  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('system_toggled', { is_accepting: cafe.is_accepting });
+  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('system_toggled', {
+    is_accepting: cafe.is_accepting,
+  });
   res.json({ is_accepting: cafe.is_accepting });
 });
 
 // GET /api/v1/cafes/me/history?offset=0&date=YYYY-MM-DD
 router.get('/me/history', requireAuth, async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
-  const limit  = 20;
+  const limit = 20;
   let query = db('recommendations')
     .where({ cafe_id: req.owner.cafeId })
     .whereIn('status', TERMINAL_STATUSES)
@@ -116,7 +192,7 @@ router.get('/me/history', requireAuth, async (req, res) => {
     // KST 경계 사용 — UTC 자정 기준이면 KST 09:00~다음날 08:59가 잡혀
     // 통계 탭(KST 기준)과 이력 날짜 필터가 서로 다른 하루를 보게 됨
     const start = kstStartOfDateString(req.query.date);
-    const end   = kstEndOfDateString(req.query.date);
+    const end = kstEndOfDateString(req.query.date);
     query = query.whereBetween('requested_at', [start, end]);
   }
 
