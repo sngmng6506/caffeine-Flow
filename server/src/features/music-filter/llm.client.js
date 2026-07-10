@@ -1,7 +1,9 @@
 const axios = require('axios');
 const {
-  OPENAI_API_KEY,
-  OPENAI_BASE_URL,
+  APP_URL,
+  OPENROUTER_API_KEY,
+  OPENROUTER_BASE_URL,
+  OPENROUTER_APP_NAME,
   MUSIC_FILTER_MODEL,
   MUSIC_FILTER_TIMEOUT_MS,
 } = require('../../config');
@@ -38,20 +40,20 @@ function parseContent(data) {
   const content = data?.choices?.[0]?.message?.content;
   if (!content) throw withCode(new Error('LLM 응답 content 누락'), 'LLM_EMPTY_RESPONSE');
   try {
-    return JSON.parse(content);
-  } catch (err) {
-    throw withCode(err, 'LLM_JSON_PARSE_ERROR');
+    return typeof content === 'string' ? JSON.parse(content) : content;
+  } catch (error) {
+    throw withCode(error, 'LLM_JSON_PARSE_ERROR');
   }
 }
 
 async function callMusicFilterLlm(messages) {
-  if (!OPENAI_API_KEY) {
-    throw withCode(new Error('OPENAI_API_KEY 누락'), 'LLM_API_KEY_MISSING');
+  if (!OPENROUTER_API_KEY) {
+    throw withCode(new Error('OPENROUTER_API_KEY 누락'), 'LLM_API_KEY_MISSING');
   }
 
   try {
-    const res = await axios.post(
-      `${OPENAI_BASE_URL}/chat/completions`,
+    const response = await axios.post(
+      `${OPENROUTER_BASE_URL}/chat/completions`,
       {
         model: MUSIC_FILTER_MODEL,
         messages,
@@ -64,27 +66,35 @@ async function callMusicFilterLlm(messages) {
             schema: RESPONSE_SCHEMA,
           },
         },
+        provider: {
+          require_parameters: true,
+        },
       },
       {
         timeout: MUSIC_FILTER_TIMEOUT_MS,
         headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           'Content-Type': 'application/json',
+          'HTTP-Referer': APP_URL,
+          'X-OpenRouter-Title': OPENROUTER_APP_NAME,
         },
       }
     );
 
     return {
-      result: parseContent(res.data),
-      model: res.data?.model || MUSIC_FILTER_MODEL,
+      result: parseContent(response.data),
+      model: response.data?.model || MUSIC_FILTER_MODEL,
     };
-  } catch (err) {
-    if (err.code === 'ECONNABORTED') throw withCode(new Error('LLM API timeout'), 'LLM_TIMEOUT');
-    if (err.response?.status) {
-      throw withCode(new Error(`LLM API HTTP ${err.response.status}`), `LLM_HTTP_${err.response.status}`);
+  } catch (error) {
+    if (error.code === 'ECONNABORTED') throw withCode(new Error('LLM API timeout'), 'LLM_TIMEOUT');
+    if (error.response?.status) {
+      throw withCode(
+        new Error(`OpenRouter API HTTP ${error.response.status}`),
+        `LLM_HTTP_${error.response.status}`
+      );
     }
-    if (err.code?.startsWith?.('LLM_')) throw err;
-    throw withCode(err, 'LLM_REQUEST_FAILED');
+    if (error.code?.startsWith?.('LLM_')) throw error;
+    throw withCode(error, 'LLM_REQUEST_FAILED');
   }
 }
 
