@@ -22,15 +22,15 @@ jobs:
     # Widevine(wvcus) + NSIS 인스톨러 + signtool 대상이 Windows이므로 windows 러너에서 빌드한다.
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: owner/package-lock.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
