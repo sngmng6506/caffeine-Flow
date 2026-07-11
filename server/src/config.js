@@ -13,11 +13,8 @@ if (!DATABASE_URL) {
   throw new Error('DATABASE_URL 환경변수가 설정되지 않았습니다.');
 }
 
-const OPENROUTER_API_KEY = env('OPENROUTER_API_KEY', env('OPENAI_API_KEY'));
-const OPENROUTER_BASE_URL = env(
-  'OPENROUTER_BASE_URL',
-  env('OPENAI_BASE_URL', 'https://openrouter.ai/api/v1')
-).replace(/\/$/, '');
+const OPENROUTER_API_KEY = env('OPENROUTER_API_KEY');
+const OPENROUTER_BASE_URL = env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 
 module.exports = {
   PORT: env('PORT', '3001'),
@@ -36,8 +33,4 @@ module.exports = {
   OPENROUTER_APP_NAME: env('OPENROUTER_APP_NAME', 'Caffeine Flow'),
   MUSIC_FILTER_MODEL: env('MUSIC_FILTER_MODEL', 'openai/gpt-4.1-mini'),
   MUSIC_FILTER_TIMEOUT_MS: Number(env('MUSIC_FILTER_TIMEOUT_MS', '8000')) || 8000,
-
-  // 기존 Railway 환경변수에서 무중단 전환하기 위한 호환 별칭.
-  OPENAI_API_KEY: OPENROUTER_API_KEY,
-  OPENAI_BASE_URL: OPENROUTER_BASE_URL,
 };

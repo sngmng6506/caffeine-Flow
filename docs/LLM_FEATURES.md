@@ -262,7 +262,7 @@ MUSIC_FILTER_MODEL=openai/gpt-4.1-mini
 MUSIC_FILTER_TIMEOUT_MS=8000
 ```
 
-LLM 호출은 OpenRouter(OpenAI 호환) 엔드포인트를 사용한다. 기존 `OPENAI_API_KEY` / `OPENAI_BASE_URL` 환경변수도 하위호환으로 계속 읽으므로 무중단 전환이 가능하다.
+LLM 호출은 OpenRouter(OpenAI 호환) 엔드포인트를 사용한다.
 
 `MUSIC_FILTER_MODEL`은 structured output(`response_format` json_schema)을 지원하는 모델이어야 한다. 미지원 모델은 OpenRouter가 오류를 반환해 fail-closed로 전부 거절된다.
 
