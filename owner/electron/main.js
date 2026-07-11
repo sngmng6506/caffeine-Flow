@@ -951,9 +951,20 @@ app.whenReady().then(async () => {
   // secure.soundcloud.com 은 /one-tap, /web-auth 등 임베디드 로그인 위젯 전용 서브도메인.
   // 트랙 재생·메타데이터는 soundcloud.com / api-v2.soundcloud.com / sndcdn.com 사용.
   // 운영 시 로그인 UI를 제거했으므로 서브도메인 전체를 막아도 손해 없음.
+  //
+  // gsi/iframe(Google one-tap)은 SoundCloud 트랙 페이지가 임베드하는 위젯만 대상이다.
+  // 이 차단은 defaultSession 전역에 걸리므로, 오너 창(mainWindow)의 "사장님 Google 로그인"
+  // iframe까지 같이 취소돼 로그인이 흰 화면에서 멈추는 문제가 있었다.
+  // → 요청이 recView/bgmView(음악 뷰)에서 온 경우에만 취소한다.
+  const isFromMusicView = (reqWc) => {
+    if (!reqWc) return false;
+    const fromView = (view) =>
+      view && !view.webContents.isDestroyed() && view.webContents.id === reqWc.id;
+    return fromView(recView) || fromView(bgmView);
+  };
   session.defaultSession.webRequest.onBeforeRequest(
     { urls: ['*://secure.soundcloud.com/*', '*://accounts.google.com/gsi/iframe*'] },
-    (_details, callback) => callback({ cancel: true })
+    (details, callback) => callback({ cancel: isFromMusicView(details.webContents) })
   );
 
   // Feature-Policy 응답 헤더 제거 — SoundCloud가 ambient-light-sensor / battery / wake-lock /
