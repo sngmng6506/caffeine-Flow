@@ -42,7 +42,7 @@ function safeSend(channel, ...args) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   try {
     if (!mainWindow.webContents.isDestroyed()) {
-      safeSend(channel, ...args);
+      mainWindow.webContents.send(channel, ...args);
     }
   } catch {}
 }
