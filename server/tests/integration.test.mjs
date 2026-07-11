@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
 
@@ -38,7 +39,7 @@ function ownerPostRec(body) {
 
 beforeAll(async () => {
   // knexfile은 CLI(cwd=src/db) 기준이라 프로그래매틱 호출엔 경로 명시 필요
-  const migrationsDir = new URL('../src/db/migrations', import.meta.url).pathname;
+  const migrationsDir = fileURLToPath(new URL('../src/db/migrations/', import.meta.url));
   await db.migrate.latest({ directory: migrationsDir });
   // 잔여 데이터 제거 (재실행 대비)
   await db('recommendations').del();
