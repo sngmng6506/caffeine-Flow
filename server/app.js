@@ -36,7 +36,14 @@ function corsOriginCheck(origin, cb) {
 
 app.set('trust proxy', 1); // Railway 등 리버스 프록시 뒤에서 실제 IP 인식
 // 보안 헤더 — CSP는 inline script가 많은 SPA·SoundCloud iframe 호환 위해 미설정. 그 외 표준 헤더만.
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+// COOP는 helmet 기본값(same-origin)이면 Google 로그인 팝업의 opener가 끊겨
+// credential postMessage 전달이 실패한다(팝업 흰 화면). GIS 공식 권고값인
+// same-origin-allow-popups로 설정 — 우리가 연 팝업과의 연결만 허용.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+}));
 app.use(cookieParser());
 app.use(express.json({ limit: '64kb' })); // body 크기 상한 — DoS 방어
 app.use(rateLimit(GLOBAL_API_RATE_LIMIT)); // 전체 API 분당 120회
