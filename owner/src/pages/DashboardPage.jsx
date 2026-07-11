@@ -402,7 +402,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   }
 
   return (
-    <div style={{ ...styles.page, margin: 0, width: `calc(${(panelRatio * 100).toFixed(2)}vw - 32px)`, maxWidth: 'none' }}>
+    <div style={{ ...styles.page, width: `${(panelRatio * 100).toFixed(2)}vw` }}>
       {/* 좌우 패널 구분선 — 드래그로 비율 조정.
           BrowserView 가 left=panelRatio% 부터 시작하는 네이티브 레이어라
           그 픽셀에 div 를 놓으면 BrowserView 가 mousedown 을 가로채 클릭이 안 잡힘.
@@ -655,7 +655,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 }
 
 const styles = {
-  page:              { padding: '16px', fontFamily: 'sans-serif' },
+  page:              { boxSizing: 'border-box', height: '100vh', overflowY: 'auto', overflowX: 'hidden', padding: '16px', fontFamily: 'sans-serif' },
   header:            { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid #eee' },
   nameRow:           { display: 'flex', alignItems: 'center', gap: 6 },
   cafeName:          { fontWeight: 700, fontSize: 18 },

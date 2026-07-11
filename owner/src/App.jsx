@@ -66,7 +66,7 @@ export default function App() {
   }
 
   const containerStyle = youtubeVisible
-    ? { width: '42vw', height: '100vh', overflowY: 'auto' }
+    ? { height: '100vh', overflow: 'hidden' }
     : {};
 
   const updateBanner = updateVersion && (
