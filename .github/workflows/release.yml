@@ -57,7 +57,7 @@ jobs:
         env:
           EVS_ACCOUNT_NAME: ${{ secrets.EVS_ACCOUNT_NAME }}
           EVS_PASSWD: ${{ secrets.EVS_PASSWD }}
-        run: python -m castlabs_evs.account reauth --no-ask
+        run: python -m castlabs_evs.account --no-ask reauth
 
       - name: owner 의존성 설치
         working-directory: owner
