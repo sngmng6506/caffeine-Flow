@@ -14,9 +14,10 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 const widevineStatus = 'castlabs';
 
 const isDev = !app.isPackaged;
-const OWNER_URL = isDev
+// OWNER_URL env로 덮어쓰기 가능 — dev electron에서 프로덕션 SPA를 로드해 디버깅할 때 사용
+const OWNER_URL = process.env.OWNER_URL || (isDev
   ? 'http://localhost:5174/owner/'
-  : 'https://caffeine-flow-production.up.railway.app/owner/';
+  : 'https://caffeine-flow-production.up.railway.app/owner/');
 
 let LEFT_RATIO = 0.42;
 
@@ -934,8 +935,13 @@ ipcMain.on('end-rec', () => {
 
 app.whenReady().then(async () => {
   // Widevine CDM 초기화 대기 (wvcus: 첫 실행 시 CDM 다운로드 후 사용 가능)
-  await components.whenReady();
-  console.log('[widevine] components ready:', components.status());
+  // components는 CastLabs 빌드 전용 API — dev용 표준 electron에는 없으므로 가드
+  if (components) {
+    await components.whenReady();
+    console.log('[widevine] components ready:', components.status());
+  } else {
+    console.log('[widevine] components API 없음 (표준 electron dev 실행) — skip');
+  }
 
   // DRM 관련 권한 자동 허용 (Spotify Widevine 라이선스 요청 등)
   const { session } = require('electron');
