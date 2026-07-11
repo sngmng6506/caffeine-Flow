@@ -31,7 +31,7 @@ npm install && npm install --prefix server \
 
 # 2) 루트에 .env 작성
 # 필수: DATABASE_URL, JWT_SECRET
-# AI 필터 사용 시: OPENAI_API_KEY
+# AI 필터 사용 시: OPENROUTER_API_KEY
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # JWT_SECRET 생성
 
 # 3) DB 마이그레이션

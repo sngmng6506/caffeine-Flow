@@ -19,9 +19,10 @@
 | `APP_URL` | | OAuth redirect·socket CORS allowlist (기본 `http://localhost:5174`) |
 | `SERVER_URL` | | Naver callback URI |
 | `YOUTUBE_API_KEY` | | 길이·라이브 체크. 미설정 시 해당 기능 비활성 |
-| `OPENAI_API_KEY` | AI 필터 사용 시 | AI 음악 필터 LLM 호출용. 누락 상태에서 필터가 켜지면 fail-closed로 자동 거절 |
-| `OPENAI_BASE_URL` | | 기본 `https://api.openai.com/v1` |
-| `MUSIC_FILTER_MODEL` | | 기본 `gpt-4.1-mini` |
+| `OPENROUTER_API_KEY` | AI 필터 사용 시 | AI 음악 필터 LLM 호출용(OpenRouter). 누락 상태에서 필터가 켜지면 fail-closed로 자동 거절. 하위호환으로 `OPENAI_API_KEY`도 읽는다 |
+| `OPENROUTER_BASE_URL` | | 기본 `https://openrouter.ai/api/v1`. `OPENAI_BASE_URL`도 폴백으로 읽는다 |
+| `OPENROUTER_APP_NAME` | | OpenRouter `X-OpenRouter-Title` 헤더용. 기본 `Caffeine Flow` |
+| `MUSIC_FILTER_MODEL` | | 기본 `openai/gpt-4.1-mini`. structured output 지원 모델이어야 함 |
 | `MUSIC_FILTER_TIMEOUT_MS` | | 기본 `8000` |
 
 owner SPA 빌드용 (Vite `VITE_*`): `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_ENABLED`.
