@@ -1,0 +1,72 @@
+name: Release Desktop App
+
+# owner 데스크톱 앱(Electron)을 태그 push 시 자동으로 빌드·EVS 서명·GitHub Release 발행한다.
+# 웹(owner/customer SPA)과 서버는 Railway가 git push로 자동 배포하지만, 데스크톱 앱은
+# 설치 바이너리에 구워지는 owner/electron/main.js 등을 포함하므로 별도 릴리즈가 필요하다.
+#
+# 트리거: v* 태그 (예: v2.5.21). 태그는 owner/package.json version과 일치해야 한다.
+# 필요한 repo secrets: EVS_ACCOUNT_NAME, EVS_PASSWD (CastLabs EVS 계정).
+#   GITHUB_TOKEN은 Actions가 자동 주입 — electron-builder가 GH_TOKEN으로 읽어 Release를 만든다.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {} # 태그를 다시 밀지 않고 수동 재실행할 때 사용
+
+permissions:
+  contents: write # GitHub Release 생성·자산 업로드에 필요
+
+jobs:
+  release:
+    # Widevine(wvcus) + NSIS 인스톨러 + signtool 대상이 Windows이므로 windows 러너에서 빌드한다.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: owner/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 태그로 트리거된 경우, 태그와 owner/package.json version이 어긋나면 중단한다.
+      # (electron-builder는 package.json 버전으로 릴리즈를 만들므로 불일치 시 태그와 다른
+      #  릴리즈가 생겨 autoUpdater가 혼란스러워진다.)
+      - name: 태그와 package.json 버전 일치 확인
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        working-directory: owner
+        run: |
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          echo "pushed tag = ${GITHUB_REF_NAME} / package.json = ${PKG_VERSION}"
+          if [ "${GITHUB_REF_NAME}" != "${PKG_VERSION}" ]; then
+            echo "::error::태그(${GITHUB_REF_NAME})와 owner/package.json 버전(${PKG_VERSION})이 다릅니다. 버전을 맞춘 뒤 태그를 다시 미세요."
+            exit 1
+          fi
+
+      # CastLabs EVS — Widevine VMP 서명(Spotify 재생용). 비대화형 로그인.
+      - name: CastLabs EVS 설치
+        run: python -m pip install --upgrade castlabs-evs
+
+      - name: EVS 로그인 (비대화형)
+        env:
+          EVS_ACCOUNT_NAME: ${{ secrets.EVS_ACCOUNT_NAME }}
+          EVS_PASSWD: ${{ secrets.EVS_PASSWD }}
+        run: python -m castlabs_evs.account reauth --no-ask
+
+      - name: owner 의존성 설치
+        working-directory: owner
+        run: npm ci
+
+      # vite build → electron-builder → afterPack(evs-sign.js)로 EVS 서명 → GitHub Release 발행.
+      # electron-builder는 GH_TOKEN으로 Release를 만들고 자산·latest.yml을 업로드한다.
+      - name: 빌드 · 서명 · 릴리즈 발행
+        working-directory: owner
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run electron:build -- --publish always
