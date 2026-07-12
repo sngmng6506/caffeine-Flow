@@ -25,7 +25,8 @@ export default function RecommendCard({ slug, rec, onUpdate, onDelete, context, 
         onDelete(rec.id);
       } else {
         const updated = await updateRec(slug, rec.id, action);
-        onUpdate(updated);
+        // context 전달 — 재생 중 곡을 스킵했을 때 부모가 다음 곡 재생을 이어가도록
+        onUpdate(updated, context);
       }
     } catch (e) {
       console.error(e.message);

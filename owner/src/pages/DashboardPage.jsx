@@ -62,6 +62,63 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   const aiAutoAcceptRef = useRef(aiAutoAccept);
   aiAutoAcceptRef.current = aiAutoAccept;
 
+  // 큐 우선순위: 투표수 내림차순 → 신청 시각 오름차순
+  const byPriority = (a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at);
+
+  // 다음 곡 재생 또는 정지.
+  // 1) 대기곡(accepted) 1순위 재생
+  // 2) 없고 AI 자동수락 ON이면 신청곡(pending) 1순위를 수락으로 승격해 재생
+  // 3) 둘 다 없으면 endRec — BGM 음소거 해제 (수동 운영 OFF에서는 pending을 건드리지 않는다)
+  async function playNextOrStop(snapshot) {
+    const nextAccepted = snapshot.filter(r => r.status === REC_STATUS.ACCEPTED).sort(byPriority)[0];
+    if (nextAccepted) {
+      try {
+        const playing = await updateRec(cafe.slug, nextAccepted.id, REC_STATUS.PLAYING);
+        setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
+        window.electronAPI?.playRec(playing.video_id);
+      } catch (e) { console.error(e); }
+      return;
+    }
+    if (aiAutoAcceptRef.current) {
+      const nextPending = snapshot.filter(r => r.status === REC_STATUS.PENDING).sort(byPriority)[0];
+      if (nextPending) {
+        try {
+          await updateRec(cafe.slug, nextPending.id, REC_STATUS.ACCEPTED);
+          const playing = await updateRec(cafe.slug, nextPending.id, REC_STATUS.PLAYING);
+          setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
+          window.electronAPI?.playRec(playing.video_id);
+        } catch (e) { console.error(e); }
+        return;
+      }
+    }
+    window.electronAPI?.endRec();
+  }
+
+  // 신청곡 전부 수락 + 재생 중 없으면 1순위 재생 — AI 자동수락 ON 전환·앱 시작 복귀 공용
+  async function drainPendingAndPlay(base) {
+    let snapshot = base || recsRef.current;
+    const pendingList = snapshot.filter(r => r.status === REC_STATUS.PENDING);
+    if (pendingList.length > 0) {
+      const updates = (await Promise.all(
+        pendingList.map(r => updateRec(cafe.slug, r.id, REC_STATUS.ACCEPTED).catch(() => null))
+      )).filter(Boolean);
+      const updateMap = Object.fromEntries(updates.map(u => [u.id, u]));
+      snapshot = snapshot.map(r => updateMap[r.id] || r);
+      setRecs(prev => prev.map(r => updateMap[r.id] || r));
+    }
+
+    const hasPlaying = snapshot.some(r => r.status === REC_STATUS.PLAYING);
+    if (hasPlaying) return;
+
+    const firstAccepted = snapshot.filter(r => r.status === REC_STATUS.ACCEPTED).sort(byPriority)[0];
+    if (!firstAccepted) return;
+    try {
+      const playing = await updateRec(cafe.slug, firstAccepted.id, REC_STATUS.PLAYING);
+      setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
+      window.electronAPI?.playRec(playing.video_id);
+    } catch (e) { console.error(e); }
+  }
+
   const [panelRatio, setPanelRatio] = useState(() => {
     const s = parseFloat(localStorage.getItem('cf_panel_ratio'));
     return isNaN(s) ? 0.42 : s;
@@ -74,26 +131,27 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   }, []); // eslint-disable-line
 
   useEffect(() => {
-    getRecommendations(cafe.slug)
+    const recsLoaded = getRecommendations(cafe.slug)
       .then(async ({ recommendations, is_accepting }) => {
         // 앱 재시작 시 playing 상태 곡들을 accepted(대기 중)로 리셋
         const playingRecs = recommendations.filter(r => r.status === REC_STATUS.PLAYING);
+        let finalList = recommendations;
         if (playingRecs.length > 0) {
           const reset = await Promise.all(
             playingRecs.map(r => updateRec(cafe.slug, r.id, REC_STATUS.ACCEPTED).catch(() => r))
           );
           const resetMap = Object.fromEntries(reset.map(r => [r.id, r]));
-          setRecs(recommendations.map(r => resetMap[r.id] ?? r));
-        } else {
-          setRecs(recommendations);
+          finalList = recommendations.map(r => resetMap[r.id] ?? r);
         }
+        setRecs(finalList);
         setIsAccepting(is_accepting);
+        return finalList;
       })
-      .catch(console.error)
+      .catch(err => { console.error(err); return null; })
       .finally(() => setLoading(false));
 
     // DB에서 최신 카페 정보 로드 (공지, 허용 플랫폼, 손님 URL 등)
-    getMe().then(latest => {
+    const meLoaded = getMe().then(latest => {
       setCafe(prev => {
         const updated = { ...prev, name: latest.name || prev.name, notice: latest.notice ?? prev.notice };
         localStorage.setItem('cafe', JSON.stringify(updated));
@@ -106,7 +164,13 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         setCustomerUrl(latest.customer_url);
       }
       setAiAutoAccept(!!latest.music_filter_enabled);
-    }).catch(() => {});
+      return latest;
+    }).catch(() => null);
+
+    // AI 자동수락 ON 상태로 앱을 켰다면, 꺼져 있는 동안 쌓인 신청곡을 일괄 수락 + 재생 시작
+    Promise.all([recsLoaded, meLoaded]).then(([list, me]) => {
+      if (list && me?.music_filter_enabled) drainPendingAndPlay(list);
+    });
 
     const socket = getSocket(cafe.slug);
 
@@ -162,8 +226,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
     // 영상 종료 감지:
     // 1) playing → played
-    // 2) 대기곡(accepted) 1순위 있으면 playRec으로 이어 재생
-    // 3) 대기곡 없으면 endRec — bgmView 음소거 해제만 (BGM은 백그라운드에서 계속 재생 중)
+    // 2) playNextOrStop — 대기곡 1순위, 없으면 (AI 자동수락 ON일 때) 신청곡 승격, 그마저 없으면 BGM 복귀
     window.electronAPI?.onVideoEnded(() => {
       const playing = recsRef.current.find(r => r.status === REC_STATUS.PLAYING);
       if (!playing) return;
@@ -171,20 +234,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
         .then(updated => {
           setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
           const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
-          const nextAccepted = latest
-            .filter(r => r.status === REC_STATUS.ACCEPTED)
-            .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
-          if (nextAccepted) {
-            updateRec(cafe.slug, nextAccepted.id, REC_STATUS.PLAYING)
-              .then(acc => {
-                setRecs(prev => prev.map(r => r.id === acc.id ? acc : r));
-                window.electronAPI?.playRec(acc.video_id);
-              })
-              .catch(console.error);
-          } else {
-            // BGM이 백그라운드에서 음소거 상태로 계속 재생 중 — 음소거만 풀면 끊김 없이 이어 들림
-            window.electronAPI?.endRec();
-          }
+          playNextOrStop(latest);
         })
         .catch(console.error);
     });
@@ -248,31 +298,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     setAiAutoAccept(next);
     if (!next) return; // OFF 전환은 즉시 종료
 
-    // ON 전환: 추천곡 → 대기곡 일괄 이동 + 재생 중 없으면 첫 대기곡 자동 재생
-    let snapshot = recsRef.current;
-    const pending = snapshot.filter(r => r.status === REC_STATUS.PENDING);
-    if (pending.length > 0) {
-      const updates = (await Promise.all(
-        pending.map(r => updateRec(cafe.slug, r.id, REC_STATUS.ACCEPTED).catch(() => null))
-      )).filter(Boolean);
-      const updateMap = Object.fromEntries(updates.map(u => [u.id, u]));
-      snapshot = snapshot.map(r => updateMap[r.id] || r);
-      setRecs(snapshot);
-    }
-
-    const hasPlaying = snapshot.some(r => r.status === REC_STATUS.PLAYING);
-    if (hasPlaying) return;
-
-    const firstAccepted = snapshot
-      .filter(r => r.status === REC_STATUS.ACCEPTED)
-      .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at))[0];
-    if (!firstAccepted) return;
-
-    try {
-      const playing = await updateRec(cafe.slug, firstAccepted.id, REC_STATUS.PLAYING);
-      setRecs(prev => prev.map(r => r.id === playing.id ? playing : r));
-      window.electronAPI?.playRec(playing.video_id);
-    } catch (e) { console.error(e); }
+    // ON 전환: 신청곡 → 대기곡 일괄 이동 + 재생 중 없으면 첫 대기곡 자동 재생
+    await drainPendingAndPlay();
   }
 
   function handleDividerMouseDown(e) {
@@ -392,8 +419,14 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     } catch (err) { console.error(err); }
   }
 
-  function handleUpdate(updated) {
+  function handleUpdate(updated, context) {
     setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
+    // 재생 중이던 곡을 스킵하면 다음 곡으로 진행 (대기곡 → AI 자동수락 ON이면 신청곡 승격 → 없으면 BGM 복귀)
+    if (context === REC_STATUS.PLAYING && updated.status === REC_STATUS.SKIPPED) {
+      const latest = recsRef.current.map(r => r.id === updated.id ? updated : r);
+      playNextOrStop(latest);
+      return;
+    }
     // 수락 시 재생 중인 곡 없으면 즉시 재생
     if (updated.status === REC_STATUS.ACCEPTED) {
       const hasPlaying = recsRef.current.some(r => r.status === REC_STATUS.PLAYING);
