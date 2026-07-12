@@ -6,9 +6,9 @@ import {
   MUSIC_FILTER_STRICTNESS_OPTIONS,
 } from '../../constants/musicFilterPolicy';
 
+// ON/OFF는 대시보드의 'AI 자동수락' 버튼이 담당 — 이 화면은 프롬프트·강도만 편집한다.
 function normalize(latest = {}) {
   return {
-    enabled: !!latest.music_filter_enabled,
     prompt: latest.music_filter_prompt || '',
     strictness: latest.music_filter_strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
   };
@@ -51,6 +51,7 @@ function TestResultCard({ result }) {
 export default function MusicFilterSettings() {
   const [initial, setInitial] = useState(normalize());
   const [form, setForm] = useState(normalize());
+  const [enabled, setEnabled] = useState(false); // 서버의 현재 AI 자동수락 상태 (읽기 전용 표시)
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -65,13 +66,15 @@ export default function MusicFilterSettings() {
         const next = normalize(latest);
         setInitial(next);
         setForm(next);
+        setEnabled(!!latest.music_filter_enabled);
       })
       .catch(() => setMessage('AI 필터 설정을 불러오지 못했습니다.'))
       .finally(() => setLoading(false));
   }, []);
 
   const changed = useMemo(() => JSON.stringify(initial) !== JSON.stringify(form), [initial, form]);
-  const canSave = changed && !saving && (!form.enabled || form.prompt.trim().length > 0);
+  // AI 자동수락이 켜져 있으면 프롬프트를 비운 채로 저장할 수 없다 (서버가 400 반환)
+  const canSave = changed && !saving && (!enabled || form.prompt.trim().length > 0);
   const canTest = !testLoading && testUrl.trim().length > 0 && form.prompt.trim().length > 0;
 
   async function handleSave() {
@@ -79,14 +82,24 @@ export default function MusicFilterSettings() {
     setSaving(true);
     setMessage('');
     try {
+      // enabled는 이 화면에서 바꾸지 않는다 — 대시보드 토글과 어긋나지 않도록
+      // 저장 직전 서버의 최신 값을 읽어 그대로 전달한다.
+      const latest = await getMe();
+      const latestEnabled = !!latest.music_filter_enabled;
+      if (latestEnabled && !form.prompt.trim()) {
+        setEnabled(latestEnabled);
+        setMessage('AI 자동수락이 켜져 있어 매장 분위기 설명을 비울 수 없습니다.');
+        return;
+      }
       const updated = await updateMusicFilter({
-        enabled: form.enabled,
+        enabled: latestEnabled,
         prompt: form.prompt.trim() || null,
         strictness: form.strictness,
       });
       const next = normalize(updated);
       setInitial(next);
       setForm(next);
+      setEnabled(!!updated.music_filter_enabled);
       setMessage('AI 음악 필터 설정을 저장했습니다.');
     } catch (error) {
       setMessage(error.message || '저장 실패');
@@ -130,14 +143,13 @@ export default function MusicFilterSettings() {
         <div style={styles.headerRow}>
           <div>
             <div style={styles.title}>AI 음악 필터</div>
-            <div style={styles.desc}>손님 신청곡이 매장 분위기에 맞는지 AI가 수락/거절만 판단합니다.</div>
+            <div style={styles.desc}>
+              대시보드의 <b>AI 자동수락</b>을 켜면 아래 매장 분위기 설명과 필터 강도로 신청곡을 심사해, 통과한 곡만 자동 수락·재생합니다.
+            </div>
           </div>
-          <button
-            onClick={() => setForm(prev => ({ ...prev, enabled: !prev.enabled }))}
-            style={{ ...styles.toggle, ...(form.enabled ? styles.toggleOn : styles.toggleOff) }}
-          >
-            {form.enabled ? 'ON' : 'OFF'}
-          </button>
+          <span style={{ ...styles.stateBadge, ...(enabled ? styles.stateOn : styles.stateOff) }}>
+            {enabled ? 'AI 자동수락 켜짐' : 'AI 자동수락 꺼짐'}
+          </span>
         </div>
 
         <label style={styles.label}>매장 분위기 설명</label>
@@ -150,8 +162,8 @@ export default function MusicFilterSettings() {
           style={styles.textarea}
         />
         <div style={styles.count}>{form.prompt.length}/1000</div>
-        {form.enabled && !form.prompt.trim() && (
-          <div style={styles.warn}>AI 필터를 켜려면 매장 분위기 설명이 필요합니다.</div>
+        {enabled && !form.prompt.trim() && (
+          <div style={styles.warn}>AI 자동수락이 켜져 있어 매장 분위기 설명을 비울 수 없습니다.</div>
         )}
 
         <label style={styles.label}>필터 강도</label>
@@ -227,9 +239,9 @@ const styles = {
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 16 },
   title: { fontSize: 15, fontWeight: 700, marginBottom: 4 },
   desc: { fontSize: 13, color: '#888', lineHeight: 1.45 },
-  toggle: { minWidth: 58, padding: '8px 14px', borderRadius: 999, border: 'none', color: '#fff', cursor: 'pointer', fontWeight: 800, fontSize: 13 },
-  toggleOn: { background: '#4caf50' },
-  toggleOff: { background: '#aaa' },
+  stateBadge: { flexShrink: 0, padding: '7px 12px', borderRadius: 999, color: '#fff', fontWeight: 800, fontSize: 12 },
+  stateOn: { background: '#ff9800' },
+  stateOff: { background: '#aaa' },
   label: { display: 'block', fontSize: 13, fontWeight: 700, color: '#555', marginTop: 14, marginBottom: 8 },
   textarea: { width: '100%', boxSizing: 'border-box', fontSize: 13, lineHeight: 1.5, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', resize: 'vertical', fontFamily: 'sans-serif', background: '#fff' },
   count: { fontSize: 11, color: '#aaa', textAlign: 'right', marginTop: 4 },

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe } from '../api';
+import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNotice, getHistory, updatePlatforms, getMe, updateMusicFilter } from '../api';
 import { getSocket, disconnectSocket } from '../socket';
 import { VALID_PLATFORMS, parseAllowedPlatforms } from '../constants/platforms';
 import { REC_STATUS } from '../constants/recommendationStatus';
@@ -56,9 +56,11 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
   const [customerUrl, setCustomerUrl] = useState('');
   const [widevineStatus, setWidevineStatus] = useState(null);
-  const [autoAccept, setAutoAccept] = useState(() => localStorage.getItem('cf_auto_accept') === 'true');
-  const autoAcceptRef = useRef(autoAccept);
-  autoAcceptRef.current = autoAccept;
+  // AI 자동수락 — 서버 music_filter_enabled가 단일 원천 (마운트 시 getMe로 로드).
+  // ON = AI 필터 통과곡만 자동 수락·재생 / OFF = 필터 없이 전부 pending 수동 운영.
+  const [aiAutoAccept, setAiAutoAccept] = useState(false);
+  const aiAutoAcceptRef = useRef(aiAutoAccept);
+  aiAutoAcceptRef.current = aiAutoAccept;
 
   const [panelRatio, setPanelRatio] = useState(() => {
     const s = parseFloat(localStorage.getItem('cf_panel_ratio'));
@@ -103,6 +105,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       if (latest.customer_url) {
         setCustomerUrl(latest.customer_url);
       }
+      setAiAutoAccept(!!latest.music_filter_enabled);
     }).catch(() => {});
 
     const socket = getSocket(cafe.slug);
@@ -120,7 +123,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
     socket.on('recommendations_update', ({ action, rec, id }) => {
       if (action === 'add') {
-        if (autoAcceptRef.current) {
+        if (aiAutoAcceptRef.current) {
           updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED)
             .then(updated => {
               setRecs(prev => prev.some(r => r.id === updated.id)
@@ -212,10 +215,37 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     catch { setIsAccepting(!next); }
   }
 
-  async function toggleAutoAccept() {
-    const next = !autoAccept;
-    setAutoAccept(next);
-    localStorage.setItem('cf_auto_accept', String(next));
+  async function toggleAiAutoAccept() {
+    const next = !aiAutoAccept;
+
+    // 서버 music_filter_enabled가 단일 원천 — 최신 프롬프트·강도를 읽어 함께 저장한다.
+    // (설정 탭에서 방금 바꾼 값을 덮어쓰지 않기 위해 토글 시점에 fresh 조회)
+    let latest;
+    try {
+      latest = await getMe();
+    } catch {
+      alert('설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    const prompt = (latest.music_filter_prompt || '').trim();
+    if (next && !prompt) {
+      alert('AI 자동수락을 켜려면 설정 탭에서 매장 분위기 설명을 먼저 입력해주세요.');
+      setTab('settings');
+      return;
+    }
+
+    try {
+      await updateMusicFilter({
+        enabled: next,
+        prompt: prompt || null,
+        strictness: latest.music_filter_strictness || undefined,
+      });
+    } catch (e) {
+      alert(e.message || 'AI 자동수락 설정 저장에 실패했습니다.');
+      return;
+    }
+    setAiAutoAccept(next);
     if (!next) return; // OFF 전환은 즉시 종료
 
     // ON 전환: 추천곡 → 대기곡 일괄 이동 + 재생 중 없으면 첫 대기곡 자동 재생
@@ -455,8 +485,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
           <button onClick={toggleAccepting} style={{ ...styles.toggleBtn, background: isAccepting ? '#4caf50' : '#888' }}>
             {isAccepting ? '신청 받는 중' : '신청 닫힘'}
           </button>
-          <button onClick={toggleAutoAccept} style={{ ...styles.toggleBtn, background: autoAccept ? '#ff9800' : '#9e9e9e', fontSize: 12 }}>
-            자동 수락 {autoAccept ? 'ON' : 'OFF'}
+          <button onClick={toggleAiAutoAccept} style={{ ...styles.toggleBtn, background: aiAutoAccept ? '#ff9800' : '#9e9e9e', fontSize: 12 }}>
+            AI 자동수락 {aiAutoAccept ? 'ON' : 'OFF'}
           </button>
           <button onClick={onLogout} style={styles.logoutBtn}>로그아웃</button>
         </div>
