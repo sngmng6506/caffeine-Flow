@@ -94,16 +94,25 @@ function isValidSlugFormat(slug) {
 }
 
 // 옛 slug로 접속한 손님에게 "이동됨" 안내를 하기 위한 조회.
-// slug가 여러 번 바뀌었을 수 있으므로(재발급을 반복한 경우) 이력을
-// 따라가 카페의 현재 slug까지 찾는다. 순환 방지를 위해 최대 5홉만 추적.
+//
+// 체인 추적(old_slug→new_slug 반복) 대신 카페 소유권으로 해석한다:
+// 옛 slug를 마지막으로 사용했던 카페를 이력에서 찾고(가장 최근 변경),
+// 그 카페의 *현재* slug(cafes 테이블 기준)를 돌려준다. 이렇게 하면
+//  - slug 재사용(버려진 slug를 다른 카페가 가져감): 이력의 new_slug가
+//    아니라 카페의 실제 현재 slug를 보므로 항상 정확
+//  - 순환(A→B→A): 카페 하나의 현재 slug로 수렴하므로 왕복 안 함
+// 이력에 old_slug가 없거나, 그 카페의 현재 slug가 조회한 slug와 같으면
+// (이동한 적 없음) null.
 async function findMovedSlug(oldSlug) {
-  let current = oldSlug;
-  for (let hop = 0; hop < 5; hop++) {
-    const entry = await db('cafe_slug_history').where({ old_slug: current }).orderBy('changed_at', 'desc').first();
-    if (!entry) break;
-    current = entry.new_slug;
-  }
-  return current === oldSlug ? null : current;
+  const entry = await db('cafe_slug_history')
+    .where({ old_slug: oldSlug })
+    .orderBy('changed_at', 'desc')
+    .first();
+  if (!entry) return null;
+
+  const cafe = await db('cafes').where({ id: entry.cafe_id }).first();
+  if (!cafe || cafe.slug === oldSlug) return null; // 카페 삭제됐거나 되돌아왔음
+  return cafe.slug;
 }
 
 module.exports = { findBySlug, findByEmail, findByGoogleId, findByNaverId, create, update, uniqueSlug, isValidSlugFormat, changeSlug, findMovedSlug };

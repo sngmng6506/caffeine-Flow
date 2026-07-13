@@ -62,12 +62,17 @@ router.put('/me/slug', requireAuth, slugChangeLimiter, async (req, res) => {
   }
 
   let cafe;
+  const oldSlug = req.owner.slug;
   try {
     cafe = await cafeService.changeSlug(req.owner.cafeId, newSlug);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     throw err;
   }
+
+  // 옛 slug room에 연결돼 있던 손님들에게 이동을 알린다. 통보를 못 받으면
+  // 다음 신청 때 404를 맞고서야 알게 되므로, 즉시 새 주소로 안내한다.
+  req.app.get('io')?.of('/cafe').to(oldSlug).emit('cafe_moved', { movedTo: cafe.slug });
 
   const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
   res.json({

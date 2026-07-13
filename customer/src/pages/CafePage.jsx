@@ -89,6 +89,11 @@ export default function CafePage({ slug }) {
     socket.on('notice_updated', ({ notice }) => setNotice(notice));
     socket.on('cafe_updated',   ({ cafe_name }) => setCafeName(cafe_name));
     socket.on('platforms_updated', ({ allowed_platforms }) => setAllowedPlatforms(allowed_platforms));
+    // 사장님이 QR을 재발급·재등록하면 이 slug는 더 이상 유효하지 않다.
+    // 열어둔 손님을 새 주소로 안내한다.
+    socket.on('cafe_moved', ({ movedTo }) => {
+      if (movedTo) window.location.replace(`/${movedTo}`);
+    });
 
     return () => disconnectSocket();
   }, [slug]);
