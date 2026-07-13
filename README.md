@@ -66,7 +66,7 @@ cd owner && npm run electron:dev
 
 | 문서 | 내용 |
 | --- | --- |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 설계 배경 — 재생 모드·종료 감지·소켓·DB 불변식 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 작동 원리 — 시스템 전경·신청곡 상태 기계·재생 파이프라인 (다이어그램 기반, 코드 없이 이해) |
 | [docs/API.md](docs/API.md) | REST 엔드포인트 전체 (인증·rate limit 포함) |
 | [docs/LLM_FEATURES.md](docs/LLM_FEATURES.md) | LLM 기반 AI 음악 필터 설계 — 정책 설정·판단 흐름·실패 처리·통계 대시보드 |
 | [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) | AI 코드 수정 시 깨지면 안 되는 상태·라우터·KST·SQL·LLM 계약 |
