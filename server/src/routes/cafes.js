@@ -1,10 +1,12 @@
 const router = require('express').Router();
+const rateLimit = require('express-rate-limit');
 const { requireAuth } = require('../middleware/auth');
 const cafeService = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
 const musicFilter = require('../features/music-filter');
 const { getTrackMetadata } = require('../services/track-metadata.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
+const { issueToken } = require('../utils/jwt');
 const { APP_URL } = require('../config');
 const { validateString, validateBool, validateInEnum } = require('../utils/validate');
 const db = require('../db/knex');
@@ -32,6 +34,47 @@ router.put('/me', requireAuth, async (req, res) => {
   const cafe = await cafeService.update(req.owner.cafeId, { name: nameCheck.value });
   req.app.get('io')?.of('/cafe').to(cafe.slug).emit('cafe_updated', { cafe_name: cafe.name });
   res.json(safeCafe(cafe));
+});
+
+// PUT /api/v1/cafes/me/slug  (QR 코드 재등록/재발급)
+//   body 없음 또는 {}         → 무작위 새 slug 자동 발급
+//   body { slug: '커스텀값' } → 사전 제작된 QR(아크릴 등) 코드로 지정
+// slug가 바뀌면 기존 로그인 세션의 JWT가 옛 slug를 담고 있어 무효가
+// 되므로, 새 토큰을 응답에 포함해 클라이언트가 즉시 교체하도록 한다.
+// 남용 방지를 위해 분당 5회로 제한한다(정상 사용에서 자주 바꿀 일이 없음).
+const slugChangeLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
+  keyGenerator: (req) => req.owner.cafeId,
+  message: { error: '잠시 후 다시 시도해주세요' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
+router.put('/me/slug', requireAuth, slugChangeLimiter, async (req, res) => {
+  const raw = req.body?.slug;
+  let newSlug;
+  if (raw == null || raw === '') {
+    newSlug = await cafeService.uniqueSlug();
+  } else {
+    if (!cafeService.isValidSlugFormat(raw))
+      return res.status(400).json({ error: 'QR 코드는 영문 소문자·숫자 4~20자여야 합니다' });
+    newSlug = raw;
+  }
+
+  let cafe;
+  try {
+    cafe = await cafeService.changeSlug(req.owner.cafeId, newSlug);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+
+  const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
+  res.json({
+    ...safeCafe(cafe),
+    customer_url: `${baseUrl}/${cafe.slug}`,
+    token: issueToken(cafe), // 새 slug가 담긴 세션 토큰으로 즉시 교체 필요
+  });
 });
 
 // PUT /api/v1/cafes/me/notice

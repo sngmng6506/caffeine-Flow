@@ -343,6 +343,20 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     }
   }
 
+  // QR 재발급/재등록 성공 시: 서버가 새 slug를 담은 토큰을 함께 내려준다.
+  // slug가 바뀌면 cafe.slug를 참조하는 소켓 연결·API 호출이 전부 새
+  // 주소를 써야 하므로, cafe state 갱신 하나로 관련 useEffect가 전부
+  // 재실행되도록 한다 (소켓 재연결은 [cafe.slug] 의존 useEffect가 처리).
+  function handleSlugChanged(updated) {
+    localStorage.setItem('token', updated.token);
+    setCafe(prev => {
+      const next = { ...prev, slug: updated.slug };
+      localStorage.setItem('cafe', JSON.stringify(next));
+      return next;
+    });
+    setCustomerUrl(updated.customer_url);
+  }
+
   async function handleNoticeSave() {
     setNoticeLoading(true);
     try {
@@ -702,7 +716,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       )}
 
       {tab === 'stats'   && <StatsPanel />}
-      {tab === 'qr'      && <QRTab url={customerUrl} cafeName={cafe.name} />}
+      {tab === 'qr'      && <QRTab url={customerUrl} cafeName={cafe.name} onSlugChanged={handleSlugChanged} />}
       {tab === 'settings' && <SettingsTab allowedPlatforms={allowedPlatforms} saving={platformSaving} onSave={async (platforms) => {
         setPlatformSaving(true);
         try {

@@ -53,7 +53,15 @@ function filterPayload(filterResult) {
 // GET /api/v1/cafes/:slug/recommendations
 router.get('/', async (req, res) => {
   const cafe = await cafeService.findBySlug(req.params.slug);
-  if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
+  if (!cafe) {
+    // 손님이 옛 QR(아크릴 등)로 접속한 경우 — 카페가 새 slug로 옮겨갔는지
+    // 확인해 안내한다. 여기서만 확인하는 이유는 손님이 카페 페이지를 여는
+    // 첫 호출이라, 이후의 신청·투표 등은 이미 정상 slug로 열린 상태에서만
+    // 일어나기 때문.
+    const moved = await cafeService.findMovedSlug(req.params.slug);
+    if (moved) return res.status(404).json({ error: 'Cafe moved', movedTo: moved });
+    return res.status(404).json({ error: 'Cafe not found' });
+  }
   const recs = await recService.getRecommendations(cafe.id);
 
   // 방문 기록 (같은 IP는 KST 기준 하루 1회만 — UNIQUE 제약 + ON CONFLICT DO NOTHING)

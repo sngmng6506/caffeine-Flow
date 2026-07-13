@@ -13,15 +13,7 @@ const STATE_COOKIE_OPTS = { httpOnly: true, secure: true, sameSite: 'lax', maxAg
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-// JWT 발급 헬퍼
-function issueToken(cafe) {
-  return jwt.sign({ cafeId: cafe.id, slug: cafe.slug }, JWT_SECRET, { expiresIn: '30d' });
-}
-
-// 신규 가입 대기 토큰 (10분 유효)
-function issuePendingToken(payload) {
-  return jwt.sign({ ...payload, pending: true }, JWT_SECRET, { expiresIn: '10m' });
-}
+const { issueToken, issuePendingToken } = require('../utils/jwt');
 
 
 // 같은 이메일의 다른 provider 계정 존재 여부 확인 — 정책상 provider별

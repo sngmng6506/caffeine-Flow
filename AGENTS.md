@@ -33,6 +33,7 @@ AI 도구(Claude Code · Codex · Gemini 등)와 사람 기여자가 공통으�
 - **클라이언트 IP는 `req.ip`** — X-Forwarded-For 직접 파싱 금지.
 - **사용자 입력 URL fetch는 `safeAxiosGet` 경유** (SSRF 방어). 익명 쓰기 엔드포인트에는 visitor+IP rate limiter를 붙인다.
 - **라우트 마운트 순서** — owner 라우터가 public보다 먼저여야 인증 핸들러가 경로를 가져간다 (`server/app.js`).
+- **slug는 불변이 아니다** — `PUT /cafes/me/slug`로 재발급·변경 가능(아크릴 QR 사전 제작 지원). slug 변경 시 JWT의 slug가 옛 값으로 남으므로 반드시 새 토큰을 응답에 포함해 클라이언트가 교체해야 한다. slug를 캐시하거나 불변 가정하는 코드를 추가하지 않는다.
 - **서버 상태값·플랫폼·한도·시간 정책은 constants 경유** — `server/src/constants/*`와 `server/src/db/sql-fragments.js`를 먼저 확인한다.
 - **프론트 상태값·플랫폼 표시도 constants 경유** — `owner/src/constants/*`, `customer/src/constants/*`를 먼저 확인한다.
 - **LLM 음악 필터는 fail-closed** — LLM 실패 시 신청곡을 통과시키지 않고 `error_rejected`로 기록한다.

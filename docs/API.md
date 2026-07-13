@@ -34,6 +34,7 @@ Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔
 | PUT | `/cafes/me/music-filter` | AI 음악 필터 설정. 판단 결과는 수락/거절만 사용하며 AI 오류 시 자동 거절 |
 | POST | `/cafes/me/music-filter/test` | 저장 없이 현재 화면 설정으로 곡 필터 테스트. body `{ url, prompt, strictness? }` → `{ decision(accept/reject), confidence, reason, model, track }`. 트랙 메타 조회 실패 400, LLM 판단 실패 503 `{ error, errorCode }` |
 | PUT | `/cafes/me/address` | 주소·좌표 |
+| PUT | `/cafes/me/slug` | QR 코드 재등록 — body 없으면 무작위 재발급, `{slug}` 지정 시 사전 제작 QR로 연결. 응답에 새 `token` 포함(클라이언트 즉시 교체 필요) |
 | PUT | `/cafes/me/status` | 신청 ON/OFF |
 | GET | `/cafes/me/history` | 재생 이력 (`?date=` KST 기준 필터) |
 | GET | `/cafes/me/stats` | 종합 통계 + TOP10 |

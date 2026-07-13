@@ -68,4 +68,42 @@ async function update(id, data) {
   return cafe;
 }
 
-module.exports = { findBySlug, findByEmail, findByGoogleId, findByNaverId, create, update };
+// slug 변경 — 자동 재발급(무작위) 또는 수동 지정(아크릴 QR 재등록) 모두 처리.
+// 트랜잭션으로 이력 기록과 갱신을 묶어 부분 실패를 막는다.
+async function changeSlug(cafeId, newSlug) {
+  return db.transaction(async (trx) => {
+    const cafe = await trx('cafes').where({ id: cafeId }).first();
+    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+
+    const conflict = await trx('cafes').where({ slug: newSlug }).first();
+    if (conflict) throw Object.assign(new Error('이미 사용 중인 QR 코드입니다'), { status: 409 });
+
+    await trx('cafe_slug_history').insert({ cafe_id: cafeId, old_slug: cafe.slug, new_slug: newSlug });
+    const [updated] = await trx('cafes').where({ id: cafeId }).update({ slug: newSlug }).returning('*');
+    return updated;
+  });
+}
+
+// slug 형식 검증 — 커스텀 지정(아크릴 QR 재등록) 시 서버가 생성하는 것과
+// 동일한 문자집합·길이만 허용한다. 다른 형식을 허용하면 URL에 안전하지
+// 않은 문자가 들어가거나, 기존 라우트 패턴(:slug)과 충돌할 수 있다.
+const SLUG_PATTERN = /^[a-z0-9]{4,20}$/;
+
+function isValidSlugFormat(slug) {
+  return typeof slug === 'string' && SLUG_PATTERN.test(slug);
+}
+
+// 옛 slug로 접속한 손님에게 "이동됨" 안내를 하기 위한 조회.
+// slug가 여러 번 바뀌었을 수 있으므로(재발급을 반복한 경우) 이력을
+// 따라가 카페의 현재 slug까지 찾는다. 순환 방지를 위해 최대 5홉만 추적.
+async function findMovedSlug(oldSlug) {
+  let current = oldSlug;
+  for (let hop = 0; hop < 5; hop++) {
+    const entry = await db('cafe_slug_history').where({ old_slug: current }).orderBy('changed_at', 'desc').first();
+    if (!entry) break;
+    current = entry.new_slug;
+  }
+  return current === oldSlug ? null : current;
+}
+
+module.exports = { findBySlug, findByEmail, findByGoogleId, findByNaverId, create, update, uniqueSlug, isValidSlugFormat, changeSlug, findMovedSlug };
