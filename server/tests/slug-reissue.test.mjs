@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
 
@@ -23,8 +22,7 @@ async function freshCafe(slug) {
 }
 
 beforeAll(async () => {
-  const migrationsDir = fileURLToPath(new URL('../src/db/migrations/', import.meta.url));
-  await db.migrate.latest({ directory: migrationsDir });
+  // 마이그레이션은 globalSetup(tests/global-setup.mjs)에서 1회만 적용된다.
 });
 
 afterAll(async () => {
