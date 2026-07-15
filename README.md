@@ -78,4 +78,4 @@ cd owner && npm run electron:dev
 
 ## 라이선스
 
-BSL 1.1
+[MIT](LICENSE)
