@@ -1,7 +1,14 @@
 node_modules/
 .env
-server/public/customer/
+.claude/
+
+# 빌드 산출물 — 배포 때마다 재생성된다.
+# customer 빌드가 outDir: '../server/public' + emptyOutDir: true 라
+# server/public 전체를 통째로 덮어쓰므로 커밋할 이유가 없다.
+# (server/admin-ui 는 이 삭제를 피하려고 public 밖에 둔 것 — 무시하면 안 됨)
+server/public/
+owner/dist/
+
+# 로컬 임시 스크립트
 server/test-api.js
 server/test-db.js
-owner/dist/
-.claude/
