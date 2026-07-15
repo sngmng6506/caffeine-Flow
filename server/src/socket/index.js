@@ -1,6 +1,7 @@
 const db = require('../db/knex');
 const jwt = require('jsonwebtoken');
 const { kstTodayString } = require('../utils/kst');
+const { HEARTBEAT_REFRESH_MS } = require('../constants/time-policy');
 
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 
@@ -18,6 +19,17 @@ function verifyOwner(socket, slug) {
   }
 }
 
+// 매장 생존 신호 — verifyOwner를 통과한 owner 연결에서만 호출한다.
+// 손님이 role=owner로 위조해 붙어도 여기 도달하지 못하므로, 꺼진 매장이
+// 켜져 있는 것처럼 보여 광고 재고·모니터링이 왜곡되는 일은 없다.
+async function touchHeartbeat(slug) {
+  try {
+    await db('cafes').where({ slug }).update({ last_heartbeat_at: db.fn.now() });
+  } catch {
+    // 하트비트 실패는 서비스 동작에 영향 없음 — 통계와 동일하게 무시
+  }
+}
+
 function initSocket(io) {
   const cafeNsp = io.of('/cafe');
 
@@ -30,15 +42,24 @@ function initSocket(io) {
 
     socket.join(slug);
 
+    // 연결 유지 중 주기 갱신 타이머 — disconnect에서 반드시 해제(누수 방지)
+    let heartbeatTimer = null;
+
     if (role === 'owner' && verifyOwner(socket, slug)) {
       if (!ownerSockets.has(slug)) ownerSockets.set(slug, new Set());
       ownerSockets.get(slug).add(socket.id);
+
+      // 매장이 지금 켜져 있음 — 연결 즉시 + 주기적으로 갱신.
+      // owner 앱 코드 변경 없이 기존 소켓 연결을 그대로 생존 신호로 쓴다.
+      touchHeartbeat(slug);
+      heartbeatTimer = setInterval(() => touchHeartbeat(slug), HEARTBEAT_REFRESH_MS);
     } else {
       // 손님 입장 시에만 피크 갱신 의미가 있음
       updatePeakConcurrent(cafeNsp, slug, ownerSockets);
     }
 
     socket.on('disconnect', () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       ownerSockets.get(slug)?.delete(socket.id);
       if (ownerSockets.get(slug)?.size === 0) ownerSockets.delete(slug);
     });
