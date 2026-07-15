@@ -12,7 +12,7 @@
 | --- | :-: | --- |
 | `DATABASE_URL` | ✓ | Postgres 연결 문자열. **누락 시 즉시 throw** |
 | `JWT_SECRET` | ✓ | 32바이트+ 랜덤. **누락·`change-me-in-production`이면 즉시 throw** |
-| `DATABASE_SSL` | | `no-verify`(기본)·`verify`·`disable`. Railway 내부망은 `disable` |
+| `DATABASE_SSL` | | `no-verify`·`verify`·`disable`. 미설정 시 호스트로 자동 결정(내부망·localhost→disable, 원격→no-verify) |
 | `PORT` | | 기본 3001 (Railway는 자체 주입) |
 | `GOOGLE_CLIENT_ID` | OAuth 시 | Google Cloud Console 발급 |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | OAuth 시 | Naver Developers |

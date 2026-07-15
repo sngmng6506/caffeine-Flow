@@ -1,22 +1,27 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../../.env') });
 
-// DATABASE_SSL 모드:
-//   'no-verify' (기본) — TLS 암호화하되 인증서 미검증. Railway/Supabase 프록시가
-//                        self-signed 체인을 쓰는 환경 호환용. MITM에는 취약.
-//   'verify'           — 인증서 검증까지 수행. CA가 신뢰 체인에 있는 환경에서 권장.
-//   'disable'          — TLS 없음. Railway internal 네트워크(*.railway.internal)처럼
-//                        사설망 직결일 때만.
+const connectionString = (process.env.DATABASE_URL || '').trim();
+
+// DATABASE_SSL 모드 (명시 설정이 항상 우선):
+//   'no-verify' — TLS 암호화하되 인증서 미검증. Railway/Supabase 프록시가
+//                 self-signed 체인을 쓰는 환경 호환용. MITM에는 취약.
+//   'verify'    — 인증서 검증까지 수행. CA가 신뢰 체인에 있는 환경에서 권장.
+//   'disable'   — TLS 없음. 사설망 직결일 때만.
+//
+// 미설정 시 호스트로 자동 결정: Railway 내부망(*.railway.internal)·localhost는
+// SSL 미지원이라 disable, 그 외 원격(Supabase, Railway 공개 프록시)은 no-verify.
+// 이 자동 감지 덕에 Railway 내부 Postgres로 옮길 때 env 변경 없이 동작한다.
 function sslConfig() {
   const rawMode = process.env.DATABASE_SSL;
-  const mode = (rawMode || 'no-verify').trim();
-
-  // GitHub Actions와 로컬 테스트의 Postgres 서비스는 SSL을 지원하지 않는다.
-  // 운영에서는 DATABASE_SSL 기본값(no-verify)을 유지하되, 테스트 환경에서는
-  // 명시적으로 DATABASE_SSL을 준 경우가 아니면 SSL을 끈다.
-  if (process.env.NODE_ENV === 'test' && !rawMode) return false;
+  const mode = (rawMode || '').trim();
 
   if (mode === 'disable') return false;
   if (mode === 'verify')  return { rejectUnauthorized: true };
+  if (mode === 'no-verify') return { rejectUnauthorized: false };
+
+  // 이하 미설정(자동) — 테스트 Postgres(GitHub Actions·로컬)는 SSL 미지원
+  if (process.env.NODE_ENV === 'test') return false;
+  if (/\.railway\.internal|@localhost|@127\.0\.0\.1|\/localhost|\/127\.0\.0\.1/.test(connectionString)) return false;
   return { rejectUnauthorized: false };
 }
 
@@ -24,7 +29,7 @@ function sslConfig() {
 module.exports = {
   client: 'pg',
   connection: {
-    connectionString: (process.env.DATABASE_URL || '').trim(),
+    connectionString,
     ssl: sslConfig(),
   },
   migrations: {
