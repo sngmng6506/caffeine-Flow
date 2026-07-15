@@ -64,6 +64,9 @@ app.use('/api/v1/tracks',                        require('./src/routes/tracks'))
 app.use('/api/v1/cafes/:slug/songs/:videoId/comments', require('./src/routes/song_comments'));
 app.use('/api/v1/songs/:videoId/comments',             require('./src/routes/song_comments'));
 
+// 운영자 콘솔 API — 사장님 JWT와 분리된 인증 경계(requireAdmin)를 쓴다.
+app.use('/api/v1/admin',                         require('./src/routes/admin'));
+
 // GET /api/v1/top10  (전체 카페 통합 TOP10, 인증 불필요)
 app.get('/api/v1/top10', async (req, res) => {
   const offset = parseInt(req.query.offset) || 0;
@@ -78,6 +81,16 @@ app.get('/owner/*', (_req, res) => {
   res.sendFile(path.join(staticPath, 'owner/index.html'));
 });
 app.get('/owner', (_req, res) => res.redirect('/owner/'));
+
+// 운영자 콘솔 — 반드시 아래 손님 SPA catch-all(app.get('*'))보다 먼저 등록해야
+// 한다. 순서가 바뀌면 /admin이 손님 index.html로 먹힌다.
+//
+// 파일을 server/public이 아니라 server/admin-ui에 두는 이유: customer 빌드가
+// outDir: '../server/public' + emptyOutDir: true라 배포마다 public을 통째로
+// 지운다. public 안에 두면 매 배포에서 사라진다.
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'admin-ui', 'index.html'));
+});
 
 // Customer SPA fallback — API 아닌 모든 경로에서 index.html 반환
 app.get('*', (_req, res) => {

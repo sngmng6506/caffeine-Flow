@@ -27,6 +27,12 @@ module.exports = {
   APP_URL: env('APP_URL', 'http://localhost:5174'),
   SERVER_URL: env('SERVER_URL', 'http://localhost:3000'),
 
+  // 운영자(플랫폼 어드민) 콘솔 비밀번호. 미설정이면 /api/v1/admin/login이
+  // 항상 503을 반환해 콘솔이 비활성 상태로 남는다 — JWT_SECRET처럼 부팅을
+  // 막지는 않는다. 어드민은 부가 도구라, 미설정 때문에 서비스 전체가
+  // 못 뜨는 편이 더 나쁘기 때문.
+  ADMIN_PASSWORD: env('ADMIN_PASSWORD'),
+
   // AI 음악 필터 — 실제 신청과 사장님 테스트가 동일한 OpenRouter 설정을 공유한다.
   OPENROUTER_API_KEY,
   OPENROUTER_BASE_URL,

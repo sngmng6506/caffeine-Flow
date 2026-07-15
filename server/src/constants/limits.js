@@ -31,6 +31,13 @@ const COMMENT_LIMIT = Object.freeze({
   ipMax: 15,
 });
 
+// 운영자 로그인은 단일 비밀번호 검증이라 무차별 대입에 그대로 노출된다.
+// 정상 사용은 하루 몇 회 수준이므로 넉넉히 15분 10회로 묶는다.
+const ADMIN_LOGIN_LIMIT = Object.freeze({
+  windowMs: 15 * ONE_MINUTE_MS,
+  max: 10,
+});
+
 module.exports = {
   ONE_MINUTE_MS,
   GLOBAL_API_RATE_LIMIT,
@@ -39,4 +46,5 @@ module.exports = {
   RECOMMENDATION_REQUEST_LIMIT,
   VOTE_LIMIT,
   COMMENT_LIMIT,
+  ADMIN_LOGIN_LIMIT,
 };

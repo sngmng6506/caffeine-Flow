@@ -4,7 +4,7 @@ Base URL은 `/api/v1`이고 모든 응답은 JSON이다. 인증이 필요한 엔
 
 > 이 문서는 CI가 코드와의 동기화를 강제한다(`server/tests/api-docs.test.mjs`) — 코드에 라우트를 추가하고 여기 문서화하지 않으면 테스트가 실패한다. 한도 수치 같은 세부 파라미터는 라우트 코드가 기준이다.
 
-범례: 🔓 공개 · 🔒 사장님 인증(requireAuth) · 🏪 카페 소유자(requireCafeOwner) · ⏱ rate limited
+범례: 🔓 공개 · 🔒 사장님 인증(requireAuth) · 🏪 카페 소유자(requireCafeOwner) · 🛡 운영자(requireAdmin) · ⏱ rate limited
 
 ---
 
@@ -88,6 +88,34 @@ owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경�
 | Method | Path | 인증 | 설명 |
 | --- | --- | :-: | --- |
 | GET | `/tracks/oembed?url=` | 🔓 | YouTube/SoundCloud/Spotify URL → `{ platform, videoId, title, channelTitle, thumbnail }`. 사용자 URL fetch는 SSRF 방어(safeAxiosGet) 경유 |
+
+---
+
+## 운영자 콘솔 — `/admin`
+
+플랫폼 운영자(사장님 아님) 전용. 전체 카페를 가로질러 조회·조치한다.
+
+인증은 사장님 JWT와 **분리된 경계**를 쓴다 — 토큰의 `role` 클레임이 `admin`이어야 하며(`middleware/auth.js` `requireAdmin`), 사장님 세션 토큰은 `role`이 없어 403이다. 비밀번호는 `ADMIN_PASSWORD` 환경변수로 설정하며, 미설정 시 로그인이 503을 반환해 콘솔이 비활성 상태가 된다.
+
+| Method | Path | 인증 | 설명 |
+| --- | --- | :-: | --- |
+| POST | `/admin/login` | 🔓 ⏱ | `{ password }` → `{ token }` (12시간). 15분 10회 제한. 미설정 503, 불일치 401 |
+| GET | `/admin/cafes` | 🛡 | 전체 카페 + 상태 + 오늘 도달/신청 |
+| PUT | `/admin/cafes/:id/suspend` | 🛡 | `{ is_suspended: boolean }` — 정지 시 손님 접근 차단(사장님 로그인은 유지) |
+| DELETE | `/admin/cafes/:id` | 🛡 | 완전 삭제. CASCADE로 신청·투표·방문·통계까지 소멸 — 되돌릴 수 없음 |
+
+`GET /admin/cafes`의 `status`는 `last_heartbeat_at` 기준으로 서버가 계산한다:
+
+| status | 의미 |
+| --- | --- |
+| `active` | 최근 5분 내 하트비트 — 지금 켜서 사용 중 |
+| `today` | 오늘(KST) 사용했으나 현재 꺼짐 |
+| `dormant` | 과거엔 썼으나 오늘은 안 씀 |
+| `never` | 하트비트 없음 — 가입만 하고 미사용 |
+
+하트비트는 owner 앱이 `/cafe` 소켓에 `role=owner`로 붙어 있는 동안 갱신된다(`src/socket/index.js`). JWT 검증(`verifyOwner`)을 통과한 연결에서만 기록하므로 손님이 위조할 수 없다.
+
+화면은 `/admin`에서 서빙한다(`server/admin-ui/index.html`).
 
 ---
 
