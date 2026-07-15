@@ -6,7 +6,14 @@ function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
   try {
-    req.owner = jwt.verify(header.slice(7), JWT_SECRET);
+    const payload = jwt.verify(header.slice(7), JWT_SECRET);
+    // 서명이 유효해도 사장님 세션 토큰만 통과시킨다. pending 토큰(가입 10분
+    // 임시)이나 admin 토큰(role만 있음)은 cafeId가 없어 이후 라우트에서
+    // undefined 바인딩 500을 유발 — 경계에서 401로 끊는다.
+    if (!payload.cafeId || !payload.slug || payload.pending) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    req.owner = payload;
     next();
   } catch {
     res.status(401).json({ error: 'Invalid token' });

@@ -86,7 +86,13 @@ async function getCafeTop10(cafeId, offset = 0) {
 }
 
 async function getGlobalTop10(offset = 0) {
-  const rows = await topQuery(db('recommendations'), offset);
+  // 정지(is_suspended) 카페의 곡은 공개 TOP10에서 제외한다 — 정지의 목적이
+  // 손님 노출 차단인데 여기만 남으면 구멍. join 대신 whereIn 서브쿼리를
+  // 쓰는 이유: topQuery가 count('id')를 쓰므로 join 시 id가 모호해짐.
+  const rows = await topQuery(
+    db('recommendations').whereIn('cafe_id', db('cafes').select('id').where({ is_suspended: false })),
+    offset,
+  );
   return pageRows(rows);
 }
 

@@ -11,20 +11,22 @@ const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 function verifyOwner(socket, slug) {
   try {
     const token = socket.handshake.auth?.token;
-    if (!token) return false;
+    if (!token) return null;
     const payload = jwt.verify(token, JWT_SECRET);
-    return payload.slug === slug;
+    return payload.slug === slug ? payload : null; // truthy payload = 인증 성공
   } catch {
-    return false;
+    return null;
   }
 }
 
 // 매장 생존 신호 — verifyOwner를 통과한 owner 연결에서만 호출한다.
 // 손님이 role=owner로 위조해 붙어도 여기 도달하지 못하므로, 꺼진 매장이
 // 켜져 있는 것처럼 보여 광고 재고·모니터링이 왜곡되는 일은 없다.
-async function touchHeartbeat(slug) {
+// cafeId 기준으로 갱신한다 — slug는 QR 재발급으로 바뀔 수 있어(AGENTS
+// 불변식), 연결 시점 slug로 계속 update하면 변경 후 0행 갱신이 된다.
+async function touchHeartbeat(cafeId) {
   try {
-    await db('cafes').where({ slug }).update({ last_heartbeat_at: db.fn.now() });
+    await db('cafes').where({ id: cafeId }).update({ last_heartbeat_at: db.fn.now() });
   } catch {
     // 하트비트 실패는 서비스 동작에 영향 없음 — 통계와 동일하게 무시
   }
@@ -45,14 +47,15 @@ function initSocket(io) {
     // 연결 유지 중 주기 갱신 타이머 — disconnect에서 반드시 해제(누수 방지)
     let heartbeatTimer = null;
 
-    if (role === 'owner' && verifyOwner(socket, slug)) {
+    const ownerPayload = role === 'owner' ? verifyOwner(socket, slug) : null;
+    if (ownerPayload) {
       if (!ownerSockets.has(slug)) ownerSockets.set(slug, new Set());
       ownerSockets.get(slug).add(socket.id);
 
       // 매장이 지금 켜져 있음 — 연결 즉시 + 주기적으로 갱신.
       // owner 앱 코드 변경 없이 기존 소켓 연결을 그대로 생존 신호로 쓴다.
-      touchHeartbeat(slug);
-      heartbeatTimer = setInterval(() => touchHeartbeat(slug), HEARTBEAT_REFRESH_MS);
+      touchHeartbeat(ownerPayload.cafeId);
+      heartbeatTimer = setInterval(() => touchHeartbeat(ownerPayload.cafeId), HEARTBEAT_REFRESH_MS);
     } else {
       // 손님 입장 시에만 피크 갱신 의미가 있음
       updatePeakConcurrent(cafeNsp, slug, ownerSockets);
