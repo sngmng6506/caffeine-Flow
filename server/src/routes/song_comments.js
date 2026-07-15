@@ -50,7 +50,7 @@ router.post('/:commentId/replies', commentLimiters, async (req, res) => {
 
 async function resolveCafeId(req) {
   if (!req.params.slug) return null;
-  const cafe = await cafeService.findBySlug(req.params.slug);
+  const cafe = await cafeService.findActiveBySlug(req.params.slug);
   return cafe?.id ?? null;
 }
 

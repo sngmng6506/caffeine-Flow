@@ -52,7 +52,7 @@ function filterPayload(filterResult) {
 
 // GET /api/v1/cafes/:slug/recommendations
 router.get('/', async (req, res) => {
-  const cafe = await cafeService.findBySlug(req.params.slug);
+  const cafe = await cafeService.findActiveBySlug(req.params.slug);
   if (!cafe) {
     // 손님이 옛 QR(아크릴 등)로 접속한 경우 — 카페가 새 slug로 옮겨갔는지
     // 확인해 안내한다. 여기서만 확인하는 이유는 손님이 카페 페이지를 여는
@@ -84,7 +84,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/v1/cafes/:slug/recommendations  (손님 신청)
 router.post('/', requestLimiters, async (req, res) => {
-  const cafe = await cafeService.findBySlug(req.params.slug);
+  const cafe = await cafeService.findActiveBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   if (!cafe.is_accepting) return res.status(403).json({ error: '현재 추천을 받지 않습니다' });
 
@@ -157,7 +157,7 @@ router.post('/', requestLimiters, async (req, res) => {
 
 // GET /api/v1/cafes/:slug/recommendations/top10?offset=0
 router.get('/top10', async (req, res) => {
-  const cafe   = await cafeService.findBySlug(req.params.slug);
+  const cafe   = await cafeService.findActiveBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   const offset = parseInt(req.query.offset) || 0;
   res.json(await statsService.getCafeTop10(cafe.id, offset));

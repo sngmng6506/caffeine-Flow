@@ -23,6 +23,16 @@ async function findBySlug(slug) {
   return db('cafes').where({ slug }).first();
 }
 
+// 손님 노출용 조회 — 정지된 카페를 제외한다.
+//
+// findBySlug에 정지 필터를 넣지 않는 이유: uniqueSlug()가 충돌 검사에
+// findBySlug를 쓰므로, 정지 카페가 안 보이면 그 slug가 재발급되어
+// cafes.slug UNIQUE 제약에 걸린다. 또 사장님 로그인(/cafes/me)은
+// 정지 중에도 동작해야 오조치 복구가 가능하다.
+async function findActiveBySlug(slug) {
+  return db('cafes').where({ slug, is_suspended: false }).first();
+}
+
 async function findByEmail(email) {
   return db('cafes').where({ owner_email: email }).first();
 }
@@ -115,4 +125,4 @@ async function findMovedSlug(oldSlug) {
   return cafe.slug;
 }
 
-module.exports = { findBySlug, findByEmail, findByGoogleId, findByNaverId, create, update, uniqueSlug, isValidSlugFormat, changeSlug, findMovedSlug };
+module.exports = { findBySlug, findActiveBySlug, findByEmail, findByGoogleId, findByNaverId, create, update, uniqueSlug, isValidSlugFormat, changeSlug, findMovedSlug };
