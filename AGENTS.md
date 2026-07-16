@@ -12,7 +12,8 @@ AI 도구(Claude Code · Codex · Gemini 등)와 사람 기여자가 공통으�
 2. **설계** — 선택지가 있으면 트레이드오프를 짧게 정리한다. 스키마 변경·삭제처럼 되돌리기 어려운 작업은 먼저 확인받는다.
 3. **계약 확인** — 상태값·라우터 순서·KST·SQL raw·LLM 동작을 바꾸는 경우 [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md)를 먼저 확인한다.
 4. **구현** — 논리 단위로 작게 나누고, 단계마다 검증한다.
-5. **커밋** — [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) 형식. 논리적 변경 1개 = 커밋 1개.
+5. **커밋** — [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) 형식. 논리적 변경 1개 = 커밋 1개. scope는 필수다(`fix(server):` — `fix:`는 위반).
+6. **병합** — 다른 도구가 만든 브랜치를 병합하기 전에 그 브랜치 커밋들이 컨벤션을 지켰는지 확인한다. 위반 커밋이 섞여 있으면 일반 merge 대신 **squash 병합**으로 컨벤션 준수 커밋 하나만 main에 남긴다 — 일반 merge는 브랜치 커밋 전부가 push 범위에 들어와 CI 커밋 린트에 걸린다.
 
 ## 커밋 전 체크리스트
 
