@@ -13,6 +13,14 @@ function validateString(value, { max, min = 1, allowNull = false, trim = true, n
   return { value: v };
 }
 
+// UUID 형식 검증 — 잘못된 형식을 DB에 넣으면 Postgres가 22P02로 500을 던지므로,
+// 라우트 경계에서 미리 걸러 404/400으로 응답하기 위한 헬퍼.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+  return typeof value === 'string' && UUID_PATTERN.test(value);
+}
+
 function validateInEnum(value, allowed, { name = 'field', defaultValue } = {}) {
   if (value === undefined && defaultValue !== undefined) return { value: defaultValue };
   if (!allowed.includes(value)) return { error: `${name} 유효하지 않음` };
@@ -45,4 +53,4 @@ function validateRecommendationBody(body = {}) {
   return { value };
 }
 
-module.exports = { validateString, validateInEnum, validateBool, validateRecommendationBody };
+module.exports = { validateString, validateInEnum, validateBool, validateRecommendationBody, isUuid };

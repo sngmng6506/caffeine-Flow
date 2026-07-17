@@ -101,8 +101,10 @@ owner 라우터가 public보다 먼저 마운트된다(인증 핸들러가 경�
 | --- | --- | :-: | --- |
 | POST | `/admin/login` | 🔓 ⏱ | `{ password }` → `{ token }` (12시간). 15분 10회 제한. 미설정 503, 불일치 401 |
 | GET | `/admin/cafes` | 🛡 | 전체 카페 + 상태 + 오늘 도달/신청 |
-| PUT | `/admin/cafes/:id/suspend` | 🛡 | `{ is_suspended: boolean }` — 정지 시 손님 접근 차단(사장님 로그인은 유지) |
-| DELETE | `/admin/cafes/:id` | 🛡 | 완전 삭제. CASCADE로 신청·투표·방문·통계까지 소멸 — 되돌릴 수 없음 |
+| PUT | `/admin/cafes/:id/suspend` | 🛡 | `{ is_suspended: boolean }` — 정지 시 손님 접근 차단(사장님 로그인은 유지). `:id`는 UUID, 형식 불일치·미존재 404 |
+| DELETE | `/admin/cafes/:id` | 🛡 | 완전 삭제. CASCADE로 신청·투표·방문·통계까지 소멸 — 되돌릴 수 없음. `:id`는 UUID, 형식 불일치·미존재 404 |
+
+손님 실시간 소켓(`/cafe`)도 정지·미존재 카페에는 접속이 거부된다(HTTP `findActiveBySlug`와 동일 경계). 검증된 사장님 연결은 오조치 복구를 위해 정지 중에도 유지된다.
 
 `GET /admin/cafes`의 `status`는 `last_heartbeat_at` 기준으로 서버가 계산한다:
 

@@ -38,16 +38,31 @@ function initSocket(io) {
   // slug별 사장님 소켓 ID 집합 — peak concurrent에서 차감
   const ownerSockets = new Map(); // slug -> Set<socketId>
 
-  cafeNsp.on('connection', (socket) => {
+  cafeNsp.on('connection', async (socket) => {
     const { slug, role } = socket.handshake.query;
     if (!slug) return socket.disconnect();
+
+    const ownerPayload = role === 'owner' ? verifyOwner(socket, slug) : null;
+
+    // 손님은 정지·미존재 카페 room에 붙지 못하게 막는다 — HTTP findActiveBySlug와
+    // 동일 경계. 붙게 두면 정지 카페의 큐 변경 브로드캐스트를 엿볼 수 있다.
+    // 검증된 사장님은 오조치 복구를 위해 정지 중에도 접속 가능해야 하므로 예외.
+    if (!ownerPayload) {
+      const cafeService = require('../services/cafe.service');
+      let active;
+      try {
+        active = await cafeService.findActiveBySlug(slug);
+      } catch {
+        return socket.disconnect(); // 조회 실패 시 fail-closed — 손님 입장 거부
+      }
+      if (!active) return socket.disconnect();
+    }
 
     socket.join(slug);
 
     // 연결 유지 중 주기 갱신 타이머 — disconnect에서 반드시 해제(누수 방지)
     let heartbeatTimer = null;
 
-    const ownerPayload = role === 'owner' ? verifyOwner(socket, slug) : null;
     if (ownerPayload) {
       if (!ownerSockets.has(slug)) ownerSockets.set(slug, new Set());
       ownerSockets.get(slug).add(socket.id);

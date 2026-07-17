@@ -16,6 +16,7 @@ const { kstTodayString, kstStartOfDay } = require('../utils/kst');
 const { ADMIN_LOGIN_LIMIT } = require('../constants/limits');
 const { HEARTBEAT_ACTIVE_WINDOW_MS } = require('../constants/time-policy');
 const { ADMIN_PASSWORD } = require('../config');
+const { isUuid } = require('../utils/validate');
 
 // 매장 상태 — 하트비트(last_heartbeat_at) 기준.
 // never: 가입 후 한 번도 앱을 켠 적 없음 → 장난/방치 계정 후보
@@ -111,6 +112,7 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
 // PUT /api/v1/admin/cafes/:id/suspend  { is_suspended: boolean }
 // 정지는 되돌릴 수 있는 1차 조치 — 손님 접근만 차단하고 데이터는 보존한다.
 router.put('/cafes/:id/suspend', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
   const value = req.body?.is_suspended;
   if (typeof value !== 'boolean') {
     return res.status(400).json({ error: 'is_suspended는 boolean이어야 합니다' });
@@ -127,6 +129,7 @@ router.put('/cafes/:id/suspend', requireAdmin, async (req, res) => {
 // cafes의 onDelete('CASCADE')로 recommendations·votes·cafe_visits·daily_stats까지
 // 함께 소멸한다. 되돌릴 수 없으므로 UI에서 카페명 확인 후에만 호출한다.
 router.delete('/cafes/:id', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
   const deleted = await db('cafes').where({ id: req.params.id }).del();
   if (!deleted) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
   res.json({ id: req.params.id, deleted: true });
