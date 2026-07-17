@@ -160,6 +160,10 @@ LLM API 실패 / timeout / JSON 파싱 실패 / API key 누락
 → status = rejected
 → 사장님 앱에 music_filter_error 알림
 → 손님에게 503 응답
+
+owner AI 자동수락 (owner/src/pages/DashboardPage.jsx)
+→ pending 중 filter_status = accepted 인 곡만 자동 accepted/playing 승격
+→ filter_status = skipped(필터 OFF 때 들어온 미심사) pending 곡은 자동수락 대상이 아님
 ```
 
 금지 사항:
@@ -170,6 +174,7 @@ LLM 실패 시 신청곡을 일단 받는 fail-open 동작으로 바꾸지 않�
 filter_status만 rejected로 만들고 status를 pending으로 남기지 않는다.
 status만 rejected로 만들고 filter_status를 누락하지 않는다.
 low/medium/high 문자열을 라우트나 UI 컴포넌트에 새로 박지 않는다.
+AI 자동수락에서 filter_status ≠ accepted 인 pending 곡을 자동 승격하지 않는다.
 ```
 
 관련 테스트:

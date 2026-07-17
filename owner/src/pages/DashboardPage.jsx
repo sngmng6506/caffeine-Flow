@@ -3,6 +3,7 @@ import { getRecommendations, createRec, updateRec, setStatus, updateMe, updateNo
 import { getSocket, disconnectSocket } from '../socket';
 import { VALID_PLATFORMS, parseAllowedPlatforms } from '../constants/platforms';
 import { REC_STATUS } from '../constants/recommendationStatus';
+import { FILTER_STATUS } from '../constants/musicFilterStatus';
 import RecommendCard from './RecommendCard';
 import StatsPanel from './StatsPanel';
 import DefaultSection from './dashboard/DefaultSection';
@@ -65,9 +66,15 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   // 큐 우선순위: 투표수 내림차순 → 신청 시각 오름차순
   const byPriority = (a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at);
 
+  // 자동수락 대상: AI 필터를 통과(filter_status=accepted)한 pending 곡만.
+  // 필터 OFF일 때 들어온 미심사(skipped) pending 곡은 심사를 거친 적이 없으므로
+  // AI 자동수락으로 자동 승격하지 않는다 (docs/AI_CHANGE_GUARDRAILS.md §3 계약).
+  const isAutoAcceptEligible = (r) =>
+    r.status === REC_STATUS.PENDING && r.filter_status === FILTER_STATUS.ACCEPTED;
+
   // 다음 곡 재생 또는 정지.
   // 1) 대기곡(accepted) 1순위 재생
-  // 2) 없고 AI 자동수락 ON이면 신청곡(pending) 1순위를 수락으로 승격해 재생
+  // 2) 없고 AI 자동수락 ON이면 AI 통과 신청곡 1순위를 수락으로 승격해 재생
   // 3) 둘 다 없으면 endRec — BGM 음소거 해제 (수동 운영 OFF에서는 pending을 건드리지 않는다)
   async function playNextOrStop(snapshot) {
     const nextAccepted = snapshot.filter(r => r.status === REC_STATUS.ACCEPTED).sort(byPriority)[0];
@@ -80,7 +87,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       return;
     }
     if (aiAutoAcceptRef.current) {
-      const nextPending = snapshot.filter(r => r.status === REC_STATUS.PENDING).sort(byPriority)[0];
+      const nextPending = snapshot.filter(isAutoAcceptEligible).sort(byPriority)[0];
       if (nextPending) {
         try {
           await updateRec(cafe.slug, nextPending.id, REC_STATUS.ACCEPTED);
@@ -94,10 +101,11 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
     window.electronAPI?.endRec();
   }
 
-  // 신청곡 전부 수락 + 재생 중 없으면 1순위 재생 — AI 자동수락 ON 전환·앱 시작 복귀 공용
+  // AI 통과 신청곡 수락 + 재생 중 없으면 1순위 재생 — AI 자동수락 ON 전환·앱 시작 복귀 공용.
+  // 미심사(skipped) pending 곡은 승격하지 않는다.
   async function drainPendingAndPlay(base) {
     let snapshot = base || recsRef.current;
-    const pendingList = snapshot.filter(r => r.status === REC_STATUS.PENDING);
+    const pendingList = snapshot.filter(isAutoAcceptEligible);
     if (pendingList.length > 0) {
       const updates = (await Promise.all(
         pendingList.map(r => updateRec(cafe.slug, r.id, REC_STATUS.ACCEPTED).catch(() => null))
@@ -187,7 +195,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
     socket.on('recommendations_update', ({ action, rec, id }) => {
       if (action === 'add') {
-        if (aiAutoAcceptRef.current) {
+        // 서버는 필터 ON일 때만 accept한 곡을 add로 브로드캐스트하지만,
+        // 클라이언트에서도 AI 통과 곡만 자동 승격하도록 한 번 더 확인한다.
+        if (aiAutoAcceptRef.current && isAutoAcceptEligible(rec)) {
           updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED)
             .then(updated => {
               setRecs(prev => prev.some(r => r.id === updated.id)
