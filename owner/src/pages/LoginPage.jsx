@@ -180,10 +180,11 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   }
 
   function openAddressSearch() {
-    if (!window.daum?.Postcode) {
+    if (!window.kakao?.Postcode) {
       const script = document.createElement('script');
-      script.src = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+      script.src = 'https://t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
       script.onload = () => runPostcode();
+      script.onerror = () => setError('주소 검색 서비스를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
       document.body.appendChild(script);
     } else {
       runPostcode();
@@ -191,7 +192,12 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   }
 
   function runPostcode() {
-    new window.daum.Postcode({
+    if (!window.kakao?.Postcode) {
+      setError('주소 검색 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+
+    new window.kakao.Postcode({
       oncomplete(data) {
         // 손님 지역 탐색 목적 — 시/구/동만 저장한다. 정밀 도로명·상세주소는
         // 발견 목적에 불필요하고 최소수집 원칙에도 어긋나므로 받지 않는다.
