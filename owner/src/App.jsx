@@ -48,10 +48,15 @@ export default function App() {
   const [updateVersion, setUpdateVersion]   = useState(null);
 
   useEffect(() => {
-    window.electronAPI?.onYoutubeState(visible => setYoutubeVisible(visible));
-    window.electronAPI?.onUpdateDownloaded(version => setUpdateVersion(version));
+    const removeYoutubeState = window.electronAPI?.onYoutubeState(visible => setYoutubeVisible(visible));
+    const removeUpdateDownloaded = window.electronAPI?.onUpdateDownloaded(version => setUpdateVersion(version));
     // 앱 시작 시 이미 로그인 상태면 YouTube 패널 바로 열기
     if (initialState.cafe) window.electronAPI?.showYoutube();
+
+    return () => {
+      if (typeof removeYoutubeState === 'function') removeYoutubeState();
+      if (typeof removeUpdateDownloaded === 'function') removeUpdateDownloaded();
+    };
   }, []);
 
   function handleLogin(cafeData) {
