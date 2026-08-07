@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, Link2, LoaderCircle, Music2, RotateCcw, Search, Send } from 'lucide-react';
+import { Link2, LoaderCircle, Music2, RotateCcw, Search, Send } from 'lucide-react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
@@ -193,7 +193,6 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
                 title={`${label}에서 음악 찾기`}
               >
                 {icon}
-                <ExternalLink size={12} aria-hidden='true' />
               </a>
             ) : (
               <span key={id} className='platform-shortcut platform-shortcut--disabled' aria-label={`${label} 신청 불가`}>

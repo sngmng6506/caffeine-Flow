@@ -67,30 +67,30 @@ Clear Flow의 핵심은 브랜드 노출이 아니라 명확한 상태, 빠른 �
 
 | 토큰 | 값 | 용도 |
 | --- | ---: | --- |
-| `--cf-brand` | `#3182F6` | 1차 CTA, 활성 탭, 핵심 선택 |
-| `--cf-brand-hover` | `#1B64DA` | hover |
-| `--cf-brand-active` | `#1957C2` | pressed |
-| `--cf-brand-soft` | `#EDF6FF` | 선택 배경, 브랜드 tint |
-| `--cf-accent-blue` | `#3182F6` | 재생 흐름, 정보성 강조 |
-| `--cf-accent-blue-soft` | `#EDF6FF` | 정보 배경, 재생 보조 영역 |
-| `--cf-accent-lilac` | `#8DA4C7` | 제한적인 보조 그래픽 |
-| `--cf-canvas` | `#F5F6F8` | 페이지 배경 |
+| `--cf-brand` | `#1769E0` | 1차 CTA, 활성 탭, 핵심 선택 |
+| `--cf-brand-hover` | `#0F56C7` | hover |
+| `--cf-brand-active` | `#0B47AA` | pressed |
+| `--cf-brand-soft` | `#E7F0FF` | 선택 배경, 브랜드 tint |
+| `--cf-accent-blue` | `#1769E0` | 재생 흐름, 정보성 강조 |
+| `--cf-accent-blue-soft` | `#E7F0FF` | 정보 배경, 재생 보조 영역 |
+| `--cf-accent-lilac` | `#7388A8` | 제한적인 보조 그래픽 |
+| `--cf-canvas` | `#F0F3F7` | 페이지 배경 |
 | `--cf-surface` | `#FFFFFF` | 카드, 입력, 탭 |
-| `--cf-surface-subtle` | `#F2F4F6` | 내부 그룹, 비활성 영역 |
-| `--cf-content-strong` | `#191F28` | 페이지 제목, 곡 제목 |
-| `--cf-content` | `#333D4B` | 본문, 버튼 텍스트 |
-| `--cf-content-muted` | `#6B7684` | 아티스트, 보조 정보 |
-| `--cf-content-caption` | `#8B95A1` | 날짜, 캡션 |
-| `--cf-content-disabled` | `#B0B8C1` | placeholder, 비활성 텍스트 |
-| `--cf-stroke` | `#E5E8EB` | 기본 테두리 |
-| `--cf-stroke-strong` | `#D1D6DB` | focus 전 입력, 강조 구분선 |
+| `--cf-surface-subtle` | `#E9EEF4` | 내부 그룹, 비활성 영역 |
+| `--cf-content-strong` | `#0F1724` | 페이지 제목, 곡 제목 |
+| `--cf-content` | `#253142` | 본문, 버튼 텍스트 |
+| `--cf-content-muted` | `#526071` | 아티스트, 보조 정보 |
+| `--cf-content-caption` | `#748091` | 날짜, 캡션 |
+| `--cf-content-disabled` | `#9AA5B1` | placeholder, 비활성 텍스트 |
+| `--cf-stroke` | `#DCE2E8` | 기본 테두리 |
+| `--cf-stroke-strong` | `#C7D0D9` | focus 전 입력, 강조 구분선 |
 | `--cf-success` | `#167A5A` | 완료, 정상 상태 |
 | `--cf-success-soft` | `#E8F6F0` | 성공 메시지 배경 |
 | `--cf-warning` | `#946200` | 주의, 신청 중단 |
 | `--cf-warning-soft` | `#FFF4D8` | 주의 메시지 배경 |
 | `--cf-destructive` | `#BF3850` | 오류, 취소 확인 |
 | `--cf-destructive-soft` | `#FCECEF` | 오류 배경 |
-| `--cf-focus` | `#3182F6` | 키보드 focus ring |
+| `--cf-focus` | `#1769E0` | 키보드 focus ring |
 
 ### 강조색 사용
 
@@ -128,11 +128,12 @@ YouTube, Spotify, SoundCloud 공식 색상은 [플랫폼 상수](./src/constants
 
 | 역할 | 크기 | 두께 | 줄높이 |
 | --- | ---: | ---: | ---: |
-| Page title | 24px | 700 | 1.3 |
-| Hero title | 20px | 700 | 1.35 |
-| Section title | 17px | 700 | 1.4 |
+| Page title | 28~32px | 700 | 1.25 |
+| Card title | 20px | 700 | 1.35 |
+| Hero title | 18px | 700 | 1.4 |
+| Section title | 18px | 700 | 1.4 |
 | Song title | 15px | 600 | 1.4 |
-| Body | 14px | 400 | 1.55 |
+| Body | 14~15px | 400 | 1.55 |
 | Body strong | 14px | 600 | 1.5 |
 | Caption | 12px | 400 | 1.45 |
 | Micro label | 11px | 600 | 1.3 |
@@ -237,6 +238,8 @@ YouTube 등에서 제공하는 음악 썸네일은 기본적으로 16:9다.
 - surface 카드와 card radius를 사용한다.
 - 링크 입력과 핵심 CTA를 같은 시야 안에 둔다.
 - 플랫폼 바로가기는 보조 도구이며 입력과 CTA보다 강조하지 않는다.
+- `음악 찾기` 라벨과 플랫폼 아이콘은 가까운 한 그룹으로 배치한다.
+- 플랫폼 아이콘 위에 별도의 외부 링크 표시를 겹쳐 그리지 않는다. 새 창 안내는 접근성 라벨로 제공한다.
 - 입력 focus에는 brand 테두리와 focus ring을 함께 제공한다.
 - 미리보기에서는 썸네일·곡 제목·플랫폼·두 행동을 명확히 분리한다.
 - `다시 선택하기`는 secondary, `이 곡 신청하기`는 primary다.

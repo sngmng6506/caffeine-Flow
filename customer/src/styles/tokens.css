@@ -1,22 +1,22 @@
 :root {
-  --cf-brand: #3182f6;
-  --cf-brand-hover: #1b64da;
-  --cf-brand-active: #1957c2;
-  --cf-brand-soft: #edf6ff;
-  --cf-accent-blue: #3182f6;
-  --cf-accent-blue-soft: #edf6ff;
-  --cf-accent-lilac: #8da4c7;
+  --cf-brand: #1769e0;
+  --cf-brand-hover: #0f56c7;
+  --cf-brand-active: #0b47aa;
+  --cf-brand-soft: #e7f0ff;
+  --cf-accent-blue: #1769e0;
+  --cf-accent-blue-soft: #e7f0ff;
+  --cf-accent-lilac: #7388a8;
 
-  --cf-canvas: #f5f6f8;
+  --cf-canvas: #f0f3f7;
   --cf-surface: #ffffff;
-  --cf-surface-subtle: #f2f4f6;
-  --cf-content-strong: #191f28;
-  --cf-content: #333d4b;
-  --cf-content-muted: #6b7684;
-  --cf-content-caption: #8b95a1;
-  --cf-content-disabled: #b0b8c1;
-  --cf-stroke: #e5e8eb;
-  --cf-stroke-strong: #d1d6db;
+  --cf-surface-subtle: #e9eef4;
+  --cf-content-strong: #0f1724;
+  --cf-content: #253142;
+  --cf-content-muted: #526071;
+  --cf-content-caption: #748091;
+  --cf-content-disabled: #9aa5b1;
+  --cf-stroke: #dce2e8;
+  --cf-stroke-strong: #c7d0d9;
 
   --cf-success: #167a5a;
   --cf-success-soft: #e8f6f0;
@@ -24,7 +24,7 @@
   --cf-warning-soft: #fff4d8;
   --cf-destructive: #bf3850;
   --cf-destructive-soft: #fcecef;
-  --cf-focus: #3182f6;
+  --cf-focus: #1769e0;
 
   --cf-status-pending: #6f658f;
   --cf-status-pending-soft: #f0edf8;
