@@ -15,6 +15,8 @@ AI는 모든 문서를 한꺼번에 읽지 않는다. 작업 종류별 필수 �
 | 로컬 개발·환경변수·배포 | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | AI 음악 필터 이해 | [LLM_FILTER.md](LLM_FILTER.md) |
 | 미구현 개선 후보 | [ROADMAP.md](ROADMAP.md) |
+| 손님 화면 디자인 기준 | [customer/DESIGN_GUIDE.md](../customer/DESIGN_GUIDE.md) |
+| 손님 화면 문구 기준 | [customer/WRITING_GUIDE.md](../customer/WRITING_GUIDE.md) |
 
 ## 코드를 수정할 때
 
@@ -34,6 +36,8 @@ AI는 모든 문서를 한꺼번에 읽지 않는다. 작업 종류별 필수 �
 - `LLM_FILTER.md`: 현재 구현된 AI 판단 동작
 - `AI_CHANGE_GUARDRAILS.md`: 반드시 유지해야 하는 코드 계약
 - `ROADMAP.md`: 아직 구현되지 않은 후보
+- `customer/DESIGN_GUIDE.md`: 손님 화면의 Soft Streaming 시각·컴포넌트 기준
+- `customer/WRITING_GUIDE.md`: 손님 화면의 목소리·용어·UI 문구 기준
 
 다음 내용은 섞지 않는다.
 

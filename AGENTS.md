@@ -27,6 +27,8 @@
 | 상태값, 라우터 순서, 플랫폼, 한도, KST, SQL raw, LLM 안전, 마이그레이션 변경 | [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) |
 | 미구현 기능 검토·설계·우선순위 논의 | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | Markdown 문서 추가·이동·분리·대규모 재구성 | [docs/DOCUMENTATION_POLICY.md](docs/DOCUMENTATION_POLICY.md) |
+| 손님 화면의 색상·레이아웃·컴포넌트·아이콘·모션 변경 | [customer/DESIGN_GUIDE.md](customer/DESIGN_GUIDE.md) |
+| 손님 화면의 버튼·상태·오류·빈 상태 등 사용자 문구 변경 | [customer/WRITING_GUIDE.md](customer/WRITING_GUIDE.md) |
 | 커밋 작성 | [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) |
 
 ### 자주 겹치는 작업
