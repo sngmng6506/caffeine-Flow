@@ -16,7 +16,7 @@ const REMOVE_MODALS_SCRIPT = `
     function killModals() {
       document.querySelectorAll('iframe').forEach(f => {
         if (!f.src) return;
-        if (!/secure\.soundcloud\.com|accounts\.google\.com\/gsi|api-auth\.soundcloud\.com/i.test(f.src)) return;
+        if (!/secure\\.soundcloud\\.com|accounts\\.google\\.com\\/gsi|api-auth\\.soundcloud\\.com/i.test(f.src)) return;
         let target = f;
         let cur = f.parentElement;
         for (let i = 0; i < 8 && cur; i++) {

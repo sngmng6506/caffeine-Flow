@@ -95,7 +95,7 @@ const READ_SPOTIFY_OVERLAY_SIGNATURE = `
       const link = el && el.href ? el : el && el.querySelector ? el.querySelector('a[href*="/track/"]') : null;
       if (link && link.href && link.href.includes('/track/')) { domHref = link.href; break; }
     }
-    const match = domHref && domHref.match(/\/track\/([A-Za-z0-9]+)/);
+    const match = domHref && domHref.match(/\\/track\\/([A-Za-z0-9]+)/);
     const trackId = match && match[1] || null;
     return trackId || (title ? title + '|' + (artist || '') : null);
   })()

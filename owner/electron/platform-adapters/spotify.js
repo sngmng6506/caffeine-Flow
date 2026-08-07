@@ -50,7 +50,7 @@ function buildClickPlaylistRow(meta) {
       for (const row of rows) {
         const link = row.querySelector('a[href*="/track/"]');
         if (!link) continue;
-        const rowTrackId = (link.href.match(/\/track\/([A-Za-z0-9]+)/) || [])[1];
+        const rowTrackId = (link.href.match(/\\/track\\/([A-Za-z0-9]+)/) || [])[1];
         const rowTitle = (link.textContent || '').trim();
         const matchById = targetTrackId && rowTrackId === targetTrackId;
         const matchByTitle = targetTitle && rowTitle === targetTitle;
@@ -149,7 +149,7 @@ async function readCurrentTrackMeta(view) {
           const uri = u.searchParams.get('uri') || '';
           const matchFromUri = uri.match(/track[:%3A]+([A-Za-z0-9]+)/i);
           if (matchFromUri) { trackId = matchFromUri[1]; break; }
-          const matchFromPath = link.href.match(/\/track\/([A-Za-z0-9]+)/);
+          const matchFromPath = link.href.match(/\\/track\\/([A-Za-z0-9]+)/);
           if (matchFromPath) trackId = matchFromPath[1];
         } catch {}
       }
