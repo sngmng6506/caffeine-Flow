@@ -14,14 +14,11 @@ const { GLOBAL_API_RATE_LIMIT } = require('./src/constants/limits');
 // app만 import해 통합 테스트를 돌릴 수 있게 한다.
 const app = express();
 
-// 허용 origin: APP_URL + 개발용 localhost. 빈 origin(파일·앱 내장 브라우저)도 허용 —
-// Electron BrowserView·일부 모바일 WebView가 빈 origin으로 옴.
 function buildAllowedOrigins() {
   const set = new Set();
   if (APP_URL) {
     set.add(APP_URL.replace(/\/$/, ''));
   }
-  // 개발 편의: Vite 기본 포트들 허용
   set.add('http://localhost:5173');
   set.add('http://localhost:5174');
   return set;
@@ -29,18 +26,61 @@ function buildAllowedOrigins() {
 const ALLOWED_ORIGINS = buildAllowedOrigins();
 
 function corsOriginCheck(origin, cb) {
-  if (!origin) return cb(null, true);
+  // 제품 클라이언트는 모두 HTTP(S) 문서에서 Socket.IO에 접속한다.
+  // origin이 없는 non-browser 연결이나 file:// 계열의 `null` origin을
+  // Electron 호환성이라는 이유로 포괄 허용하지 않는다.
+  if (typeof origin !== 'string' || origin.trim() === '' || origin === 'null') {
+    return cb(new Error('Origin required'));
+  }
   if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
   cb(new Error(`Origin not allowed: ${origin}`));
 }
 
+// 배포 SPA가 실제로 사용하는 외부 리소스만 허용한다.
+// - Google Identity Services: 사장님 Google 로그인
+// - Daum/Kakao postcode: 카페 지역 입력
+// - unpkg Leaflet: 운영자 지도
+// 외부 음악 페이지는 별도 Electron BrowserView에서 열리므로 이 CSP에 추가하지 않는다.
+const CSP_DIRECTIVES = {
+  defaultSrc: ["'self'"],
+  baseUri: ["'self'"],
+  connectSrc: ["'self'", 'wss:', 'https://accounts.google.com/gsi/'],
+  fontSrc: ["'self'", 'data:'],
+  formAction: ["'self'"],
+  frameAncestors: ["'self'"],
+  frameSrc: [
+    'https://accounts.google.com/gsi/',
+    'https://postcode.map.daum.net',
+    'https://postcode.map.kakao.com',
+  ],
+  imgSrc: ["'self'", 'data:', 'https:'],
+  mediaSrc: ["'self'", 'https:'],
+  objectSrc: ["'none'"],
+  scriptSrc: [
+    "'self'",
+    'https://accounts.google.com/gsi/client',
+    'https://t1.daumcdn.net',
+    'https://t1.kakaocdn.net',
+    'https://unpkg.com',
+  ],
+  scriptSrcAttr: ["'none'"],
+  styleSrc: [
+    "'self'",
+    "'unsafe-inline'", // React inline style과 Leaflet DOM style에 필요. inline script는 허용하지 않는다.
+    'https://accounts.google.com/gsi/style',
+    'https://unpkg.com',
+  ],
+};
+
 app.set('trust proxy', 1); // Railway 등 리버스 프록시 뒤에서 실제 IP 인식
-// 보안 헤더 — CSP는 inline script가 많은 SPA·SoundCloud iframe 호환 위해 미설정. 그 외 표준 헤더만.
-// COOP는 helmet 기본값(same-origin)이면 Google 로그인 팝업의 opener가 끊겨
-// credential postMessage 전달이 실패한다(팝업 흰 화면). GIS 공식 권고값인
-// same-origin-allow-popups로 설정 — 우리가 연 팝업과의 연결만 허용.
+// COOP는 Google 로그인 팝업의 opener/postMessage 연결을 위해
+// same-origin-allow-popups를 유지한다. COEP는 외부 로그인/지도 리소스와의 호환 때문에 끈다.
+// CSP 자체는 비활성화하지 않고 위 allowlist로 제한한다.
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: CSP_DIRECTIVES,
+  },
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
 }));
@@ -82,14 +122,15 @@ app.get('/owner/*', (_req, res) => {
 });
 app.get('/owner', (_req, res) => res.redirect('/owner/'));
 
+// 운영자 콘솔 정적 자산. admin index의 inline script/style을 없애 CSP에서
+// script-src 'unsafe-inline'을 열지 않도록 별도 경로로 제공한다.
+const adminUiPath = path.join(__dirname, 'admin-ui');
+app.use('/admin-assets', express.static(adminUiPath, { index: false }));
+
 // 운영자 콘솔 — 반드시 아래 손님 SPA catch-all(app.get('*'))보다 먼저 등록해야
 // 한다. 순서가 바뀌면 /admin이 손님 index.html로 먹힌다.
-//
-// 파일을 server/public이 아니라 server/admin-ui에 두는 이유: customer 빌드가
-// outDir: '../server/public' + emptyOutDir: true라 배포마다 public을 통째로
-// 지운다. public 안에 두면 매 배포에서 사라진다.
 app.get('/admin', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'admin-ui', 'index.html'));
+  res.sendFile(path.join(adminUiPath, 'index.html'));
 });
 
 // Customer SPA fallback — API 아닌 모든 경로에서 index.html 반환
@@ -103,4 +144,4 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: '서버 오류가 발생했습니다' });
 });
 
-module.exports = { app, corsOriginCheck };
+module.exports = { app, corsOriginCheck, CSP_DIRECTIVES };

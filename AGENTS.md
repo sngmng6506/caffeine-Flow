@@ -23,6 +23,7 @@
 | HTTP 라우트, 요청·응답, 인증, 상태 코드 변경 | [docs/API.md](docs/API.md) |
 | 환경변수, 실행 명령, 테스트, 마이그레이션, 배포 변경 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 | 음악 필터, 프롬프트, 모델 호출, 판단·오류 정책 변경 | [docs/LLM_FILTER.md](docs/LLM_FILTER.md) |
+| CSP, CORS, Socket origin, 외부 스크립트·iframe, IPC·preload 보안 변경 | [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) |
 | 상태값, 라우터 순서, 플랫폼, 한도, KST, SQL raw, LLM 안전, 마이그레이션 변경 | [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) |
 | 미구현 기능 검토·설계·우선순위 논의 | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | Markdown 문서 추가·이동·분리·대규모 재구성 | [docs/DOCUMENTATION_POLICY.md](docs/DOCUMENTATION_POLICY.md) |
@@ -33,6 +34,7 @@
 - 추천곡 상태 전이 변경: `ARCHITECTURE.md` + `AI_CHANGE_GUARDRAILS.md`
 - AI 자동수락 변경: `LLM_FILTER.md` + `AI_CHANGE_GUARDRAILS.md`
 - Electron 재생 상태와 서버 큐 연동 변경: `PLAYBACK.md` + `ARCHITECTURE.md` + `AI_CHANGE_GUARDRAILS.md`
+- 외부 로그인·지도·스크립트·iframe 추가: `AI_CHANGE_GUARDRAILS.md` + 실제 소비 코드
 - 새 API와 환경변수 추가: `API.md` + `DEVELOPMENT.md`
 - 아직 구현하지 않을 아이디어 정리: `ROADMAP.md`만 사용
 
@@ -44,6 +46,7 @@
 - API 경로·인증·요청·응답·오류 코드가 바뀌면 `API.md`를 수정한다.
 - 환경변수·실행·테스트·마이그레이션·배포 절차가 바뀌면 `DEVELOPMENT.md`를 수정한다.
 - LLM 입력·출력·판단 상태·fail-closed 동작이 바뀌면 `LLM_FILTER.md`와 관련 가드레일을 수정한다.
+- CSP allowlist, Socket origin 정책, 외부 콘텐츠·IPC 보안 경계가 바뀌면 관련 가드레일을 수정한다.
 - 아직 구현되지 않은 제안은 현재 동작 문서가 아니라 `ROADMAP.md`에 기록한다.
 - 한 사실은 담당 문서 한 곳에서만 자세히 설명하고 다른 문서는 링크만 둔다.
 
@@ -61,7 +64,7 @@
 
 1. **분류** — 작업이 어떤 영역과 계약을 건드리는지 판단한다.
 2. **읽기** — 대상 코드와 라우팅된 문서·상수·테스트를 확인한다.
-3. **경계 확인** — 상태, 라우터 순서, KST, SQL raw, LLM, 마이그레이션은 가드레일을 확인한다.
+3. **경계 확인** — 상태, 라우터 순서, KST, SQL raw, LLM, 웹 보안, 마이그레이션은 가드레일을 확인한다.
 4. **구현** — 논리 단위를 작게 유지하고 동작 변경과 구조 변경을 가능하면 분리한다.
 5. **검증** — 문법, 테스트, 빌드, 문서 동기화를 확인한다.
 6. **문서 판단** — 외부 동작이나 계약이 바뀌었을 때만 담당 문서를 갱신한다.
@@ -90,6 +93,8 @@ DB가 필요한 통합 테스트와 환경변수는 [docs/DEVELOPMENT.md](docs/D
 - slug는 변경 가능하며 변경 시 새 JWT를 클라이언트가 교체한다.
 - 상태값·플랫폼·한도·시간 정책은 각 constants를 사용한다.
 - LLM 음악 필터는 fail-closed다.
+- CSP 자체를 끄지 않으며 외부 리소스는 기능별 allowlist로만 추가한다.
+- Socket.IO에서 origin 없는 연결이나 `null` origin을 포괄 허용하지 않는다.
 - `server/app.js`와 `server/server.js` 분리를 유지한다.
 - 날짜·통계 경계는 KST 유틸을 사용한다.
 - 한국어 커밋·주석, 영어 식별자를 기본으로 한다.
