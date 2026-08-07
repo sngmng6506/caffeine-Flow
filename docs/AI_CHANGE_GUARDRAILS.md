@@ -1,6 +1,6 @@
 # AI Change Guardrails
 
-> **AI가 읽을 때:** 상태값, 라우터 순서, 플랫폼, 한도, KST, SQL raw, LLM 안전, 인증 경계, 마이그레이션을 건드릴 때
+> **AI가 읽을 때:** 상태값, 라우터 순서, 플랫폼, 한도, KST, SQL raw, LLM 안전, 인증·웹 보안 경계, 마이그레이션을 건드릴 때
 > **함께 갱신할 때:** 반드시 유지해야 하는 불변식이나 기준 파일이 달라질 때
 > **생략 가능한 경우:** 위 계약에 영향이 없는 표시 문구·스타일·국소적 내부 리팩터링
 
@@ -93,6 +93,31 @@ customer/src/constants/platforms.js
 
 재생 세부사항: [PLAYBACK.md](PLAYBACK.md)
 
+## Web Security Boundary Contract
+
+기준 파일:
+
+```text
+server/app.js
+server/server.js
+server/tests/security-headers.test.mjs
+owner/electron/preload.js
+```
+
+- `Content-Security-Policy`를 서버 전체에서 끄지 않는다.
+- 외부 스크립트·iframe·connect 대상은 실제 기능이 사용하는 origin만 명시적으로 추가한다.
+- 새 외부 서비스 도입을 이유로 `https:` 전체나 `*`를 `script-src`, `frame-src`, `connect-src`에 추가하지 않는다.
+- `script-src`에 `'unsafe-inline'`을 추가하지 않는다. 필요한 inline JavaScript는 정적 파일·nonce·hash 방식으로 분리한다.
+- React inline style과 Leaflet DOM style 때문에 `style-src 'unsafe-inline'`은 현재 허용하지만 script 허용과 혼동하지 않는다.
+- Google 로그인 호환을 위한 COOP `same-origin-allow-popups`와 COEP 비활성화는 목적이 분명한 예외이며 임의 확대하지 않는다.
+- Socket.IO는 `APP_URL`과 개발용 localhost처럼 명시된 웹 origin만 허용한다.
+- origin header가 없거나 값이 `null`인 연결을 Electron 호환성이라는 이유로 포괄 허용하지 않는다.
+- Electron 운영 앱은 HTTP(S) owner 페이지를 로드하므로 정상 origin이 존재한다. `file://` 기반으로 구조를 바꾸면 origin 정책을 먼저 재설계한다.
+- 외부 음악 페이지는 Electron BrowserView 경계 안에서 열며 서버 SPA CSP에 음악 플랫폼 도메인을 추가하지 않는다.
+- preload/IPC 채널을 추가할 때 renderer에서 필요한 최소 기능만 노출하고 임의 코드 실행·파일 시스템 접근을 직접 노출하지 않는다.
+
+보안 경계를 바꾸면 `server/tests/security-headers.test.mjs`와 관련 빌드를 함께 확인한다.
+
 ## Limit Policy Contract
 
 기준 파일:
@@ -181,9 +206,10 @@ server/src/features/music-filter/decision.policy.js
 ## 변경 전 체크
 
 - [ ] 관련 상수와 기존 테스트를 먼저 확인했다.
-- [ ] 상태·라우터·KST·SQL·LLM 계약을 바꾸지 않았거나 변경 이유를 명시했다.
+- [ ] 상태·라우터·KST·SQL·LLM·웹 보안 계약을 바꾸지 않았거나 변경 이유를 명시했다.
 - [ ] 로직 변경에 테스트를 추가하거나 기존 테스트를 통과시켰다.
 - [ ] owner/customer 변경은 각 Vite 빌드를 통과했다.
 - [ ] 라우트 변경은 `docs/API.md`에 반영했다.
+- [ ] CSP/origin/외부 리소스 변경은 보안 경계 테스트를 확인했다.
 - [ ] 현재 구현과 미래 계획을 같은 문서에 섞지 않았다.
 - [ ] 시크릿·토큰·개인정보가 코드와 로그에 없다.
