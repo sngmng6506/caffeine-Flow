@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link2, LoaderCircle, RotateCcw, Search, Send } from 'lucide-react';
+import { Link2, LoaderCircle, Search, Send, X } from 'lucide-react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
@@ -137,12 +137,12 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
 
         <div className='request-card__actions'>
           <button type='button' onClick={() => setStep('input')} className='button button--secondary'>
-            <RotateCcw size={17} aria-hidden='true' />
-            다시 선택
+            <X size={17} aria-hidden='true' />
+            취소
           </button>
           <button type='button' onClick={handleSubmit} disabled={loading} className='button button--primary'>
             {loading ? <LoaderCircle className='is-spinning' size={18} aria-hidden='true' /> : <Send size={18} aria-hidden='true' />}
-            {loading ? '신청 중…' : '곡 신청'}
+            {loading ? '신청 중…' : '신청'}
           </button>
         </div>
       </section>
