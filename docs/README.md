@@ -2,6 +2,8 @@
 
 Caffeine Flow 문서는 **한 사실을 한 문서에서만 자세히 설명한다.** 다른 문서에서는 짧게 요약하고 기준 문서로 연결한다.
 
+AI는 모든 문서를 한꺼번에 읽지 않는다. 작업 종류별 필수 문서와 갱신 조건은 루트 [AGENTS.md](../AGENTS.md)가 기준이다. 각 기준 문서 제목 아래에는 `AI가 읽을 때`, `함께 갱신할 때`, `생략 가능한 경우`가 표시된다.
+
 ## 처음 읽기
 
 | 목적 | 문서 |
@@ -18,7 +20,7 @@ Caffeine Flow 문서는 **한 사실을 한 문서에서만 자세히 설명한�
 
 | 작업 | 먼저 읽을 문서 |
 | --- | --- |
-| 일반 코드 변경 | [AGENTS.md](../AGENTS.md) |
+| 모든 작업의 시작과 문서 선택 | [AGENTS.md](../AGENTS.md) |
 | 상태·라우터·시간·SQL·LLM 변경 | [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md) |
 | 커밋 작성 | [COMMIT_CONVENTION.md](../COMMIT_CONVENTION.md) |
 | 문서 추가·재구성 | [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md) |
@@ -39,3 +41,4 @@ Caffeine Flow 문서는 **한 사실을 한 문서에서만 자세히 설명한�
 - API 레퍼런스에 설계 배경을 길게 넣지 않는다.
 - 가드레일에 기능 설명을 복사하지 않는다.
 - 환경변수 목록을 기능 문서마다 반복하지 않는다.
+- 내부 리팩터링만으로 불필요한 문서 변경을 만들지 않는다.
