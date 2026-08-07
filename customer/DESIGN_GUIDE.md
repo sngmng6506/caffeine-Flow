@@ -274,6 +274,7 @@ Danger:
 - disabled 상태는 opacity만 낮추지 말고 cursor와 상호작용도 비활성화한다.
 - hover, pressed, focus-visible 상태를 모두 정의한다.
 - 아이콘만 있는 버튼은 44px 터치 영역과 `aria-label`을 제공한다.
+- 카드·행 안에서 대상이 명확한 보조 버튼은 `취소`, `댓글`처럼 짧게 쓰고, 독립 CTA와 최종 확인 행동은 대상을 명시한다.
 
 ### 입력
 
@@ -302,7 +303,7 @@ Danger:
 - 곡 제목은 content-strong, 아티스트·채널은 content-muted를 사용한다.
 - 좋아요는 pill 형태의 secondary action이며 활성 상태는 brand-soft와 brand로 표시한다.
 - 댓글 펼치기는 chevron 방향과 `aria-expanded`를 함께 갱신한다.
-- 신청 취소는 본인 곡이며 취소 가능한 상태일 때만 표시한다.
+- 신청 취소는 본인 곡이며 취소 가능한 상태일 때만 `취소`로 표시하고, 확인 단계에서는 신청곡 취소임을 명시한다.
 
 ### 상태 배지
 

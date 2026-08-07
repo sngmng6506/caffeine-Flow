@@ -99,7 +99,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, show
         {cancellable && (
           <button type='button' onClick={handleCancel} className='pill-action pill-action--danger'>
             <X size={16} aria-hidden='true' />
-            <span>신청 취소하기</span>
+            <span>취소</span>
           </button>
         )}
       </div>
