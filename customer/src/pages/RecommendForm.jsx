@@ -147,13 +147,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   }
 
   return (
-    <form onSubmit={handlePreview} className='request-card' aria-labelledby='request-title'>
-      <div className='request-card__heading'>
-        <div>
-          <h2 id='request-title'>신청곡 추가</h2>
-        </div>
-      </div>
-
+    <form onSubmit={handlePreview} className='request-card' aria-label='신청곡 추가'>
       <label className='field-label' htmlFor='music-url'>음악 링크</label>
       <div className='input-shell'>
         <Link2 size={18} aria-hidden='true' />
