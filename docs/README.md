@@ -21,6 +21,7 @@ Caffeine Flow 문서는 **한 사실을 한 문서에서만 자세히 설명한�
 | 일반 코드 변경 | [AGENTS.md](../AGENTS.md) |
 | 상태·라우터·시간·SQL·LLM 변경 | [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md) |
 | 커밋 작성 | [COMMIT_CONVENTION.md](../COMMIT_CONVENTION.md) |
+| 문서 추가·재구성 | [DOCUMENTATION_POLICY.md](DOCUMENTATION_POLICY.md) |
 
 ## 문서별 단일 책임
 
