@@ -21,22 +21,36 @@ test('CSP는 필요한 외부 리소스만 허용하고 inline script를 허용�
   assert.match(csp, /default-src 'self'/);
   assert.match(csp, /script-src[^;]*'self'/);
   assert.match(csp, /https:\/\/accounts\.google\.com\/gsi\/client/);
-  assert.match(csp, /https:\/\/t1\.daumcdn\.net/);
   assert.match(csp, /https:\/\/t1\.kakaocdn\.net/);
+  assert.match(csp, /https:\/\/postcode\.map\.kakao\.com/);
   assert.match(csp, /https:\/\/unpkg\.com/);
+  assert.doesNotMatch(csp, /daumcdn\.net/);
+  assert.doesNotMatch(csp, /postcode\.map\.daum\.net/);
   assert.match(csp, /script-src-attr 'none'/);
   assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
   assert.match(csp, /object-src 'none'/);
 });
 
-test('운영자 콘솔은 inline script 없이 외부 정적 자산을 사용한다', () => {
+test('운영자 콘솔은 inline script 없이 Leaflet CDN 자산을 SRI로 고정한다', () => {
   const html = readFileSync(new URL('../admin-ui/index.html', import.meta.url), 'utf8');
   const adminJs = readFileSync(new URL('../admin-ui/admin.js', import.meta.url), 'utf8');
 
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/i);
-  assert.match(html, /src="\/admin-assets\/admin\.js"/);
   assert.match(html, /href="\/admin-assets\/admin\.css"/);
+  assert.match(html, /src="\/admin-assets\/admin\.js"/);
+  assert.match(html, /leaflet@1\.9\.4\/dist\/leaflet\.css[\s\S]*integrity="sha256-p4NxAoJBhIIN\+hmNHrzRCf9tD\/miZyoHS5obTRR9BMY="[\s\S]*crossorigin=""/);
+  assert.match(html, /leaflet@1\.9\.4\/dist\/leaflet\.js[\s\S]*integrity="sha256-20nQCchB9co0qIjJZRGuk2\/Z9VM\+kNiyxNV1lvTlZBo="[\s\S]*crossorigin=""/);
   assert.doesNotThrow(() => new Function(adminJs));
+});
+
+test('owner 우편번호 연동은 Kakao CDN과 kakao.Postcode만 사용한다', () => {
+  const loginPage = readFileSync(new URL('../../owner/src/pages/LoginPage.jsx', import.meta.url), 'utf8');
+
+  assert.match(loginPage, /https:\/\/t1\.kakaocdn\.net\/mapjsapi\/bundle\/postcode\/prod\/postcode\.v2\.js/);
+  assert.match(loginPage, /window\.kakao\?\.Postcode/);
+  assert.match(loginPage, /new window\.kakao\.Postcode/);
+  assert.doesNotMatch(loginPage, /t1\.daumcdn\.net/);
+  assert.doesNotMatch(loginPage, /window\.daum/);
 });
 
 test('Socket.IO origin 검사는 same-origin 호환성과 cross-origin 제한을 함께 유지한다', async () => {

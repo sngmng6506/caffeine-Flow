@@ -42,8 +42,8 @@ function corsOriginCheck(origin, cb) {
 
 // 배포 SPA가 실제로 사용하는 외부 리소스만 허용한다.
 // - Google Identity Services: 사장님 Google 로그인
-// - Daum/Kakao postcode: 카페 지역 입력
-// - unpkg Leaflet: 운영자 지도
+// - Kakao postcode: 카페 지역 입력
+// - unpkg Leaflet: 운영자 지도(SRI로 버전·무결성 고정)
 // 외부 음악 페이지는 별도 Electron BrowserView에서 열리므로 이 CSP에 추가하지 않는다.
 const CSP_DIRECTIVES = {
   defaultSrc: ["'self'"],
@@ -54,7 +54,6 @@ const CSP_DIRECTIVES = {
   frameAncestors: ["'self'"],
   frameSrc: [
     'https://accounts.google.com/gsi/',
-    'https://postcode.map.daum.net',
     'https://postcode.map.kakao.com',
   ],
   imgSrc: ["'self'", 'data:', 'https:'],
@@ -63,7 +62,6 @@ const CSP_DIRECTIVES = {
   scriptSrc: [
     "'self'",
     'https://accounts.google.com/gsi/client',
-    'https://t1.daumcdn.net',
     'https://t1.kakaocdn.net',
     'https://unpkg.com',
   ],
