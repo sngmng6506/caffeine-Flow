@@ -1,562 +1,185 @@
 # AI Change Guardrails
 
-이 문서는 Caffeine Flow를 AI 도구(Codex, Copilot, Claude, Gemini 등)로 수정할 때 **깨지면 안 되는 암묵적 계약**을 정리한다.
+이 문서는 사람과 AI 도구가 코드를 변경할 때 **깨뜨리면 안 되는 계약**만 정리한다. 기능 설명은 복사하지 않고 담당 문서로 연결한다.
 
-목표는 단순한 코딩 스타일 통일이 아니라, AI가 구조를 모른 채 문자열·라우터 순서·상태값·시간 기준·SQL raw를 바꾸다가 서비스 동작을 깨는 일을 막는 것이다.
+작업 순서:
 
----
-
-## 1. 기본 원칙
-
-AI로 코드를 수정할 때는 아래 순서를 지킨다.
-
-```txt
-1. 관련 상수 파일을 먼저 확인한다.
-2. 문자열을 새로 만들기보다 기존 상수를 import한다.
-3. 상태값, 라우터 순서, KST 기준, SQL raw는 임의로 단순화하지 않는다.
-4. 기능 변경 후 해당 계약 테스트를 추가하거나 갱신한다.
-5. 변경 범위를 작게 유지하고, 한 커밋에 하나의 의도만 담는다.
+```text
+관련 코드와 상수 확인
+→ 아래 계약 확인
+→ 작은 범위로 구현
+→ 테스트·문서 갱신
 ```
 
-주요 상수 파일:
+전체 구조는 [ARCHITECTURE.md](ARCHITECTURE.md), 재생 엔진은 [PLAYBACK.md](PLAYBACK.md), AI 필터는 [LLM_FILTER.md](LLM_FILTER.md)를 참고한다.
 
-```txt
+## Recommendation Status Contract
+
+기준 파일:
+
+```text
 server/src/constants/recommendation-status.js
-server/src/constants/music-filter-status.js
-server/src/constants/music-filter-policy.js
-server/src/constants/platforms.js
-server/src/constants/limits.js
-server/src/constants/time-policy.js
-server/src/db/sql-fragments.js
-owner/src/constants/recommendationStatus.js
-owner/src/constants/musicFilterStatus.js
-owner/src/constants/musicFilterPolicy.js
-owner/src/constants/platforms.js
-customer/src/constants/recommendationStatus.js
-customer/src/constants/platforms.js
-```
-
----
-
-## 2. Recommendation Status Contract
-
-추천곡의 일반 큐 상태는 `status` 컬럼으로 관리한다.
-
-허용 상태:
-
-```txt
-pending
-accepted
-playing
-played
-skipped
-rejected
-```
-
-서버 상태값은 직접 문자열로 쓰지 말고 다음 파일의 상수를 사용한다.
-
-```txt
-server/src/constants/recommendation-status.js
-```
-
-프론트 상태 표시·필터링도 직접 문자열로 쓰지 말고 앱별 상수를 사용한다.
-
-```txt
 owner/src/constants/recommendationStatus.js
 customer/src/constants/recommendationStatus.js
 ```
 
-의미별 그룹:
+- 허용 상태: `pending`, `accepted`, `playing`, `played`, `skipped`, `rejected`.
+- 활성 상태는 `pending`, `accepted`, `playing`이다.
+- 종료 상태는 다시 활성 상태로 되돌리지 않는다.
+- 손님 큐에는 활성 상태만 노출한다.
+- 동일 카페·동일 곡의 활성 중복은 DB 제약으로도 막는다.
+- 상태 문자열을 라우트나 UI에 새로 직접 작성하지 않는다.
 
-```txt
-ACTIVE_STATUSES
-→ pending / accepted / playing
+상태 흐름: [ARCHITECTURE.md#recommendation-status-contract](ARCHITECTURE.md#recommendation-status-contract)
 
-TERMINAL_STATUSES
-→ played / skipped / rejected
+## Music Filter Status Contract
 
-OWNER_MUTABLE_STATUSES
-→ accepted / rejected / playing / played / skipped
-```
+기준 파일:
 
-중요 계약:
-
-```txt
-손님 큐 조회에는 ACTIVE_STATUSES만 노출한다.
-played / skipped / rejected는 손님 큐에 다시 노출하면 안 된다.
-TERMINAL_STATUSES에서 다른 상태로 되돌리는 전이는 금지한다.
-```
-
-관련 테스트:
-
-```txt
-server/tests/integration.test.mjs
-server/tests/transition.test.mjs
-```
-
----
-
-## 3. Music Filter Status Contract
-
-AI 음악 필터의 판단 결과는 일반 큐 상태인 `status`와 분리해서 `filter_status`에 저장한다.
-
-허용 상태:
-
-```txt
-skipped
-accepted
-rejected
-error_rejected
-```
-
-서버 상태값은 직접 문자열로 쓰지 말고 다음 파일의 상수를 사용한다.
-
-```txt
+```text
 server/src/constants/music-filter-status.js
-```
-
-owner UI의 필터 배지도 직접 문자열 비교 대신 다음 파일의 상수를 사용한다.
-
-```txt
-owner/src/constants/musicFilterStatus.js
-```
-
-필터 강도 정책은 다음 파일에서 관리한다.
-
-```txt
 server/src/constants/music-filter-policy.js
+owner/src/constants/musicFilterStatus.js
 owner/src/constants/musicFilterPolicy.js
 ```
 
-현재 허용 강도:
+| 상황 | `status` | `filter_status` |
+| --- | --- | --- |
+| 필터 OFF | `pending` | `skipped` |
+| LLM 수락 | `pending` | `accepted` |
+| LLM 거절 | `rejected` | `rejected` |
+| LLM 오류 | `rejected` | `error_rejected` |
 
-```txt
-low
-medium
-high
-```
+- LLM 오류를 fail-open으로 바꾸지 않는다.
+- `review`, `maybe`, `unknown` 같은 중간 판단을 추가하지 않는다.
+- 자동수락은 `pending && filter_status=accepted`만 대상으로 한다.
+- `filter_status=skipped` 곡을 자동 승격하지 않는다.
+- 판단 상태와 일반 큐 상태를 한 컬럼으로 합치지 않는다.
 
-중요 계약:
+상세 동작: [LLM_FILTER.md](LLM_FILTER.md)
 
-```txt
-AI 필터 OFF
-→ action = accept
-→ filter_status = skipped
-→ status = pending
+## Router Mount Order Contract
 
-LLM accept
-→ action = accept
-→ filter_status = accepted
-→ status = pending
-
-LLM reject
-→ action = reject
-→ filter_status = rejected
-→ status = rejected
-
-LLM API 실패 / timeout / JSON 파싱 실패 / API key 누락
-→ action = reject
-→ filter_status = error_rejected
-→ status = rejected
-→ 사장님 앱에 music_filter_error 알림
-→ 손님에게 503 응답
-
-owner AI 자동수락 (owner/src/pages/DashboardPage.jsx)
-→ pending 중 filter_status = accepted 인 곡만 자동 accepted/playing 승격
-→ filter_status = skipped(필터 OFF 때 들어온 미심사) pending 곡은 자동수락 대상이 아님
-```
-
-금지 사항:
-
-```txt
-review / pending / maybe / unknown 같은 중간 판단값을 만들지 않는다.
-LLM 실패 시 신청곡을 일단 받는 fail-open 동작으로 바꾸지 않는다.
-filter_status만 rejected로 만들고 status를 pending으로 남기지 않는다.
-status만 rejected로 만들고 filter_status를 누락하지 않는다.
-low/medium/high 문자열을 라우트나 UI 컴포넌트에 새로 박지 않는다.
-AI 자동수락에서 filter_status ≠ accepted 인 pending 곡을 자동 승격하지 않는다.
-```
-
-관련 테스트:
-
-```txt
-server/tests/music-filter.test.mjs
-```
-
-상세 설계 문서:
-
-```txt
-docs/LLM_FEATURES.md
-```
-
----
-
-## 4. Router Mount Order Contract
-
-사장님 추천곡 라우터와 손님 추천곡 라우터는 같은 prefix를 공유한다.
-
-```txt
-/api/v1/cafes/:slug/recommendations
-```
-
-반드시 사장님 라우터를 먼저 등록해야 한다.
+`server/app.js`에서 사장님 추천곡 라우터가 public 라우터보다 먼저 등록되어야 한다.
 
 ```js
 app.use('/api/v1/cafes/:slug/recommendations', require('./src/routes/recommendations.owner'));
 app.use('/api/v1/cafes/:slug/recommendations', require('./src/routes/recommendations'));
 ```
 
-이 순서를 바꾸면 다음 라우트가 public router에 먼저 먹힐 수 있다.
+- 정리 목적으로 순서를 바꾸지 않는다.
+- `/owner`, `PUT /:id`, `DELETE /:id`가 public 라우터에 잡히지 않는지 확인한다.
+- 라우트 추가·변경 시 `docs/API.md`를 함께 갱신한다.
 
-```txt
-/owner
-PUT /:id
-DELETE /:id
-```
+## Platform Contract
 
-금지 사항:
+기준 파일:
 
-```txt
-라우터 정리 목적으로 owner/public mount 순서를 바꾸지 않는다.
-손님 라우터에 범용 /:id 라우트를 추가하지 않는다.
-사장님 전용 상태 변경 로직을 public router로 옮기지 않는다.
-```
-
-관련 파일:
-
-```txt
-server/app.js
-server/src/routes/recommendations.js
-server/src/routes/recommendations.owner.js
-```
-
----
-
-## 5. Platform Contract
-
-지원 플랫폼은 상수 파일에서 관리한다.
-
-```txt
+```text
 server/src/constants/platforms.js
 owner/src/constants/platforms.js
 customer/src/constants/platforms.js
 ```
 
-현재 지원 플랫폼:
+- 지원 플랫폼은 `youtube`, `soundcloud`, `spotify`다.
+- URL 파싱·표시·허용 여부에서 같은 상수를 사용한다.
+- 사용자 URL fetch는 `safeAxiosGet`을 거쳐 SSRF를 방어한다.
+- 외부 플랫폼 DOM 우회는 플랫폼별 경계 안에 둔다.
+- Electron IPC와 preload 노출을 임의로 넓히지 않는다.
 
-```txt
-youtube
-soundcloud
-spotify
-```
+재생 세부사항: [PLAYBACK.md](PLAYBACK.md)
 
-서버 플랫폼 관련 로직은 다음 상수/유틸을 사용한다.
+## Limit Policy Contract
 
-```txt
-PLATFORM
-VALID_PLATFORMS
-PLATFORM_LABELS
-parseAllowedPlatforms()
-formatAllowedPlatforms()
-platformLabel()
-```
+기준 파일:
 
-프론트 플랫폼 표시·링크·배지는 각 앱의 constants를 사용한다.
-
-```txt
-owner/src/constants/platforms.js
-customer/src/constants/platforms.js
-```
-
-금지 사항:
-
-```txt
-라우트 파일마다 ['youtube', 'soundcloud', 'spotify']를 새로 만들지 않는다.
-프론트 컴포넌트 안에 플랫폼 표시명/색상/배지를 다시 만들지 않는다.
-표시명 매핑 { youtube: 'YouTube', ... }을 라우트 안에 다시 만들지 않는다.
-새 플랫폼을 추가할 때 일부 파일만 수정하지 않는다.
-```
-
-새 플랫폼을 추가할 때 확인할 곳:
-
-```txt
-server/src/constants/platforms.js
-server/src/routes/tracks.js
-owner/src/constants/platforms.js
-owner/src 관련 플랫폼 설정 UI
-customer/src/constants/platforms.js
-customer/src 관련 신청 UI
-docs/API.md
-관련 테스트
-```
-
-관련 테스트:
-
-```txt
-server/tests/platforms.test.mjs
-```
-
----
-
-## 6. Limit Policy Contract
-
-운영 한도 정책은 다음 파일에서 관리한다.
-
-```txt
+```text
 server/src/constants/limits.js
 ```
 
-현재 정책:
+- 익명 쓰기 엔드포인트는 visitor와 IP 제한을 함께 검토한다.
+- `req.ip`를 사용하고 `X-Forwarded-For`를 직접 파싱하지 않는다.
+- 한도 숫자를 라우트에 중복 작성하지 않는다.
+- 큐 만석, 중복, rate limit을 같은 오류로 임의 통합하지 않는다.
+- 테스트 환경에서의 limiter 우회는 실제 운영 정책을 바꾸지 않는다.
 
-```txt
-GLOBAL_API_RATE_LIMIT = 120/min
-QUEUE_MAX_SIZE = 30
-VISITOR_ID_MAX_LENGTH = 64
-RECOMMENDATION_REQUEST_LIMIT = visitor 3/min, IP 10/min
-VOTE_LIMIT = visitor 15/min, IP 40/min
-COMMENT_LIMIT = visitor 5/min, IP 15/min
-```
+## KST Time Policy Contract
 
-중요 계약:
+기준 파일:
 
-```txt
-visitor_id는 위조 가능하므로 단독 rate limit 기준으로 쓰면 안 된다.
-익명 쓰기 API는 visitor_id 한도와 IP 한도를 둘 다 통과해야 한다.
-NODE_ENV=test에서는 rate limit을 skip한다.
-```
-
-금지 사항:
-
-```txt
-route 안에 windowMs, max 숫자를 직접 박지 않는다.
-visitor_id만으로 신청/투표/댓글 제한을 걸지 않는다.
-테스트 편의를 위해 운영 rate limit을 제거하지 않는다.
-```
-
-관련 테스트:
-
-```txt
-server/tests/limits.test.mjs
-```
-
----
-
-## 7. KST Time Policy Contract
-
-서비스의 통계·방문 기록·날짜 경계는 한국 시간 기준이다.
-
-시간 정책은 다음 파일에서 관리한다.
-
-```txt
+```text
 server/src/constants/time-policy.js
 server/src/utils/kst.js
 owner/src/utils/kst.js
 ```
 
-현재 정책:
+- 방문·이력·통계의 날짜 경계는 KST다.
+- UTC 자정을 직접 계산하지 않는다.
+- 서버 SQL과 UI 날짜 필터가 같은 하루를 보게 한다.
+- 새 통계 쿼리는 기존 KST 유틸 또는 SQL fragment를 재사용한다.
 
-```txt
-TIMEZONE = Asia/Seoul
-KST_OFFSET_HOURS = 9
-ACTIVE_QUEUE_LOOKBACK_DAYS = 6
-MUSIC_FILTER_STATS_LOOKBACK_DAYS = 6
-STATS_PATTERN_LOOKBACK_DAYS = 30
-```
+## SQL Raw Fragment Contract
 
-의미:
+기준 파일:
 
-```txt
-ACTIVE_QUEUE_LOOKBACK_DAYS = 6
-→ 오늘 포함 최근 7일 손님 큐 조회
-
-MUSIC_FILTER_STATS_LOOKBACK_DAYS = 6
-→ 오늘 포함 최근 7일 AI 필터 통계
-
-STATS_PATTERN_LOOKBACK_DAYS = 30
-→ 기존 동작 유지: 30일 전 KST 자정부터 패턴 통계
-```
-
-금지 사항:
-
-```txt
-통계 날짜 경계를 new Date().toISOString() UTC 기준으로 단순화하지 않는다.
-Asia/Seoul 문자열을 여러 파일에 직접 복사하지 않는다.
-KST 기준 통계와 이력 날짜 필터가 서로 다른 하루를 보게 만들지 않는다.
-owner 통계 화면의 오늘 날짜도 owner/src/utils/kst.js를 경유한다.
-```
-
-관련 테스트:
-
-```txt
-server/tests/kst.test.mjs
-server/tests/time-policy.test.mjs
-```
-
----
-
-## 8. SQL Raw Fragment Contract
-
-Knex raw SQL은 AI가 가장 쉽게 깨뜨리는 영역이다.
-
-공유 SQL fragment는 다음 파일에서 관리한다.
-
-```txt
+```text
 server/src/db/sql-fragments.js
 ```
 
-특히 canonical video id SQL은 반드시 아래 형태를 유지한다.
+- 공통 raw SQL 표현식을 복사하지 않는다.
+- `recommendations.id`는 UUID이므로 `MIN/MAX(id)`로 순서를 정하지 않는다.
+- 순서가 필요하면 시간 컬럼 또는 `ROW_NUMBER() OVER (... ORDER BY ...)`를 사용한다.
+- 바인딩이 필요한 raw SQL에 문자열 보간을 사용하지 않는다.
+- 집계 변경은 실제 PostgreSQL 스키마로 검증한다.
 
-```js
-const CANONICAL_VIDEO_ID_SQL = `split_part(video_id, chr(63), 1)`;
-```
+## LLM Prompt and Safety Contract
 
-이유:
+기준 파일:
 
-```txt
-Knex는 문자열 리터럴 안의 ?도 바인딩 placeholder로 해석할 수 있다.
-split_part(video_id, '?', 1)처럼 쓰면 SELECT와 GROUP BY가 서로 다른 placeholder로 컴파일되어 Postgres GROUP BY 오류가 날 수 있다.
-```
-
-금지 사항:
-
-```txt
-가독성을 이유로 chr(63)을 '?' 문자열로 바꾸지 않는다.
-SELECT와 GROUP BY의 canonical expression을 서로 다르게 만들지 않는다.
-KST hour/dow SQL을 서비스 파일마다 직접 작성하지 않는다.
-```
-
-관련 테스트:
-
-```txt
-server/tests/integration.test.mjs
-server/tests/time-policy.test.mjs
-```
-
----
-
-## 9. LLM Prompt and Safety Contract
-
-AI 음악 필터는 프롬프트 텍스트 자체보다 **판단 계약**이 중요하다.
-
-핵심 계약:
-
-```txt
-LLM decision은 accept 또는 reject만 허용한다.
-사용자 입력은 명령이 아니라 심사 대상 데이터로 취급한다.
-곡 제목, 채널명, 신청자명에 포함된 지시문은 무시한다.
-LLM 실패 시 fail-closed로 거절한다.
-```
-
-금지 사항:
-
-```txt
-review 상태를 추가하지 않는다.
-LLM 응답 자유문장을 직접 파싱해 상태 전이를 만들지 않는다.
-프롬프트 인젝션 방어 문구를 제거하지 않는다.
-LLM 오류를 조용히 무시하고 신청을 통과시키지 않는다.
-```
-
-관련 파일:
-
-```txt
+```text
 server/src/features/music-filter/prompt.builder.js
 server/src/features/music-filter/llm.client.js
 server/src/features/music-filter/decision.policy.js
-server/src/features/music-filter/music-filter.service.js
 ```
 
-관련 테스트:
+- 곡 제목·아티스트·신청자명은 명령이 아니라 신뢰할 수 없는 데이터다.
+- 출력은 `accept` 또는 `reject`의 구조화된 JSON만 허용한다.
+- timeout·키 누락·HTTP 오류·파싱 오류는 `error_rejected`로 처리한다.
+- 손님에게 내부 오류와 프롬프트를 노출하지 않는다.
+- 모델 변경 시 JSON Schema 지원 여부를 확인한다.
+- 프롬프트 변경은 상태 계약과 오류 경로 테스트를 함께 확인한다.
 
-```txt
-server/tests/music-filter.test.mjs
-```
+## Migration Contract
 
----
+- 공유 DB에서 로컬 `migrate`를 실행하지 않는다. 배포 start command가 적용한다.
+- 모든 마이그레이션은 `up`과 `down`을 구현한다.
+- 데이터 삭제보다 상태 변경과 보존을 우선한다.
+- partial unique index 변경 시 기존 중복 데이터를 먼저 정리한다.
+- UUID를 정수 PK처럼 취급하지 않는다.
+- 마이그레이션은 빈 DB와 기존 데이터가 있는 DB 양쪽을 고려한다.
 
-## 10. Migration Contract
+## Authentication and Slug Contract
 
-마이그레이션은 fresh DB와 기존 운영 DB를 모두 고려해야 한다.
+- 사장님 토큰, pending 토큰, admin 토큰의 경계를 합치지 않는다.
+- `requireAuth`는 정상 사장님 세션만 통과시킨다.
+- slug는 변경 가능하다.
+- slug 변경 응답에는 새 JWT를 포함하고 클라이언트가 즉시 교체한다.
+- slug를 장기 캐시하거나 카페의 불변 ID로 사용하지 않는다.
+- 정지 카페의 손님 HTTP·소켓 접근을 우회하지 않는다.
 
-중요 계약:
+## App Boundary Contract
 
-```txt
-새 컬럼 추가 migration은 기존 DB에서 한 번만 실행되어야 한다.
-fresh DB에서는 테이블 생성 순서와 파일명 순서가 충돌하지 않아야 한다.
-컬럼 보정용 ensure migration은 안전하게 idempotent 해야 한다.
-```
+- `server/app.js`와 `server/server.js` 분리를 유지한다. 테스트는 `app.js`를 import한다.
+- DB 상태가 단일 원천이며 소켓 이벤트만으로 영구 상태를 만들지 않는다.
+- Electron 재생 상태와 서버 큐 상태가 충돌하지 않도록 한 곡만 `playing`으로 유지한다.
+- 화면 검증이 불가능한 환경에서는 UI 스타일을 대량 변경하지 않는다.
 
-주의 사항:
+## 변경 전 체크
 
-```txt
-테이블이 존재한다고 가정하고 alterTable을 바로 실행하지 않는다.
-컬럼이 이미 존재한다고 가정하지 않는다.
-마이그레이션 파일명을 기존 초기화 파일보다 앞서는 형태로 만들지 않는다.
-```
-
-관련 파일:
-
-```txt
-server/src/db/migrations/
-```
-
----
-
-## 11. Before Changing Code Checklist
-
-AI로 코드를 수정하기 전 아래를 확인한다.
-
-```txt
-상태값을 바꾸는가?
-→ server/src/constants/recommendation-status.js / music-filter-status.js 확인
-→ owner/src/constants/* / customer/src/constants/* 확인
-
-플랫폼을 바꾸는가?
-→ server/src/constants/platforms.js 확인
-→ owner/src/constants/platforms.js / customer/src/constants/platforms.js 확인
-
-rate limit이나 큐 한도를 바꾸는가?
-→ limits.js 확인
-
-날짜/통계를 바꾸는가?
-→ server time-policy.js / kst.js / sql-fragments.js 확인
-→ owner/src/utils/kst.js 확인
-
-raw SQL을 바꾸는가?
-→ sql-fragments.js 확인, integration test 유지
-
-LLM 기능을 바꾸는가?
-→ LLM_FEATURES.md와 music-filter.test.mjs 확인
-
-라우터를 정리하는가?
-→ recommendations.owner가 public보다 먼저 mount되는지 확인
-
-DB 컬럼을 추가하는가?
-→ fresh DB와 기존 DB 모두에서 migration이 안전한지 확인
-```
-
----
-
-## 12. Minimum Test Expectations
-
-AI 수정 후 최소한 아래 테스트/빌드를 통과해야 한다.
-
-```bash
-npm test --prefix server
-npm run build --prefix customer
-npm run build --prefix owner
-```
-
-계약별 주요 테스트:
-
-```txt
-api-docs.test.mjs       → API 문서와 라우트 동기화
-integration.test.mjs    → 실제 Postgres 통합 흐름, top10 SQL 회귀
-transition.test.mjs     → 추천곡 상태 전이
-music-filter.test.mjs   → LLM accept/reject/fail-closed 계약
-platforms.test.mjs      → 플랫폼 목록/표시명/DB 문자열 계약
-limits.test.mjs         → rate limit/queue limit 정책
-kst.test.mjs            → KST 날짜 계산
-time-policy.test.mjs    → KST/SQL fragment 계약
-```
-
-CI는 위 서버 테스트와 customer/owner build 외에 신규 커밋 메시지도 `COMMIT_CONVENTION.md` 형식으로 검사한다.
+- [ ] 관련 상수와 기존 테스트를 먼저 확인했다.
+- [ ] 상태·라우터·KST·SQL·LLM 계약을 바꾸지 않았거나 변경 이유를 명시했다.
+- [ ] 로직 변경에 테스트를 추가하거나 기존 테스트를 통과시켰다.
+- [ ] owner/customer 변경은 각 Vite 빌드를 통과했다.
+- [ ] 라우트 변경은 `docs/API.md`에 반영했다.
+- [ ] 현재 구현과 미래 계획을 같은 문서에 섞지 않았다.
+- [ ] 시크릿·토큰·개인정보가 코드와 로그에 없다.
