@@ -14,7 +14,6 @@ const { PLATFORM, VALID_PLATFORMS } = require('../constants/platforms');
 
 const ownerOnly = [requireAuth, requireCafeOwner];
 
-// POST /api/v1/cafes/:slug/recommendations/owner  (사장님: 직접 추가)
 router.post('/owner', ownerOnly, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
@@ -34,49 +33,45 @@ router.post('/owner', ownerOnly, async (req, res) => {
 
   if (recStatus === REC_STATUS.PLAYING) {
     const cleared = await recService.clearPlaying(cafe.id, null);
-    for (const r of cleared) {
-      broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
-    }
+    for (const r of cleared) broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
   }
 
   let rec;
   try {
     rec = await recService.add(cafe.id, {
-      videoId,
-      title,
-      channelTitle,
-      thumbnail,
-      duration,
-      requesterIp: getClientIp(req),
-      requesterName: null,
-      platform,
+      videoId, title, channelTitle, thumbnail, duration,
+      requesterIp: getClientIp(req), requesterName: null, platform,
     });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
     throw err;
   }
-  const updated = recStatus !== REC_STATUS.PENDING ? await recService.updateStatus(rec.id, recStatus) : rec;
+  const updated = recStatus !== REC_STATUS.PENDING
+    ? await recService.updateStatus(cafe.id, rec.id, recStatus)
+    : rec;
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec: updated });
   res.status(201).json(updated);
 });
 
-// PUT /api/v1/cafes/:slug/recommendations/:id  (사장님: 상태 변경)
 router.put('/:id', ownerOnly, async (req, res) => {
   const { status } = req.body;
   if (!OWNER_MUTABLE_STATUSES.includes(status)) return res.status(400).json({ error: '유효하지 않은 status' });
 
-  // playing으로 바꿀 때 기존 playing 곡을 서버 단에서 played로 처리
+  // clearPlaying 같은 선행 부수효과보다 먼저 target의 cafe scope를 검증한다.
+  // 그렇지 않으면 다른 카페 ID + status=playing 요청만으로 내 카페의 현재
+  // playing 곡을 played로 바꾸는 교차-tenant 부수효과가 생길 수 있다.
+  const target = await recService.findByIdForCafe(req.owner.cafeId, req.params.id);
+  if (!target) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
+
   if (status === REC_STATUS.PLAYING) {
     const cleared = await recService.clearPlaying(req.owner.cafeId, req.params.id);
-    for (const r of cleared) {
-      broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
-    }
+    for (const r of cleared) broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
   }
 
   let rec;
   try {
-    rec = await recService.updateStatus(req.params.id, status);
+    rec = await recService.updateStatus(req.owner.cafeId, req.params.id, status);
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     throw err;
@@ -85,9 +80,9 @@ router.put('/:id', ownerOnly, async (req, res) => {
   res.json(rec);
 });
 
-// DELETE /api/v1/cafes/:slug/recommendations/:id  (사장님)
 router.delete('/:id', ownerOnly, async (req, res) => {
-  await recService.remove(req.params.id);
+  const deleted = await recService.remove(req.owner.cafeId, req.params.id);
+  if (!deleted) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'delete', id: req.params.id });
   res.json({ ok: true });
 });

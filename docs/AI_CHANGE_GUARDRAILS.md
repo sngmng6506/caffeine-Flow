@@ -196,6 +196,23 @@ server/src/features/music-filter/decision.policy.js
 - slug를 장기 캐시하거나 카페의 불변 ID로 사용하지 않는다.
 - 정지 카페의 손님 HTTP·소켓 접근을 우회하지 않는다.
 
+## Recommendation Tenant Isolation Contract
+
+기준 파일:
+
+```text
+server/src/services/recommendation.service.js
+server/src/routes/recommendations.js
+server/src/routes/recommendations.owner.js
+server/tests/auth-boundary.test.mjs
+```
+
+- `/:id` 기반 추천곡 mutation은 recommendation ID만으로 조회·수정하지 않는다.
+- 상태 변경·삭제·취소·투표·투표 취소·댓글 작성은 항상 `(cafeId, recommendationId)` 범위를 함께 검증한다.
+- 사장님 JWT의 `cafeId`와 손님 URL의 `:slug`에서 조회한 `cafe.id`가 tenant boundary의 기준이다.
+- 다른 카페에 속한 recommendation ID는 존재 여부를 노출하지 않고 404로 처리한다.
+- 이 검증은 라우트의 사전 체크에만 의존하지 않고 서비스 계층에서도 강제한다.
+
 ## App Boundary Contract
 
 - `server/app.js`와 `server/server.js` 분리를 유지한다. 테스트는 `app.js`를 import한다.
