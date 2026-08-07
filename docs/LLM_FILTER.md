@@ -1,5 +1,9 @@
 # AI 음악 필터
 
+> **AI가 읽을 때:** 음악 필터 설정, 프롬프트, 모델 호출, 구조화 출력, 자동수락, 오류 처리를 수정할 때
+> **함께 갱신할 때:** LLM 입력·출력, `filter_status`, fail-closed, 자동수락 조건이 달라질 때
+> **생략 가능한 경우:** AI 판단과 무관한 일반 큐 UI·재생 UI만 수정할 때
+
 Caffeine Flow는 사장님이 작성한 매장 분위기 정책을 기준으로 손님 신청곡을 자동 심사한다. 이 기능은 음악 추천기가 아니라 **부적절한 곡이 매장에 재생되는 위험을 줄이는 운영 안전장치**다.
 
 전체 신청 흐름은 [ARCHITECTURE.md](ARCHITECTURE.md), 엔드포인트는 [API.md](API.md), 변경 금지 계약은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md)를 참고한다.
