@@ -14,24 +14,28 @@ const { GLOBAL_API_RATE_LIMIT } = require('./src/constants/limits');
 // app만 import해 통합 테스트를 돌릴 수 있게 한다.
 const app = express();
 
-function buildAllowedOrigins() {
+function buildAllowedOrigins({ appUrl = APP_URL, nodeEnv = process.env.NODE_ENV } = {}) {
   const set = new Set();
-  if (APP_URL) {
-    set.add(APP_URL.replace(/\/$/, ''));
+  if (appUrl) {
+    set.add(appUrl.replace(/\/$/, ''));
   }
-  set.add('http://localhost:5173');
-  set.add('http://localhost:5174');
+  if (nodeEnv !== 'production') {
+    set.add('http://localhost:5173');
+    set.add('http://localhost:5174');
+  }
   return set;
 }
 const ALLOWED_ORIGINS = buildAllowedOrigins();
 
 function corsOriginCheck(origin, cb) {
-  // 제품 클라이언트는 모두 HTTP(S) 문서에서 Socket.IO에 접속한다.
-  // origin이 없는 non-browser 연결이나 file:// 계열의 `null` origin을
-  // Electron 호환성이라는 이유로 포괄 허용하지 않는다.
-  if (typeof origin !== 'string' || origin.trim() === '' || origin === 'null') {
-    return cb(new Error('Origin required'));
+  // CORS Origin은 브라우저의 cross-origin 경계이지 인증 수단이 아니다.
+  // same-origin GET/HEAD(예: Socket.IO 초기 long-polling)는 Origin 헤더가
+  // 없을 수 있으므로 헤더 부재 자체를 거절하지 않는다.
+  if (origin === undefined || origin === null || origin === '') {
+    return cb(null, true);
   }
+  // file://, data: 등 opaque origin은 명시적으로 허용하지 않는다.
+  if (origin === 'null') return cb(new Error('Opaque origin not allowed'));
   if (ALLOWED_ORIGINS.has(origin)) return cb(null, true);
   cb(new Error(`Origin not allowed: ${origin}`));
 }
@@ -144,4 +148,4 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: '서버 오류가 발생했습니다' });
 });
 
-module.exports = { app, corsOriginCheck, CSP_DIRECTIVES };
+module.exports = { app, buildAllowedOrigins, corsOriginCheck, CSP_DIRECTIVES };
