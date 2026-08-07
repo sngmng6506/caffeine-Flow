@@ -5,7 +5,7 @@ import request from 'supertest';
 
 import appModule from '../app.js';
 
-const { app, corsOriginCheck } = appModule;
+const { app, buildAllowedOrigins, corsOriginCheck } = appModule;
 
 function checkOrigin(origin) {
   return new Promise((resolve) => {
@@ -39,14 +39,15 @@ test('운영자 콘솔은 inline script 없이 외부 정적 자산을 사용한
   assert.doesNotThrow(() => new Function(adminJs));
 });
 
-test('Socket.IO origin 검사는 명시적으로 허용된 웹 origin만 통과시킨다', async () => {
+test('Socket.IO origin 검사는 same-origin 호환성과 cross-origin 제한을 함께 유지한다', async () => {
+  // same-origin GET/HEAD long-polling은 브라우저가 Origin을 생략할 수 있다.
+  const missing = await checkOrigin(undefined);
+  assert.equal(missing.error, null);
+  assert.equal(missing.allowed, true);
+
   const localhost = await checkOrigin('http://localhost:5174');
   assert.equal(localhost.error, null);
   assert.equal(localhost.allowed, true);
-
-  const missing = await checkOrigin(undefined);
-  assert.ok(missing.error);
-  assert.equal(missing.allowed, undefined);
 
   const nullOrigin = await checkOrigin('null');
   assert.ok(nullOrigin.error);
@@ -55,4 +56,13 @@ test('Socket.IO origin 검사는 명시적으로 허용된 웹 origin만 통과�
   const foreign = await checkOrigin('https://evil.example');
   assert.ok(foreign.error);
   assert.equal(foreign.allowed, undefined);
+});
+
+test('운영 origin allowlist에는 개발 localhost를 포함하지 않는다', () => {
+  const origins = buildAllowedOrigins({
+    appUrl: 'https://caffeine.example',
+    nodeEnv: 'production',
+  });
+
+  assert.deepEqual([...origins], ['https://caffeine.example']);
 });
