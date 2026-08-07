@@ -317,6 +317,10 @@
   margin-top: 12px;
 }
 
+.request-card .feedback {
+  margin-top: 12px;
+}
+
 .request-card__actions {
   display: grid;
   grid-template-columns: 1fr 1.25fr;

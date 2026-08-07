@@ -138,11 +138,11 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         <div className='request-card__actions'>
           <button type='button' onClick={() => setStep('input')} className='button button--secondary'>
             <RotateCcw size={17} aria-hidden='true' />
-            다시 선택하기
+            다시 선택
           </button>
           <button type='button' onClick={handleSubmit} disabled={loading} className='button button--primary'>
             {loading ? <LoaderCircle className='is-spinning' size={18} aria-hidden='true' /> : <Send size={18} aria-hidden='true' />}
-            {loading ? '신청 중…' : '이 곡 신청하기'}
+            {loading ? '신청 중…' : '곡 신청'}
           </button>
         </div>
       </section>
