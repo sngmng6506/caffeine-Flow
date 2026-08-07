@@ -3,11 +3,16 @@ const SHORTCUT_GROUPS = [
     platform: 'YouTube',
     color: '#ff0000',
     bg: '#fff5f5',
-    note: '계정 불필요',
+    note: 'YouTube는 계정 불필요 · Music은 로그인 권장',
     links: [
-      { label: 'YouTube Music', url: 'https://music.youtube.com' },
+      { label: 'YouTube Music', url: 'https://music.youtube.com', action: 'bgm' },
       { label: 'YouTube', url: 'https://www.youtube.com' },
       { label: '인기 음악 차트', url: 'https://www.youtube.com/feed/trending?bp=4gINGgt5dG1hX2NoYXJ0cw%3D%3D' },
+      {
+        label: 'YouTube Music 로그인',
+        url: 'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmusic.youtube.com%2F',
+        action: 'login',
+      },
     ],
   },
   {
