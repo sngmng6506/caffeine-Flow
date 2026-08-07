@@ -71,6 +71,8 @@ owner/electron/   데스크톱 재생 엔진
 | [LLM_FILTER.md](docs/LLM_FILTER.md) | 현재 AI 음악 필터 동작 |
 | [AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) | 변경 시 유지할 코드 계약 |
 | [ROADMAP.md](docs/ROADMAP.md) | 아직 구현되지 않은 개선 후보 |
+| [Customer Design Guide](customer/DESIGN_GUIDE.md) | 손님 화면 Soft Streaming 디자인 기준 |
+| [Customer Writing Guide](customer/WRITING_GUIDE.md) | 손님 화면 목소리·용어·UI 문구 기준 |
 | [AGENTS.md](AGENTS.md) | 사람·AI 도구 공통 작업 규칙 |
 
 ## 라이선스
