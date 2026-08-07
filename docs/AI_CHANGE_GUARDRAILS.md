@@ -110,8 +110,8 @@ owner/electron/preload.js
 - `script-src`에 `'unsafe-inline'`을 추가하지 않는다. 필요한 inline JavaScript는 정적 파일·nonce·hash 방식으로 분리한다.
 - React inline style과 Leaflet DOM style 때문에 `style-src 'unsafe-inline'`은 현재 허용하지만 script 허용과 혼동하지 않는다.
 - Google 로그인 호환을 위한 COOP `same-origin-allow-popups`와 COEP 비활성화는 목적이 분명한 예외이며 임의 확대하지 않는다.
-- Socket.IO는 `APP_URL`과 개발용 localhost처럼 명시된 웹 origin만 허용한다.
-- origin header가 없거나 값이 `null`인 연결을 Electron 호환성이라는 이유로 포괄 허용하지 않는다.
+- 명시적 Origin이 있는 Socket.IO 브라우저 cross-origin 연결은 `APP_URL` allowlist로 제한하고, 개발 localhost는 production에서 허용하지 않는다.
+- Origin 헤더 부재는 same-origin GET/HEAD 또는 non-browser 요청에서 정상일 수 있으므로 인증 신호로 사용하지 않는다. 단 `Origin: null`은 opaque origin이므로 거절한다.
 - Electron 운영 앱은 HTTP(S) owner 페이지를 로드하므로 정상 origin이 존재한다. `file://` 기반으로 구조를 바꾸면 origin 정책을 먼저 재설계한다.
 - 외부 음악 페이지는 Electron BrowserView 경계 안에서 열며 서버 SPA CSP에 음악 플랫폼 도메인을 추가하지 않는다.
 - preload/IPC 채널을 추가할 때 renderer에서 필요한 최소 기능만 노출하고 임의 코드 실행·파일 시스템 접근을 직접 노출하지 않는다.
