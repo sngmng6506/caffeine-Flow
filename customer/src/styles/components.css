@@ -111,8 +111,8 @@
 .now-playing {
   margin-bottom: var(--cf-space-4);
   padding: 16px;
-  color: var(--cf-content-strong);
-  background: var(--cf-surface);
+  color: var(--cf-on-dark);
+  background: var(--cf-now-playing);
   border-radius: var(--cf-radius-card);
 }
 
@@ -121,7 +121,7 @@
   align-items: center;
   gap: 7px;
   margin-bottom: 13px;
-  color: var(--cf-brand);
+  color: var(--cf-on-dark-accent);
   font-size: 12px;
   font-weight: 700;
 }
@@ -130,9 +130,9 @@
   width: 7px;
   height: 7px;
   margin-left: 1px;
-  background: var(--cf-brand);
+  background: var(--cf-on-dark-accent);
   border-radius: 50%;
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-brand) 35%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-on-dark-accent) 35%, transparent);
   animation: cf-pulse 1.8s infinite;
 }
 
@@ -158,6 +158,11 @@
   place-items: center;
 }
 
+.now-playing__thumb--fallback {
+  color: var(--cf-on-dark);
+  background: var(--cf-on-dark-soft);
+}
+
 .now-playing__info,
 .request-preview__info {
   min-width: 0;
@@ -177,7 +182,7 @@
 .now-playing__channel {
   overflow: hidden;
   margin: 5px 0 0;
-  color: var(--cf-content-muted);
+  color: var(--cf-on-dark-muted);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -462,13 +467,24 @@
 }
 
 .tabs__button.is-active {
-  color: var(--cf-brand);
-  background: var(--cf-brand-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cf-brand) 10%, transparent);
+  color: var(--cf-on-dark);
+  background: var(--cf-brand);
+}
+
+.tab-swipe-area {
+  touch-action: pan-y;
 }
 
 .tab-panel {
   min-height: 160px;
+}
+
+.tab-panel--forward {
+  animation: cf-tab-forward var(--cf-motion-base);
+}
+
+.tab-panel--backward {
+  animation: cf-tab-backward var(--cf-motion-base);
 }
 
 .content-section + .content-section {
@@ -951,6 +967,16 @@
 @keyframes cf-pulse {
   70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--cf-brand) 0%, transparent); }
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-brand) 0%, transparent); }
+}
+
+@keyframes cf-tab-forward {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes cf-tab-backward {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @media (max-width: 380px) {

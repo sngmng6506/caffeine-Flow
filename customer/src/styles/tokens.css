@@ -1,22 +1,28 @@
 :root {
-  --cf-brand: #1769e0;
-  --cf-brand-hover: #0f56c7;
-  --cf-brand-active: #0b47aa;
-  --cf-brand-soft: #e7f0ff;
-  --cf-accent-blue: #1769e0;
-  --cf-accent-blue-soft: #e7f0ff;
-  --cf-accent-lilac: #7388a8;
+  --cf-brand: #155eef;
+  --cf-brand-hover: #004eeb;
+  --cf-brand-active: #003fbd;
+  --cf-brand-soft: #dce9ff;
+  --cf-accent-blue: #155eef;
+  --cf-accent-blue-soft: #dce9ff;
+  --cf-accent-lilac: #667ea8;
 
-  --cf-canvas: #f0f3f7;
+  --cf-canvas: #f2f4f7;
   --cf-surface: #ffffff;
-  --cf-surface-subtle: #e9eef4;
-  --cf-content-strong: #0f1724;
-  --cf-content: #253142;
-  --cf-content-muted: #526071;
-  --cf-content-caption: #748091;
-  --cf-content-disabled: #9aa5b1;
-  --cf-stroke: #dce2e8;
-  --cf-stroke-strong: #c7d0d9;
+  --cf-surface-subtle: #eef2f6;
+  --cf-content-strong: #101828;
+  --cf-content: #344054;
+  --cf-content-muted: #667085;
+  --cf-content-caption: #7c8798;
+  --cf-content-disabled: #98a2b3;
+  --cf-stroke: #e4e7ec;
+  --cf-stroke-strong: #d0d5dd;
+
+  --cf-now-playing: #172b4d;
+  --cf-on-dark: #ffffff;
+  --cf-on-dark-muted: #c9d4e5;
+  --cf-on-dark-accent: #8eb7ff;
+  --cf-on-dark-soft: #2a4164;
 
   --cf-success: #167a5a;
   --cf-success-soft: #e8f6f0;
@@ -24,7 +30,7 @@
   --cf-warning-soft: #fff4d8;
   --cf-destructive: #bf3850;
   --cf-destructive-soft: #fcecef;
-  --cf-focus: #1769e0;
+  --cf-focus: #155eef;
 
   --cf-status-pending: #6f658f;
   --cf-status-pending-soft: #f0edf8;

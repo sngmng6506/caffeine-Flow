@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link2, LoaderCircle, Music2, RotateCcw, Search, Send } from 'lucide-react';
+import { Link2, LoaderCircle, RotateCcw, Search, Send } from 'lucide-react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
+import SongThumbnail from '../components/SongThumbnail';
 
 function YouTubeIcon() {
   return (
@@ -119,10 +120,12 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         </div>
 
         <div className='request-preview'>
-          {preview.thumbnail
-            ? <img src={preview.thumbnail} alt='' className='request-preview__thumb' />
-            : <div className='request-preview__thumb request-preview__thumb--fallback'><Music2 size={22} aria-hidden='true' /></div>
-          }
+          <SongThumbnail
+            src={preview.thumbnail}
+            className='request-preview__thumb'
+            fallbackClassName='request-preview__thumb--fallback'
+            iconSize={22}
+          />
           <div className='request-preview__info'>
             <span className='platform-badge' style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
             <strong>{preview.title}</strong>

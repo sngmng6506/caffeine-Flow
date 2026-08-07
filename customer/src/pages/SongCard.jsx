@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Heart, MessageCircle, Music2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Heart, MessageCircle, X } from 'lucide-react';
 import { vote, unvote, cancelRecommendation } from '../api';
 import { hasVoted, markVoted, removeVote } from '../votedSongs';
 import { CANCELLABLE_STATUSES, REC_STATUS_LABELS } from '../constants/recommendationStatus';
 import { COMPACT_PLATFORM_BADGE, PLATFORM } from '../constants/platforms';
+import SongThumbnail from '../components/SongThumbnail';
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, showDate, position, isMyRequest, hideStatus, expanded }) {
   const [error, setError] = useState('');
@@ -43,10 +44,11 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, show
     <article className='song-card'>
       <div className='song-card__row'>
         {position && <span className='song-card__position' aria-label={`${position}번째`}>{position}</span>}
-        {rec.thumbnail
-          ? <img src={rec.thumbnail} alt='' className='song-card__thumb' />
-          : <div className='song-card__thumb song-card__thumb--fallback'><Music2 size={20} aria-hidden='true' /></div>
-        }
+        <SongThumbnail
+          src={rec.thumbnail}
+          className='song-card__thumb'
+          fallbackClassName='song-card__thumb--fallback'
+        />
         <div className='song-card__body'>
           <h3 className='song-card__title'>{rec.title}</h3>
           <div className='song-card__meta'>

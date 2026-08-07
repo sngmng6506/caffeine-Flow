@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -28,6 +28,7 @@ import { ACTIVE_STATUSES, HISTORY_STATUSES, REC_STATUS } from '../constants/reco
 import NowPlaying from './NowPlaying';
 import RecommendForm from './RecommendForm';
 import SongCard from './SongCard';
+import SongThumbnail from '../components/SongThumbnail';
 
 function getTabs(cafeName) {
   return [
@@ -58,6 +59,7 @@ export default function CafePage({ slug }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('queue');
+  const [tabDirection, setTabDirection] = useState('forward');
   const [cafeTop, setCafeTop] = useState([]);
   const [cafeTopHasMore, setCafeTopHasMore] = useState(false);
   const [globalTop, setGlobalTop] = useState([]);
@@ -70,7 +72,9 @@ export default function CafePage({ slug }) {
   const [historyLimit, setHistoryLimit] = useState(10);
   const [historyExpanded, setHistoryExpanded] = useState(null);
   const [queueExpanded, setQueueExpanded] = useState(null);
+  const swipeStart = useRef(null);
   const deviceName = getDeviceName();
+  const tabs = getTabs(cafeName);
 
   const nowPlaying = recs.find(rec => rec.status === REC_STATUS.PLAYING) || null;
   const waitingQueue = recs
@@ -193,6 +197,36 @@ export default function CafePage({ slug }) {
     setSuccessTimer(setTimeout(() => setSuccessMsg(''), 4000));
   }
 
+  function changeTab(nextTab) {
+    if (nextTab === tab) return;
+    const currentIndex = tabs.findIndex(item => item.id === tab);
+    const nextIndex = tabs.findIndex(item => item.id === nextTab);
+    setTabDirection(nextIndex > currentIndex ? 'forward' : 'backward');
+    setTab(nextTab);
+  }
+
+  function handleSwipeStart(event) {
+    if (event.touches.length !== 1 || event.target.closest?.('input, textarea, select, button, a, [role=button]')) {
+      swipeStart.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    swipeStart.current = { x: touch.clientX, y: touch.clientY };
+  }
+
+  function handleSwipeEnd(event) {
+    if (!swipeStart.current || event.changedTouches.length !== 1) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - swipeStart.current.x;
+    const deltaY = touch.clientY - swipeStart.current.y;
+    swipeStart.current = null;
+
+    if (Math.abs(deltaX) < 56 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+    const currentIndex = tabs.findIndex(item => item.id === tab);
+    const nextIndex = deltaX < 0 ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex >= 0 && nextIndex < tabs.length) changeTab(tabs[nextIndex].id);
+  }
+
   if (loading) {
     return (
       <main className='app-state'>
@@ -216,7 +250,7 @@ export default function CafePage({ slug }) {
     <main className='customer-page'>
       <header className='cafe-header'>
         <h1>{cafeName || '신청곡'}</h1>
-        <p>오늘 듣고 싶은 음악을 신청해 보세요.</p>
+        <p>듣고 싶은 음악을 신청해 보세요.</p>
       </header>
 
       {notice && (
@@ -235,22 +269,28 @@ export default function CafePage({ slug }) {
       <NowPlaying rec={nowPlaying} />
 
       <nav className='tabs' role='tablist' aria-label='음악 목록'>
-        {getTabs(cafeName).map(item => (
+        {tabs.map(item => (
           <button
             key={item.id}
             type='button'
             role='tab'
             aria-selected={tab === item.id}
             className={tab === item.id ? 'tabs__button is-active' : 'tabs__button'}
-            onClick={() => setTab(item.id)}
+            onClick={() => changeTab(item.id)}
           >
             {item.label}
           </button>
         ))}
       </nav>
 
+      <div
+        className='tab-swipe-area'
+        onTouchStart={handleSwipeStart}
+        onTouchEnd={handleSwipeEnd}
+        onTouchCancel={() => { swipeStart.current = null; }}
+      >
       {tab === 'queue' && (
-        <div className='tab-panel' role='tabpanel'>
+        <div key='queue' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
           {isAccepting && (
             <RecommendForm
               slug={slug}
@@ -317,7 +357,7 @@ export default function CafePage({ slug }) {
       )}
 
       {tab === 'history' && (
-        <div className='tab-panel' role='tabpanel'>
+        <div key='history' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
           {history.length === 0 ? (
             <StatePanel title='최근 재생한 곡이 없어요.' description='재생이 끝난 곡은 여기에서 다시 볼 수 있어요.' />
           ) : (
@@ -351,7 +391,7 @@ export default function CafePage({ slug }) {
       )}
 
       {(tab === 'cafeTop' || tab === 'globalTop') && (
-        <div className='tab-panel' role='tabpanel'>
+        <div key={tab} className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
           <Top10List
             items={tab === 'cafeTop' ? cafeTop : globalTop}
             hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}
@@ -361,6 +401,7 @@ export default function CafePage({ slug }) {
           />
         </div>
       )}
+      </div>
 
       <footer className='customer-footer'>
         <span>Caffeine Flow</span>
@@ -408,8 +449,8 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
         <div><h2>인기곡</h2><p>신청과 좋아요를 기준으로 모았어요.</p></div>
       </div>
       <div className='segmented-control' aria-label='인기곡 정렬'>
-        <button type='button' aria-pressed={sortBy === 'count'} onClick={() => setSortBy('count')}>신청 많은 순</button>
-        <button type='button' aria-pressed={sortBy === 'votes'} onClick={() => setSortBy('votes')}>좋아요 많은 순</button>
+        <button type='button' aria-pressed={sortBy === 'count'} onClick={() => setSortBy('count')}>신청순</button>
+        <button type='button' aria-pressed={sortBy === 'votes'} onClick={() => setSortBy('votes')}>좋아요순</button>
       </div>
       <ol className='rank-list'>
         {sorted.map((item, index) => {
@@ -419,7 +460,12 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
             <li className='rank-list__item' key={rowKey}>
               <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
                 <span className='rank-row__number'>{index + 1}</span>
-                {item.thumbnail ? <img className='rank-row__thumbnail' src={item.thumbnail} alt='' /> : <span className='rank-row__thumbnail rank-row__thumbnail--empty'><Music2 size={18} /></span>}
+                <SongThumbnail
+                  src={item.thumbnail}
+                  className='rank-row__thumbnail'
+                  fallbackClassName='rank-row__thumbnail--empty'
+                  iconSize={18}
+                />
                 <span className='rank-row__info'>
                   <strong>{item.title}</strong>
                   <small>{item.channel_title} · {item.count}회 신청</small>
