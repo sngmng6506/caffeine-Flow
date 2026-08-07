@@ -1,5 +1,27 @@
 import { useEffect, useState } from 'react';
-import { getRecommendations, getCafeTop10, getGlobalTop10, getSongComments, postSongComment, postSongReply } from '../api';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Heart,
+  Info,
+  LoaderCircle,
+  MessageCircle,
+  Music2,
+  PauseCircle,
+  Reply,
+  Send,
+  Sparkles,
+} from 'lucide-react';
+import {
+  getRecommendations,
+  getCafeTop10,
+  getGlobalTop10,
+  getSongComments,
+  postSongComment,
+  postSongReply,
+} from '../api';
 import { getDeviceName } from '../deviceName';
 import { getSocket, disconnectSocket } from '../socket';
 import { VALID_PLATFORMS } from '../constants/platforms';
@@ -10,11 +32,23 @@ import SongCard from './SongCard';
 
 function getTabs(cafeName) {
   return [
-    { id: 'queue',     label: '신청곡' },
-    { id: 'history',  label: '최근 7일' },
-    { id: 'cafeTop',  label: cafeName ? `${cafeName} TOP` : '카페 TOP' },
+    { id: 'queue', label: '신청곡' },
+    { id: 'history', label: '최근 재생' },
+    { id: 'cafeTop', label: cafeName ? `${cafeName} TOP` : '매장 TOP' },
     { id: 'globalTop', label: '전체 TOP' },
   ];
+}
+
+function StatePanel({ icon: Icon = Music2, title, description, loading = false }) {
+  return (
+    <div className='empty-state' role={loading ? 'status' : undefined}>
+      <span className='empty-state__icon' aria-hidden='true'>
+        <Icon size={24} className={loading ? 'spin' : ''} />
+      </span>
+      <strong>{title}</strong>
+      {description && <p>{description}</p>}
+    </div>
+  );
 }
 
 export default function CafePage({ slug }) {
@@ -25,54 +59,57 @@ export default function CafePage({ slug }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('queue');
-  const [cafeTop, setCafeTop]       = useState([]);
+  const [cafeTop, setCafeTop] = useState([]);
   const [cafeTopHasMore, setCafeTopHasMore] = useState(false);
-  const [globalTop, setGlobalTop]   = useState([]);
+  const [globalTop, setGlobalTop] = useState([]);
   const [globalTopHasMore, setGlobalTopHasMore] = useState(false);
   const [topLoading, setTopLoading] = useState(false);
-  const [topLoaded, setTopLoaded]   = useState({ cafeTop: false, globalTop: false });
+  const [topLoaded, setTopLoaded] = useState({ cafeTop: false, globalTop: false });
   const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
-  const [successMsg, setSuccessMsg]     = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
   const [historyLimit, setHistoryLimit] = useState(10);
   const [historyExpanded, setHistoryExpanded] = useState(null);
-  const [queueExpanded, setQueueExpanded]     = useState(null);
+  const [queueExpanded, setQueueExpanded] = useState(null);
   const deviceName = getDeviceName();
 
-  const nowPlaying = recs.find(r => r.status === REC_STATUS.PLAYING) || null;
+  const nowPlaying = recs.find(rec => rec.status === REC_STATUS.PLAYING) || null;
   const waitingQueue = recs
-    .filter(r => r.status === REC_STATUS.ACCEPTED)
+    .filter(rec => rec.status === REC_STATUS.ACCEPTED)
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
   const pendingQueue = recs
-    .filter(r => r.status === REC_STATUS.PENDING)
+    .filter(rec => rec.status === REC_STATUS.PENDING)
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
   const history = recs
-    .filter(r => HISTORY_STATUSES.includes(r.status))
+    .filter(rec => HISTORY_STATUSES.includes(rec.status))
     .sort((a, b) => new Date(b.played_at || b.requested_at) - new Date(a.played_at || a.requested_at));
 
   useEffect(() => {
     getRecommendations(slug)
-      .then(({ recommendations, is_accepting, notice, cafe_name, allowed_platforms }) => {
+      .then(({ recommendations, is_accepting, notice: nextNotice, cafe_name, allowed_platforms }) => {
         setRecs(recommendations);
         setIsAccepting(is_accepting);
-        setNotice(notice);
+        setNotice(nextNotice);
         setCafeName(cafe_name);
         if (allowed_platforms) setAllowedPlatforms(allowed_platforms);
       })
-      .catch(e => setError(e.message))
+      .catch(caught => setError(caught.message))
       .finally(() => setLoading(false));
 
     const socket = getSocket(slug);
-
     let connected = false;
+
     socket.on('connect', () => {
-      if (!connected) { connected = true; return; }
-      // 재연결 시 놓친 업데이트 복구
+      if (!connected) {
+        connected = true;
+        return;
+      }
+
       getRecommendations(slug)
-        .then(({ recommendations, is_accepting, notice, cafe_name, allowed_platforms }) => {
+        .then(({ recommendations, is_accepting, notice: nextNotice, cafe_name, allowed_platforms }) => {
           setRecs(recommendations);
           setIsAccepting(is_accepting);
-          setNotice(notice);
+          setNotice(nextNotice);
           setCafeName(cafe_name);
           if (allowed_platforms) setAllowedPlatforms(allowed_platforms);
         })
@@ -80,17 +117,15 @@ export default function CafePage({ slug }) {
     });
 
     socket.on('recommendations_update', ({ action, rec, id }) => {
-      if (action === 'add')    setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
-      if (action === 'update' || action === 'vote') setRecs(prev => prev.map(r => r.id === rec.id ? rec : r));
-      if (action === 'delete') setRecs(prev => prev.filter(r => r.id !== id));
+      if (action === 'add') setRecs(previous => previous.some(item => item.id === rec.id) ? previous : [rec, ...previous]);
+      if (action === 'update' || action === 'vote') setRecs(previous => previous.map(item => item.id === rec.id ? rec : item));
+      if (action === 'delete') setRecs(previous => previous.filter(item => item.id !== id));
     });
 
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
-    socket.on('notice_updated', ({ notice }) => setNotice(notice));
-    socket.on('cafe_updated',   ({ cafe_name }) => setCafeName(cafe_name));
+    socket.on('notice_updated', ({ notice: nextNotice }) => setNotice(nextNotice));
+    socket.on('cafe_updated', ({ cafe_name }) => setCafeName(cafe_name));
     socket.on('platforms_updated', ({ allowed_platforms }) => setAllowedPlatforms(allowed_platforms));
-    // 사장님이 QR을 재발급·재등록하면 이 slug는 더 이상 유효하지 않다.
-    // 열어둔 손님을 새 주소로 안내한다.
     socket.on('cafe_moved', ({ movedTo }) => {
       if (movedTo) window.location.replace(`/${movedTo}`);
     });
@@ -102,59 +137,102 @@ export default function CafePage({ slug }) {
     if (tab === 'cafeTop' && !topLoaded.cafeTop) {
       setTopLoading(true);
       getCafeTop10(slug, 0)
-        .then(({ items, hasMore }) => { setCafeTop(items); setCafeTopHasMore(hasMore); setTopLoaded(p => ({ ...p, cafeTop: true })); })
+        .then(({ items, hasMore }) => {
+          setCafeTop(items);
+          setCafeTopHasMore(hasMore);
+          setTopLoaded(previous => ({ ...previous, cafeTop: true }));
+        })
         .catch(() => {})
         .finally(() => setTopLoading(false));
     }
+
     if (tab === 'globalTop' && !topLoaded.globalTop) {
       setTopLoading(true);
       getGlobalTop10(0)
-        .then(({ items, hasMore }) => { setGlobalTop(items); setGlobalTopHasMore(hasMore); setTopLoaded(p => ({ ...p, globalTop: true })); })
+        .then(({ items, hasMore }) => {
+          setGlobalTop(items);
+          setGlobalTopHasMore(hasMore);
+          setTopLoaded(previous => ({ ...previous, globalTop: true }));
+        })
         .catch(() => {})
         .finally(() => setTopLoading(false));
     }
-  }, [tab]);
+  }, [tab, slug, topLoaded.cafeTop, topLoaded.globalTop]);
 
   async function loadMoreTop() {
     setTopLoading(true);
     try {
       if (tab === 'cafeTop') {
         const { items, hasMore } = await getCafeTop10(slug, cafeTop.length);
-        setCafeTop(prev => [...prev, ...items]);
+        setCafeTop(previous => [...previous, ...items]);
         setCafeTopHasMore(hasMore);
       } else {
         const { items, hasMore } = await getGlobalTop10(globalTop.length);
-        setGlobalTop(prev => [...prev, ...items]);
+        setGlobalTop(previous => [...previous, ...items]);
         setGlobalTopHasMore(hasMore);
       }
-    } catch {}
-    setTopLoading(false);
+    } catch {
+      // 기존 목록은 유지하고 다시 시도할 수 있게 둔다.
+    } finally {
+      setTopLoading(false);
+    }
   }
 
   function handleUpdate(updated) {
-    setRecs(prev => prev.map(r => r.id === updated.id ? updated : r));
+    setRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
   }
 
   function handleDelete(id) {
-    setRecs(prev => prev.filter(r => r.id !== id));
+    setRecs(previous => previous.filter(rec => rec.id !== id));
   }
 
   function handleAdded(rec) {
-    setRecs(prev => prev.some(r => r.id === rec.id) ? prev : [rec, ...prev]);
-    const position = recs.filter(r => [REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(r.status)).length + 1;
-    setSuccessMsg(`${position}번째로 대기 중이에요!`);
+    setRecs(previous => previous.some(item => item.id === rec.id) ? previous : [rec, ...previous]);
+    const position = recs.filter(item => [REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(item.status)).length + 1;
+    setSuccessMsg(`신청했어요. 현재 ${position}번째로 기다리고 있어요.`);
     if (successTimer) clearTimeout(successTimer);
     setSuccessTimer(setTimeout(() => setSuccessMsg(''), 4000));
   }
 
-  if (loading) return <div style={styles.center}>불러오는 중...</div>;
-  if (error)   return <div style={styles.center}>{error}</div>;
+  if (loading) {
+    return (
+      <main className='app-state'>
+        <LoaderCircle className='spin' size={28} aria-hidden='true' />
+        <h1>신청곡을 불러오고 있어요.</h1>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className='app-state'>
+        <AlertTriangle size={28} aria-hidden='true' />
+        <h1>신청곡 화면을 열지 못했어요.</h1>
+        <p>{error}<br />QR 코드를 다시 스캔하거나 매장에 문의해 주세요.</p>
+      </main>
+    );
+  }
 
   return (
-    <div style={styles.page}>
-      {cafeName && <h2 style={styles.cafeName}>{cafeName}</h2>}
-      {notice && <div style={styles.notice}>📢 {notice}</div>}
-      {!isAccepting && <div style={styles.closed}>현재 신청을 받지 않습니다</div>}
+    <main className='customer-page'>
+      <header className='cafe-header'>
+        <span className='cafe-header__brand'><Sparkles size={14} aria-hidden='true' /> Caffeine Flow</span>
+        <h1>{cafeName || '신청곡'}</h1>
+        <p>오늘 듣고 싶은 음악을 신청해 보세요.</p>
+      </header>
+
+      {notice && (
+        <div className='status-panel status-panel--info'>
+          <Info size={18} aria-hidden='true' />
+          <span>{notice}</span>
+        </div>
+      )}
+      {!isAccepting && (
+        <div className='status-panel status-panel--warning'>
+          <PauseCircle size={18} aria-hidden='true' />
+          <span><strong>지금은 신청을 쉬고 있어요.</strong><small>재개되면 이 화면에서 바로 신청할 수 있어요.</small></span>
+        </div>
+      )}
 
       <NowPlaying rec={nowPlaying} />
 
@@ -163,176 +241,209 @@ export default function CafePage({ slug }) {
           slug={slug}
           onAdded={handleAdded}
           playingVideoId={nowPlaying?.video_id}
-          activeVideoIds={recs
-            .filter(r => ACTIVE_STATUSES.includes(r.status))
-            .map(r => r.video_id)}
+          activeVideoIds={recs.filter(rec => ACTIVE_STATUSES.includes(rec.status)).map(rec => rec.video_id)}
           allowedPlatforms={allowedPlatforms}
         />
       )}
-      {successMsg && <div style={styles.successMsg}>{successMsg}</div>}
 
-      <div style={styles.tabBar}>
-        {getTabs(cafeName).map(t => (
+      {successMsg && (
+        <div className='feedback feedback--success' role='status'>
+          <CheckCircle2 size={18} aria-hidden='true' />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
+      <nav className='tabs' role='tablist' aria-label='음악 목록'>
+        {getTabs(cafeName).map(item => (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            style={{ ...styles.tabBtn, ...(tab === t.id ? styles.tabActive : {}) }}
+            key={item.id}
+            type='button'
+            role='tab'
+            aria-selected={tab === item.id}
+            className={tab === item.id ? 'tabs__button is-active' : 'tabs__button'}
+            onClick={() => setTab(item.id)}
           >
-            {t.label}
+            {item.label}
           </button>
         ))}
-      </div>
+      </nav>
 
       {tab === 'queue' && (
-        <>
+        <div className='tab-panel' role='tabpanel'>
           {waitingQueue.length > 0 && (
-            <section>
-              <h3 style={styles.sectionTitle}>대기 중 ({waitingQueue.length})</h3>
-              {waitingQueue.map((r, i) => (
-                <div key={r.id}>
-                  <div
-                    onClick={() => setQueueExpanded(v => v === r.id ? null : r.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={i + 1}
-                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.id} />
-                  </div>
-                  {queueExpanded === r.id && (
-                    <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
-                  )}
+            <QueueSection title='대기 중' description='재생이 확정된 신청곡이에요.' count={waitingQueue.length}>
+              {waitingQueue.map((rec, index) => (
+                <div className='song-list__item' key={rec.id}>
+                  <SongCard
+                    slug={slug}
+                    rec={rec}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    onToggle={() => setQueueExpanded(value => value === rec.id ? null : rec.id)}
+                    position={index + 1}
+                    isMyRequest={rec.requester_name === deviceName}
+                    hideStatus
+                    expanded={queueExpanded === rec.id}
+                  />
+                  {queueExpanded === rec.id && <CommentSection videoId={rec.video_id} slug={slug} />}
                 </div>
               ))}
-            </section>
+            </QueueSection>
           )}
+
           {pendingQueue.length > 0 && (
-            <section>
-              <h3 style={styles.sectionTitle}>신청 곡 ({pendingQueue.length})</h3>
-              {pendingQueue.map((r, i) => (
-                <div key={r.id}>
-                  <div
-                    onClick={() => setQueueExpanded(v => v === r.id ? null : r.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} onDelete={handleDelete} position={waitingQueue.length + i + 1}
-                      isMyRequest={r.requester_name === deviceName} hideStatus expanded={queueExpanded === r.id} />
-                  </div>
-                  {queueExpanded === r.id && (
-                    <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
-                  )}
+            <QueueSection title='확인 중' description='매장에서 신청곡을 확인하고 있어요.' count={pendingQueue.length}>
+              {pendingQueue.map((rec, index) => (
+                <div className='song-list__item' key={rec.id}>
+                  <SongCard
+                    slug={slug}
+                    rec={rec}
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    onToggle={() => setQueueExpanded(value => value === rec.id ? null : rec.id)}
+                    position={waitingQueue.length + index + 1}
+                    isMyRequest={rec.requester_name === deviceName}
+                    hideStatus
+                    expanded={queueExpanded === rec.id}
+                  />
+                  {queueExpanded === rec.id && <CommentSection videoId={rec.video_id} slug={slug} />}
                 </div>
               ))}
-            </section>
+            </QueueSection>
           )}
+
           {waitingQueue.length === 0 && pendingQueue.length === 0 && (
-            <div style={styles.empty}>대기 중인 신청곡이 없습니다.<br />첫 번째 곡을 신청해보세요!</div>
+            <StatePanel title='아직 기다리는 곡이 없어요.' description='첫 번째 신청곡을 골라 보세요.' />
           )}
-        </>
+        </div>
       )}
 
       {tab === 'history' && (
-        <>
-          {history.length === 0 && (
-            <div style={styles.empty}>최근 7일 재생 이력이 없습니다.</div>
-          )}
-          {history.length > 0 && (
-            <section>
-              {history.slice(0, historyLimit).map(r => (
-                <div key={r.id}>
-                  <div
-                    onClick={() => setHistoryExpanded(v => v === r.id ? null : r.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <SongCard slug={slug} rec={r} onUpdate={handleUpdate} showDate expanded={historyExpanded === r.id} />
+        <div className='tab-panel' role='tabpanel'>
+          {history.length === 0 ? (
+            <StatePanel title='최근 재생한 곡이 없어요.' description='재생이 끝난 곡은 여기에서 다시 볼 수 있어요.' />
+          ) : (
+            <section className='content-section'>
+              <div className='section-heading'>
+                <div><h2>최근 재생</h2><p>최근 7일 동안 매장에서 들은 곡이에요.</p></div>
+              </div>
+              <div className='song-list'>
+                {history.slice(0, historyLimit).map(rec => (
+                  <div className='song-list__item' key={rec.id}>
+                    <SongCard
+                      slug={slug}
+                      rec={rec}
+                      onUpdate={handleUpdate}
+                      onToggle={() => setHistoryExpanded(value => value === rec.id ? null : rec.id)}
+                      showDate
+                      expanded={historyExpanded === rec.id}
+                    />
+                    {historyExpanded === rec.id && <CommentSection videoId={rec.video_id} slug={slug} />}
                   </div>
-                  {historyExpanded === r.id && (
-                    <CommentSection videoId={r.video_id} slug={slug} isGlobal={false} />
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
               {historyLimit < history.length && (
-                <button onClick={() => setHistoryLimit(p => p + 10)} style={styles.loadMoreBtn}>
-                  더 보기 ({history.length - historyLimit}개 남음)
+                <button type='button' className='button button--secondary button--full' onClick={() => setHistoryLimit(value => value + 10)}>
+                  더 보기 · {history.length - historyLimit}곡 남음
                 </button>
               )}
             </section>
           )}
-        </>
+        </div>
       )}
 
       {(tab === 'cafeTop' || tab === 'globalTop') && (
-        <Top10List
-          items={tab === 'cafeTop' ? cafeTop : globalTop}
-          hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}
-          loading={topLoading}
-          slug={tab === 'cafeTop' ? slug : null}
-          onLoadMore={loadMoreTop}
-        />
+        <div className='tab-panel' role='tabpanel'>
+          <Top10List
+            items={tab === 'cafeTop' ? cafeTop : globalTop}
+            hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}
+            loading={topLoading}
+            slug={tab === 'cafeTop' ? slug : null}
+            onLoadMore={loadMoreTop}
+          />
+        </div>
       )}
-      <footer style={styles.footer}>
-        <a href="/privacy.html" target="_blank" rel="noreferrer" style={styles.footerLink}>개인정보 처리방침</a>
-        <span style={styles.footerLabel}>dev info</span>
-        <span style={styles.footerLink}>github.com/sngmng6506</span>
+
+      <footer className='customer-footer'>
+        <span>Caffeine Flow</span>
+        <a href='/privacy.html' target='_blank' rel='noreferrer'>개인정보 처리방침</a>
       </footer>
-    </div>
+    </main>
+  );
+}
+
+function QueueSection({ title, description, count, children }) {
+  return (
+    <section className='content-section'>
+      <div className='section-heading'>
+        <div><h2>{title}</h2><p>{description}</p></div>
+        <span className='count-badge'>{count}</span>
+      </div>
+      <div className='song-list'>{children}</div>
+    </section>
   );
 }
 
 function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
   const [expanded, setExpanded] = useState(null);
-  const [sortBy, setSortBy] = useState('count'); // 'count' | 'votes'
+  const [sortBy, setSortBy] = useState('count');
 
-  if (loading && items.length === 0) return <div style={styles.center}>불러오는 중...</div>;
-  if (!loading && items.length === 0) return <div style={styles.empty}>아직 데이터가 없습니다.</div>;
+  if (loading && items.length === 0) {
+    return <StatePanel icon={LoaderCircle} title='인기곡을 불러오고 있어요.' loading />;
+  }
+  if (!loading && items.length === 0) {
+    return <StatePanel title='아직 순위를 만들 데이터가 없어요.' description='신청이 쌓이면 인기곡을 보여 드릴게요.' />;
+  }
 
   const sorted = [...items].sort((a, b) => {
     if (sortBy === 'votes') {
-      const diff = (b.total_votes || 0) - (a.total_votes || 0);
-      return diff !== 0 ? diff : b.count - a.count;
+      const voteDifference = (b.total_votes || 0) - (a.total_votes || 0);
+      return voteDifference !== 0 ? voteDifference : b.count - a.count;
     }
-    const diff = b.count - a.count;
-    return diff !== 0 ? diff : (b.total_votes || 0) - (a.total_votes || 0);
+    const countDifference = b.count - a.count;
+    return countDifference !== 0 ? countDifference : (b.total_votes || 0) - (a.total_votes || 0);
   });
 
   return (
-    <>
-      <div style={styles.sortBar}>
-        <button onClick={() => setSortBy('count')} style={{ ...styles.sortBtn, ...(sortBy === 'count' ? styles.sortActive : {}) }}>신청순</button>
-        <button onClick={() => setSortBy('votes')} style={{ ...styles.sortBtn, ...(sortBy === 'votes' ? styles.sortActive : {}) }}>좋아요순</button>
+    <section className='content-section'>
+      <div className='section-heading'>
+        <div><h2>인기곡</h2><p>신청과 좋아요를 기준으로 모았어요.</p></div>
       </div>
-      <ol style={styles.rankList}>
-        {sorted.map((item, i) => {
-          const rowKey = `${item.video_id}__${i}`;
+      <div className='segmented-control' aria-label='인기곡 정렬'>
+        <button type='button' aria-pressed={sortBy === 'count'} onClick={() => setSortBy('count')}>신청 많은 순</button>
+        <button type='button' aria-pressed={sortBy === 'votes'} onClick={() => setSortBy('votes')}>좋아요 많은 순</button>
+      </div>
+      <ol className='rank-list'>
+        {sorted.map((item, index) => {
+          const rowKey = `${item.video_id}__${index}`;
+          const isExpanded = expanded === rowKey;
           return (
-            <li key={rowKey} style={styles.rankItem}>
-              <div
-                style={styles.rankRow}
-                onClick={() => setExpanded(v => v === rowKey ? null : rowKey)}
-              >
-                <span style={styles.rank}>{i + 1}</span>
-                <img src={item.thumbnail} alt="" style={styles.thumb} />
-                <div style={styles.rankInfo}>
-                  <div style={styles.rankTitle}>{item.title}</div>
-                  <div style={styles.rankMeta}>{item.channel_title} · {item.count}회 신청 · 👍 {item.total_votes || 0}</div>
-                </div>
-                <span style={styles.chevron}>{expanded === rowKey ? '▲' : '▼'}</span>
-              </div>
-              {expanded === rowKey && (
-                <CommentSection videoId={item.video_id} slug={slug} isGlobal={!slug} />
-              )}
+            <li className='rank-list__item' key={rowKey}>
+              <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
+                <span className='rank-row__number'>{index + 1}</span>
+                {item.thumbnail ? <img className='rank-row__thumbnail' src={item.thumbnail} alt='' /> : <span className='rank-row__thumbnail rank-row__thumbnail--empty'><Music2 size={18} /></span>}
+                <span className='rank-row__info'>
+                  <strong>{item.title}</strong>
+                  <small>{item.channel_title} · {item.count}회 신청</small>
+                </span>
+                <span className='rank-row__votes'><Heart size={14} aria-hidden='true' /> {item.total_votes || 0}</span>
+                {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
+              </button>
+              {isExpanded && <CommentSection videoId={item.video_id} slug={slug} />}
             </li>
           );
         })}
       </ol>
       {hasMore && (
-        <button onClick={onLoadMore} disabled={loading} style={styles.loadMoreBtn}>
+        <button type='button' className='button button--secondary button--full' onClick={onLoadMore} disabled={loading}>
           {loading ? '불러오는 중...' : '더 보기'}
         </button>
       )}
-    </>
+    </section>
   );
 }
 
-function CommentSection({ videoId, slug, isGlobal }) {
+function CommentSection({ videoId, slug }) {
   const [comments, setComments] = useState(null);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(false);
@@ -343,187 +454,116 @@ function CommentSection({ videoId, slug, isGlobal }) {
     getSongComments(videoId).then(setComments).catch(() => setComments([]));
   }, [videoId]);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(event) {
+    event.preventDefault();
     if (!body.trim()) return;
     setLoading(true);
     setError('');
     try {
-      const comment = await postSongComment(videoId, slug, {
-        commenterName: deviceName,
-        body: body.trim(),
-      });
-      setComments(prev => [comment, ...prev]);
+      const comment = await postSongComment(videoId, slug, { commenterName: deviceName, body: body.trim() });
+      setComments(previous => [comment, ...(previous || [])]);
       setBody('');
-    } catch (e) {
-      setError(e.message);
+    } catch (caught) {
+      setError(caught.message);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div style={styles.commentSection}>
-      <div style={styles.deviceName}>내 닉네임: <strong>{deviceName}</strong></div>
-      <form onSubmit={handleSubmit} style={styles.commentForm}>
-        <div style={styles.commentInputRow}>
-          <input
-            placeholder="댓글 추가..."
-            value={body}
-            onChange={e => setBody(e.target.value)}
-            style={styles.bodyInput}
-            maxLength={200}
-            required
-          />
-        </div>
-        {error && <div style={styles.commentError}>{error}</div>}
+    <section className='comments' aria-label='댓글'>
+      <div className='comments__heading'>
+        <span><MessageCircle size={17} aria-hidden='true' /> 댓글</span>
+        <small>내 닉네임 · {deviceName}</small>
+      </div>
+      <form className='comment-form' onSubmit={handleSubmit}>
+        <label className='sr-only' htmlFor={`comment-${videoId}`}>댓글</label>
+        <input id={`comment-${videoId}`} value={body} onChange={event => setBody(event.target.value)} placeholder='댓글을 남겨 보세요' maxLength={200} required />
+        {error && <p className='form-error' role='alert'>{error}</p>}
         {body.trim() && (
-          <div style={styles.commentActions}>
-            <button type="button" onClick={() => setBody('')} style={styles.cancelBtn}>취소</button>
-            <button type="submit" disabled={loading} style={styles.submitBtn}>
-              {loading ? '등록 중...' : '댓글'}
+          <div className='comment-form__actions'>
+            <button type='button' className='button button--text' onClick={() => setBody('')}>돌아가기</button>
+            <button type='submit' className='button button--primary button--compact' disabled={loading}>
+              <Send size={15} aria-hidden='true' /> {loading ? '등록 중...' : '댓글 등록하기'}
             </button>
           </div>
         )}
       </form>
 
-      {comments === null && <div style={styles.commentLoading}>불러오는 중...</div>}
-      {comments?.length === 0 && <div style={styles.noComment}>첫 번째 댓글을 남겨보세요.</div>}
-      {comments?.map(c => (
-        <CommentItem key={c.id} comment={c} videoId={videoId} slug={slug} deviceName={deviceName} isGlobal={isGlobal}
-          onReplyAdded={(reply) => setComments(prev =>
-            prev.map(x => x.id === c.id ? { ...x, replies: [...x.replies, reply] } : x)
-          )}
+      {comments === null && <p className='comments__state'>댓글을 불러오고 있어요.</p>}
+      {comments?.length === 0 && <p className='comments__state'>아직 댓글이 없어요.<br />첫 번째 이야기를 남겨 보세요.</p>}
+      {comments?.map(comment => (
+        <CommentItem
+          key={comment.id}
+          comment={comment}
+          videoId={videoId}
+          slug={slug}
+          deviceName={deviceName}
+          onReplyAdded={reply => setComments(previous => previous.map(item => item.id === comment.id ? { ...item, replies: [...item.replies, reply] } : item))}
         />
       ))}
-    </div>
+    </section>
   );
 }
 
-function CommentItem({ comment: c, videoId, slug, deviceName, isGlobal, onReplyAdded }) {
+function CommentItem({ comment, videoId, slug, deviceName, onReplyAdded }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleReply(e) {
-    e.preventDefault();
+  async function handleReply(event) {
+    event.preventDefault();
     if (!body.trim()) return;
     setLoading(true);
     setError('');
     try {
-      const reply = await postSongReply(videoId, c.id, slug, {
-        commenterName: deviceName,
-        body: body.trim(),
-      });
+      const reply = await postSongReply(videoId, comment.id, slug, { commenterName: deviceName, body: body.trim() });
       onReplyAdded(reply);
       setBody('');
       setReplyOpen(false);
-    } catch (e) {
-      setError(e.message);
+    } catch (caught) {
+      setError(caught.message);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div style={styles.commentItem}>
-      <div style={styles.commentMeta}>
-        <span style={styles.commenterName}>
-          {c.commenter_name || '익명'}{c.cafe_name ? <span style={styles.cafeTag}> in {c.cafe_name}</span> : ''}
-        </span>
-        <span style={styles.commentDate}>{new Date(c.created_at).toLocaleDateString('ko-KR')}</span>
+    <article className='comment-item'>
+      <div className='comment-item__meta'>
+        <strong>{comment.commenter_name || '익명'}{comment.cafe_name && <small> · {comment.cafe_name}</small>}</strong>
+        <time>{new Date(comment.created_at).toLocaleDateString('ko-KR')}</time>
       </div>
-      <div style={styles.commentBody}>{c.body}</div>
-      <button onClick={() => setReplyOpen(v => !v)} style={styles.replyBtn}>답글</button>
+      <p>{comment.body}</p>
+      <button type='button' className='reply-button' aria-expanded={replyOpen} onClick={() => setReplyOpen(value => !value)}><Reply size={14} aria-hidden='true' /> 답글</button>
 
-      {(c.replies?.length > 0 || replyOpen) && (
-        <div style={styles.replies}>
-          {c.replies?.map(r => (
-            <div key={r.id} style={styles.replyItem}>
-              <div style={styles.commentMeta}>
-                <span style={styles.commenterName}>
-                  {r.commenter_name || '익명'}{r.cafe_name ? <span style={styles.cafeTag}> in {r.cafe_name}</span> : ''}
-                </span>
-                <span style={styles.commentDate}>{new Date(r.created_at).toLocaleDateString('ko-KR')}</span>
+      {(comment.replies?.length > 0 || replyOpen) && (
+        <div className='replies'>
+          {comment.replies?.map(reply => (
+            <article className='reply-item' key={reply.id}>
+              <div className='comment-item__meta'>
+                <strong>{reply.commenter_name || '익명'}{reply.cafe_name && <small> · {reply.cafe_name}</small>}</strong>
+                <time>{new Date(reply.created_at).toLocaleDateString('ko-KR')}</time>
               </div>
-              <div style={styles.commentBody}>{r.body}</div>
-              <button onClick={() => setReplyOpen(true)} style={styles.replyBtn}>답글</button>
-            </div>
+              <p>{reply.body}</p>
+              <button type='button' className='reply-button' onClick={() => setReplyOpen(true)}><Reply size={14} aria-hidden='true' /> 답글</button>
+            </article>
           ))}
 
           {replyOpen && (
-            <form onSubmit={handleReply} style={styles.replyForm}>
-              <input
-                placeholder="답글 추가..."
-                value={body}
-                onChange={e => setBody(e.target.value)}
-                style={styles.bodyInput}
-                maxLength={200}
-                required
-                autoFocus
-              />
-              {error && <div style={styles.commentError}>{error}</div>}
-              <div style={styles.commentActions}>
-                <button type="button" onClick={() => { setReplyOpen(false); setBody(''); }} style={styles.cancelBtn}>취소</button>
-                <button type="submit" disabled={loading} style={styles.submitBtn}>{loading ? '등록 중...' : '답글'}</button>
+            <form className='reply-form' onSubmit={handleReply}>
+              <label className='sr-only' htmlFor={`reply-${comment.id}`}>답글</label>
+              <input id={`reply-${comment.id}`} value={body} onChange={event => setBody(event.target.value)} placeholder='답글을 남겨 보세요' maxLength={200} required autoFocus />
+              {error && <p className='form-error' role='alert'>{error}</p>}
+              <div className='comment-form__actions'>
+                <button type='button' className='button button--text' onClick={() => { setReplyOpen(false); setBody(''); }}>돌아가기</button>
+                <button type='submit' className='button button--primary button--compact' disabled={loading}>{loading ? '등록 중...' : '답글 등록하기'}</button>
               </div>
             </form>
           )}
         </div>
       )}
-    </div>
+    </article>
   );
 }
-
-const styles = {
-  page:        { maxWidth: 480, margin: '0 auto', padding: '16px', fontFamily: 'sans-serif' },
-  cafeName:    { margin: '0 0 12px 0', fontSize: 24, fontWeight: 800, color: '#1a1a2e' },
-  notice:      { marginBottom: 12, padding: '10px 14px', background: '#e3f2fd', borderRadius: 8, fontSize: 13, color: '#1565c0' },
-  closed:      { marginBottom: 16, padding: '8px 12px', background: '#fff3cd', borderRadius: 8, fontSize: 13, color: '#856404' },
-  successMsg:  { marginBottom: 12, padding: '10px 14px', background: '#e8f5e9', borderRadius: 8, fontSize: 13, color: '#2e7d32', fontWeight: 600 },
-  tabBar:      { display: 'flex', gap: 4, margin: '16px 0', borderBottom: '1px solid #eee', paddingBottom: 0 },
-  tabBtn:      { flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 600, border: 'none', borderBottom: '2px solid transparent', background: 'none', cursor: 'pointer', color: '#aaa' },
-  tabActive:   { color: '#1a1a2e', borderBottom: '2px solid #1a1a2e' },
-  sectionTitle:{ fontSize: 15, fontWeight: 700, margin: '0 0 8px 0', color: '#333' },
-  empty:       { textAlign: 'center', color: '#aaa', padding: '40px 0', lineHeight: 1.8 },
-  center:      { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' },
-  loadMoreBtn:    { width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#555' },
-  sortBar:        { display: 'flex', gap: 6, marginBottom: 12 },
-  sortBtn:        { padding: '5px 14px', borderRadius: 18, border: '1px solid #ddd', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#888' },
-  sortActive:     { background: '#1a1a2e', color: '#fff', border: '1px solid #1a1a2e', fontWeight: 600 },
-  rankList:       { listStyle: 'none', margin: 0, padding: 0 },
-  rankItem:       { borderBottom: '1px solid #eee' },
-  rankRow:        { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', cursor: 'pointer' },
-  rank:           { width: 24, textAlign: 'center', fontWeight: 800, fontSize: 15, color: '#1a1a2e', flexShrink: 0 },
-  thumb:          { width: 60, height: 45, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
-  rankInfo:       { flex: 1, minWidth: 0 },
-  rankTitle:      { fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  rankMeta:       { fontSize: 12, color: '#888', marginTop: 2 },
-  chevron:        { fontSize: 11, color: '#aaa', flexShrink: 0 },
-
-  commentSection: { padding: '12px 12px 16px 16px', background: '#fafafa', borderRadius: 8, marginBottom: 4 },
-  commentForm:    { marginBottom: 12 },
-  commentInputRow:{ display: 'flex', gap: 10, alignItems: 'flex-start' },
-  deviceName:     { fontSize: 12, color: '#888', marginBottom: 8 },
-  bodyInput:      { flex: 1, fontSize: 13, padding: '6px 8px', borderRadius: 6, border: 'none', borderBottom: '1px solid #ccc', outline: 'none', background: 'transparent' },
-  commentActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
-  cancelBtn:      { padding: '6px 12px', borderRadius: 18, border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: '#555' },
-  submitBtn:      { padding: '6px 14px', borderRadius: 18, border: 'none', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 },
-  commentError:   { fontSize: 12, color: '#e63946', marginTop: 4 },
-  commentLoading: { fontSize: 13, color: '#aaa', padding: '8px 0' },
-  noComment:      { fontSize: 13, color: '#aaa', padding: '8px 0' },
-  commentItem:    { marginTop: 12 },
-  commentMeta:    { display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 2 },
-  commenterName:  { fontSize: 13, fontWeight: 700 },
-  cafeTag:        { fontSize: 12, fontWeight: 400, color: '#bbb' },
-  commentDate:    { fontSize: 11, color: '#aaa' },
-  commentBody:    { fontSize: 13, lineHeight: 1.5 },
-  replyBtn:       { fontSize: 12, fontWeight: 600, color: '#555', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', marginTop: 2 },
-  replyForm:      { marginTop: 8 },
-  replies:        { marginTop: 8, paddingLeft: 16, borderLeft: '2px solid #eee' },
-  footer:         { marginTop: 40, paddingBottom: 24, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 },
-  footerLabel:    { fontSize: 10, color: '#ddd', fontFamily: 'monospace' },
-  footerLink:     { fontSize: 11, color: '#ccc', fontFamily: 'monospace' },
-  replyItem:      { marginTop: 8 },
-};

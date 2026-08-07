@@ -24,19 +24,19 @@ export const CANCELLABLE_STATUSES = Object.freeze([
 ]);
 
 export const REC_STATUS_LABELS = Object.freeze({
-  [REC_STATUS.PENDING]: '대기',
-  [REC_STATUS.ACCEPTED]: '수락',
+  [REC_STATUS.PENDING]: '확인 중',
+  [REC_STATUS.ACCEPTED]: '대기 중',
   [REC_STATUS.PLAYING]: '재생 중',
-  [REC_STATUS.PLAYED]: '완료',
-  [REC_STATUS.REJECTED]: '거절',
-  [REC_STATUS.SKIPPED]: '스킵',
+  [REC_STATUS.PLAYED]: '재생 완료',
+  [REC_STATUS.REJECTED]: '신청 불가',
+  [REC_STATUS.SKIPPED]: '건너뜀',
 });
 
 export const REC_STATUS_COLORS = Object.freeze({
-  [REC_STATUS.PENDING]: '#888',
-  [REC_STATUS.ACCEPTED]: '#4caf50',
-  [REC_STATUS.PLAYING]: '#2196f3',
-  [REC_STATUS.PLAYED]: '#9e9e9e',
-  [REC_STATUS.REJECTED]: '#f44336',
-  [REC_STATUS.SKIPPED]: '#ff9800',
+  [REC_STATUS.PENDING]: 'var(--cf-status-pending)',
+  [REC_STATUS.ACCEPTED]: 'var(--cf-status-accepted)',
+  [REC_STATUS.PLAYING]: 'var(--cf-status-playing)',
+  [REC_STATUS.PLAYED]: 'var(--cf-status-played)',
+  [REC_STATUS.REJECTED]: 'var(--cf-status-rejected)',
+  [REC_STATUS.SKIPPED]: 'var(--cf-status-skipped)',
 });

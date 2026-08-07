@@ -13,7 +13,7 @@ async function apiFetch(method, path, body) {
   });
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
-  if (!res.ok) throw new Error(data.error || '요청 실패');
+  if (!res.ok) throw new Error(data.error || '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.');
   return data;
 }
 

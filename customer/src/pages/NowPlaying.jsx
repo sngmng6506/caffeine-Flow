@@ -1,26 +1,29 @@
+import { AudioLines, Music2 } from 'lucide-react';
+
 export default function NowPlaying({ rec }) {
   if (!rec) return null;
+
   return (
-    <div style={styles.wrap}>
-      <span style={styles.badge}>▶ 재생 중</span>
-      {rec.thumbnail
-        ? <img src={rec.thumbnail} alt="" style={styles.thumb} />
-        : <div style={styles.thumbFallback} />
-      }
-      <div style={styles.info}>
-        <div style={styles.title}>{rec.title}</div>
-        <div style={styles.channel}>{rec.channel_title}</div>
+    <section className='now-playing' aria-label='현재 재생 중인 곡'>
+      <div className='now-playing__status'>
+        <AudioLines size={16} aria-hidden='true' />
+        <span>재생 중</span>
+        <span className='now-playing__pulse' aria-hidden='true' />
       </div>
-    </div>
+      <div className='now-playing__content'>
+        {rec.thumbnail
+          ? <img src={rec.thumbnail} alt='' className='now-playing__thumb' />
+          : (
+            <div className='now-playing__thumb now-playing__thumb--fallback'>
+              <Music2 size={24} aria-hidden='true' />
+            </div>
+          )
+        }
+        <div className='now-playing__info'>
+          <h2 className='now-playing__title'>{rec.title}</h2>
+          <p className='now-playing__channel'>{rec.channel_title}</p>
+        </div>
+      </div>
+    </section>
   );
 }
-
-const styles = {
-  wrap:          { display: 'flex', alignItems: 'center', gap: 12, background: '#1a1a2e', color: '#fff', borderRadius: 12, padding: '12px 16px', marginBottom: 16 },
-  badge:         { fontSize: 11, background: '#e63946', borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', flexShrink: 0 },
-  thumb:         { width: 56, height: 42, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
-  thumbFallback: { width: 56, height: 42, borderRadius: 6, background: '#333', flexShrink: 0 },
-  info:          { overflow: 'hidden', minWidth: 0 },
-  title:         { fontWeight: 600, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  channel:       { fontSize: 12, color: '#aaa', marginTop: 2 },
-};

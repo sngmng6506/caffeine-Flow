@@ -1,4 +1,5 @@
 import CafePage from './pages/CafePage';
+import { Music2 } from 'lucide-react';
 
 // URL: /:slug  (예: /my-cafe, /my-cafe/, /my-cafe?foo=bar 모두 허용)
 // slug는 카페 가입 시 cafe.service.js의 generateSlug에서 [a-z0-9]만 사용해 생성됨.
@@ -12,10 +13,12 @@ function parseSlug() {
 export default function App() {
   const slug = parseSlug();
 
-  if (!slug) return <div style={styles.center}>카페 QR코드를 스캔해주세요.</div>;
+  if (!slug) return (
+    <main className='app-state'>
+      <div className='app-state__icon' aria-hidden='true'><Music2 size={26} /></div>
+      <h1>카페 QR 코드를 스캔해 주세요</h1>
+      <p>매장의 신청곡 화면으로 연결해 드릴게요.</p>
+    </main>
+  );
   return <CafePage slug={slug} />;
 }
-
-const styles = {
-  center: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'sans-serif' },
-};

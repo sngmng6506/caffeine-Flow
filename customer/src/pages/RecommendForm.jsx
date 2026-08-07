@@ -1,36 +1,37 @@
 import { useState } from 'react';
+import { ExternalLink, Link2, LoaderCircle, Music2, RotateCcw, Search, Send } from 'lucide-react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
 
 function YouTubeIcon() {
   return (
-    <svg width="38" height="27" viewBox="0 0 38 27" fill="none">
-      <rect width="38" height="27" rx="7" fill="#FF0000"/>
-      <polygon points="15,7 15,20 26,13.5" fill="white"/>
+    <svg width='34' height='24' viewBox='0 0 38 27' fill='none' aria-hidden='true'>
+      <rect width='38' height='27' rx='7' fill='#FF0000' />
+      <polygon points='15,7 15,20 26,13.5' fill='white' />
     </svg>
   );
 }
 
 function SpotifyIcon() {
   return (
-    <svg width="27" height="27" viewBox="0 0 27 27" fill="none">
-      <circle cx="13.5" cy="13.5" r="13.5" fill="#1DB954"/>
-      <path d="M7 10.5c4-2 9-2 13 0"   stroke="white" strokeWidth="2"   fill="none" strokeLinecap="round"/>
-      <path d="M7.5 14c3.5-1.5 8-1.5 12 0" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
-      <path d="M8 17.5c3-1.2 6.5-1.2 11 0" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+    <svg width='26' height='26' viewBox='0 0 27 27' fill='none' aria-hidden='true'>
+      <circle cx='13.5' cy='13.5' r='13.5' fill='#1DB954' />
+      <path d='M7 10.5c4-2 9-2 13 0' stroke='white' strokeWidth='2' fill='none' strokeLinecap='round' />
+      <path d='M7.5 14c3.5-1.5 8-1.5 12 0' stroke='white' strokeWidth='1.8' fill='none' strokeLinecap='round' />
+      <path d='M8 17.5c3-1.2 6.5-1.2 11 0' stroke='white' strokeWidth='1.5' fill='none' strokeLinecap='round' />
     </svg>
   );
 }
 
 function SoundCloudIcon() {
   return (
-    <svg width="38" height="27" viewBox="0 0 38 27" fill="none">
-      <rect width="38" height="27" rx="7" fill="#FF5500"/>
-      <path d="M8 18.5 Q8 15 11 15 Q11 11 14.5 11 Q15 8 18 8 Q22 8 22 12.5 L22 18.5 Z" fill="white" opacity="0.9"/>
-      <rect x="24" y="12" width="2" height="7" rx="1" fill="white" opacity="0.7"/>
-      <rect x="27.5" y="10" width="2" height="9" rx="1" fill="white" opacity="0.7"/>
-      <rect x="31" y="13" width="2" height="6" rx="1" fill="white" opacity="0.7"/>
+    <svg width='34' height='24' viewBox='0 0 38 27' fill='none' aria-hidden='true'>
+      <rect width='38' height='27' rx='7' fill='#FF5500' />
+      <path d='M8 18.5 Q8 15 11 15 Q11 11 14.5 11 Q15 8 18 8 Q22 8 22 12.5 L22 18.5 Z' fill='white' opacity='0.9' />
+      <rect x='24' y='12' width='2' height='7' rx='1' fill='white' opacity='0.7' />
+      <rect x='27.5' y='10' width='2' height='9' rx='1' fill='white' opacity='0.7' />
+      <rect x='31' y='13' width='2' height='6' rx='1' fill='white' opacity='0.7' />
     </svg>
   );
 }
@@ -48,32 +49,33 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   const [error, setError] = useState('');
   const [step, setStep] = useState('input');
 
-  async function handlePreview(e) {
-    e.preventDefault();
+  async function handlePreview(event) {
+    event.preventDefault();
     if (!url.trim()) return;
     setLoading(true);
     setError('');
+
     try {
       const data = await getOembed(url.trim());
       if (data.platform && !allowedPlatforms.includes(data.platform)) {
-        setError(`이 카페에서는 ${platformLabel(data.platform)} 신청을 받지 않습니다.`);
+        setError(`이 매장에서는 ${platformLabel(data.platform)} 신청곡을 받고 있지 않아요.`);
         setUrl('');
         return;
       }
       if (data.videoId === playingVideoId) {
-        setError('현재 재생 중인 곡입니다.');
+        setError('지금 재생 중인 곡이에요. 다른 곡을 선택해 주세요.');
         setUrl('');
         return;
       }
       if (activeVideoIds.includes(data.videoId)) {
-        setError('이미 대기 중인 곡입니다. 다른 곡을 신청해주세요.');
+        setError('이미 대기 중인 곡이에요. 다른 곡을 선택해 주세요.');
         setUrl('');
         return;
       }
       setPreview(data);
       setStep('preview');
-    } catch (e) {
-      setError(e.message);
+    } catch (caught) {
+      setError(caught.message);
     } finally {
       setLoading(false);
     }
@@ -82,21 +84,22 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   async function handleSubmit() {
     setLoading(true);
     setError('');
+
     try {
       const rec = await postRecommendation(slug, {
-        videoId:       preview.videoId,
-        title:         preview.title,
-        channelTitle:  preview.channelTitle,
-        thumbnail:     preview.thumbnail,
-        platform:      preview.platform,
+        videoId: preview.videoId,
+        title: preview.title,
+        channelTitle: preview.channelTitle,
+        thumbnail: preview.thumbnail,
+        platform: preview.platform,
         requesterName: getDeviceName(),
       });
       onAdded(rec);
       setUrl('');
       setPreview(null);
       setStep('input');
-    } catch (e) {
-      setError(e.message);
+    } catch (caught) {
+      setError(caught.message);
       setUrl('');
       setPreview(null);
       setStep('input');
@@ -108,88 +111,102 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   if (step === 'preview' && preview) {
     const badge = PLATFORM_BADGE[preview.platform] || PLATFORM_BADGE[PLATFORM.YOUTUBE];
     return (
-      <div style={styles.wrap}>
-        <div style={styles.previewCard}>
-          {preview.thumbnail
-            ? <img src={preview.thumbnail} alt="" style={styles.thumb} />
-            : <div style={styles.thumbFallback} />
-          }
-          <div style={styles.info}>
-            <span style={{ ...styles.badge, background: badge.bg, color: badge.color }}>
-              {badge.label}
-            </span>
-            <div style={styles.title}>{preview.title}</div>
-            <div style={styles.channel}>{preview.channelTitle}</div>
+      <section className='request-card' aria-labelledby='request-preview-title'>
+        <div className='request-card__heading'>
+          <span className='request-card__heading-icon' aria-hidden='true'><Music2 size={20} /></span>
+          <div>
+            <p className='request-card__eyebrow'>신청곡 미리보기</p>
+            <h2 id='request-preview-title'>이 곡이 맞나요?</h2>
           </div>
         </div>
-        {error && <div style={styles.error}>{error}</div>}
-        <div style={styles.btnRow}>
-          <button onClick={() => setStep('input')} style={styles.cancelBtn}>취소</button>
-          <button onClick={handleSubmit} disabled={loading} style={styles.submitBtn}>
-            {loading ? '신청 중...' : '신청하기'}
+
+        <div className='request-preview'>
+          {preview.thumbnail
+            ? <img src={preview.thumbnail} alt='' className='request-preview__thumb' />
+            : <div className='request-preview__thumb request-preview__thumb--fallback'><Music2 size={22} aria-hidden='true' /></div>
+          }
+          <div className='request-preview__info'>
+            <span className='platform-badge' style={{ background: badge.bg, color: badge.color }}>{badge.label}</span>
+            <strong>{preview.title}</strong>
+            <span>{preview.channelTitle}</span>
+          </div>
+        </div>
+
+        {error && <div className='feedback feedback--error' role='alert'>{error}</div>}
+
+        <div className='request-card__actions'>
+          <button type='button' onClick={() => setStep('input')} className='button button--secondary'>
+            <RotateCcw size={17} aria-hidden='true' />
+            다시 선택하기
+          </button>
+          <button type='button' onClick={handleSubmit} disabled={loading} className='button button--primary'>
+            {loading ? <LoaderCircle className='is-spinning' size={18} aria-hidden='true' /> : <Send size={18} aria-hidden='true' />}
+            {loading ? '신청 중…' : '이 곡 신청하기'}
           </button>
         </div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <form onSubmit={handlePreview} style={styles.wrap}>
-      <div style={styles.platformRow}>
-        <div style={styles.platformIcons}>
+    <form onSubmit={handlePreview} className='request-card' aria-labelledby='request-title'>
+      <div className='request-card__heading'>
+        <span className='request-card__heading-icon' aria-hidden='true'><Music2 size={20} /></span>
+        <div>
+          <p className='request-card__eyebrow'>MUSIC REQUEST</p>
+          <h2 id='request-title'>신청곡 추가</h2>
+        </div>
+      </div>
+
+      <label className='field-label' htmlFor='music-url'>음악 링크</label>
+      <div className='input-shell'>
+        <Link2 size={18} aria-hidden='true' />
+        <input
+          id='music-url'
+          type='url'
+          inputMode='url'
+          placeholder='음악 링크를 붙여 넣어 주세요'
+          value={url}
+          onChange={event => setUrl(event.target.value)}
+          autoComplete='off'
+        />
+      </div>
+
+      {error && <div className='feedback feedback--error' role='alert'>{error}</div>}
+
+      <button type='submit' disabled={loading || !url.trim()} className='button button--primary button--full'>
+        {loading ? <LoaderCircle className='is-spinning' size={18} aria-hidden='true' /> : <Search size={18} aria-hidden='true' />}
+        {loading ? '곡 정보를 확인하고 있어요' : '신청곡 확인하기'}
+      </button>
+
+      <div className='platform-shortcuts'>
+        <span className='platform-shortcuts__label'>음악 찾기</span>
+        <div className='platform-shortcuts__links'>
           {PLATFORM_LINKS.map(({ id, href }) => {
             const allowed = allowedPlatforms.includes(id);
+            const label = platformLabel(id);
             const icon = PLATFORM_ICONS[id];
             return allowed ? (
               <a
                 key={id}
                 href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                style={styles.iconLink}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='platform-shortcut'
+                aria-label={`${label}에서 음악 찾기, 새 창`}
+                title={`${label}에서 음악 찾기`}
               >
                 {icon}
+                <ExternalLink size={12} aria-hidden='true' />
               </a>
             ) : (
-              <span key={id} style={{ ...styles.iconLink, opacity: 0.25, pointerEvents: 'none' }}>
+              <span key={id} className='platform-shortcut platform-shortcut--disabled' aria-label={`${label} 신청 불가`}>
                 {icon}
               </span>
             );
           })}
         </div>
-        <span style={styles.platformHint}>바로 가기</span>
       </div>
-      <input
-        placeholder="링크를 붙여넣으세요"
-        value={url}
-        onChange={e => setUrl(e.target.value)}
-        style={styles.input}
-      />
-      {error && <div style={styles.error}>{error}</div>}
-      <button type="submit" disabled={loading || !url.trim()} style={styles.submitBtn}>
-        {loading ? '확인 중...' : '곡 확인'}
-      </button>
     </form>
   );
 }
-
-const styles = {
-  wrap:         { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px', background: '#f8f8f8', borderRadius: 12, marginBottom: 20 },
-  previewCard:  { display: 'flex', gap: 12, alignItems: 'center' },
-  thumb:        { width: 80, height: 60, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
-  thumbFallback:{ width: 80, height: 60, borderRadius: 6, background: '#ddd', flexShrink: 0 },
-  info:         { flex: 1, minWidth: 0 },
-  badge:        { fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, marginBottom: 4, display: 'inline-block' },
-  title:        { fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  channel:      { fontSize: 12, color: '#888', marginTop: 2 },
-  input:         { fontSize: 14, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', outline: 'none' },
-  platformRow:   { display: 'flex', alignItems: 'center', gap: 10 },
-  platformHint:  { fontSize: 11, color: '#aaa', whiteSpace: 'nowrap' },
-  platformIcons: { display: 'flex', gap: 8, alignItems: 'center' },
-  iconLink:      { display: 'flex', alignItems: 'center', lineHeight: 0 },
-  btnRow:       { display: 'flex', gap: 8 },
-  submitBtn:    { flex: 1, padding: '10px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 },
-  cancelBtn:    { padding: '10px 16px', borderRadius: 8, background: '#fff', border: '1px solid #ddd', cursor: 'pointer' },
-  error:        { fontSize: 13, color: '#e63946' },
-};
