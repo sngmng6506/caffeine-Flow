@@ -17,7 +17,7 @@ import { dashboardStyles as styles } from './dashboard/dashboardStyles';
 
 const DEFAULT_DROP_TARGET = 'default';
 
-export default function DashboardPage({ cafe: initialCafe, onLogout }) {
+export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanner }) {
   const [cafe, setCafe] = useState(initialCafe);
   const [dragOver, setDragOver] = useState(null);
   const [defaultVideo, setDefaultVideo] = useState(readSavedBgm);
@@ -188,6 +188,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
 
   return (
     <div style={{ ...styles.page, width: `${(panelRatio * 100).toFixed(2)}vw` }}>
+      {updateBanner}
       {/* BrowserView 경계보다 8px 왼쪽에 renderer 드래그 영역을 둔다. */}
       <div
         onMouseDown={handleDividerMouseDown}

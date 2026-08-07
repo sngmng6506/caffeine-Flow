@@ -91,15 +91,15 @@ export default function App() {
   );
   return (
     <div style={containerStyle}>
-      {updateBanner}
-      <DashboardPage cafe={cafe} onLogout={handleLogout} />
+      <DashboardPage cafe={cafe} onLogout={handleLogout} updateBanner={updateBanner} />
     </div>
   );
 }
 
 const bannerStyle = {
   position: 'sticky', top: 0, zIndex: 9999,
-  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap',
+  width: '100%', boxSizing: 'border-box', textAlign: 'center',
   background: '#1a1a2e', color: '#fff', fontSize: 13, fontWeight: 600,
   padding: '10px 16px',
 };
