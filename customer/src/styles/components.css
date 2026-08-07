@@ -433,7 +433,7 @@
   top: 8px;
   display: flex;
   gap: 4px;
-  margin: 18px 0 22px;
+  margin: 0 0 22px;
   padding: 4px;
   overflow-x: auto;
   background: var(--cf-canvas);

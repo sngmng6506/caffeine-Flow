@@ -234,23 +234,6 @@ export default function CafePage({ slug }) {
 
       <NowPlaying rec={nowPlaying} />
 
-      {isAccepting && tab === 'queue' && (
-        <RecommendForm
-          slug={slug}
-          onAdded={handleAdded}
-          playingVideoId={nowPlaying?.video_id}
-          activeVideoIds={recs.filter(rec => ACTIVE_STATUSES.includes(rec.status)).map(rec => rec.video_id)}
-          allowedPlatforms={allowedPlatforms}
-        />
-      )}
-
-      {successMsg && (
-        <div className='feedback feedback--success' role='status'>
-          <CheckCircle2 size={18} aria-hidden='true' />
-          <span>{successMsg}</span>
-        </div>
-      )}
-
       <nav className='tabs' role='tablist' aria-label='음악 목록'>
         {getTabs(cafeName).map(item => (
           <button
@@ -268,6 +251,23 @@ export default function CafePage({ slug }) {
 
       {tab === 'queue' && (
         <div className='tab-panel' role='tabpanel'>
+          {isAccepting && (
+            <RecommendForm
+              slug={slug}
+              onAdded={handleAdded}
+              playingVideoId={nowPlaying?.video_id}
+              activeVideoIds={recs.filter(rec => ACTIVE_STATUSES.includes(rec.status)).map(rec => rec.video_id)}
+              allowedPlatforms={allowedPlatforms}
+            />
+          )}
+
+          {successMsg && (
+            <div className='feedback feedback--success' role='status'>
+              <CheckCircle2 size={18} aria-hidden='true' />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
           {waitingQueue.length > 0 && (
             <QueueSection title='대기 중' description='재생이 확정된 신청곡이에요.' count={waitingQueue.length}>
               {waitingQueue.map((rec, index) => (
