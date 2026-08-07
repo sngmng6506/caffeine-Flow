@@ -1,5 +1,9 @@
 # 재생 엔진
 
+> **AI가 읽을 때:** Electron, BrowserView, BGM·신청곡 재생, 종료 감지, 플랫폼 DOM 우회, IPC를 수정할 때
+> **함께 갱신할 때:** overlay/takeover, 플랫폼별 재생·복구 방식, 종료 신호, preload 계약이 달라질 때
+> **생략 가능한 경우:** 재생과 무관한 일반 React UI·서버 API만 수정할 때
+
 이 문서는 사장님 Electron 앱의 재생 구조와 플랫폼별 제약을 설명한다. 전체 시스템 경계는 [ARCHITECTURE.md](ARCHITECTURE.md), 로컬 실행과 배포 명령은 [DEVELOPMENT.md](DEVELOPMENT.md)를 참고한다.
 
 ## 역할
