@@ -127,6 +127,10 @@ npm run test:unit --prefix server
 npm test --prefix server
 ```
 
+`test:unit`은 `vitest.unit.config.mjs`에 명시된 DB 비의존 테스트만 실행하며
+마이그레이션이나 PostgreSQL 연결을 수행하지 않는다. `npm test`는 실제
+PostgreSQL에 마이그레이션을 적용하는 통합 테스트를 포함한다.
+
 통합 테스트 환경 예시:
 
 ```bash

@@ -31,11 +31,6 @@ router.post('/owner', ownerOnly, async (req, res) => {
 
   const recStatus = ACTIVE_STATUSES.includes(body.status) ? body.status : REC_STATUS.PENDING;
 
-  if (recStatus === REC_STATUS.PLAYING) {
-    const cleared = await recService.clearPlaying(cafe.id, null);
-    for (const r of cleared) broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
-  }
-
   let rec;
   try {
     rec = await recService.add(cafe.id, {
@@ -46,9 +41,16 @@ router.post('/owner', ownerOnly, async (req, res) => {
     if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
     throw err;
   }
-  const updated = recStatus !== REC_STATUS.PENDING
-    ? await recService.updateStatus(cafe.id, rec.id, recStatus)
-    : rec;
+  let updated = rec;
+  if (recStatus === REC_STATUS.PLAYING) {
+    const result = await recService.setPlaying(cafe.id, rec.id);
+    for (const cleared of result.cleared) {
+      broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: cleared });
+    }
+    updated = result.rec;
+  } else if (recStatus !== REC_STATUS.PENDING) {
+    updated = await recService.updateStatus(cafe.id, rec.id, recStatus);
+  }
 
   broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec: updated });
   res.status(201).json(updated);
@@ -64,14 +66,17 @@ router.put('/:id', ownerOnly, async (req, res) => {
   const target = await recService.findByIdForCafe(req.owner.cafeId, req.params.id);
   if (!target) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
 
-  if (status === REC_STATUS.PLAYING) {
-    const cleared = await recService.clearPlaying(req.owner.cafeId, req.params.id);
-    for (const r of cleared) broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: r });
-  }
-
   let rec;
   try {
-    rec = await recService.updateStatus(req.owner.cafeId, req.params.id, status);
+    if (status === REC_STATUS.PLAYING) {
+      const result = await recService.setPlaying(req.owner.cafeId, req.params.id);
+      for (const cleared of result.cleared) {
+        broadcast(req, req.params.slug, 'recommendations_update', { action: 'update', rec: cleared });
+      }
+      rec = result.rec;
+    } else {
+      rec = await recService.updateStatus(req.owner.cafeId, req.params.id, status);
+    }
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     throw err;

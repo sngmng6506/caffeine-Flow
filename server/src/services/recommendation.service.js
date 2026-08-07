@@ -30,8 +30,10 @@ async function findByIdForCafe(cafeId, id, dbOrTrx = db) {
   return dbOrTrx('recommendations').where({ id, cafe_id: cafeId }).first();
 }
 
-async function requireForCafe(dbOrTrx, cafeId, id) {
-  const rec = await findByIdForCafe(cafeId, id, dbOrTrx);
+async function requireForCafe(dbOrTrx, cafeId, id, { forUpdate = false } = {}) {
+  let query = dbOrTrx('recommendations').where({ id, cafe_id: cafeId });
+  if (forUpdate) query = query.forUpdate();
+  const rec = await query.first();
   if (!rec) throw Object.assign(new Error('추천곡을 찾을 수 없습니다'), { status: 404 });
   return rec;
 }
@@ -102,9 +104,8 @@ function isValidTransition(from, to) {
   return !TERMINAL_STATUSES.includes(from);
 }
 
-async function updateStatus(cafeId, id, status) {
+async function updateStatusRow(dbOrTrx, current, status) {
   const now = new Date();
-  const current = await requireForCafe(db, cafeId, id);
   if (!isValidTransition(current.status, status)) {
     throw Object.assign(
       new Error(`이미 종료된 곡입니다 (${current.status} → ${status} 불가)`),
@@ -125,16 +126,16 @@ async function updateStatus(cafeId, id, status) {
     }
   }
 
-  const [rec] = await db('recommendations')
-    .where({ id, cafe_id: cafeId })
+  const [rec] = await dbOrTrx('recommendations')
+    .where({ id: current.id, cafe_id: current.cafe_id })
     .update(updates)
     .returning('*');
   return rec;
 }
 
-async function clearPlaying(cafeId, exceptId) {
+async function clearPlayingRows(dbOrTrx, cafeId, exceptId) {
   const now = new Date();
-  let query = db('recommendations').where({ cafe_id: cafeId, status: REC_STATUS.PLAYING });
+  let query = dbOrTrx('recommendations').where({ cafe_id: cafeId, status: REC_STATUS.PLAYING });
   if (exceptId) query = query.whereNot({ id: exceptId });
 
   const playingRecs = await query.clone().select('id', 'playing_started_at');
@@ -144,13 +145,55 @@ async function clearPlaying(cafeId, exceptId) {
     if (r.playing_started_at) {
       updates.play_duration_seconds = Math.round((now - new Date(r.playing_started_at)) / 1000);
     }
-    const [updated] = await db('recommendations')
+    const [updated] = await dbOrTrx('recommendations')
       .where({ id: r.id, cafe_id: cafeId })
       .update(updates)
       .returning('*');
     results.push(updated);
   }
   return results;
+}
+
+// 카페 행을 잠가 기존 playing 종료와 새 playing 전환을 직렬화한다.
+// owner 소켓 이벤트가 동시에 들어와도 카페마다 마지막 요청 한 곡만
+// playing으로 남고, 유효하지 않은 target은 기존 곡을 건드리기 전에 차단한다.
+async function setPlaying(cafeId, id) {
+  return db.transaction(async (trx) => {
+    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
+    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+
+    const current = await requireForCafe(trx, cafeId, id, { forUpdate: true });
+    if (!isValidTransition(current.status, REC_STATUS.PLAYING)) {
+      throw Object.assign(
+        new Error(`이미 종료된 곡입니다 (${current.status} → ${REC_STATUS.PLAYING} 불가)`),
+        { status: 409 }
+      );
+    }
+
+    const cleared = await clearPlayingRows(trx, cafeId, id);
+    const rec = await updateStatusRow(trx, current, REC_STATUS.PLAYING);
+    return { rec, cleared };
+  });
+}
+
+async function updateStatus(cafeId, id, status) {
+  if (status === REC_STATUS.PLAYING) {
+    const { rec } = await setPlaying(cafeId, id);
+    return rec;
+  }
+
+  return db.transaction(async (trx) => {
+    const current = await requireForCafe(trx, cafeId, id, { forUpdate: true });
+    return updateStatusRow(trx, current, status);
+  });
+}
+
+async function clearPlaying(cafeId, exceptId) {
+  return db.transaction(async (trx) => {
+    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
+    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+    return clearPlayingRows(trx, cafeId, exceptId);
+  });
 }
 
 async function remove(cafeId, id) {
@@ -203,6 +246,7 @@ module.exports = {
   countActive,
   add,
   updateStatus,
+  setPlaying,
   clearPlaying,
   remove,
   vote,

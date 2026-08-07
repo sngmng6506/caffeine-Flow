@@ -15,9 +15,7 @@ export default defineConfig({
     // 여러 DB 테스트가 같은 Postgres를 공유하므로 순차 실행으로 데이터
     // 간섭도 방지한다(이중 안전장치).
     pool: 'forks',
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    singleFork: true,
     fileParallelism: false,
   },
 });

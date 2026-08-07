@@ -74,6 +74,8 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 ## 곡 댓글 — `/songs/:videoId/comments`
 
 `/cafes/:slug/songs/:videoId/comments` 경로에서도 같은 곡 댓글에 접근한다.
+카페 경로는 활성 카페만 허용하며 잘못된 slug는 404다. 답글의
+`:commentId`는 URL의 `:videoId`에 속한 최상위 댓글이어야 한다.
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |

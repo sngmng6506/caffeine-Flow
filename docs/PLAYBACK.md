@@ -91,6 +91,8 @@ setPanelRatio    렌더러/BrowserView 경계 조정
 ```
 
 렌더러 공개 API는 `owner/electron/preload.js`, 메인 프로세스 IPC 처리는 각 책임 모듈이 기준이다.
+`on*` 이벤트 구독 함수는 해당 리스너만 제거하는 해제 함수를 반환하며,
+컴포넌트 정리 시 다른 화면의 구독을 일괄 삭제하지 않는다.
 
 ## 실패와 복구
 

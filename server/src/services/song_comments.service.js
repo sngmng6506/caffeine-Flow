@@ -31,9 +31,15 @@ async function addComment(videoId, cafeId = null, { commenterIp, commenterName, 
   return { ...comment, cafe_name: null, replies: [] };
 }
 
-async function addReply(parentId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {
+async function addReply(videoId, parentId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {
   const parent = await db('song_comments').where({ id: parentId }).first();
-  if (!parent || parent.parent_id !== null) throw Object.assign(new Error('유효하지 않은 댓글'), { status: 400 });
+  if (
+    !parent
+    || parent.parent_id !== null
+    || canonicalizeVideoId(parent.video_id) !== canonicalizeVideoId(videoId)
+  ) {
+    throw Object.assign(new Error('유효하지 않은 댓글'), { status: 400 });
+  }
 
   const [reply] = await db('song_comments')
     .insert({

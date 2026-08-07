@@ -21,9 +21,36 @@ export default function useRecommendationQueue({
   const [widevineStatus, setWidevineStatus] = useState(null);
   const [aiAutoAccept, setAiAutoAccept] = useState(false);
   const aiAutoAcceptRef = useRef(aiAutoAccept);
+  const playingTransitionRef = useRef(false);
 
   recommendationsRef.current = recommendations;
   aiAutoAcceptRef.current = aiAutoAccept;
+
+  function storeRecommendation(updated) {
+    recommendationsRef.current = recommendationsRef.current.map(rec =>
+      rec.id === updated.id ? updated : rec
+    );
+    setRecommendations(previous => previous.map(rec =>
+      rec.id === updated.id ? updated : rec
+    ));
+  }
+
+  // 소켓 add 이벤트와 수동 수락이 겹쳐도 renderer에서는 한 번에 한 곡만
+  // playing 전환을 요청한다. 서버도 카페 잠금으로 최종 불변식을 보장한다.
+  async function startPlaying(rec) {
+    if (playingTransitionRef.current) return null;
+    if (recommendationsRef.current.some(item => item.status === REC_STATUS.PLAYING)) return null;
+
+    playingTransitionRef.current = true;
+    try {
+      const playing = await updateRec(cafe.slug, rec.id, REC_STATUS.PLAYING);
+      storeRecommendation(playing);
+      window.electronAPI?.playRec(playing.video_id);
+      return playing;
+    } finally {
+      playingTransitionRef.current = false;
+    }
+  }
 
   // 다음 곡 재생 또는 정지.
   // 1) accepted 1순위 재생
@@ -33,9 +60,7 @@ export default function useRecommendationQueue({
     const nextAccepted = snapshot.filter(rec => rec.status === REC_STATUS.ACCEPTED).sort(byPriority)[0];
     if (nextAccepted) {
       try {
-        const playing = await updateRec(cafe.slug, nextAccepted.id, REC_STATUS.PLAYING);
-        setRecommendations(previous => previous.map(rec => rec.id === playing.id ? playing : rec));
-        window.electronAPI?.playRec(playing.video_id);
+        await startPlaying(nextAccepted);
       } catch (error) {
         console.error(error);
       }
@@ -46,10 +71,9 @@ export default function useRecommendationQueue({
       const nextPending = snapshot.filter(isAutoAcceptEligible).sort(byPriority)[0];
       if (nextPending) {
         try {
-          await updateRec(cafe.slug, nextPending.id, REC_STATUS.ACCEPTED);
-          const playing = await updateRec(cafe.slug, nextPending.id, REC_STATUS.PLAYING);
-          setRecommendations(previous => previous.map(rec => rec.id === playing.id ? playing : rec));
-          window.electronAPI?.playRec(playing.video_id);
+          const accepted = await updateRec(cafe.slug, nextPending.id, REC_STATUS.ACCEPTED);
+          storeRecommendation(accepted);
+          await startPlaying(accepted);
         } catch (error) {
           console.error(error);
         }
@@ -71,6 +95,7 @@ export default function useRecommendationQueue({
       )).filter(Boolean);
       const updateMap = Object.fromEntries(updates.map(update => [update.id, update]));
       snapshot = snapshot.map(rec => updateMap[rec.id] || rec);
+      recommendationsRef.current = snapshot;
       setRecommendations(previous => previous.map(rec => updateMap[rec.id] || rec));
     }
 
@@ -80,9 +105,7 @@ export default function useRecommendationQueue({
     if (!firstAccepted) return;
 
     try {
-      const playing = await updateRec(cafe.slug, firstAccepted.id, REC_STATUS.PLAYING);
-      setRecommendations(previous => previous.map(rec => rec.id === playing.id ? playing : rec));
-      window.electronAPI?.playRec(playing.video_id);
+      await startPlaying(firstAccepted);
     } catch (error) {
       console.error(error);
     }
@@ -155,19 +178,11 @@ export default function useRecommendationQueue({
         if (aiAutoAcceptRef.current && isAutoAcceptEligible(rec)) {
           updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED)
             .then(updated => {
-              setRecommendations(previous => previous.some(item => item.id === updated.id)
-                ? previous.map(item => item.id === updated.id ? updated : item)
-                : [...previous, updated]
-              );
-              const hasPlaying = recommendationsRef.current.some(item => item.status === REC_STATUS.PLAYING);
-              if (!hasPlaying) {
-                updateRec(cafe.slug, updated.id, REC_STATUS.PLAYING)
-                  .then(playing => {
-                    setRecommendations(previous => previous.map(item => item.id === playing.id ? playing : item));
-                    window.electronAPI?.playRec(playing.video_id);
-                  })
-                  .catch(console.error);
-              }
+              recommendationsRef.current = recommendationsRef.current.some(item => item.id === updated.id)
+                ? recommendationsRef.current.map(item => item.id === updated.id ? updated : item)
+                : [...recommendationsRef.current, updated];
+              setRecommendations(recommendationsRef.current);
+              startPlaying(updated).catch(console.error);
             })
             .catch(() => {
               setRecommendations(previous => previous.some(item => item.id === rec.id) ? previous : [rec, ...previous]);
@@ -186,25 +201,24 @@ export default function useRecommendationQueue({
 
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
 
-    window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
-    window.electronAPI?.onWidevineStatus(status => setWidevineStatus(status));
+    const removeNowPlaying = window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
+    const removeWidevineStatus = window.electronAPI?.onWidevineStatus(status => setWidevineStatus(status));
 
     const savedBgmUrl = savedToBgmUrl(readSavedBgm());
     if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
-    window.electronAPI?.onVideoEnded(() => {
+    const removeVideoEnded = window.electronAPI?.onVideoEnded(() => {
       const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
       if (!playing) return;
       updateRec(cafe.slug, playing.id, REC_STATUS.PLAYED)
         .then(updated => {
-          setRecommendations(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
-          const latest = recommendationsRef.current.map(rec => rec.id === updated.id ? updated : rec);
-          playNextOrStop(latest);
+          storeRecommendation(updated);
+          playNextOrStop(recommendationsRef.current);
         })
         .catch(console.error);
     });
 
-    window.electronAPI?.onCleanupBeforeQuit?.(async () => {
+    const removeCleanupBeforeQuit = window.electronAPI?.onCleanupBeforeQuit?.(async () => {
       try {
         const playing = recommendationsRef.current.filter(rec => rec.status === REC_STATUS.PLAYING);
         await Promise.all(
@@ -216,7 +230,10 @@ export default function useRecommendationQueue({
 
     return () => {
       disconnectSocket();
-      window.electronAPI?.removeAllListeners();
+      if (typeof removeNowPlaying === 'function') removeNowPlaying();
+      if (typeof removeWidevineStatus === 'function') removeWidevineStatus();
+      if (typeof removeVideoEnded === 'function') removeVideoEnded();
+      if (typeof removeCleanupBeforeQuit === 'function') removeCleanupBeforeQuit();
     };
   }, [cafe.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -264,24 +281,15 @@ export default function useRecommendationQueue({
   }
 
   function handleUpdate(updated, context) {
-    setRecommendations(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
+    storeRecommendation(updated);
 
     if (context === REC_STATUS.PLAYING && updated.status === REC_STATUS.SKIPPED) {
-      const latest = recommendationsRef.current.map(rec => rec.id === updated.id ? updated : rec);
-      playNextOrStop(latest);
+      playNextOrStop(recommendationsRef.current);
       return;
     }
 
     if (updated.status === REC_STATUS.ACCEPTED) {
-      const hasPlaying = recommendationsRef.current.some(rec => rec.status === REC_STATUS.PLAYING);
-      if (!hasPlaying) {
-        updateRec(cafe.slug, updated.id, REC_STATUS.PLAYING)
-          .then(playing => {
-            setRecommendations(previous => previous.map(rec => rec.id === playing.id ? playing : rec));
-            window.electronAPI?.playRec(playing.video_id);
-          })
-          .catch(console.error);
-      }
+      startPlaying(updated).catch(console.error);
     }
   }
 

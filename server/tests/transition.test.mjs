@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { isValidTransition, TERMINAL_STATUSES } from '../src/services/recommendation.service.js';
+import { OWNER_MUTABLE_STATUSES } from '../src/constants/recommendation-status.js';
 
 describe('추천곡 상태 전이', () => {
   it('활성 상태 간 양방향 전이 허용 (드래그 UI)', () => {
@@ -21,5 +22,9 @@ describe('추천곡 상태 전이', () => {
   });
   it('동일 상태 재설정은 허용 (멱등)', () => {
     expect(isValidTransition('played', 'played')).toBe(true);
+  });
+
+  it('사장님 API는 accepted → pending 복귀를 허용한다', () => {
+    expect(OWNER_MUTABLE_STATUSES).toContain('pending');
   });
 });
