@@ -150,7 +150,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   }
 
   return (
-    <form onSubmit={handlePreview} className='request-card' aria-label='신청곡 추가'>
+    <form onSubmit={handlePreview} className='request-card request-card--input' aria-label='신청곡 추가'>
       <label className='field-label' htmlFor='music-url'>음악 링크</label>
       <div className='input-shell'>
         <Link2 size={18} aria-hidden='true' />
@@ -165,7 +165,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         />
       </div>
 
-      {error && <div className='feedback feedback--error' role='alert'>{error}</div>}
+      {error && <div className='feedback feedback--error request-card__input-error' role='alert'>{error}</div>}
 
       <button type='submit' disabled={loading || !url.trim()} className='button button--primary button--full'>
         {loading ? <LoaderCircle className='is-spinning' size={18} aria-hidden='true' /> : <Search size={18} aria-hidden='true' />}

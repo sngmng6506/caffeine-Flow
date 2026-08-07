@@ -6,7 +6,7 @@
 
 Caffeine Flow 손님 화면의 시각·상호작용 기준이다. 사용자 문구는 [WRITING_GUIDE.md](./WRITING_GUIDE.md)를 따른다.
 
-이 문서는 **리디자인 목표 계약**이다. 현재 화면에는 컴포넌트별 인라인 스타일이 남아 있으므로 한 번에 전부 교체하지 않는다. 이후 UI 작업에서 실제 화면을 확인하며 컴포넌트 단위로 이 가이드에 맞춰 이동한다.
+이 문서는 **현재 손님 UI 구현 계약**이다. 새 화면과 수정은 아래 토큰·컴포넌트·상호작용 규칙을 유지하며, 실제 화면을 확인하면서 컴포넌트 단위로 진행한다.
 
 ## 디자인 방향: Clear Flow
 
@@ -46,7 +46,7 @@ Clear Flow의 핵심은 브랜드 노출이 아니라 명확한 상태, 빠른 �
 
 ## 구현 구조
 
-현재 `customer/src/pages`의 인라인 스타일은 기존 구현이다. 리디자인을 시작할 때 다음 구조를 목표로 한다.
+손님 UI는 다음 구조로 관리한다.
 
 1. `customer/src/styles/tokens.css`: 색상, 타이포, 간격, radius, shadow, motion 토큰
 2. `customer/src/styles/global.css`: reset, 기본 배경·폰트, focus, reduced motion
@@ -242,8 +242,9 @@ YouTube 등에서 제공하는 음악 썸네일은 기본적으로 16:9다.
 - `음악 찾기` 라벨과 플랫폼 아이콘은 가까운 한 그룹으로 배치한다.
 - 플랫폼 아이콘 위에 별도의 외부 링크 표시를 겹쳐 그리지 않는다. 새 창 안내는 접근성 라벨로 제공한다.
 - 입력 focus에는 brand 테두리와 focus ring을 함께 제공한다.
+- 입력 오류는 음악 링크 입력과 핵심 CTA 사이에 두고, 위아래 간격을 각각 12px로 맞춘다.
 - 미리보기에서는 썸네일·곡 제목·플랫폼·두 행동을 명확히 분리한다.
-- `다시 선택하기`는 secondary, `이 곡 신청하기`는 primary다.
+- `다시 선택`은 왼쪽 secondary, `곡 신청`은 오른쪽 primary다. 세로 배치에서는 primary가 아래에 온다.
 
 ### 버튼
 
@@ -276,7 +277,7 @@ Danger:
 
 ### 입력
 
-- surface 배경, stroke 테두리, control radius
+- surface-subtle 배경, 기본 transparent 테두리, control radius
 - 높이 48px, 글자 16px 이상
 - placeholder는 content-disabled를 사용하지만 라벨을 완전히 대체하지 않는다.
 - 오류 시 destructive 테두리와 오류 문구를 함께 표시한다.
@@ -289,7 +290,7 @@ Danger:
 - 신청 입력은 신청곡 탭의 콘텐츠로 배치해 다른 탭에서는 탐색 위치만 유지한다.
 - 모바일 콘텐츠 영역에서 좌우 스와이프로 인접 탭을 이동할 수 있게 한다.
 - 56px 이상의 뚜렷한 가로 제스처만 처리하고 세로 스크롤, 입력, 버튼, 링크 조작은 가로 전환보다 우선한다.
-- 활성 탭은 brand 텍스트, brand-soft 배경 또는 명확한 indicator 중 하나로 강조한다.
+- 활성 탭은 brand 배경과 흰색 텍스트로 강조한다.
 - underline과 pill 강조를 동시에 사용하지 않는다.
 - 각 탭의 터치 높이는 44px 이상이어야 한다.
 - 탭 전환으로 데이터가 바뀌면 선택 상태를 `aria-selected`로 제공한다.

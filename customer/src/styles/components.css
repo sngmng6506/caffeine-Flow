@@ -196,6 +196,11 @@
   border-radius: var(--cf-radius-card);
 }
 
+.request-card--input {
+  display: flex;
+  flex-direction: column;
+}
+
 .request-card__heading {
   display: flex;
   align-items: center;
@@ -319,6 +324,10 @@
 
 .request-card .feedback {
   margin-top: 12px;
+}
+
+.request-card__input-error {
+  margin: 12px 0 0;
 }
 
 .request-card__actions {
