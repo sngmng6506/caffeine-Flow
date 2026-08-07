@@ -160,6 +160,32 @@ describe('투표', () => {
   });
 });
 
+describe('곡 댓글 경로 검증', () => {
+  it('존재하지 않는 카페 slug를 전역 댓글로 저장하지 않는다', async () => {
+    const res = await request(app)
+      .post('/api/v1/cafes/missing-cafe/songs/comment_guard/comments')
+      .set(guestHeaders('comment-guard'))
+      .send({ body: '저장되면 안 됨' });
+
+    expect(res.status).toBe(404);
+    expect(Number((await db('song_comments').where({ video_id: 'comment_guard' }).count('* as n').first()).n)).toBe(0);
+  });
+
+  it('다른 곡의 부모 댓글에는 답글을 달 수 없다', async () => {
+    const [parent] = await db('song_comments').insert({
+      video_id: 'reply_parent_video', cafe_id: cafe.id, body: '부모 댓글',
+    }).returning('*');
+
+    const res = await request(app)
+      .post(`/api/v1/songs/other_video/comments/${parent.id}/replies`)
+      .set(guestHeaders('reply-guard'))
+      .send({ body: '잘못된 답글' });
+
+    expect(res.status).toBe(400);
+    expect(Number((await db('song_comments').where({ parent_id: parent.id }).count('* as n').first()).n)).toBe(0);
+  });
+});
+
 describe('통계 — knex raw ? 바인딩 회귀 (split_part 이스케이프)', () => {
   beforeAll(async () => {
     // '?si=' 추적 파라미터가 붙은 곡과 원곡이 하나로 병합되는지까지 검증
@@ -225,5 +251,54 @@ describe('사장님 상태 변경 — 인증·전이 검증', () => {
 
   it('종료 상태(played) → accepted 역방향 전이 → 409', async () => {
     expect((await put(ownerToken, 'accepted')).status).toBe(409);
+  });
+
+  it('accepted → pending으로 되돌릴 수 있다', async () => {
+    const [target] = await db('recommendations').insert({
+      cafe_id: cafe.id, video_id: 'return_to_pending', title: '되돌릴 곡', status: 'accepted',
+    }).returning('*');
+    const res = await request(app)
+      .put(`/api/v1/cafes/${cafe.slug}/recommendations/${target.id}`)
+      .set({ Authorization: `Bearer ${ownerToken}` })
+      .send({ status: 'pending' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('pending');
+  });
+
+  it('동시 playing 요청 후에도 카페에는 한 곡만 playing으로 남는다', async () => {
+    await db('recommendations').where({ cafe_id: cafe.id, status: 'playing' }).update({ status: 'played' });
+    const targets = await db('recommendations').insert([
+      { cafe_id: cafe.id, video_id: 'playing_race_a', title: '경쟁 A', status: 'accepted' },
+      { cafe_id: cafe.id, video_id: 'playing_race_b', title: '경쟁 B', status: 'accepted' },
+    ]).returning('*');
+
+    const responses = await Promise.all(targets.map(target =>
+      request(app)
+        .put(`/api/v1/cafes/${cafe.slug}/recommendations/${target.id}`)
+        .set({ Authorization: `Bearer ${ownerToken}` })
+        .send({ status: 'playing' })
+    ));
+
+    expect(responses.every(response => response.status === 200)).toBe(true);
+    expect(Number((await db('recommendations')
+      .where({ cafe_id: cafe.id, status: 'playing' })
+      .count('* as n').first()).n)).toBe(1);
+  });
+
+  it('종료 곡을 playing으로 요청해도 현재 재생곡을 종료하지 않는다', async () => {
+    await db('recommendations').where({ cafe_id: cafe.id, status: 'playing' }).update({ status: 'played' });
+    const [current, terminal] = await db('recommendations').insert([
+      { cafe_id: cafe.id, video_id: 'playing_stays', title: '현재 재생', status: 'playing' },
+      { cafe_id: cafe.id, video_id: 'terminal_target', title: '종료 대상', status: 'played' },
+    ]).returning('*');
+
+    const res = await request(app)
+      .put(`/api/v1/cafes/${cafe.slug}/recommendations/${terminal.id}`)
+      .set({ Authorization: `Bearer ${ownerToken}` })
+      .send({ status: 'playing' });
+
+    expect(res.status).toBe(409);
+    expect((await db('recommendations').where({ id: current.id }).first()).status).toBe('playing');
   });
 });
