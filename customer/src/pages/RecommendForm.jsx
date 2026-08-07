@@ -113,9 +113,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     return (
       <section className='request-card' aria-labelledby='request-preview-title'>
         <div className='request-card__heading'>
-          <span className='request-card__heading-icon' aria-hidden='true'><Music2 size={20} /></span>
           <div>
-            <p className='request-card__eyebrow'>신청곡 미리보기</p>
             <h2 id='request-preview-title'>이 곡이 맞나요?</h2>
           </div>
         </div>
@@ -151,9 +149,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   return (
     <form onSubmit={handlePreview} className='request-card' aria-labelledby='request-title'>
       <div className='request-card__heading'>
-        <span className='request-card__heading-icon' aria-hidden='true'><Music2 size={20} /></span>
         <div>
-          <p className='request-card__eyebrow'>MUSIC REQUEST</p>
           <h2 id='request-title'>신청곡 추가</h2>
         </div>
       </div>

@@ -35,25 +35,13 @@
 }
 
 .cafe-header {
-  margin: 4px 2px 20px;
-}
-
-.cafe-header__brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 8px;
-  color: var(--cf-brand);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  margin: 8px 4px 24px;
 }
 
 .cafe-header h1 {
   margin: 0;
   color: var(--cf-content-strong);
-  font-size: clamp(26px, 7vw, 32px);
+  font-size: clamp(26px, 7vw, 30px);
   line-height: 1.25;
   letter-spacing: -0.035em;
 }
@@ -121,53 +109,34 @@
 }
 
 .now-playing {
-  position: relative;
-  overflow: hidden;
   margin-bottom: var(--cf-space-4);
   padding: 16px;
-  color: white;
-  background: var(--cf-gradient-now-playing);
+  color: var(--cf-content-strong);
+  background: var(--cf-surface);
   border-radius: var(--cf-radius-card);
-  box-shadow: var(--cf-shadow-raised);
-}
-
-.now-playing::after {
-  position: absolute;
-  right: -44px;
-  bottom: -68px;
-  width: 170px;
-  height: 170px;
-  border: 30px solid rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  content: '';
 }
 
 .now-playing__status {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 7px;
   margin-bottom: 13px;
-  color: rgba(255, 255, 255, 0.84);
+  color: var(--cf-brand);
   font-size: 12px;
-  font-weight: 750;
-  letter-spacing: 0.03em;
+  font-weight: 700;
 }
 
 .now-playing__pulse {
   width: 7px;
   height: 7px;
   margin-left: 1px;
-  background: #b8f3de;
+  background: var(--cf-brand);
   border-radius: 50%;
-  box-shadow: 0 0 0 0 rgba(184, 243, 222, 0.45);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-brand) 35%, transparent);
   animation: cf-pulse 1.8s infinite;
 }
 
 .now-playing__content {
-  position: relative;
-  z-index: 1;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -179,7 +148,7 @@
   aspect-ratio: 16 / 9;
   flex: 0 0 auto;
   object-fit: cover;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--cf-surface-subtle);
   border-radius: 11px;
 }
 
@@ -208,7 +177,7 @@
 .now-playing__channel {
   overflow: hidden;
   margin: 5px 0 0;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--cf-content-muted);
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -217,10 +186,9 @@
 .request-card {
   margin-bottom: 18px;
   padding: 16px;
-  background: color-mix(in srgb, var(--cf-surface) 96%, var(--cf-brand-soft));
-  border: 1px solid var(--cf-stroke);
+  background: var(--cf-surface);
+  border: 0;
   border-radius: var(--cf-radius-card);
-  box-shadow: var(--cf-shadow-subtle);
 }
 
 .request-card__heading {
@@ -228,25 +196,6 @@
   align-items: center;
   gap: 11px;
   margin-bottom: 16px;
-}
-
-.request-card__heading-icon {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  color: var(--cf-brand);
-  background: var(--cf-brand-soft);
-  border-radius: 13px;
-}
-
-.request-card__eyebrow {
-  margin: 0 0 2px;
-  color: var(--cf-content-caption);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.11em;
 }
 
 .request-card h2 {
@@ -271,8 +220,8 @@
   gap: 10px;
   padding: 0 13px;
   color: var(--cf-content-muted);
-  background: var(--cf-surface);
-  border: 1px solid var(--cf-stroke-strong);
+  background: var(--cf-surface-subtle);
+  border: 1px solid transparent;
   border-radius: var(--cf-radius-control);
   transition: border-color var(--cf-motion-fast), box-shadow var(--cf-motion-fast);
 }
@@ -311,7 +260,7 @@
   border-radius: var(--cf-radius-control);
   cursor: pointer;
   font-size: 14px;
-  font-weight: 750;
+  font-weight: 700;
   transition: transform var(--cf-motion-fast), background var(--cf-motion-fast), border-color var(--cf-motion-fast);
 }
 
@@ -421,7 +370,7 @@
   justify-content: center;
   border-radius: var(--cf-radius-badge);
   font-size: 10px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
 }
 
@@ -462,8 +411,8 @@
   height: 44px;
   display: grid;
   place-items: center;
-  background: var(--cf-surface);
-  border: 1px solid var(--cf-stroke);
+  background: var(--cf-surface-subtle);
+  border: 0;
   border-radius: 12px;
   text-decoration: none;
   transition: transform var(--cf-motion-fast), box-shadow var(--cf-motion-fast);
@@ -471,7 +420,6 @@
 
 .platform-shortcut:hover {
   transform: translateY(-1px);
-  box-shadow: var(--cf-shadow-subtle);
 }
 
 .platform-shortcut > svg:last-child {
@@ -495,11 +443,9 @@
   margin: 18px 0 22px;
   padding: 4px;
   overflow-x: auto;
-  background: color-mix(in srgb, var(--cf-surface) 92%, transparent);
-  border: 1px solid var(--cf-stroke);
+  background: var(--cf-canvas);
+  border: 0;
   border-radius: 14px;
-  box-shadow: var(--cf-shadow-subtle);
-  backdrop-filter: blur(12px);
   scrollbar-width: none;
 }
 
@@ -574,9 +520,8 @@
   padding: 0;
   list-style: none;
   background: var(--cf-surface);
-  border: 1px solid var(--cf-stroke);
+  border: 0;
   border-radius: var(--cf-radius-card);
-  box-shadow: var(--cf-shadow-subtle);
 }
 
 .song-list__item + .song-list__item,
@@ -655,7 +600,7 @@
 
 .song-card__mine {
   color: var(--cf-brand);
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .status-badge {
@@ -739,8 +684,8 @@
   padding: 28px 20px;
   text-align: center;
   color: var(--cf-content-muted);
-  background: color-mix(in srgb, var(--cf-surface) 84%, transparent);
-  border: 1px dashed var(--cf-stroke-strong);
+  background: var(--cf-surface);
+  border: 0;
   border-radius: var(--cf-radius-card);
 }
 
@@ -791,7 +736,6 @@
 .segmented-control button[aria-pressed='true'] {
   color: var(--cf-brand);
   background: var(--cf-surface);
-  box-shadow: var(--cf-shadow-subtle);
 }
 
 .rank-row {
@@ -877,7 +821,7 @@
   gap: 6px;
   color: var(--cf-content-strong);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .comments__heading small {
@@ -995,7 +939,7 @@
 }
 
 .customer-footer span {
-  font-weight: 750;
+  font-weight: 700;
 }
 
 .customer-footer a:hover {
@@ -1012,8 +956,8 @@
 }
 
 @keyframes cf-pulse {
-  70% { box-shadow: 0 0 0 7px rgba(184, 243, 222, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(184, 243, 222, 0); }
+  70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--cf-brand) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-brand) 0%, transparent); }
 }
 
 @media (max-width: 380px) {

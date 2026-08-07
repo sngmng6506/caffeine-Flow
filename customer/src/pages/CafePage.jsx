@@ -12,7 +12,6 @@ import {
   PauseCircle,
   Reply,
   Send,
-  Sparkles,
 } from 'lucide-react';
 import {
   getRecommendations,
@@ -216,7 +215,6 @@ export default function CafePage({ slug }) {
   return (
     <main className='customer-page'>
       <header className='cafe-header'>
-        <span className='cafe-header__brand'><Sparkles size={14} aria-hidden='true' /> Caffeine Flow</span>
         <h1>{cafeName || '신청곡'}</h1>
         <p>오늘 듣고 싶은 음악을 신청해 보세요.</p>
       </header>

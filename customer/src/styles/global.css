@@ -22,10 +22,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 15% -10%, rgba(169, 157, 242, 0.18), transparent 34%),
-    radial-gradient(circle at 100% 12%, rgba(57, 118, 217, 0.1), transparent 28%),
-    var(--cf-canvas);
+  background: var(--cf-canvas);
 }
 
 button,
