@@ -1,80 +1,77 @@
 # Caffeine Flow
 
-Caffeine Flow는 카페에서 손님 신청곡을 QR로 받고, 사장님이 데스크톱에서 안전하게 큐를 관리·재생하는 실시간 BGM 운영 도구다. YouTube · SoundCloud · Spotify 세 플랫폼을 한 화면에서 **매장 BGM(고정) + 신청곡(임시 오버레이)** 구조로 재생한다.
+카페 손님이 QR로 음악을 신청하고, 사장님이 데스크톱에서 큐를 관리·재생하는 실시간 BGM 운영 도구다.
 
-| | |
-| --- | --- |
-| **손님** | QR 스캔 → 모바일 브라우저에서 링크 신청·투표·댓글 (앱 설치 없음) |
-| **사장님** | Electron 데스크톱 앱에서 큐 관리 + 실제 재생, 또는 웹 대시보드 |
-| **백엔드** | Express + Postgres, Socket.IO 실시간 큐, Railway 배포 |
-| **재생** | BrowserView 2개 (BGM 고정 / 신청곡 오버레이), 곡 종료 자동 감지 |
-| **AI** | 사장님이 설정한 매장 분위기 정책을 기반으로 손님 신청곡을 LLM이 수락/거절 |
+```text
+손님 모바일 웹  → 신청·투표·댓글
+Express 서버    → 검증·저장·Socket.IO 동기화
+사장님 앱       → 수락·재생·스킵·운영 설정
+Electron        → YouTube·SoundCloud·Spotify 실제 재생
+```
 
 ## 핵심 기능
 
-- QR 기반 손님 신청곡 접수, 투표, 댓글
-- 사장님 데스크톱 큐 관리와 BGM/신청곡 오버레이 재생
-- YouTube · SoundCloud · Spotify 링크 메타데이터 자동 추출
-- 매장 분위기 프롬프트 기반 AI 음악 필터: `accept` / `reject`만 사용, 오류 시 fail-closed
-- Postgres + Socket.IO 기반 실시간 큐 동기화
+- 앱 설치 없는 QR 기반 신청곡 접수
+- 사장님용 실시간 큐 관리
+- YouTube·SoundCloud·Spotify 메타데이터 처리
+- 매장 BGM과 신청곡의 overlay 재생
+- 매장 분위기 프롬프트 기반 AI 음악 필터
+- 투표·댓글·재생 이력·운영 통계
+- Google·Naver 로그인과 Electron 자동 업데이트
+
+AI 음악 필터는 `accept` 또는 `reject`만 사용하며 오류 시 fail-closed로 동작한다.
 
 ## 기술 스택
 
-React 18 · Vite 5 (손님·사장님 SPA) · Node.js · Express 4 · Knex 3 · Socket.IO 4 · PostgreSQL · Electron 41(CastLabs `wvcus`) · Google/Naver OAuth · Vitest/Supertest · Railway · GitHub Releases
+React · Vite · Node.js · Express · Knex · Socket.IO · PostgreSQL · Electron · Vitest · Railway
 
 ## 빠른 시작
 
 ```bash
-# 1) 의존성 설치
-npm install && npm install --prefix server \
-  && npm install --prefix customer && npm install --prefix owner
+# 의존성 설치
+npm install
+npm install --prefix server
+npm install --prefix customer
+npm install --prefix owner
 
-# 2) 루트에 .env 작성
-# 필수: DATABASE_URL, JWT_SECRET
-# AI 필터 사용 시: OPENROUTER_API_KEY
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # JWT_SECRET 생성
+# 루트 .env에 DATABASE_URL, JWT_SECRET 설정
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
-# 3) DB 마이그레이션
+# DB와 개발 서버
 npm run migrate --prefix server
+npm run dev:server
+npm run dev:customer
+npm run dev:owner
 
-# 4) 개발 서버 (각 터미널)
-npm run dev:server     # localhost:3001
-npm run dev:customer   # localhost:5173
-npm run dev:owner      # localhost:5174
-
-# 5) 사장님 데스크톱 개발 모드
-cd owner && npm run electron:dev
+# Electron 개발 모드
+npm run electron:dev --prefix owner
 ```
 
-환경변수 전체 목록과 테스트·배포 명령은 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)를 참고한다.
+환경변수와 테스트·배포 방법은 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)를 참고한다.
 
-## 프로젝트 구조
+## 저장소 구조
 
-```
-├── server/        Express + Postgres 백엔드 (배포 대상)
-│   ├── app.js       Express 앱 조립 (라우트·미들웨어) — 테스트가 import
-│   ├── server.js    HTTP·Socket.IO 리슨 (Railway 실행 엔트리)
-│   └── src/         routes · services · middleware · socket · db · utils
-├── customer/      손님 SPA (Vite + React)
-├── owner/         사장님 SPA + Electron 데스크톱
-│   ├── electron/    메인 프로세스, preload, 스텔스
-│   └── src/         대시보드·로그인 UI
-└── railway.json   빌드·실행 설정
+```text
+server/           API·Socket.IO·PostgreSQL
+customer/         손님 React SPA
+owner/src/        사장님 React UI
+owner/electron/   데스크톱 재생 엔진
 ```
 
 ## 문서
 
-| 문서 | 내용 |
-| --- | --- |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 작동 원리 — 시스템 전경·신청곡 상태 기계·재생 파이프라인 (다이어그램 기반, 코드 없이 이해) |
-| [docs/API.md](docs/API.md) | REST 엔드포인트 전체 (인증·rate limit 포함) |
-| [docs/LLM_FEATURES.md](docs/LLM_FEATURES.md) | LLM 기반 AI 음악 필터 설계 — 정책 설정·판단 흐름·실패 처리·통계 대시보드 |
-| [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) | AI 코드 수정 시 깨지면 안 되는 상태·라우터·KST·SQL·LLM 계약 |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | 로컬 개발·환경변수·마이그레이션·테스트·배포 |
-| [AGENTS.md](AGENTS.md) | AI 도구 협업 규칙 (도구 무관 계약) |
-| [COMMIT_CONVENTION.md](COMMIT_CONVENTION.md) | 커밋 메시지 형식 |
+전체 문서 지도: [docs/README.md](docs/README.md)
 
-> AI 도구별 어댑터인 `CLAUDE.md` · `GEMINI.md` · `.cursor/rules`는 모두 `AGENTS.md`와 `docs/AI_CHANGE_GUARDRAILS.md` 계약을 참조한다.
+| 문서 | 역할 |
+| --- | --- |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 시스템 경계·데이터 흐름·상태 모델 |
+| [PLAYBACK.md](docs/PLAYBACK.md) | Electron 재생 엔진과 플랫폼 제약 |
+| [API.md](docs/API.md) | REST 엔드포인트 레퍼런스 |
+| [DEVELOPMENT.md](docs/DEVELOPMENT.md) | 환경변수·테스트·배포 |
+| [LLM_FILTER.md](docs/LLM_FILTER.md) | 현재 AI 음악 필터 동작 |
+| [AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) | 변경 시 유지할 코드 계약 |
+| [ROADMAP.md](docs/ROADMAP.md) | 아직 구현되지 않은 개선 후보 |
+| [AGENTS.md](AGENTS.md) | 사람·AI 도구 공통 작업 규칙 |
 
 ## 라이선스
 
