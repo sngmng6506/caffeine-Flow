@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { changeSlug } from '../../api';
 
-export default function QRTab({ url, cafeName, onSlugChanged }) {
+export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugChanged }) {
   const [showChange, setShowChange] = useState(false);
   const [customSlug, setCustomSlug] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,6 +26,14 @@ export default function QRTab({ url, cafeName, onSlugChanged }) {
   }
 
   function handlePrint() { window.print(); }
+
+  function handleRestore() {
+    if (!initialSlug || initialSlug === currentSlug) return;
+    const confirmed = window.confirm(
+      `최초 QR 코드(${initialSlug})로 돌아갈까요?\n현재 QR 코드는 더 이상 동작하지 않습니다.`
+    );
+    if (confirmed) handleReissue(initialSlug);
+  }
 
   // 무작위 재발급(slug 없이) 또는 사전 제작 QR 코드로 재등록(slug 지정).
   // 성공 시 부모가 cafe.slug·토큰·소켓 연결을 함께 갱신해야 하므로
@@ -72,10 +80,18 @@ export default function QRTab({ url, cafeName, onSlugChanged }) {
 
       {/* 미리 제작한 아크릴 QR 등으로 교체하고 싶을 때 */}
       <div className="no-print" style={qrStyles.changeSection}>
+        {error && <div style={qrStyles.error}>{error}</div>}
         {!showChange ? (
-          <button onClick={() => setShowChange(true)} style={qrStyles.changeLink}>
-            다른 QR 코드로 변경
-          </button>
+          <div style={qrStyles.changeLinks}>
+            <button onClick={() => setShowChange(true)} disabled={loading} style={qrStyles.changeLink}>
+              다른 QR 코드로 변경
+            </button>
+            {initialSlug && initialSlug !== currentSlug && (
+              <button onClick={handleRestore} disabled={loading} style={qrStyles.restoreLink}>
+                {loading ? '처리 중...' : '최초 QR 코드로 돌아가기'}
+              </button>
+            )}
+          </div>
         ) : (
           <div style={qrStyles.changeBox}>
             <p style={qrStyles.changeHint}>
@@ -88,7 +104,6 @@ export default function QRTab({ url, cafeName, onSlugChanged }) {
               onChange={e => setCustomSlug(e.target.value.trim().toLowerCase())}
               style={qrStyles.input}
             />
-            {error && <div style={qrStyles.error}>{error}</div>}
             <div style={qrStyles.changeBtnRow}>
               <button onClick={() => handleReissue(customSlug)} disabled={loading} style={qrStyles.btn}>
                 {loading ? '처리 중...' : customSlug ? '이 코드로 연결' : '무작위로 재발급'}
@@ -118,7 +133,9 @@ const qrStyles = {
   btnRow:         { display: 'flex', gap: 10 },
   btn:            { padding: '10px 24px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
   changeSection:  { marginTop: 4, width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  changeLinks:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
   changeLink:     { fontSize: 12, color: '#999', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' },
+  restoreLink:    { fontSize: 12, color: '#1a1a2e', background: '#fff', border: '1px solid #ccc', borderRadius: 7, padding: '7px 12px', cursor: 'pointer', fontWeight: 600 },
   changeBox:      { width: '100%', display: 'flex', flexDirection: 'column', gap: 10, background: '#fafafa', border: '1px solid #eee', borderRadius: 10, padding: 16 },
   changeHint:     { fontSize: 12, color: '#888', lineHeight: 1.6, margin: 0 },
   input:          { padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, boxSizing: 'border-box', width: '100%' },

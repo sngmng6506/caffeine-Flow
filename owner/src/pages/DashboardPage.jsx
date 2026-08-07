@@ -98,7 +98,11 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
   function handleSlugChanged(updated) {
     localStorage.setItem('token', updated.token);
     setCafe(previous => {
-      const next = { ...previous, slug: updated.slug };
+      const next = {
+        ...previous,
+        slug: updated.slug,
+        initial_slug: updated.initial_slug || previous.initial_slug,
+      };
       localStorage.setItem('cafe', JSON.stringify(next));
       return next;
     });
@@ -246,7 +250,15 @@ export default function DashboardPage({ cafe: initialCafe, onLogout }) {
       />
 
       {tab === 'stats' && <StatsPanel />}
-      {tab === 'qr' && <QRTab url={customerUrl} cafeName={cafe.name} onSlugChanged={handleSlugChanged} />}
+      {tab === 'qr' && (
+        <QRTab
+          url={customerUrl}
+          cafeName={cafe.name}
+          currentSlug={cafe.slug}
+          initialSlug={cafe.initial_slug}
+          onSlugChanged={handleSlugChanged}
+        />
+      )}
       {tab === 'settings' && (
         <SettingsTab
           allowedPlatforms={allowedPlatforms}

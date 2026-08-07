@@ -43,7 +43,8 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/cafes/me/stats/hourly-songs` | 🔒 | 특정 시간대 곡 `?hour=` |
 | GET | `/cafes/me/stats/weekday-songs` | 🔒 | 특정 요일 곡 `?day=` |
 
-`PUT /cafes/me/slug` 응답의 새 JWT는 클라이언트가 즉시 교체해야 한다.
+`GET /cafes/me`는 최초 가입 시 할당된 QR slug를 `initial_slug`로 반환한다.
+`PUT /cafes/me/slug` 응답에도 `initial_slug`와 새 JWT가 포함되며, 클라이언트는 JWT를 즉시 교체해야 한다.
 
 ## 추천곡 — `/cafes/:slug/recommendations`
 

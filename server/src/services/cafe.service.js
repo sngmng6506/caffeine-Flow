@@ -94,6 +94,16 @@ async function changeSlug(cafeId, newSlug) {
   });
 }
 
+// 최초 가입 시 할당된 slug는 첫 변경 이력의 old_slug다.
+// 변경 이력이 없으면 아직 최초 slug를 사용 중이므로 null을 반환한다.
+async function findInitialSlug(cafeId) {
+  const firstChange = await db('cafe_slug_history')
+    .where({ cafe_id: cafeId })
+    .orderBy('changed_at', 'asc')
+    .first('old_slug');
+  return firstChange?.old_slug || null;
+}
+
 // slug 형식 검증 — 커스텀 지정(아크릴 QR 재등록) 시 서버가 생성하는 것과
 // 동일한 문자집합·길이만 허용한다. 다른 형식을 허용하면 URL에 안전하지
 // 않은 문자가 들어가거나, 기존 라우트 패턴(:slug)과 충돌할 수 있다.
@@ -125,4 +135,17 @@ async function findMovedSlug(oldSlug) {
   return cafe.slug;
 }
 
-module.exports = { findBySlug, findActiveBySlug, findByEmail, findByGoogleId, findByNaverId, create, update, uniqueSlug, isValidSlugFormat, changeSlug, findMovedSlug };
+module.exports = {
+  findBySlug,
+  findActiveBySlug,
+  findByEmail,
+  findByGoogleId,
+  findByNaverId,
+  create,
+  update,
+  uniqueSlug,
+  isValidSlugFormat,
+  changeSlug,
+  findInitialSlug,
+  findMovedSlug,
+};

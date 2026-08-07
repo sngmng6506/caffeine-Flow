@@ -23,8 +23,13 @@ const {
 router.get('/me', requireAuth, async (req, res) => {
   const cafe = await cafeService.findBySlug(req.owner.slug);
   if (!cafe) return res.status(404).json({ error: 'Not found' });
+  const initialSlug = await cafeService.findInitialSlug(cafe.id) || cafe.slug;
   const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
-  res.json({ ...safeCafe(cafe), customer_url: `${baseUrl}/${cafe.slug}` });
+  res.json({
+    ...safeCafe(cafe),
+    initial_slug: initialSlug,
+    customer_url: `${baseUrl}/${cafe.slug}`,
+  });
 });
 
 // PUT /api/v1/cafes/me
@@ -74,9 +79,11 @@ router.put('/me/slug', requireAuth, slugChangeLimiter, async (req, res) => {
   // 다음 신청 때 404를 맞고서야 알게 되므로, 즉시 새 주소로 안내한다.
   req.app.get('io')?.of('/cafe').to(oldSlug).emit('cafe_moved', { movedTo: cafe.slug });
 
+  const initialSlug = await cafeService.findInitialSlug(cafe.id) || cafe.slug;
   const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
   res.json({
     ...safeCafe(cafe),
+    initial_slug: initialSlug,
     customer_url: `${baseUrl}/${cafe.slug}`,
     token: issueToken(cafe), // 새 slug가 담긴 세션 토큰으로 즉시 교체 필요
   });

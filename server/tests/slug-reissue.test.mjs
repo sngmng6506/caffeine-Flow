@@ -32,7 +32,7 @@ afterAll(async () => {
 });
 
 describe('QR slug 재발급/재등록', () => {
-  it('무작위 재발급 → 새 slug + 새 토큰 발급, 옛 slug는 이동 안내', async () => {
+  it('무작위 재발급 → 최초 slug 조회·복원과 새 토큰 발급', async () => {
     const cafe = await freshCafe('slugone');
     const res = await request(app)
       .put('/api/v1/cafes/me/slug')
@@ -50,6 +50,22 @@ describe('QR slug 재발급/재등록', () => {
     const guest = await request(app).get('/api/v1/cafes/slugone/recommendations');
     expect(guest.status).toBe(404);
     expect(guest.body.movedTo).toBe(res.body.slug);
+
+    // 새 세션에서 최초 할당 slug를 확인하고 기존 변경 API로 복원
+    const me = await request(app)
+      .get('/api/v1/cafes/me')
+      .set({ Authorization: `Bearer ${res.body.token}` });
+    expect(me.status).toBe(200);
+    expect(me.body.initial_slug).toBe('slugone');
+
+    const restored = await request(app)
+      .put('/api/v1/cafes/me/slug')
+      .set({ Authorization: `Bearer ${res.body.token}` })
+      .send({ slug: me.body.initial_slug });
+    expect(restored.status).toBe(200);
+    expect(restored.body.slug).toBe('slugone');
+    expect(restored.body.initial_slug).toBe('slugone');
+    expect(jwt.verify(restored.body.token, JWT_SECRET).slug).toBe('slugone');
   });
 
   it('커스텀 slug 지정(아크릴 QR 재등록)', async () => {
