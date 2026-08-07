@@ -90,7 +90,7 @@ onWidevineStatus Widevine 상태
 setPanelRatio    렌더러/BrowserView 경계 조정
 ```
 
-정확한 채널명과 payload는 `owner/electron/preload.js`와 `owner/electron/main.js`가 기준이다.
+렌더러 공개 API는 `owner/electron/preload.js`, 메인 프로세스 IPC 처리는 각 책임 모듈이 기준이다.
 
 ## 실패와 복구
 
@@ -105,22 +105,24 @@ setPanelRatio    렌더러/BrowserView 경계 조정
 ## 구현 위치
 
 ```text
-owner/electron/main.js             창·재생 오케스트레이션
-owner/electron/preload.js          안전한 renderer API
-owner/electron/stealth-preload.js  외부 플랫폼 호환 처리
-owner/electron/youtube-preload.js  YouTube 종료 이벤트
-owner/src/pages/dashboard/         큐 UI와 Electron 이벤트 소비
+owner/electron/main.js                         앱 준비·종료 수명주기 조율
+owner/electron/window-manager.js               BrowserWindow·BrowserView·패널 배치
+owner/electron/playback-controller.js          BGM·신청곡 모드와 IPC 오케스트레이션
+owner/electron/end-detection.js                 Spotify·SoundCloud 시그니처 종료 감지
+owner/electron/platform-adapters/spotify.js     Spotify 재생·takeover 복구
+owner/electron/platform-adapters/soundcloud.js  SoundCloud 모달 제거·실제 클릭
+owner/electron/session-tools.js                 세션 초기화·쿠키 import·요청 정책
+owner/electron/auto-update.js                   electron-updater 이벤트와 재시작
+owner/electron/preload.js                       안전한 renderer API
+owner/electron/stealth-preload.js               외부 플랫폼 호환 처리
+owner/electron/youtube-preload.js               YouTube 종료 이벤트
+owner/src/pages/dashboard/                      큐 UI와 Electron 이벤트 소비
 ```
 
-`owner/electron/main.js`를 분리할 때 권장 경계:
+변경 원칙:
 
-```text
-window-manager
-playback-controller
-platform-adapters/youtube
-platform-adapters/spotify
-platform-adapters/soundcloud
-update-manager
-```
-
-분리는 동작 변경과 섞지 않고 플랫폼 하나씩 검증한다.
+- `main.js`에 플랫폼별 DOM 로직을 다시 넣지 않는다.
+- 창 배치 변경은 `window-manager.js`, 재생 순서 변경은 `playback-controller.js`에서 처리한다.
+- 외부 플랫폼 셀렉터와 클릭은 해당 어댑터 안에 둔다.
+- 종료 감지 임계값과 polling 정리는 `end-detection.js`에서 관리한다.
+- 구조 변경과 실제 재생 정책 변경을 가능하면 별도 커밋으로 나눈다.
