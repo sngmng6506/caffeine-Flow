@@ -261,7 +261,10 @@ export default function CafePage({ slug }) {
   return (
     <main className='customer-page'>
       <header className='cafe-header'>
-        <h1>{cafeName || '신청곡'}</h1>
+        <div className='cafe-header__title'>
+          <h1>{cafeName || '신청곡'}</h1>
+          {isAccepting && <span className='cafe-header__status'><i aria-hidden='true' />신청 가능</span>}
+        </div>
       </header>
 
       {notice && (

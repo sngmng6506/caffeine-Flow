@@ -8,9 +8,9 @@ Caffeine Flow 손님 화면의 시각·상호작용 기준이다. 사용자 문�
 
 이 문서는 **현재 손님 UI 구현 계약**이다. 기능·상태 전이는 유지하면서 아래 규칙을 컴포넌트 단위로 적용하고, 실제 화면을 확인하며 차이를 해소한다.
 
-## 디자인 방향: Open Flow
+## 디자인 방향: Open Flow · Editorial Violet
 
-Open Flow는 디스콰이엇과 Threads에서 보이는 **열린 세로 피드의 정보 구조**를 참고한 모바일 음악 커뮤니티 경험이다. 특정 서비스의 화면을 복제하지 않고, 콘텐츠가 연속해서 읽히고 반응이 자연스럽게 이어지는 원칙만 가져온다.
+Open Flow는 디스콰이엇과 Threads에서 보이는 **열린 세로 피드의 정보 구조**를 참고한 모바일 음악 커뮤니티 경험이다. 비주얼 언어는 따뜻한 아이보리 캔버스, 잉크색 본문, 선명한 바이올렛 핵심 행동을 조합한 `Editorial Violet`을 사용한다. 특정 서비스의 화면을 복제하지 않고, 콘텐츠가 연속해서 읽히고 반응이 자연스럽게 이어지는 원칙만 가져온다.
 
 - 카페에서 QR을 스캔한 손님이 설명 없이도 곡을 신청할 수 있어야 한다.
 - 신청곡 하나를 하나의 피드 게시물처럼 읽고, 좋아요와 댓글을 같은 문맥에서 바로 사용할 수 있어야 한다.
@@ -71,37 +71,37 @@ Open Flow의 핵심은 **목록을 탐색하는 화면**이 아니라 **사람�
 
 | 토큰 | 값 | 용도 |
 | --- | ---: | --- |
-| `--cf-brand` | `#155EEF` | 1차 CTA, 활성 탭, 핵심 선택 |
-| `--cf-brand-hover` | `#004EEB` | hover |
-| `--cf-brand-active` | `#003FBD` | pressed |
-| `--cf-brand-soft` | `#DCE9FF` | 선택 배경, 브랜드 tint |
-| `--cf-accent-blue` | `#155EEF` | 재생 흐름, 정보성 강조 |
-| `--cf-accent-blue-soft` | `#DCE9FF` | 정보 배경, 재생 보조 영역 |
-| `--cf-accent-lilac` | `#667EA8` | 제한적인 보조 그래픽 |
-| `--cf-canvas` | `#FFFFFF` | 기본 페이지와 피드 배경 |
-| `--cf-surface` | `#FFFFFF` | 카드, 입력, 탭 |
-| `--cf-surface-subtle` | `#F7F8FA` | 입력, 펼친 댓글, 비활성 영역 |
-| `--cf-content-strong` | `#101828` | 페이지 제목, 곡 제목 |
-| `--cf-content` | `#344054` | 본문, 버튼 텍스트 |
-| `--cf-content-muted` | `#667085` | 아티스트, 보조 정보 |
-| `--cf-content-caption` | `#7C8798` | 날짜, 캡션 |
-| `--cf-content-disabled` | `#98A2B3` | placeholder, 비활성 텍스트 |
-| `--cf-stroke` | `#E4E7EC` | 기본 테두리 |
-| `--cf-stroke-strong` | `#D0D5DD` | focus 전 입력, 강조 구분선 |
-| `--cf-now-playing` | `#F7F8FA` | 현재 재생 고정 게시물 배경 |
-| `--cf-success` | `#167A5A` | 완료, 정상 상태 |
-| `--cf-success-soft` | `#E8F6F0` | 성공 메시지 배경 |
-| `--cf-warning` | `#946200` | 주의, 신청 중단 |
-| `--cf-warning-soft` | `#FFF4D8` | 주의 메시지 배경 |
-| `--cf-destructive` | `#BF3850` | 오류, 취소 확인 |
-| `--cf-destructive-soft` | `#FCECEF` | 오류 배경 |
-| `--cf-focus` | `#155EEF` | 키보드 focus ring |
+| `--cf-brand` | `#6254E7` | 1차 CTA, 활성 탭, 핵심 선택 |
+| `--cf-brand-hover` | `#5143D3` | hover |
+| `--cf-brand-active` | `#4135B5` | pressed |
+| `--cf-brand-soft` | `#EEEBFF` | 선택 배경, 브랜드 tint |
+| `--cf-accent-blue` | `#6254E7` | 재생 흐름, 정보성 강조 |
+| `--cf-accent-blue-soft` | `#EEEBFF` | 정보 배경, 재생 보조 영역 |
+| `--cf-accent-lilac` | `#8A7FF0` | 제한적인 보조 그래픽 |
+| `--cf-canvas` | `#F4F2EE` | 페이지 바깥의 따뜻한 중립 배경 |
+| `--cf-surface` | `#FFFEFC` | 피드, 입력, 탭 |
+| `--cf-surface-subtle` | `#F6F4F0` | 입력, 펼친 댓글, 비활성 영역 |
+| `--cf-content-strong` | `#19181C` | 페이지 제목, 곡 제목 |
+| `--cf-content` | `#3F3D45` | 본문, 버튼 텍스트 |
+| `--cf-content-muted` | `#74717C` | 아티스트, 보조 정보 |
+| `--cf-content-caption` | `#8A8790` | 날짜, 캡션 |
+| `--cf-content-disabled` | `#AAA6AF` | placeholder, 비활성 텍스트 |
+| `--cf-stroke` | `#E7E2DB` | 기본 테두리 |
+| `--cf-stroke-strong` | `#D5CFC6` | focus 전 입력, 강조 구분선 |
+| `--cf-now-playing` | `#211C33` | 현재 재생 고정 게시물 배경 |
+| `--cf-success` | `#167C59` | 완료, 정상 상태 |
+| `--cf-success-soft` | `#E7F5EE` | 성공 메시지 배경 |
+| `--cf-warning` | `#966100` | 주의, 신청 중단 |
+| `--cf-warning-soft` | `#FFF3D6` | 주의 메시지 배경 |
+| `--cf-destructive` | `#C33D59` | 오류, 취소 확인 |
+| `--cf-destructive-soft` | `#FBECEF` | 오류 배경 |
+| `--cf-focus` | `#6254E7` | 키보드 focus ring |
 
 ### 강조색 사용
 
 - 장식용 그라데이션을 사용하지 않는다.
 - 파란색은 1차 CTA, 활성 탭, 재생 상태처럼 우선순위가 높은 요소에만 쓴다.
-- 넓은 면은 흰색을 유지하고 섹션은 여백과 1px 구분선으로 나눈다.
+- 모바일 피드는 따뜻한 흰색 surface를 유지하고 섹션은 여백과 1px 구분선으로 나눈다. 넓은 화면의 바깥 캔버스에는 아이보리를 사용한다.
 - 색이 있는 넓은 카드 배경은 경고·오류처럼 즉시 구별해야 하는 피드백에만 사용한다.
 - 썸네일이 없을 때도 텍스트 대비가 유지되어야 한다.
 
@@ -237,8 +237,8 @@ YouTube 등에서 제공하는 음악 썸네일은 기본적으로 16:9다.
 ### 재생 중 카드
 
 - 화면에서 가장 강한 시각 요소다.
-- 피드 최상단에 고정된 강조 게시물처럼 배치한다. subtle surface, `재생 중` 라벨, 16:9 썸네일, 곡 제목, 아티스트·채널 순서로 구성한다.
-- 어두운 대형 hero 카드로 피드와 분리하지 않는다. 강조는 왼쪽 상태선, 라벨, 작은 재생 indicator 중 최대 두 가지로 제한한다.
+- 피드 최상단에 고정된 강조 게시물처럼 배치한다. compact deep-plum surface, `재생 중` 라벨, 16:9 썸네일, 곡 제목, 아티스트·채널 순서로 구성한다.
+- 어두운 면은 현재 재생 카드 한 곳에만 쓰고 높이를 과도하게 키우지 않는다. 강조는 색면, 라벨, 작은 재생 indicator 중 최대 두 가지로 제한한다.
 - 재생 애니메이션은 작은 equalizer 또는 점 변화 중 하나만 사용한다.
 - 실시간 플레이어가 멈추거나 버퍼링 중이면 같은 위치의 라벨과 아이콘을 각각 `일시정지 중`, `불러오는 중`으로 바꾸고 재생 애니메이션은 숨긴다.
 - 실시간 플레이어 상태는 추천곡의 `playing` 상태와 시각적으로만 결합하며 별도 큐 상태처럼 표시하지 않는다.
