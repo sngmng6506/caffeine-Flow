@@ -30,6 +30,7 @@ import NowPlaying from './NowPlaying';
 import RecommendForm from './RecommendForm';
 import SongCard from './SongCard';
 import SongThumbnail from '../components/SongThumbnail';
+import LongPressCopy from '../components/LongPressCopy';
 
 function getTabs(cafeName) {
   return [
@@ -70,6 +71,7 @@ export default function CafePage({ slug }) {
   const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [successMsg, setSuccessMsg] = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
+  const [copyNotice, setCopyNotice] = useState(null);
   const [historyLimit, setHistoryLimit] = useState(10);
   const [historyExpanded, setHistoryExpanded] = useState(null);
   const [queueExpanded, setQueueExpanded] = useState(null);
@@ -78,8 +80,15 @@ export default function CafePage({ slug }) {
     recommendationId: null,
   });
   const swipeStart = useRef(null);
+  const swipeClickTimer = useRef(null);
+  const copyNoticeTimer = useRef(null);
   const deviceName = getDeviceName();
   const tabs = getTabs(cafeName);
+
+  useEffect(() => () => {
+    if (swipeClickTimer.current) clearTimeout(swipeClickTimer.current);
+    if (copyNoticeTimer.current) clearTimeout(copyNoticeTimer.current);
+  }, []);
 
   const nowPlaying = recs.find(rec => rec.status === REC_STATUS.PLAYING) || null;
   const waitingQueue = recs
@@ -201,6 +210,12 @@ export default function CafePage({ slug }) {
     setRecs(previous => previous.filter(rec => rec.id !== id));
   }
 
+  function handleCopyResult(result) {
+    setCopyNotice(result);
+    if (copyNoticeTimer.current) clearTimeout(copyNoticeTimer.current);
+    copyNoticeTimer.current = setTimeout(() => setCopyNotice(null), 2500);
+  }
+
   function handleAdded(rec) {
     setRecs(previous => previous.some(item => item.id === rec.id) ? previous : [rec, ...previous]);
     const position = recs.filter(item => [REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(item.status)).length + 1;
@@ -218,25 +233,52 @@ export default function CafePage({ slug }) {
   }
 
   function handleSwipeStart(event) {
-    if (event.touches.length !== 1 || event.target.closest?.('input, textarea, select, button, a, [role=button]')) {
+    if (event.touches.length !== 1 || event.target.closest?.('input, textarea, select, a')) {
       swipeStart.current = null;
       return;
     }
     const touch = event.touches[0];
-    swipeStart.current = { x: touch.clientX, y: touch.clientY };
+    swipeStart.current = { x: touch.clientX, y: touch.clientY, axis: null };
+  }
+
+  function handleSwipeMove(event) {
+    const gesture = swipeStart.current;
+    if (!gesture || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - gesture.x;
+    const deltaY = touch.clientY - gesture.y;
+    const horizontalDistance = Math.abs(deltaX);
+    const verticalDistance = Math.abs(deltaY);
+
+    if (!gesture.axis && Math.max(horizontalDistance, verticalDistance) >= 8) {
+      gesture.axis = horizontalDistance >= verticalDistance * 0.9 ? 'horizontal' : 'vertical';
+    }
+    if (gesture.axis === 'horizontal') event.preventDefault();
   }
 
   function handleSwipeEnd(event) {
     if (!swipeStart.current || event.changedTouches.length !== 1) return;
+    const gesture = swipeStart.current;
     const touch = event.changedTouches[0];
-    const deltaX = touch.clientX - swipeStart.current.x;
-    const deltaY = touch.clientY - swipeStart.current.y;
+    const deltaX = touch.clientX - gesture.x;
     swipeStart.current = null;
 
-    if (Math.abs(deltaX) < 56 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+    if (gesture.axis !== 'horizontal' || Math.abs(deltaX) < 44) return;
     const currentIndex = tabs.findIndex(item => item.id === tab);
     const nextIndex = deltaX < 0 ? currentIndex + 1 : currentIndex - 1;
-    if (nextIndex >= 0 && nextIndex < tabs.length) changeTab(tabs[nextIndex].id);
+    if (swipeClickTimer.current) clearTimeout(swipeClickTimer.current);
+    swipeClickTimer.current = setTimeout(() => { swipeClickTimer.current = null; }, 450);
+    if (nextIndex >= 0 && nextIndex < tabs.length) {
+      changeTab(tabs[nextIndex].id);
+    }
+  }
+
+  function handleSwipeClickCapture(event) {
+    if (!swipeClickTimer.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearTimeout(swipeClickTimer.current);
+    swipeClickTimer.current = null;
   }
 
   if (loading) {
@@ -305,8 +347,10 @@ export default function CafePage({ slug }) {
       <div
         className='tab-swipe-area'
         onTouchStart={handleSwipeStart}
+        onTouchMove={handleSwipeMove}
         onTouchEnd={handleSwipeEnd}
         onTouchCancel={() => { swipeStart.current = null; }}
+        onClickCapture={handleSwipeClickCapture}
       >
       {tab === 'queue' && (
         <div key='queue' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
@@ -337,6 +381,7 @@ export default function CafePage({ slug }) {
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                     onToggle={() => setQueueExpanded(value => value === rec.id ? null : rec.id)}
+                    onLinkCopyResult={handleCopyResult}
                     position={index + 1}
                     isMyRequest={rec.requester_name === deviceName}
                     hideStatus
@@ -358,6 +403,7 @@ export default function CafePage({ slug }) {
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                     onToggle={() => setQueueExpanded(value => value === rec.id ? null : rec.id)}
+                    onLinkCopyResult={handleCopyResult}
                     position={waitingQueue.length + index + 1}
                     isMyRequest={rec.requester_name === deviceName}
                     hideStatus
@@ -392,6 +438,7 @@ export default function CafePage({ slug }) {
                       rec={rec}
                       onUpdate={handleUpdate}
                       onToggle={() => setHistoryExpanded(value => value === rec.id ? null : rec.id)}
+                      onLinkCopyResult={handleCopyResult}
                       showDate
                       expanded={historyExpanded === rec.id}
                     />
@@ -417,13 +464,28 @@ export default function CafePage({ slug }) {
             loading={topLoading}
             slug={tab === 'cafeTop' ? slug : null}
             onLoadMore={loadMoreTop}
+            onCopyResult={handleCopyResult}
           />
         </div>
       )}
       </div>
 
+      {copyNotice && (
+        <div className={`copy-toast copy-toast--${copyNotice.type}`} role={copyNotice.type === 'error' ? 'alert' : 'status'}>
+          {copyNotice.type === 'error'
+            ? <AlertTriangle size={18} aria-hidden='true' />
+            : <CheckCircle2 size={18} aria-hidden='true' />}
+          <span>{copyNotice.message}</span>
+        </div>
+      )}
+
       <footer className='customer-footer'>
-        <span>Caffeine Flow</span>
+        <div>
+          <span>Caffeine Flow</span>
+          <a className='customer-footer__developer' href='https://github.com/sngmng6506' target='_blank' rel='noopener noreferrer'>
+            Dev info · github.com/sngmng6506
+          </a>
+        </div>
         <a href='/privacy.html' target='_blank' rel='noreferrer'>개인정보 처리방침</a>
       </footer>
     </main>
@@ -442,7 +504,7 @@ function QueueSection({ title, description, count, children }) {
   );
 }
 
-function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
+function Top10List({ items, hasMore, loading, slug, onLoadMore, onCopyResult }) {
   const [expanded, setExpanded] = useState(null);
   const [sortBy, setSortBy] = useState('count');
 
@@ -477,21 +539,23 @@ function Top10List({ items, hasMore, loading, slug, onLoadMore }) {
           const isExpanded = expanded === rowKey;
           return (
             <li className='rank-list__item' key={rowKey}>
-              <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
-                <span className='rank-row__number'>{index + 1}</span>
-                <SongThumbnail
-                  src={item.thumbnail}
-                  className='rank-row__thumbnail'
-                  fallbackClassName='rank-row__thumbnail--empty'
-                  iconSize={18}
-                />
-                <span className='rank-row__info'>
-                  <strong>{item.title}</strong>
-                  <small>{item.channel_title} · {item.count}회 신청</small>
-                </span>
-                <span className='rank-row__votes'><Heart size={14} aria-hidden='true' /> {item.total_votes || 0}</span>
-                {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
-              </button>
+              <LongPressCopy videoId={item.video_id} onResult={onCopyResult}>
+                <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
+                  <span className='rank-row__number'>{index + 1}</span>
+                  <SongThumbnail
+                    src={item.thumbnail}
+                    className='rank-row__thumbnail'
+                    fallbackClassName='rank-row__thumbnail--empty'
+                    iconSize={18}
+                  />
+                  <span className='rank-row__info'>
+                    <strong>{item.title}</strong>
+                    <small>{item.channel_title} · {item.count}회 신청</small>
+                  </span>
+                  <span className='rank-row__votes'><Heart size={14} aria-hidden='true' /> {item.total_votes || 0}</span>
+                  {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
+                </button>
+              </LongPressCopy>
               {isExpanded && <CommentSection videoId={item.video_id} slug={slug} />}
             </li>
           );

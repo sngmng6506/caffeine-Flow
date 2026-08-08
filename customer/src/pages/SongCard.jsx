@@ -5,8 +5,9 @@ import { hasVoted, markVoted, removeVote } from '../votedSongs';
 import { CANCELLABLE_STATUSES, REC_STATUS_LABELS } from '../constants/recommendationStatus';
 import { COMPACT_PLATFORM_BADGE, PLATFORM } from '../constants/platforms';
 import SongThumbnail from '../components/SongThumbnail';
+import LongPressCopy from '../components/LongPressCopy';
 
-export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, showDate, position, isMyRequest, hideStatus, expanded }) {
+export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLinkCopyResult, showDate, position, isMyRequest, hideStatus, expanded }) {
   const [error, setError] = useState('');
   const voted = hasVoted(slug, rec.id);
   const cancellable = isMyRequest && CANCELLABLE_STATUSES.includes(rec.status);
@@ -41,7 +42,8 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, show
   }
 
   return (
-    <article className='song-card'>
+    <LongPressCopy videoId={rec.video_id} onResult={onLinkCopyResult}>
+      <article className='song-card'>
       <div className='song-card__context'>
         <div className='song-card__details'>
           {position && <span className='song-card__position'>{position}번째</span>}
@@ -98,6 +100,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, show
       </div>
 
       {error && <div className='feedback feedback--error song-card__error' role='alert'>{error}</div>}
-    </article>
+      </article>
+    </LongPressCopy>
   );
 }
