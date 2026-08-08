@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Caffeine Flow — Design Lab</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="lab-shell">
+    <header class="lab-header">
+      <div>
+        <p class="eyebrow">CAFFEINE FLOW / DESIGN LAB</p>
+        <h1>Flow Mark Playground</h1>
+        <p class="intro">대표 마크와 재생 상태 표현을 실제 코드로 실험하는 정적 목업입니다.</p>
+      </div>
+      <div class="status-pill"><span></span> STATIC MOCKUP</div>
+    </header>
+
+    <section class="hero-grid">
+      <article class="hero-card">
+        <div class="section-label">CORE MARK</div>
+        <div id="heroMark" class="hero-mark" aria-label="Caffeine Flow flow mark"></div>
+        <div class="hero-caption">
+          <span>center = current choice</span>
+          <span>ring = collective flow</span>
+        </div>
+      </article>
+
+      <article class="control-card">
+        <div class="section-label">PLAYGROUND</div>
+        <div class="control-row">
+          <label for="stateSelect">STATE</label>
+          <select id="stateSelect">
+            <option value="idle">Idle</option>
+            <option value="playing" selected>Playing</option>
+            <option value="request">New request</option>
+            <option value="spread">Spread</option>
+          </select>
+        </div>
+        <div class="control-row">
+          <label for="speedRange">SPEED</label>
+          <input id="speedRange" type="range" min="0" max="100" value="46" />
+          <output id="speedValue">46</output>
+        </div>
+        <div class="control-row">
+          <label for="energyRange">ENERGY</label>
+          <input id="energyRange" type="range" min="0" max="100" value="72" />
+          <output id="energyValue">72</output>
+        </div>
+        <button id="burstButton" type="button">TRIGGER REQUEST</button>
+        <p class="tiny-note">SVG 도형만 사용합니다. 이미지 에셋 없음.</p>
+      </article>
+    </section>
+
+    <section class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">01 / STATES</p>
+          <h2>Animation states</h2>
+        </div>
+        <p>같은 심볼을 상태에 따라 변형합니다.</p>
+      </div>
+      <div class="state-grid">
+        <article class="state-card"><div class="state-mark" data-state="idle"></div><strong>IDLE</strong><span>대기 / 정지</span></article>
+        <article class="state-card"><div class="state-mark" data-state="playing"></div><strong>PLAYING</strong><span>현재 재생</span></article>
+        <article class="state-card"><div class="state-mark" data-state="request"></div><strong>NEW REQUEST</strong><span>새 신청 유입</span></article>
+        <article class="state-card"><div class="state-mark" data-state="spread"></div><strong>SPREAD</strong><span>공간으로 확산</span></article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">02 / UI</p>
+          <h2>Product mockups</h2>
+        </div>
+        <p>실제 손님 화면에 넣었을 때의 밀도를 확인합니다.</p>
+      </div>
+
+      <div class="mockup-grid">
+        <article class="now-playing-card">
+          <div class="np-mark small-mark" data-state="playing"></div>
+          <div class="np-copy">
+            <span class="np-label">재생 중 <i></i></span>
+            <strong>[Playlist] 아무 생각 없이 듣기 좋은 국내 음악 모음</strong>
+            <span>잔잔</span>
+          </div>
+          <div class="equalizer" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </article>
+
+        <article class="request-card">
+          <div class="request-icon small-mark" data-state="request"></div>
+          <div><span>NEW REQUEST</span><strong>다음 곡이 흐름에 합류했습니다.</strong></div>
+          <b>+1</b>
+        </article>
+
+        <article class="profile-card">
+          <div class="profile-mark" data-state="idle"></div>
+          <strong>temp</strong>
+          <span>music queue · 12 listeners</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">03 / SCALE</p>
+          <h2>Responsive mark</h2>
+        </div>
+        <p>favicon부터 히어로까지 같은 구조를 유지합니다.</p>
+      </div>
+      <div class="scale-row">
+        <div><div class="scale-mark size-128" data-state="playing"></div><span>128</span></div>
+        <div><div class="scale-mark size-96" data-state="playing"></div><span>96</span></div>
+        <div><div class="scale-mark size-64" data-state="playing"></div><span>64</span></div>
+        <div><div class="scale-mark size-40" data-state="playing"></div><span>40</span></div>
+        <div><div class="scale-mark size-24" data-state="playing"></div><span>24</span></div>
+        <div><div class="scale-mark size-16" data-state="playing" data-minimal="true"></div><span>16</span></div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">04 / TOKENS</p>
+          <h2>Visual tokens</h2>
+        </div>
+      </div>
+      <div class="token-row">
+        <div class="token"><i class="swatch acid"></i><span>ACID</span><code>#F3FF00</code></div>
+        <div class="token"><i class="swatch pink"></i><span>PINK</span><code>#FF3CAB</code></div>
+        <div class="token"><i class="swatch orange"></i><span>WARM</span><code>#FF9D45</code></div>
+        <div class="token"><i class="swatch ink"></i><span>INK</span><code>#070807</code></div>
+      </div>
+    </section>
+
+    <footer>
+      <span>design-lab / standalone static files</span>
+      <span>No build step · no dependency · no app runtime import</span>
+    </footer>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
