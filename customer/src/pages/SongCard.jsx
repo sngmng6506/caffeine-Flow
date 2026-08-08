@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Heart, MessageCircle, X } from 'lucide-react';
+import { Heart, MessageCircle, X } from 'lucide-react';
 import { vote, unvote, cancelRecommendation } from '../api';
 import { hasVoted, markVoted, removeVote } from '../votedSongs';
 import { CANCELLABLE_STATUSES, REC_STATUS_LABELS } from '../constants/recommendationStatus';
@@ -42,43 +42,36 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, show
 
   return (
     <article className='song-card'>
-      <div className='song-card__row'>
-        {position && <span className='song-card__position' aria-label={`${position}번째`}>{position}</span>}
-        <SongThumbnail
-          src={rec.thumbnail}
-          className='song-card__thumb'
-          fallbackClassName='song-card__thumb--fallback'
-        />
-        <div className='song-card__body'>
-          <h3 className='song-card__title'>{rec.title}</h3>
-          <div className='song-card__meta'>
-            {platformBadge && (
-              <span className='platform-badge platform-badge--compact' style={{ background: platformBadge.bg }}>
-                {platformBadge.label}
-              </span>
-            )}
-            <span>{rec.channel_title}</span>
-            {rec.duration && <span>· {rec.duration}</span>}
-          </div>
-          <div className='song-card__details'>
-            {!hideStatus && <span className={`status-badge status-badge--${rec.status}`}>{REC_STATUS_LABELS[rec.status]}</span>}
-            {showDate && rec.requested_at && (
-              <span>{new Date(rec.requested_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</span>
-            )}
-            {!isMyRequest && rec.requester_name && <span>신청 · {rec.requester_name}</span>}
-            {isMyRequest && <span className='song-card__mine'>내 신청곡</span>}
-          </div>
+      <div className='song-card__context'>
+        <div className='song-card__details'>
+          {position && <span className='song-card__position'>{position}번째</span>}
+          {!hideStatus && <span className={`status-badge status-badge--${rec.status}`}>{REC_STATUS_LABELS[rec.status]}</span>}
+          {isMyRequest && <span className='song-card__mine'>내 신청곡</span>}
+          {!isMyRequest && rec.requester_name && <span>{rec.requester_name}</span>}
+          {showDate && rec.requested_at && (
+            <span>{new Date(rec.requested_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}</span>
+          )}
         </div>
-        <button
-          type='button'
-          onClick={onToggle}
-          className='icon-button song-card__comments'
-          aria-expanded={expanded}
-          aria-label={expanded ? '댓글 닫기' : '댓글 보기'}
-        >
-          {expanded ? <ChevronUp size={19} aria-hidden='true' /> : <ChevronDown size={19} aria-hidden='true' />}
-        </button>
       </div>
+
+      <div className='song-card__body'>
+        <h3 className='song-card__title'>{rec.title}</h3>
+        <div className='song-card__meta'>
+          {platformBadge && (
+            <span className='platform-badge platform-badge--compact' style={{ background: platformBadge.bg }}>
+              {platformBadge.label}
+            </span>
+          )}
+          <span>{rec.channel_title}</span>
+          {rec.duration && <span>· {rec.duration}</span>}
+        </div>
+      </div>
+
+      <SongThumbnail
+        src={rec.thumbnail}
+        className='song-card__thumb'
+        fallbackClassName='song-card__thumb--fallback'
+      />
 
       <div className='song-card__actions'>
         <button
@@ -94,7 +87,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, show
         </button>
         <button type='button' onClick={onToggle} className='pill-action' aria-expanded={expanded}>
           <MessageCircle size={16} aria-hidden='true' />
-          <span>{expanded ? '댓글 닫기' : '댓글 보기'}</span>
+          <span>댓글</span>
         </button>
         {cancellable && (
           <button type='button' onClick={handleCancel} className='pill-action pill-action--danger'>

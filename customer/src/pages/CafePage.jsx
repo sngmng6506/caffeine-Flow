@@ -262,7 +262,6 @@ export default function CafePage({ slug }) {
     <main className='customer-page'>
       <header className='cafe-header'>
         <h1>{cafeName || '신청곡'}</h1>
-        <p>듣고 싶은 음악을 신청해 보세요.</p>
       </header>
 
       {notice && (

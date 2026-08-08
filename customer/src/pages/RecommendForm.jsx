@@ -49,6 +49,13 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState('input');
+  const [composerOpen, setComposerOpen] = useState(false);
+
+  function closeComposer() {
+    setComposerOpen(false);
+    setUrl('');
+    setError('');
+  }
 
   async function handlePreview(event) {
     event.preventDefault();
@@ -99,6 +106,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
       setUrl('');
       setPreview(null);
       setStep('input');
+      setComposerOpen(false);
     } catch (caught) {
       setError(caught.message);
       setUrl('');
@@ -136,7 +144,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         {error && <div className='feedback feedback--error' role='alert'>{error}</div>}
 
         <div className='request-card__actions'>
-          <button type='button' onClick={() => setStep('input')} className='button button--secondary'>
+          <button type='button' onClick={() => setStep('input')} className='button button--secondary' disabled={loading}>
             <X size={17} aria-hidden='true' />
             취소
           </button>
@@ -149,9 +157,26 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     );
   }
 
+  if (!composerOpen) {
+    return (
+      <section className='request-composer' aria-label='신청곡 추가'>
+        <button type='button' className='request-composer__trigger' onClick={() => setComposerOpen(true)}>
+          <span className='request-composer__icon' aria-hidden='true'><Link2 size={18} /></span>
+          <span>듣고 싶은 곡이 있나요?</span>
+          <strong>입력</strong>
+        </button>
+      </section>
+    );
+  }
+
   return (
     <form onSubmit={handlePreview} className='request-card request-card--input' aria-label='신청곡 추가'>
-      <label className='field-label' htmlFor='music-url'>음악 링크</label>
+      <div className='request-card__topline'>
+        <label className='field-label' htmlFor='music-url'>음악 링크</label>
+        <button type='button' className='icon-button request-card__close' onClick={closeComposer} aria-label='신청곡 추가 닫기' disabled={loading}>
+          <X size={18} aria-hidden='true' />
+        </button>
+      </div>
       <div className='input-shell'>
         <Link2 size={18} aria-hidden='true' />
         <input

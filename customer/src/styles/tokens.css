@@ -7,9 +7,9 @@
   --cf-accent-blue-soft: #dce9ff;
   --cf-accent-lilac: #667ea8;
 
-  --cf-canvas: #f2f4f7;
+  --cf-canvas: #ffffff;
   --cf-surface: #ffffff;
-  --cf-surface-subtle: #eef2f6;
+  --cf-surface-subtle: #f7f8fa;
   --cf-content-strong: #101828;
   --cf-content: #344054;
   --cf-content-muted: #667085;
@@ -18,11 +18,7 @@
   --cf-stroke: #e4e7ec;
   --cf-stroke-strong: #d0d5dd;
 
-  --cf-now-playing: #172b4d;
-  --cf-on-dark: #ffffff;
-  --cf-on-dark-muted: #c9d4e5;
-  --cf-on-dark-accent: #8eb7ff;
-  --cf-on-dark-soft: #2a4164;
+  --cf-now-playing: #f7f8fa;
 
   --cf-success: #167a5a;
   --cf-success-soft: #e8f6f0;
@@ -56,8 +52,8 @@
 
   --cf-radius-badge: 6px;
   --cf-radius-control: 12px;
-  --cf-radius-item: 14px;
-  --cf-radius-card: 18px;
+  --cf-radius-item: 12px;
+  --cf-radius-card: 16px;
   --cf-radius-overlay: 24px;
   --cf-radius-pill: 999px;
 
