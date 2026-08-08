@@ -583,11 +583,12 @@
   position: sticky;
   z-index: 5;
   top: 0;
-  display: flex;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
   margin: 0;
   padding: 0 16px;
-  overflow-x: auto;
+  overflow: hidden;
   background: var(--cf-surface);
   border: 0;
   border-bottom: 1px solid var(--cf-stroke);
@@ -601,10 +602,11 @@
 
 .tabs__button {
   position: relative;
-  min-width: max-content;
+  min-width: 0;
+  width: 100%;
   min-height: 48px;
-  flex: 0 0 auto;
-  padding: 12px 0;
+  overflow: hidden;
+  padding: 12px 4px;
   border: 0;
   border-radius: 0;
   cursor: pointer;
@@ -612,6 +614,8 @@
   background: transparent;
   font-size: 14px;
   font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   transition: color var(--cf-motion-fast), background var(--cf-motion-fast), box-shadow var(--cf-motion-fast);
 }
 
