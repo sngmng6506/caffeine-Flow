@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Caffeine Flow · Customer Design Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="lab-header">
+      <div>
+        <p class="lab-eyebrow">Caffeine Flow</p>
+        <h1>Customer Design Lab</h1>
+        <p class="lab-description">같은 정보와 기능을 세 가지 시각 언어로 비교하는 독립 정적 시안입니다.</p>
+      </div>
+      <div class="lab-controls" aria-label="시안 보기 설정">
+        <div class="control-group" role="group" aria-label="시안 필터">
+          <button type="button" class="control-button is-active" data-filter="all">전체 비교</button>
+          <button type="button" class="control-button" data-filter="threads">A</button>
+          <button type="button" class="control-button" data-filter="disquiet">B</button>
+          <button type="button" class="control-button" data-filter="toss">C</button>
+          <button type="button" class="control-button" data-filter="midnight">D</button>
+          <button type="button" class="control-button" data-filter="zine">E</button>
+          <button type="button" class="control-button" data-filter="messenger">F</button>
+          <button type="button" class="control-button" data-filter="bento">G</button>
+          <button type="button" class="control-button" data-filter="jukebox">H</button>
+          <button type="button" class="control-button" data-filter="signal">I</button>
+          <button type="button" class="control-button" data-filter="nightwave">J</button>
+          <button type="button" class="control-button" data-filter="acid">K</button>
+          <button type="button" class="control-button" data-filter="redline">L</button>
+          <button type="button" class="control-button" data-filter="polar">M</button>
+          <button type="button" class="control-button" data-filter="layeredlime">N</button>
+          <button type="button" class="control-button" data-filter="bluefloat">O</button>
+          <button type="button" class="control-button" data-filter="redoffset">P</button>
+          <button type="button" class="control-button" data-filter="chromestack">Q</button>
+          <button type="button" class="control-button" data-filter="cyberqueue">R</button>
+          <button type="button" class="control-button" data-filter="dailysignal">S</button>
+        </div>
+        <div class="control-group" role="group" aria-label="화면 너비">
+          <button type="button" class="control-button is-active" data-width="390">390px</button>
+          <button type="button" class="control-button" data-width="480">480px</button>
+        </div>
+      </div>
+    </header>
+    <main class="concept-stage" id="concept-stage" data-filter="all" data-width="390"></main>
+    <script src="./app.js"></script>
+  </body>
+</html>
