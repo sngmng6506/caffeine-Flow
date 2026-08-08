@@ -5,6 +5,7 @@ const {
   createSpotifyOverlayDetector,
   createSpotifyTakeoverDetector,
 } = require('./end-detection');
+const { PLAYBACK_STATE, createPlaybackStateDetector } = require('./playback-state');
 
 function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   let currentBgmUrl = null;
@@ -13,14 +14,28 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   let spotifyOverlayDetector = null;
   let soundCloudDetector = null;
   let spotifyTakeoverDetector = null;
+  let playbackStateDetector = null;
 
   function stopDetectors() {
     spotifyOverlayDetector?.stop();
     soundCloudDetector?.stop();
     spotifyTakeoverDetector?.stop();
+    playbackStateDetector?.stop();
     spotifyOverlayDetector = null;
     soundCloudDetector = null;
     spotifyTakeoverDetector = null;
+    playbackStateDetector = null;
+  }
+
+  function startPlaybackStateDetector() {
+    playbackStateDetector = createPlaybackStateDetector({
+      getView: () => currentRecMode === 'spotify-takeover'
+        ? windowManager.getBgmView()
+        : windowManager.getRecView(),
+      safeSend: windowManager.safeSend,
+      isQuitting,
+    });
+    playbackStateDetector.start();
   }
 
   function showPanel() {
@@ -77,6 +92,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
         isQuitting,
       });
       spotifyTakeoverDetector.start();
+      startPlaybackStateDetector();
       return;
     }
 
@@ -92,6 +108,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     const recView = windowManager.createRecView();
     windowManager.attachRecView();
     recView.webContents.loadURL(url);
+    startPlaybackStateDetector();
 
     if (soundcloud.isSoundCloudUrl(url)) {
       soundcloud.preparePlayback(recView, {
@@ -121,6 +138,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
 
     const mode = currentRecMode;
     currentRecMode = null;
+    windowManager.safeSend('playback-state', PLAYBACK_STATE.UNKNOWN);
 
     if (mode === 'spotify-takeover') {
       const resumeMeta = savedBgmMeta;

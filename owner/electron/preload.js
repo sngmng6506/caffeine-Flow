@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onYoutubeState:   (cb) => subscribe('youtube-state', cb),
   onVideoEnded:     (cb) => subscribe('video-ended', cb, () => undefined),
   onNowPlaying:     (cb) => subscribe('now-playing', cb),
+  onPlaybackState:  (cb) => subscribe('playback-state', cb),
 
   openBgmDevTools:     ()    => ipcRenderer.send('open-bgm-devtools'),
   openLoginWindow:     (url) => ipcRenderer.send('open-login-window', url),

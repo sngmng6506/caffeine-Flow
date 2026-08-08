@@ -7,7 +7,9 @@ import {
   ACTIVE_QUEUE_LOOKBACK_DAYS,
   MUSIC_FILTER_STATS_LOOKBACK_DAYS,
   STATS_PATTERN_LOOKBACK_DAYS,
+  PLAYBACK_STATE_TTL_MS,
 } from '../src/constants/time-policy.js';
+import { PLAYBACK_STATE, PLAYBACK_STATES } from '../src/constants/playback-state.js';
 import {
   CANONICAL_VIDEO_ID_SQL,
   KST_HOUR_SQL,
@@ -31,6 +33,12 @@ describe('KST 시간 정책 계약', () => {
 
   it('시간대/요일 패턴 통계는 기존 동작대로 30일 전 KST 자정부터 집계한다', () => {
     expect(STATS_PATTERN_LOOKBACK_DAYS).toBe(30);
+  });
+
+  it('재생 상태는 큐 상태와 분리하고 끊긴 신호를 15초 안에 만료한다', () => {
+    expect(PLAYBACK_STATES).toEqual(['playing', 'paused', 'buffering', 'unknown']);
+    expect(PLAYBACK_STATE.PAUSED).toBe('paused');
+    expect(PLAYBACK_STATE_TTL_MS).toBe(15_000);
   });
 });
 

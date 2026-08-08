@@ -3,6 +3,7 @@ import { getRecommendations, updateRec, setStatus, getMe, updateMusicFilter } fr
 import { getSocket, disconnectSocket } from '../../socket';
 import { parseAllowedPlatforms } from '../../constants/platforms';
 import { REC_STATUS } from '../../constants/recommendationStatus';
+import { PLAYBACK_STATE } from '../../constants/playbackState';
 import { readSavedBgm, savedToBgmUrl } from './bgmStorage';
 import { byPriority, isAutoAcceptEligible } from './queuePolicy';
 
@@ -203,6 +204,13 @@ export default function useRecommendationQueue({
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
 
     const removeNowPlaying = window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
+    const removePlaybackState = window.electronAPI?.onPlaybackState(state => {
+      const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
+      socket.emit('playback_state', {
+        state: Object.values(PLAYBACK_STATE).includes(state) ? state : PLAYBACK_STATE.UNKNOWN,
+        recommendationId: playing?.id || null,
+      });
+    });
     const removeWidevineStatus = window.electronAPI?.onWidevineStatus(status => setWidevineStatus(status));
 
     const savedBgmUrl = savedToBgmUrl(readSavedBgm());
@@ -232,6 +240,7 @@ export default function useRecommendationQueue({
     return () => {
       disconnectSocket();
       if (typeof removeNowPlaying === 'function') removeNowPlaying();
+      if (typeof removePlaybackState === 'function') removePlaybackState();
       if (typeof removeWidevineStatus === 'function') removeWidevineStatus();
       if (typeof removeVideoEnded === 'function') removeVideoEnded();
       if (typeof removeCleanupBeforeQuit === 'function') removeCleanupBeforeQuit();

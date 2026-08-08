@@ -17,6 +17,8 @@ const STATS_PATTERN_LOOKBACK_DAYS = 30;
 //   곧바로 휴면으로 보이지 않게 한다.
 const HEARTBEAT_REFRESH_MS = 2 * 60 * 1000;
 const HEARTBEAT_ACTIVE_WINDOW_MS = 5 * 60 * 1000;
+// Electron은 5초마다 재생 상태를 재전송한다. 두 번의 누락을 허용한 뒤 손님 화면을 초기화한다.
+const PLAYBACK_STATE_TTL_MS = 15 * 1000;
 
 module.exports = {
   TIMEZONE,
@@ -28,4 +30,5 @@ module.exports = {
   STATS_PATTERN_LOOKBACK_DAYS,
   HEARTBEAT_REFRESH_MS,
   HEARTBEAT_ACTIVE_WINDOW_MS,
+  PLAYBACK_STATE_TTL_MS,
 };

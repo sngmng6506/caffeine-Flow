@@ -1,7 +1,9 @@
 const db = require('../db/knex');
 const jwt = require('jsonwebtoken');
 const { kstTodayString } = require('../utils/kst');
-const { HEARTBEAT_REFRESH_MS } = require('../constants/time-policy');
+const { isUuid } = require('../utils/validate');
+const { HEARTBEAT_REFRESH_MS, PLAYBACK_STATE_TTL_MS } = require('../constants/time-policy');
+const { PLAYBACK_STATE, PLAYBACK_STATES } = require('../constants/playback-state');
 
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 
@@ -37,6 +39,18 @@ function initSocket(io) {
 
   // slug별 사장님 소켓 ID 집합 — peak concurrent에서 차감
   const ownerSockets = new Map(); // slug -> Set<socketId>
+  const playbackPublishers = new Map(); // slug -> { socketId, timer, payload }
+
+  function clearPlaybackState(slug, socketId = null) {
+    const current = playbackPublishers.get(slug);
+    if (!current || (socketId && current.socketId !== socketId)) return;
+    clearTimeout(current.timer);
+    playbackPublishers.delete(slug);
+    cafeNsp.to(slug).emit('playback_state', {
+      state: PLAYBACK_STATE.UNKNOWN,
+      recommendationId: null,
+    });
+  }
 
   cafeNsp.on('connection', async (socket) => {
     const { slug, role } = socket.handshake.query;
@@ -59,6 +73,8 @@ function initSocket(io) {
     }
 
     socket.join(slug);
+    const currentPlayback = playbackPublishers.get(slug);
+    if (currentPlayback) socket.emit('playback_state', currentPlayback.payload);
 
     // 연결 유지 중 주기 갱신 타이머 — disconnect에서 반드시 해제(누수 방지)
     let heartbeatTimer = null;
@@ -71,6 +87,23 @@ function initSocket(io) {
       // owner 앱 코드 변경 없이 기존 소켓 연결을 그대로 생존 신호로 쓴다.
       touchHeartbeat(ownerPayload.cafeId);
       heartbeatTimer = setInterval(() => touchHeartbeat(ownerPayload.cafeId), HEARTBEAT_REFRESH_MS);
+
+      socket.on('playback_state', (payload = {}) => {
+        if (!PLAYBACK_STATES.includes(payload.state)) return;
+        const recommendationId = isUuid(payload.recommendationId)
+          ? payload.recommendationId
+          : null;
+
+        const previous = playbackPublishers.get(slug);
+        if (previous) clearTimeout(previous.timer);
+        const timer = setTimeout(() => clearPlaybackState(slug, socket.id), PLAYBACK_STATE_TTL_MS);
+        const nextPlayback = {
+          state: payload.state,
+          recommendationId,
+        };
+        playbackPublishers.set(slug, { socketId: socket.id, timer, payload: nextPlayback });
+        cafeNsp.to(slug).emit('playback_state', nextPlayback);
+      });
     } else {
       // 손님 입장 시에만 피크 갱신 의미가 있음
       updatePeakConcurrent(cafeNsp, slug, ownerSockets);
@@ -78,6 +111,7 @@ function initSocket(io) {
 
     socket.on('disconnect', () => {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
+      clearPlaybackState(slug, socket.id);
       ownerSockets.get(slug)?.delete(socket.id);
       if (ownerSockets.get(slug)?.size === 0) ownerSockets.delete(slug);
     });

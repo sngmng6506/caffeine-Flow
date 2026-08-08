@@ -25,6 +25,7 @@ import { getDeviceName } from '../deviceName';
 import { getSocket, disconnectSocket } from '../socket';
 import { VALID_PLATFORMS } from '../constants/platforms';
 import { ACTIVE_STATUSES, HISTORY_STATUSES, REC_STATUS } from '../constants/recommendationStatus';
+import { PLAYBACK_STATE } from '../constants/playbackState';
 import NowPlaying from './NowPlaying';
 import RecommendForm from './RecommendForm';
 import SongCard from './SongCard';
@@ -72,6 +73,10 @@ export default function CafePage({ slug }) {
   const [historyLimit, setHistoryLimit] = useState(10);
   const [historyExpanded, setHistoryExpanded] = useState(null);
   const [queueExpanded, setQueueExpanded] = useState(null);
+  const [playbackState, setPlaybackState] = useState({
+    state: PLAYBACK_STATE.UNKNOWN,
+    recommendationId: null,
+  });
   const swipeStart = useRef(null);
   const deviceName = getDeviceName();
   const tabs = getTabs(cafeName);
@@ -129,6 +134,13 @@ export default function CafePage({ slug }) {
     socket.on('notice_updated', ({ notice: nextNotice }) => setNotice(nextNotice));
     socket.on('cafe_updated', ({ cafe_name }) => setCafeName(cafe_name));
     socket.on('platforms_updated', ({ allowed_platforms }) => setAllowedPlatforms(allowed_platforms));
+    socket.on('playback_state', payload => {
+      if (!Object.values(PLAYBACK_STATE).includes(payload?.state)) return;
+      setPlaybackState({
+        state: payload.state,
+        recommendationId: payload.recommendationId || null,
+      });
+    });
     socket.on('cafe_moved', ({ movedTo }) => {
       if (movedTo) window.location.replace(`/${movedTo}`);
     });
@@ -266,7 +278,12 @@ export default function CafePage({ slug }) {
         </div>
       )}
 
-      <NowPlaying rec={nowPlaying} />
+      <NowPlaying
+        rec={nowPlaying}
+        playbackState={playbackState.recommendationId === nowPlaying?.id
+          ? playbackState.state
+          : PLAYBACK_STATE.UNKNOWN}
+      />
 
       <nav className='tabs' role='tablist' aria-label='음악 목록'>
         {tabs.map(item => (

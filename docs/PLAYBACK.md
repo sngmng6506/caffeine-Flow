@@ -86,6 +86,7 @@ setBgmUrl        기본 BGM 설정
 clearBgm         기본 BGM 해제
 onVideoEnded     신청곡 종료 알림
 onNowPlaying     현재 재생 정보
+onPlaybackState  재생·일시정지·버퍼링 상태
 onWidevineStatus Widevine 상태
 setPanelRatio    렌더러/BrowserView 경계 조정
 ```
@@ -93,6 +94,11 @@ setPanelRatio    렌더러/BrowserView 경계 조정
 렌더러 공개 API는 `owner/electron/preload.js`, 메인 프로세스 IPC 처리는 각 책임 모듈이 기준이다.
 `on*` 이벤트 구독 함수는 해당 리스너만 제거하는 해제 함수를 반환하며,
 컴포넌트 정리 시 다른 화면의 구독을 일괄 삭제하지 않는다.
+
+재생 상태는 추천곡의 DB `playing` 상태와 분리된 실시간 신호다. Electron이
+`playing`, `paused`, `buffering`, `unknown` 중 하나를 보내며, 서버는 인증된 사장님
+소켓의 신호만 카페 룸에 전달한다. 신호가 만료되거나 사장님 앱 연결이 끊기면
+`unknown`으로 초기화하고 추천곡의 DB 상태는 변경하지 않는다.
 
 ## 실패와 복구
 
@@ -111,6 +117,7 @@ owner/electron/main.js                         앱 준비·종료 수명주기 �
 owner/electron/window-manager.js               BrowserWindow·BrowserView·패널 배치
 owner/electron/playback-controller.js          BGM·신청곡 모드와 IPC 오케스트레이션
 owner/electron/end-detection.js                 Spotify·SoundCloud 시그니처 종료 감지
+owner/electron/playback-state.js                플랫폼 공통 실시간 재생 상태 감지
 owner/electron/platform-adapters/spotify.js     Spotify 재생·takeover 복구
 owner/electron/platform-adapters/soundcloud.js  SoundCloud 모달 제거·실제 클릭
 owner/electron/session-tools.js                 세션 초기화·쿠키 import·요청 정책
