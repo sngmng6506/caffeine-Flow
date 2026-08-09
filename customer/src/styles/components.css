@@ -124,10 +124,15 @@
   opacity: 0.8;
 }
 
-.status-panel--info {
-  color: var(--cf-accent-blue);
-  background: var(--cf-accent-blue-soft);
-  border-color: color-mix(in srgb, var(--cf-accent-blue) 16%, transparent);
+.status-panel--notice {
+  color: var(--cf-content);
+  background: var(--cf-surface-subtle);
+  border-color: var(--cf-stroke);
+  border-left: 4px solid var(--cf-brand);
+}
+
+.status-panel--notice > svg {
+  color: var(--cf-brand);
 }
 
 .status-panel--warning {
@@ -599,6 +604,25 @@
 
 .tabs::-webkit-scrollbar {
   display: none;
+}
+
+.tabs--cafe-active {
+  display: flex;
+  overflow-x: auto;
+}
+
+.tabs--cafe-active .tabs__button {
+  width: auto;
+  flex: 1 0 64px;
+}
+
+.tabs--cafe-active .tabs__button.is-active {
+  min-width: max-content;
+  flex: 0 0 auto;
+  overflow: visible;
+  padding-right: 12px;
+  padding-left: 12px;
+  text-overflow: clip;
 }
 
 .tabs__button {

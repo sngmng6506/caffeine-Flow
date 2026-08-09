@@ -310,7 +310,7 @@ export default function CafePage({ slug }) {
       </header>
 
       {notice && (
-        <div className='status-panel status-panel--info'>
+        <div className='status-panel status-panel--notice'>
           <Info size={18} aria-hidden='true' />
           <span>{notice}</span>
         </div>
@@ -329,7 +329,7 @@ export default function CafePage({ slug }) {
           : PLAYBACK_STATE.UNKNOWN}
       />
 
-      <nav className='tabs' role='tablist' aria-label='음악 목록'>
+      <nav className={tab === 'cafeTop' ? 'tabs tabs--cafe-active' : 'tabs'} role='tablist' aria-label='음악 목록'>
         {tabs.map(item => (
           <button
             key={item.id}
