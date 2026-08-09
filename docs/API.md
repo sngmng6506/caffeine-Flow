@@ -34,7 +34,7 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | PUT | `/cafes/me/address` | 🔒 | 지역·좌표 변경 |
 | PUT | `/cafes/me/slug` | 🔒 | QR slug 재발급·지정. 새 `token` 포함 |
 | PUT | `/cafes/me/status` | 🔒 | 신청 접수 ON/OFF |
-| GET | `/cafes/me/history` | 🔒 | 재생 이력. `?date=`는 KST 기준 |
+| GET | `/cafes/me/history` | 🔒 | 재생 이력. 처리 최신순, `?date=`는 신청일의 KST 기준 |
 | GET | `/cafes/me/stats` | 🔒 | 종합 통계와 TOP10 |
 | GET | `/cafes/me/stats/music-filter` | 🔒 | 최근 AI 필터 처리 현황 |
 | GET | `/cafes/me/stats/daily` | 🔒 | 일별 통계 `?date=` |

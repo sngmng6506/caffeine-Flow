@@ -15,6 +15,7 @@ import {
   KST_HOUR_SQL,
   KST_DOW_SQL,
   KST_VISIT_DATE_SQL,
+  HISTORY_SORT_AT_SQL,
   kstDatePartSql,
 } from '../src/db/sql-fragments.js';
 
@@ -52,6 +53,10 @@ describe('DB SQL fragment 계약', () => {
     expect(KST_HOUR_SQL).toBe("date_part('hour', requested_at AT TIME ZONE 'Asia/Seoul')::int");
     expect(KST_DOW_SQL).toBe("date_part('dow', requested_at AT TIME ZONE 'Asia/Seoul')::int");
     expect(KST_VISIT_DATE_SQL).toBe("(now() AT TIME ZONE 'Asia/Seoul')::date");
+  });
+
+  it('사장님 이력은 재생·처리 시각을 우선하고 없으면 신청 시각을 사용한다', () => {
+    expect(HISTORY_SORT_AT_SQL).toBe('COALESCE(played_at, requested_at)');
   });
 
   it('지원하지 않는 date_part는 허용하지 않는다', () => {

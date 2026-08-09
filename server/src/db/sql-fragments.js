@@ -16,11 +16,13 @@ function kstDatePartSql(part, column = 'requested_at') {
 const KST_HOUR_SQL = kstDatePartSql('hour');
 const KST_DOW_SQL = kstDatePartSql('dow');
 const KST_VISIT_DATE_SQL = `(now() AT TIME ZONE '${TIMEZONE}')::date`;
+const HISTORY_SORT_AT_SQL = 'COALESCE(played_at, requested_at)';
 
 module.exports = {
   CANONICAL_VIDEO_ID_SQL,
   KST_HOUR_SQL,
   KST_DOW_SQL,
   KST_VISIT_DATE_SQL,
+  HISTORY_SORT_AT_SQL,
   kstDatePartSql,
 };

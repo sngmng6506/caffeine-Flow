@@ -18,6 +18,7 @@ const {
   DEFAULT_MUSIC_FILTER_STRICTNESS,
   VALID_MUSIC_FILTER_STRICTNESS,
 } = require('../constants/music-filter-policy');
+const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -241,7 +242,9 @@ router.get('/me/history', requireAuth, async (req, res) => {
   let query = db('recommendations')
     .where({ cafe_id: req.owner.cafeId })
     .whereIn('status', TERMINAL_STATUSES)
-    .orderBy('requested_at', 'desc');
+    .orderByRaw(`${HISTORY_SORT_AT_SQL} DESC`)
+    .orderBy('requested_at', 'desc')
+    .orderBy('id', 'desc');
 
   if (req.query.date) {
     // KST 경계 사용 — UTC 자정 기준이면 KST 09:00~다음날 08:59가 잡혀
