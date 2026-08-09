@@ -204,7 +204,9 @@ export default function useRecommendationQueue({
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
 
     const removeNowPlaying = window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
-    const removePlaybackState = window.electronAPI?.onPlaybackState(state => {
+    // owner UI는 Railway에서 최신 버전을 불러오므로 설치본 preload보다 앞설 수 있다.
+    // 구버전 Electron에는 이 채널이 없어도 Dashboard 렌더링을 계속한다.
+    const removePlaybackState = window.electronAPI?.onPlaybackState?.(state => {
       const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
       socket.emit('playback_state', {
         state: Object.values(PLAYBACK_STATE).includes(state) ? state : PLAYBACK_STATE.UNKNOWN,
