@@ -11,7 +11,6 @@ const PUBLIC_CAFE_FIELDS = [
   'allowed_platforms',
   'music_filter_enabled',
   'music_filter_prompt',
-  'music_filter_strictness',
   'address',
   'road_address',
   'region',

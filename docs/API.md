@@ -29,8 +29,8 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | PUT | `/cafes/me` | 🔒 | 카페명 등 기본 정보 변경 |
 | PUT | `/cafes/me/notice` | 🔒 | 손님 공지 변경 |
 | PUT | `/cafes/me/platforms` | 🔒 | 허용 플랫폼 변경 |
-| PUT | `/cafes/me/music-filter` | 🔒 | AI 음악 필터 설정 |
-| POST | `/cafes/me/music-filter/test` | 🔒 | 저장 없이 곡 필터 판단 미리보기 |
+| PUT | `/cafes/me/music-filter` | 🔒 | AI 음악 필터 사용 여부·매장 분위기 설명 설정 |
+| POST | `/cafes/me/music-filter/test` | 🔒 | 현재 매장 분위기 설명으로 저장 없이 곡 판단 미리보기 |
 | PUT | `/cafes/me/address` | 🔒 | 지역·좌표 변경 |
 | PUT | `/cafes/me/slug` | 🔒 | QR slug 재발급·지정. 새 `token` 포함 |
 | PUT | `/cafes/me/status` | 🔒 | 신청 접수 ON/OFF |

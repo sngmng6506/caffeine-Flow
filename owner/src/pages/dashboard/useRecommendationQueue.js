@@ -281,7 +281,6 @@ export default function useRecommendationQueue({
       await updateMusicFilter({
         enabled: next,
         prompt: prompt || null,
-        strictness: latest.music_filter_strictness || undefined,
       });
     } catch (error) {
       alert(error.message || 'AI 자동수락 설정 저장에 실패했습니다.');

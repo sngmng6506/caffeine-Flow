@@ -42,7 +42,7 @@ customer/src/constants/recommendationStatus.js
 
 ```text
 server/src/constants/music-filter-status.js
-server/src/constants/music-filter-policy.js
+server/src/features/music-filter/prompt.builder.js
 owner/src/constants/musicFilterStatus.js
 owner/src/constants/musicFilterPolicy.js
 ```
@@ -59,6 +59,8 @@ owner/src/constants/musicFilterPolicy.js
 - 자동수락은 `pending && filter_status=accepted`만 대상으로 한다.
 - `filter_status=skipped` 곡을 자동 승격하지 않는다.
 - 판단 상태와 일반 큐 상태를 한 컬럼으로 합치지 않는다.
+- 별도의 필터 강도를 다시 추가하지 않는다. 사장님이 작성한 매장 분위기 설명을 유일한 매장 판단 정책으로 사용한다.
+- 레거시 `music_filter_strictness` DB 컬럼은 마이그레이션 호환을 위해 남겨두되 런타임 API·프롬프트에서 사용하거나 노출하지 않는다.
 
 상세 동작: [LLM_FILTER.md](LLM_FILTER.md)
 

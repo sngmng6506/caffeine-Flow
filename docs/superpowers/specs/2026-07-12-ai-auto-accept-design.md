@@ -28,13 +28,13 @@
 
 - 버튼 텍스트 `자동 수락` → `AI 자동수락`.
 - 마운트 시 `getMe()`로 `music_filter_enabled` 로드해 초기화.
-- **ON 클릭**: `getMe()`로 최신 프롬프트·강도 조회 → 프롬프트 없으면 안내(alert)하고 켜지 않음 → 있으면 `updateMusicFilter({ enabled: true, prompt, strictness })` 저장 후 기존 pending 일괄 수락 + 재생 시작(기존 동작 유지).
-- **OFF 클릭**: 최신 프롬프트·강도 유지한 채 `enabled: false` 저장.
+- **ON 클릭**: `getMe()`로 최신 프롬프트 조회 → 프롬프트 없으면 안내(alert)하고 켜지 않음 → 있으면 `updateMusicFilter({ enabled: true, prompt })` 저장 후 기존 pending 일괄 수락 + 재생 시작(기존 동작 유지).
+- **OFF 클릭**: 최신 프롬프트를 유지한 채 `enabled: false` 저장.
 - socket `add` 핸들러의 자동 수락 판단은 이 서버 상태 ref로 대체.
 
 ### 설정 탭 (`owner/src/pages/dashboard/MusicFilterSettings.jsx`)
 
-- ON/OFF 토글 제거. 프롬프트 + 필터 강도 + AI 테스트만 남김.
+- ON/OFF 토글 제거. 프롬프트 + AI 테스트만 남김.
 - 설명 문구를 "대시보드의 AI 자동수락에 사용됩니다"로 조정.
 - **stale enabled 방지**: 저장 직전 `getMe()`로 최신 `music_filter_enabled`를 읽어 그 값을 그대로 전송(설정 탭이 필터를 켜고 끄는 일이 없도록).
 - 서버 enabled=true 상태에서 프롬프트를 비워 저장하는 것은 차단(경고 표시).

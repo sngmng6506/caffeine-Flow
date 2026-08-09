@@ -1,12 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeLlmDecision, rejectionFromError } from '../src/features/music-filter/decision.policy.js';
+import { buildMusicFilterMessages } from '../src/features/music-filter/prompt.builder.js';
 import { FILTER_ACTION, FILTER_STATUS } from '../src/constants/music-filter-status.js';
-import {
-  DEFAULT_MUSIC_FILTER_STRICTNESS,
-  MUSIC_FILTER_STRICTNESS,
-  MUSIC_FILTER_STRICTNESS_GUIDES,
-  VALID_MUSIC_FILTER_STRICTNESS,
-} from '../src/constants/music-filter-policy.js';
 
 describe('AI 음악 필터 상태 계약', () => {
   it('LLM accept는 action=accept, filter_status=accepted로 정규화한다', () => {
@@ -36,19 +31,21 @@ describe('AI 음악 필터 상태 계약', () => {
   });
 });
 
-describe('AI 음악 필터 강도 계약', () => {
-  it('허용 strictness는 low/medium/high이고 기본값은 medium이다', () => {
-    expect(VALID_MUSIC_FILTER_STRICTNESS).toEqual([
-      MUSIC_FILTER_STRICTNESS.LOW,
-      MUSIC_FILTER_STRICTNESS.MEDIUM,
-      MUSIC_FILTER_STRICTNESS.HIGH,
-    ]);
-    expect(DEFAULT_MUSIC_FILTER_STRICTNESS).toBe(MUSIC_FILTER_STRICTNESS.MEDIUM);
-  });
+describe('AI 음악 필터 프롬프트 계약', () => {
+  it('사장님 정책을 유일한 매장 판단 기준으로 전달하고 필터 강도를 추가하지 않는다', () => {
+    const messages = buildMusicFilterMessages({
+      cafePrompt: '재즈와 로파이만 허용합니다.',
+      track: {
+        platform: 'youtube',
+        title: '테스트 곡',
+        channelTitle: '테스트 채널',
+      },
+    });
+    const userMessage = messages.find(message => message.role === 'user').content;
 
-  it('각 strictness는 프롬프트 가이드를 가진다', () => {
-    for (const strictness of VALID_MUSIC_FILTER_STRICTNESS) {
-      expect(MUSIC_FILTER_STRICTNESS_GUIDES[strictness]).toBeTruthy();
-    }
+    expect(userMessage).toContain('[사장님이 설정한 매장 분위기]\n재즈와 로파이만 허용합니다.');
+    expect(userMessage).not.toContain('필터 강도');
+    expect(userMessage).not.toContain('느슨하게');
+    expect(userMessage).not.toContain('엄격하게');
   });
 });

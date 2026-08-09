@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getMe, testMusicFilter, updateMusicFilter } from '../../api';
-import {
-  DEFAULT_MUSIC_FILTER_PROMPT,
-  DEFAULT_MUSIC_FILTER_STRICTNESS,
-  MUSIC_FILTER_STRICTNESS_OPTIONS,
-} from '../../constants/musicFilterPolicy';
+import { DEFAULT_MUSIC_FILTER_PROMPT } from '../../constants/musicFilterPolicy';
 
-// ON/OFF는 대시보드의 'AI 자동수락' 버튼이 담당 — 이 화면은 프롬프트·강도만 편집한다.
+// ON/OFF는 대시보드의 'AI 자동수락' 버튼이 담당 — 이 화면은 프롬프트만 편집한다.
 function normalize(latest = {}) {
   return {
     prompt: latest.music_filter_prompt || '',
-    strictness: latest.music_filter_strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
   };
 }
 
@@ -23,7 +18,7 @@ function TestResultCard({ result }) {
   if (!result) {
     return (
       <div style={styles.testEmpty}>
-        테스트를 실행하면 현재 화면의 매장 분위기 설명과 필터 강도를 기준으로 AI 판단 결과가 표시됩니다.
+        테스트를 실행하면 현재 화면의 매장 분위기 설명을 기준으로 AI 판단 결과가 표시됩니다.
       </div>
     );
   }
@@ -94,7 +89,6 @@ export default function MusicFilterSettings() {
       const updated = await updateMusicFilter({
         enabled: latestEnabled,
         prompt: form.prompt.trim() || null,
-        strictness: form.strictness,
       });
       const next = normalize(updated);
       setInitial(next);
@@ -118,7 +112,6 @@ export default function MusicFilterSettings() {
       const result = await testMusicFilter({
         url: testUrl.trim(),
         prompt: form.prompt.trim(),
-        strictness: form.strictness,
       });
       setTestResult(result);
     } catch (error) {
@@ -144,7 +137,7 @@ export default function MusicFilterSettings() {
           <div>
             <div style={styles.title}>AI 음악 필터</div>
             <div style={styles.desc}>
-              대시보드의 <b>AI 자동수락</b>을 켜면 아래 매장 분위기 설명과 필터 강도로 신청곡을 심사해, 통과한 곡만 자동 수락·재생합니다.
+              대시보드의 <b>AI 자동수락</b>을 켜면 아래 매장 분위기 설명으로 신청곡을 심사해, 통과한 곡만 자동 수락·재생합니다.
             </div>
           </div>
           <span style={{ ...styles.stateBadge, ...(enabled ? styles.stateOn : styles.stateOff) }}>
@@ -166,22 +159,6 @@ export default function MusicFilterSettings() {
           <div style={styles.warn}>AI 자동수락이 켜져 있어 매장 분위기 설명을 비울 수 없습니다.</div>
         )}
 
-        <label style={styles.label}>필터 강도</label>
-        <div style={styles.strictnessRow}>
-          {MUSIC_FILTER_STRICTNESS_OPTIONS.map(item => {
-            const active = form.strictness === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setForm(prev => ({ ...prev, strictness: item.id }))}
-                style={{ ...styles.strictnessBtn, ...(active ? styles.strictnessActive : {}) }}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-
         <div style={styles.info}>
           AI 판단 실패, API 오류, 응답 파싱 실패가 발생하면 매장 분위기 보호를 위해 신청곡은 자동 거절됩니다. 이 경우 사장님 앱에 알림이 표시됩니다.
         </div>
@@ -199,7 +176,7 @@ export default function MusicFilterSettings() {
         <div style={styles.headerRow}>
           <div>
             <div style={styles.title}>AI 필터 테스트</div>
-            <div style={styles.desc}>곡 URL을 입력하면 현재 화면의 매장 분위기 설명과 필터 강도로 수락/거절 판단을 미리 확인합니다.</div>
+            <div style={styles.desc}>곡 URL을 입력하면 현재 화면의 매장 분위기 설명으로 수락/거절 판단을 미리 확인합니다.</div>
           </div>
           <span style={styles.badge}>OpenRouter</span>
         </div>
@@ -246,9 +223,6 @@ const styles = {
   textarea: { width: '100%', boxSizing: 'border-box', fontSize: 13, lineHeight: 1.5, padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', resize: 'vertical', fontFamily: 'sans-serif', background: '#fff' },
   count: { fontSize: 11, color: '#aaa', textAlign: 'right', marginTop: 4 },
   warn: { fontSize: 12, color: '#e63946', marginTop: 6 },
-  strictnessRow: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8 },
-  strictnessBtn: { padding: '10px 0', textAlign: 'center', borderRadius: 10, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#777', outline: 'none' },
-  strictnessActive: { borderColor: '#1a1a2e', background: '#1a1a2e', color: '#fff' },
   info: { marginTop: 14, padding: 12, borderRadius: 8, background: '#fff7e6', color: '#8a5a00', fontSize: 12, lineHeight: 1.45 },
   actions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 16, flexWrap: 'wrap' },
   okMsg: { marginRight: 'auto', fontSize: 12, color: '#4caf50' },

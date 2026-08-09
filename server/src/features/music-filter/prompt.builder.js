@@ -1,14 +1,8 @@
-const {
-  DEFAULT_MUSIC_FILTER_STRICTNESS,
-  MUSIC_FILTER_STRICTNESS_GUIDES,
-} = require('../../constants/music-filter-policy');
-
 function compact(value, fallback = '') {
   return String(value || fallback).trim();
 }
 
-function buildMusicFilterMessages({ cafePrompt, strictness = DEFAULT_MUSIC_FILTER_STRICTNESS, track }) {
-  const strictnessGuide = MUSIC_FILTER_STRICTNESS_GUIDES[strictness] || MUSIC_FILTER_STRICTNESS_GUIDES[DEFAULT_MUSIC_FILTER_STRICTNESS];
+function buildMusicFilterMessages({ cafePrompt, track }) {
   const storePrompt = compact(cafePrompt, '이 매장의 분위기를 해치지 않는 곡만 허용합니다.');
 
   return [
@@ -29,9 +23,6 @@ function buildMusicFilterMessages({ cafePrompt, strictness = DEFAULT_MUSIC_FILTE
       content: [
         '[사장님이 설정한 매장 분위기]',
         storePrompt,
-        '',
-        '[필터 강도]',
-        strictnessGuide,
         '',
         '[신청곡 메타데이터]',
         `플랫폼: ${compact(track.platform, 'unknown')}`,

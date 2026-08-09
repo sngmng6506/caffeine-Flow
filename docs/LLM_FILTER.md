@@ -15,8 +15,11 @@ Caffeine Flow는 사장님이 작성한 매장 분위기 정책을 기준으로 
 ```text
 music_filter_enabled     필터 사용 여부
 music_filter_prompt      매장 분위기 설명
-music_filter_strictness  low / medium / high
 ```
+
+별도의 필터 강도는 사용하지 않는다. 사장님이 작성한 매장 분위기 설명이 유일한 매장 판단 정책이며, 각 곡 요청에는 그 시점의 최신 설명을 그대로 전달한다.
+
+과거 배포 호환을 위해 DB의 `music_filter_strictness` 컬럼은 남아 있지만 API에 노출하거나 저장·판단에 사용하지 않는다.
 
 손님 신청은 일반 검증을 통과한 뒤 LLM으로 전달된다.
 

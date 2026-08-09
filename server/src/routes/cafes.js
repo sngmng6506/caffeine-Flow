@@ -14,10 +14,6 @@ const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('..
 const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
 const { TERMINAL_STATUSES } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
-const {
-  DEFAULT_MUSIC_FILTER_STRICTNESS,
-  VALID_MUSIC_FILTER_STRICTNESS,
-} = require('../constants/music-filter-policy');
 const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 
 // GET /api/v1/cafes/me
@@ -129,13 +125,6 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
   });
   if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
 
-  const strictnessCheck = validateInEnum(
-    req.body?.strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
-    VALID_MUSIC_FILTER_STRICTNESS,
-    { name: 'strictness' }
-  );
-  if (strictnessCheck.error) return res.status(400).json({ error: strictnessCheck.error });
-
   if (enabledCheck.value && !promptCheck.value) {
     return res.status(400).json({ error: 'AI 필터를 켜려면 매장 분위기 설명을 입력해주세요' });
   }
@@ -143,13 +132,11 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
   const cafe = await cafeService.update(req.owner.cafeId, {
     music_filter_enabled: enabledCheck.value,
     music_filter_prompt: promptCheck.value,
-    music_filter_strictness: strictnessCheck.value,
   });
 
   res.json({
     music_filter_enabled: cafe.music_filter_enabled,
     music_filter_prompt: cafe.music_filter_prompt,
-    music_filter_strictness: cafe.music_filter_strictness,
   });
 });
 
@@ -164,13 +151,6 @@ router.post('/me/music-filter/test', requireAuth, async (req, res) => {
   });
   if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
 
-  const strictnessCheck = validateInEnum(
-    req.body?.strictness || DEFAULT_MUSIC_FILTER_STRICTNESS,
-    VALID_MUSIC_FILTER_STRICTNESS,
-    { name: 'strictness' }
-  );
-  if (strictnessCheck.error) return res.status(400).json({ error: strictnessCheck.error });
-
   let track;
   try {
     track = await getTrackMetadata(urlCheck.value);
@@ -182,7 +162,6 @@ router.post('/me/music-filter/test', requireAuth, async (req, res) => {
 
   const result = await musicFilter.evaluateTrack({
     cafePrompt: promptCheck.value,
-    strictness: strictnessCheck.value,
     track,
   });
 
