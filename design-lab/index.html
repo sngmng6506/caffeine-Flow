@@ -22,8 +22,8 @@
         <div class="section-label">CORE MARK</div>
         <div id="heroMark" class="hero-mark" aria-label="Caffeine Flow flow mark"></div>
         <div class="hero-caption">
-          <span>center = current choice</span>
-          <span>ring = collective flow</span>
+          <span>shape = sound in motion</span>
+          <span>color = flow intensity</span>
         </div>
       </article>
 
@@ -39,6 +39,15 @@
           </select>
         </div>
         <div class="control-row">
+          <label for="variantSelect">VARIANT</label>
+          <select id="variantSelect">
+            <option value="balanced" selected>Balanced</option>
+            <option value="mirror">Stereo Mirror</option>
+            <option value="steps">Flow Steps</option>
+            <option value="cf">CF Pulse</option>
+          </select>
+        </div>
+        <div class="control-row">
           <label for="speedRange">SPEED</label>
           <input id="speedRange" type="range" min="0" max="100" value="46" />
           <output id="speedValue">46</output>
@@ -51,6 +60,22 @@
         <button id="burstButton" type="button">TRIGGER REQUEST</button>
         <p class="tiny-note">SVG 도형만 사용합니다. 이미지 에셋 없음.</p>
       </article>
+    </section>
+
+    <section class="section-block">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">00 / VARIATIONS</p>
+          <h2>Waveform structures</h2>
+        </div>
+        <p>Same visual tokens, different flow structures.</p>
+      </div>
+      <div class="variation-grid">
+        <article class="variation-card"><div class="variation-mark" data-state="playing" data-variant="balanced"></div><strong>BALANCED</strong><span>Natural live equalizer rhythm</span></article>
+        <article class="variation-card"><div class="variation-mark" data-state="playing" data-variant="mirror"></div><strong>STEREO MIRROR</strong><span>Symmetrical audio identity</span></article>
+        <article class="variation-card"><div class="variation-mark" data-state="playing" data-variant="steps"></div><strong>FLOW STEPS</strong><span>Directional rise and release</span></article>
+        <article class="variation-card"><div class="variation-mark" data-state="playing" data-variant="cf"></div><strong>CF PULSE</strong><span>Initials built from active bars</span></article>
+      </div>
     </section>
 
     <section class="section-block">

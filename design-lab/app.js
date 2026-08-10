@@ -7,25 +7,40 @@ const COLORS = {
   ink: '#070807',
 };
 
-function polar(cx, cy, radius, angle) {
-  return {
-    x: cx + Math.cos(angle) * radius,
-    y: cy + Math.sin(angle) * radius,
-  };
-}
+const WAVE_HEIGHTS = {
+  balanced: [24, 48, 34, 68, 40, 54, 28],
+  mirror: [20, 34, 50, 64, 76, 64, 50, 34, 20],
+  steps: [18, 26, 36, 48, 64, 52, 38, 24],
+};
 
-function seededSize(index, state, energy) {
-  const wave = Math.sin(index * 1.83 + (state === 'playing' ? 1.1 : .3));
-  const base = 2.7 + (wave + 1) * 1.4;
-  return base + energy * .018;
-}
+const CF_BARS = [
+  { x: 22, y: 28, width: 8, height: 64 },
+  { x: 30, y: 28, width: 24, height: 8 },
+  { x: 30, y: 84, width: 24, height: 8 },
+  { x: 66, y: 28, width: 8, height: 64 },
+  { x: 74, y: 28, width: 26, height: 8 },
+  { x: 74, y: 52, width: 20, height: 8 },
+];
 
-function colorAt(index, count) {
-  const t = index / Math.max(1, count - 1);
-  if (t < .35) return COLORS.acid;
-  if (t < .58) return COLORS.warm;
-  if (t < .84) return COLORS.pink;
-  return COLORS.acid;
+function waveformBars(variant, minimal, energy) {
+  if (variant === 'cf' && !minimal) return CF_BARS;
+
+  const heights = minimal ? [24, 44, 66, 44, 24] : WAVE_HEIGHTS[variant] || WAVE_HEIGHTS.balanced;
+  const width = minimal ? 9 : variant === 'mirror' ? 6 : 7;
+  const gap = minimal ? 5 : variant === 'mirror' ? 4 : 5;
+  const totalWidth = heights.length * width + (heights.length - 1) * gap;
+  const startX = (120 - totalWidth) / 2;
+  const energyScale = minimal ? 1 : .72 + energy * .004;
+
+  return heights.map((height, index) => {
+    const scaledHeight = height * energyScale;
+    return {
+      x: startX + index * (width + gap),
+      y: 60 - scaledHeight / 2,
+      width,
+      height: scaledHeight,
+    };
+  });
 }
 
 function svgEl(name, attrs = {}) {
@@ -34,76 +49,36 @@ function svgEl(name, attrs = {}) {
   return node;
 }
 
-function buildMark({ state = 'idle', speed = 46, energy = 72, minimal = false } = {}) {
+function buildMark({ state = 'idle', speed = 46, energy = 72, minimal = false, variant = 'balanced' } = {}) {
   const svg = svgEl('svg', { viewBox: '0 0 120 120', class: `flow-mark ${state}`, role: 'img' });
-  svg.style.setProperty('--flow-speed', `${Math.max(2.8, 9 - speed * .06)}s`);
+  svg.style.setProperty('--wave-speed', `${Math.max(.5, 1.35 - speed * .008)}s`);
 
+  svg.dataset.variant = variant;
   const defs = svgEl('defs');
-  const glow = svgEl('filter', { id: `glow-${Math.random().toString(36).slice(2)}`, x: '-80%', y: '-80%', width: '260%', height: '260%' });
-  glow.append(svgEl('feGaussianBlur', { stdDeviation: minimal ? '0.4' : '1.7', result: 'blur' }));
-  const merge = svgEl('feMerge');
-  merge.append(svgEl('feMergeNode', { in: 'blur' }), svgEl('feMergeNode', { in: 'SourceGraphic' }));
-  glow.append(merge);
-  defs.append(glow);
+  const gradientId = `wave-${Math.random().toString(36).slice(2)}`;
+  const gradient = svgEl('linearGradient', { id: gradientId, x1: '0', y1: '0', x2: '0', y2: '1' });
+  gradient.append(
+    svgEl('stop', { offset: '0', 'stop-color': COLORS.acid }),
+    svgEl('stop', { offset: '.55', 'stop-color': COLORS.warm }),
+    svgEl('stop', { offset: '1', 'stop-color': COLORS.pink })
+  );
+  defs.append(gradient);
   svg.append(defs);
 
-  svg.append(svgEl('circle', { cx: '60', cy: '60', r: minimal ? '13' : '12.5', fill: COLORS.acid, class: 'core' }));
-
-  const count = minimal ? 8 : 18;
-  const radius = minimal ? 40 : 42;
-  const ring = svgEl('g', { class: 'ring' });
-  const gapStart = state === 'idle' ? 14 : 13;
-
-  for (let i = 0; i < count; i += 1) {
-    if (!minimal && (i === gapStart || i === gapStart + 1)) continue;
-    const angle = -Math.PI / 2 + (Math.PI * 2 * i) / count;
-    const p = polar(60, 60, radius, angle);
-    const r = minimal ? 2.5 : seededSize(i, state, energy);
-    const orb = svgEl('circle', {
-      cx: p.x.toFixed(2),
-      cy: p.y.toFixed(2),
-      r: r.toFixed(2),
-      fill: colorAt(i, count),
-      class: 'orb',
-      style: `--i:${i}`,
-    });
-    ring.append(orb);
-  }
-
-  if (!minimal) {
-    const accent = svgEl('path', {
-      d: 'M 21 79 A 46 46 0 0 1 15.5 67',
-      fill: 'none',
-      stroke: COLORS.pink,
-      'stroke-width': state === 'playing' ? '5.2' : '4.4',
-      'stroke-linecap': 'round',
-      opacity: state === 'idle' ? '.58' : '1',
-    });
-    ring.append(accent);
-  }
-
-  svg.append(ring);
-
-  if (state === 'request' && !minimal) {
-    const requestP = polar(60, 60, 51, -.25);
-    svg.append(svgEl('circle', {
-      cx: requestP.x.toFixed(2),
-      cy: requestP.y.toFixed(2),
-      r: '5.5',
-      fill: COLORS.pink,
-      class: 'request-orb',
+  const waveform = svgEl('g', { class: 'waveform' });
+  waveformBars(variant, minimal, energy).forEach((bar, index) => {
+    waveform.append(svgEl('rect', {
+      x: bar.x.toFixed(2),
+      y: bar.y.toFixed(2),
+      width: bar.width.toFixed(2),
+      height: bar.height.toFixed(2),
+      rx: minimal ? '3' : '4',
+      fill: `url(#${gradientId})`,
+      class: 'wave-bar',
+      style: `--i:${index}`,
     }));
-  }
-
-  if (state === 'spread' && !minimal) {
-    [50, 55].forEach((r, idx) => {
-      svg.append(svgEl('circle', {
-        cx: '60', cy: '60', r: String(r), fill: 'none',
-        stroke: idx ? COLORS.pink : COLORS.acid,
-        'stroke-width': '.6', opacity: '.18',
-      }));
-    });
-  }
+  });
+  svg.append(waveform);
 
   return svg;
 }
@@ -115,12 +90,13 @@ function mountMark(container, options) {
 function renderStaticMarks() {
   document.querySelectorAll('[data-state]').forEach((el) => {
     const minimal = el.dataset.minimal === 'true';
-    mountMark(el, { state: el.dataset.state, speed: 46, energy: 68, minimal });
+    mountMark(el, { state: el.dataset.state, speed: 46, energy: 68, minimal, variant: el.dataset.variant });
   });
 }
 
 const hero = document.querySelector('#heroMark');
 const stateSelect = document.querySelector('#stateSelect');
+const variantSelect = document.querySelector('#variantSelect');
 const speedRange = document.querySelector('#speedRange');
 const energyRange = document.querySelector('#energyRange');
 const speedValue = document.querySelector('#speedValue');
@@ -130,12 +106,13 @@ const burstButton = document.querySelector('#burstButton');
 function renderHero(overrideState) {
   mountMark(hero, {
     state: overrideState || stateSelect.value,
+    variant: variantSelect.value,
     speed: Number(speedRange.value),
     energy: Number(energyRange.value),
   });
 }
 
-[stateSelect, speedRange, energyRange].forEach((input) => {
+[stateSelect, variantSelect, speedRange, energyRange].forEach((input) => {
   input.addEventListener('input', () => {
     speedValue.value = speedRange.value;
     energyValue.value = energyRange.value;
