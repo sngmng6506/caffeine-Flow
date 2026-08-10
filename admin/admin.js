@@ -10,6 +10,8 @@ let sortKey = 'created_at';
 let view = 'list';
 let map = null;
 let markers = null;
+let loginRetryTimer = null;
+let statsCafeId = null;
 
 const $ = (s) => document.querySelector(s);
 const token = () => sessionStorage.getItem(TOKEN_KEY);
@@ -25,7 +27,11 @@ async function api(method, path, body) {
   });
   if (res.status === 401 || res.status === 403) { logout(); throw new Error('인증 만료'); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `오류 (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(data.error || `오류 (${res.status})`);
+    error.retryAfterSeconds = Number(data.retry_after_seconds) || 0;
+    throw error;
+  }
   return data;
 }
 
@@ -43,7 +49,34 @@ async function login() {
     sessionStorage.setItem(TOKEN_KEY, t);
     $('#pw').value = '';
     start();
-  } catch (e) { err.textContent = e.message; }
+  } catch (e) {
+    if (e.retryAfterSeconds > 0) startLoginRetryCountdown(e.retryAfterSeconds);
+    else err.textContent = e.message;
+  }
+}
+
+function startLoginRetryCountdown(seconds) {
+  const button = $('#loginBtn');
+  const err = $('#loginErr');
+  let remaining = Math.max(1, Math.ceil(seconds));
+
+  clearInterval(loginRetryTimer);
+  button.disabled = true;
+
+  const renderCountdown = () => {
+    if (remaining <= 0) {
+      clearInterval(loginRetryTimer);
+      loginRetryTimer = null;
+      button.disabled = false;
+      err.textContent = '';
+      return;
+    }
+    err.textContent = `${remaining}초 후 다시 시도할 수 있습니다`;
+    remaining -= 1;
+  };
+
+  renderCountdown();
+  loginRetryTimer = setInterval(renderCountdown, 1000);
 }
 
 function fmtDate(v) {

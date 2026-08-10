@@ -7,6 +7,7 @@ import {
   RECOMMENDATION_REQUEST_LIMIT,
   VOTE_LIMIT,
   COMMENT_LIMIT,
+  ADMIN_LOGIN_LIMIT,
 } from '../src/constants/limits.js';
 
 describe('운영 한도 정책 상수', () => {
@@ -44,5 +45,9 @@ describe('운영 한도 정책 상수', () => {
       visitorMax: 5,
       ipMax: 15,
     });
+  });
+
+  it('운영자 로그인은 15분 동안 10회로 제한한다', () => {
+    expect(ADMIN_LOGIN_LIMIT).toEqual({ windowMs: 15 * ONE_MINUTE_MS, max: 10 });
   });
 });

@@ -33,8 +33,16 @@ const skipInTest = () => process.env.NODE_ENV === 'test';
 
 const loginLimiter = rateLimit({
   ...ADMIN_LOGIN_LIMIT,
-  message: { error: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요' },
   skip: skipInTest,
+  skipSuccessfulRequests: true,
+  handler: (req, res, _next, options) => {
+    const resetAt = req.rateLimit?.resetTime?.getTime() || Date.now() + ADMIN_LOGIN_LIMIT.windowMs;
+    const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+    res.status(options.statusCode).json({
+      error: `로그인 시도가 너무 많습니다. ${retryAfterSeconds}초 후 다시 시도하세요`,
+      retry_after_seconds: retryAfterSeconds,
+    });
+  },
 });
 
 // 길이가 달라도 조기 반환하지 않도록 해시를 비교 — 비밀번호 길이 유출 방지
@@ -53,7 +61,7 @@ function cafeStatus(lastHeartbeatAt, now, todayStartMs) {
 }
 
 // POST /api/v1/admin/login  { password } → { token }
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   if (!ADMIN_PASSWORD) {
     return res.status(503).json({ error: 'ADMIN_PASSWORD 미설정 — 어드민 콘솔 비활성' });
   }
