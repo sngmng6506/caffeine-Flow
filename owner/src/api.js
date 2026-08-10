@@ -47,14 +47,4 @@ export const deleteRec = (slug, id) =>
 
 export const getHistory = (offset = 0, date = null) =>
   apiFetch('GET', `/cafes/me/history?offset=${offset}${date ? `&date=${date}` : ''}`);
-export const getStats = () => apiFetch('GET', '/cafes/me/stats');
-export const getMusicFilterStats = () => apiFetch('GET', '/cafes/me/stats/music-filter');
-export const getDailyStats = date => apiFetch('GET', `/cafes/me/stats/daily?date=${date}`);
-export const getHourlyStats = () => apiFetch('GET', '/cafes/me/stats/hourly');
-export const getWeekdayStats = () => apiFetch('GET', '/cafes/me/stats/weekday');
-export const getHourlySongs = (hour, offset = 0) =>
-  apiFetch('GET', `/cafes/me/stats/hourly-songs?hour=${hour}&offset=${offset}`);
-export const getWeekdaySongs = (day, offset = 0) =>
-  apiFetch('GET', `/cafes/me/stats/weekday-songs?day=${day}&offset=${offset}`);
-
 export const getSongComments = videoId => apiFetch('GET', `/songs/${videoId}/comments`);

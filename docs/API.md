@@ -96,8 +96,9 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
-| POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. 로그인 횟수 제한은 임시 비활성 |
+| POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. 15분 10회 제한, 차단 시 `retry_after_seconds` 반환 |
 | GET | `/admin/cafes` | 🛡 | 전체 카페와 운영 상태 조회 |
+| GET | `/admin/cafes/:id/stats` | 🛡 | 특정 카페의 오늘·누적·시간대·요일·AI 필터 통계 |
 | PUT | `/admin/cafes/:id/suspend` | 🛡 | 카페 정지·해제 |
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
 

@@ -10,6 +10,7 @@ const router = require('express').Router();
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const db = require('../db/knex');
+const statsService = require('../services/stats.service');
 const { requireAdmin } = require('../middleware/auth');
 const { issueAdminToken } = require('../utils/jwt');
 const { kstTodayString, kstStartOfDay } = require('../utils/kst');
@@ -115,6 +116,38 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
     today_unique_visitors: visitMap.get(c.id) || 0,
     today_requests: requestMap.get(c.id) || 0,
   })));
+});
+
+// GET /api/v1/admin/cafes/:id/stats
+// 사장님 화면에서 분리한 매장 통계를 기존 KST 집계 서비스로 조회한다.
+router.get('/cafes/:id/stats', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
+
+  const cafe = await db('cafes').where({ id: req.params.id }).select('id', 'name').first();
+  if (!cafe) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
+
+  const todayDate = kstTodayString();
+  const [totals, today, hourly, weekday, musicFilter] = await Promise.all([
+    statsService.getStats(cafe.id),
+    statsService.getDailyStats(cafe.id, todayDate),
+    statsService.getHourlyPattern(cafe.id),
+    statsService.getDayOfWeekPattern(cafe.id),
+    statsService.getMusicFilterStats(cafe.id),
+  ]);
+
+  res.json({
+    cafe,
+    totals,
+    today: {
+      date: today.date,
+      total: today.total,
+      played: today.played,
+      skipped: today.skipped,
+    },
+    hourly,
+    weekday,
+    musicFilter,
+  });
 });
 
 // PUT /api/v1/admin/cafes/:id/suspend  { is_suspended: boolean }

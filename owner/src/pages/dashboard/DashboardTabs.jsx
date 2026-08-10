@@ -4,7 +4,6 @@ import { dashboardStyles as styles } from './dashboardStyles';
 const TABS = [
   ['queue', '신청 목록'],
   ['history', '이력'],
-  ['stats', '통계'],
   ['qr', 'QR 코드'],
   ['settings', '설정'],
   ['contact', '문의'],

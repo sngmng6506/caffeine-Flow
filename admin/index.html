@@ -35,7 +35,7 @@
     <button class="chip" data-filter="suspended">정지됨</button>
     <span class="spacer"></span>
     <button class="chip on" data-sort="created_at">신규순</button>
-    <button class="chip" data-sort="today_unique_visitors">도달순</button>
+    <button class="chip" data-sort="today_unique_visitors">방문자순</button>
     <span class="spacer"></span>
     <button class="chip on" data-view="list">리스트</button>
     <button class="chip" data-view="map">지도</button>
@@ -48,7 +48,7 @@
         <thead>
           <tr>
             <th>상태</th><th>카페</th><th>지역</th>
-            <th class="num">오늘 도달</th><th class="num">오늘 신청</th>
+            <th class="num">오늘 방문자</th><th class="num">오늘 신청</th>
             <th>마지막 사용</th><th>가입일</th><th></th>
           </tr>
         </thead>
@@ -57,6 +57,16 @@
       <div class="empty hidden" id="empty">해당하는 카페가 없습니다</div>
     </div>
     <div id="mapView" class="hidden"><div id="map"></div></div>
+    <section id="statsView" class="hidden">
+      <div class="detail-header">
+        <button class="act" id="statsBack">← 목록</button>
+        <div>
+          <h2 id="statsTitle">카페 통계</h2>
+          <p>매장 신청과 AI 필터 운영 현황</p>
+        </div>
+      </div>
+      <div id="statsContent"></div>
+    </section>
   </main>
 </div>
 

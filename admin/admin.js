@@ -2,7 +2,7 @@
 // 남지 않는다. 전체 카페 데이터 접근 권한이라 localStorage보다 보수적으로.
 const TOKEN_KEY = 'cf_admin_token';
 const STATUS_LABEL = { active: '사용 중', today: '오늘 사용', dormant: '휴면', never: '미사용' };
-const STATUS_COLOR = { active: '#4ade80', today: '#facc15', dormant: '#f87171', never: '#6b7280' };
+const STATUS_COLOR = { active: '#16a34a', today: '#d97706', dormant: '#dc2626', never: '#9ca3af' };
 
 let cafes = [];
 let filter = 'all';
@@ -116,7 +116,7 @@ function renderSummary() {
   $('#summary').innerHTML = `
     <span>카페 <b>${cafes.length}</b></span>
     <span>사용 중 <b>${live}</b></span>
-    <span>오늘 도달 <b>${reach}</b></span>
+    <span>오늘 방문자 <b>${reach}</b></span>
     <span>미사용 <b>${never}</b></span>`;
 }
 
@@ -127,7 +127,7 @@ function renderList() {
     <tr class="${c.is_suspended ? 'susp' : ''}">
       <td><span class="dot s-${c.status}"></span>${STATUS_LABEL[c.status]}</td>
       <td>
-        <div class="name">${esc(c.name)}${c.is_suspended ? '<span class="badge">정지</span>' : ''}</div>
+        <button class="name name-link" data-stats="${c.id}">${esc(c.name)}</button>${c.is_suspended ? '<span class="badge">정지</span>' : ''}
         <div class="sub">/${esc(c.slug)} · ${esc(c.owner_email || '—')}</div>
       </td>
       <td class="sub">${esc([c.region, c.district, c.dong].filter(Boolean).join(' ') || '미등록')}</td>
@@ -151,7 +151,7 @@ function esc(s) {
 function renderMap() {
   if (!map) {
     map = L.map('map').setView([36.5, 127.8], 7); // 남한 전체
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19,
     }).addTo(map);
     markers = L.layerGroup().addTo(map);
@@ -164,7 +164,7 @@ function renderMap() {
       fillOpacity: c.is_suspended ? 0.15 : 0.7, weight: 2,
     }).bindPopup(`
       <b>${esc(c.name)}</b><br>${STATUS_LABEL[c.status]}${c.is_suspended ? ' · 정지됨' : ''}<br>
-      오늘 도달 ${c.today_unique_visitors} · 신청 ${c.today_requests}`).addTo(markers);
+      오늘 방문자 ${c.today_unique_visitors} · 신청 ${c.today_requests}`).addTo(markers);
   });
   if (pts.length) {
     map.fitBounds(L.latLngBounds(pts.map((c) => [+c.latitude, +c.longitude])).pad(0.2));
@@ -176,7 +176,81 @@ function render() {
   renderSummary();
   $('#listView').classList.toggle('hidden', view !== 'list');
   $('#mapView').classList.toggle('hidden', view !== 'map');
-  if (view === 'list') renderList(); else renderMap();
+  $('#statsView').classList.toggle('hidden', view !== 'stats');
+  if (view === 'list') renderList();
+  if (view === 'map') renderMap();
+}
+
+function metric(label, value, sub = '') {
+  return `<div class="metric"><b>${value}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+}
+
+function renderPattern(items, labelKey, formatLabel) {
+  const visibleItems = items.filter((item) => item.count > 0);
+  if (!visibleItems.length) return '<div class="stats-empty">아직 집계된 신청이 없습니다</div>';
+  const max = Math.max(...visibleItems.map((item) => item.count), 1);
+  return `<div class="pattern-list">${visibleItems.map((item) => `
+    <div class="pattern-row">
+      <span>${formatLabel(item[labelKey])}</span>
+      <div class="pattern-track"><i style="width:${Math.max(4, Math.round((item.count / max) * 100))}%"></i></div>
+      <b>${item.count}</b>
+    </div>`).join('')}</div>`;
+}
+
+function renderCafeStats(data) {
+  const { today, totals, hourly, weekday, musicFilter } = data;
+  const pct = (value) => `${Math.round((value || 0) * 1000) / 10}%`;
+  const topSongs = totals.topSongs.length
+    ? `<ol class="top-songs">${totals.topSongs.map((song) => `
+        <li><div><b>${esc(song.title)}</b><span>${esc(song.channel_title || '—')}</span></div><strong>${song.count}회</strong></li>`).join('')}</ol>`
+    : '<div class="stats-empty">아직 재생된 곡이 없습니다</div>';
+  const rejections = musicFilter.recentRejections.length
+    ? `<div class="rejection-list">${musicFilter.recentRejections.map((item) => `
+        <div><b>${esc(item.title)}</b><span>${esc(item.filterReason || '거절 사유 없음')}</span></div>`).join('')}</div>`
+    : '<div class="stats-empty">최근 거절된 곡이 없습니다</div>';
+
+  $('#statsTitle').textContent = `${data.cafe.name} 통계`;
+  $('#statsContent').innerHTML = `
+    <section class="stats-section">
+      <h3>오늘</h3>
+      <div class="metric-grid">
+        ${metric('신청', today.total)}
+        ${metric('재생', today.played)}
+        ${metric('스킵', today.skipped)}
+        ${metric('누적 신청', totals.total)}
+      </div>
+    </section>
+    <div class="stats-columns">
+      <section class="stats-section"><h3>시간대별 신청 <small>최근 30일</small></h3>${renderPattern(hourly, 'hour', (hour) => `${hour}시`)}</section>
+      <section class="stats-section"><h3>요일별 신청 <small>최근 30일</small></h3>${renderPattern(weekday, 'day', (day) => `${day}요일`)}</section>
+    </div>
+    <section class="stats-section">
+      <h3>AI 필터 <small>최근 7일</small></h3>
+      <div class="metric-grid">
+        ${metric('처리', musicFilter.processed, `미적용 ${musicFilter.skipped}건`)}
+        ${metric('통과', musicFilter.accepted, pct(musicFilter.acceptRate))}
+        ${metric('거절', musicFilter.rejected, pct(musicFilter.rejectRate))}
+        ${metric('오류 거절', musicFilter.errorRejected, pct(musicFilter.errorRate))}
+      </div>
+      <h4>최근 거절 사유</h4>
+      ${rejections}
+    </section>
+    <section class="stats-section"><h3>인기곡 TOP 10 <small>누적 재생 기준</small></h3>${topSongs}</section>`;
+}
+
+async function openCafeStats(cafeId) {
+  statsCafeId = cafeId;
+  view = 'stats';
+  $('#statsTitle').textContent = '카페 통계';
+  $('#statsContent').innerHTML = '<div class="stats-empty">불러오는 중...</div>';
+  document.querySelectorAll('.chip[data-view]').forEach((button) => button.classList.remove('on'));
+  render();
+  try {
+    const data = await api('GET', `/cafes/${cafeId}/stats`);
+    if (statsCafeId === cafeId) renderCafeStats(data);
+  } catch (error) {
+    if (statsCafeId === cafeId) $('#statsContent').innerHTML = `<div class="stats-empty error-text">${esc(error.message)}</div>`;
+  }
 }
 
 async function load() {
@@ -208,10 +282,13 @@ $('#refresh').addEventListener('click', () => load().catch((e) => alert(e.messag
 
 // 행 액션 — 삭제는 CASCADE로 통계까지 사라지므로 카페명 입력으로 한 번 더 확인
 $('#rows').addEventListener('click', async (e) => {
+  const stats = e.target.closest('[data-stats]');
   const s = e.target.closest('[data-suspend]');
   const d = e.target.closest('[data-del]');
   try {
-    if (s) {
+    if (stats) {
+      await openCafeStats(stats.dataset.stats);
+    } else if (s) {
       await api('PUT', `/cafes/${s.dataset.suspend}/suspend`, { is_suspended: s.dataset.val === 'true' });
       await load();
     } else if (d) {
@@ -222,6 +299,13 @@ $('#rows').addEventListener('click', async (e) => {
       await load();
     }
   } catch (err) { alert(err.message); }
+});
+
+$('#statsBack').addEventListener('click', () => {
+  statsCafeId = null;
+  view = 'list';
+  document.querySelectorAll('.chip[data-view]').forEach((button) => button.classList.toggle('on', button.dataset.view === 'list'));
+  render();
 });
 
 $('#loginBtn').addEventListener('click', login);

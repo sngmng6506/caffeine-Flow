@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { createRec, updateRec, updatePlatforms } from '../api';
 import { VALID_PLATFORMS } from '../constants/platforms';
 import { REC_STATUS } from '../constants/recommendationStatus';
-import StatsPanel from './StatsPanel';
 import SettingsTab from './dashboard/SettingsTab';
 import QRTab from './dashboard/QRTab';
 import ContactTab from './dashboard/ContactTab';
@@ -250,7 +249,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
         onDelete={handleDelete}
       />
 
-      {tab === 'stats' && <StatsPanel />}
       {tab === 'qr' && (
         <QRTab
           url={customerUrl}
