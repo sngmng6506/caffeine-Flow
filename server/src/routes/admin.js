@@ -53,7 +53,7 @@ function cafeStatus(lastHeartbeatAt, now, todayStartMs) {
 }
 
 // POST /api/v1/admin/login  { password } → { token }
-router.post('/login', loginLimiter, (req, res) => {
+router.post('/login', (req, res) => {
   if (!ADMIN_PASSWORD) {
     return res.status(503).json({ error: 'ADMIN_PASSWORD 미설정 — 어드민 콘솔 비활성' });
   }
