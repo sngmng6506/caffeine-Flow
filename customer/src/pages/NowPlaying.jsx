@@ -1,6 +1,33 @@
-import { AudioLines, LoaderCircle, Pause } from 'lucide-react';
+import { LoaderCircle, Pause } from 'lucide-react';
 import SongThumbnail from '../components/SongThumbnail';
 import { PLAYBACK_STATE } from '../constants/playbackState';
+
+const WAVE_BAR_HEIGHTS = [8, 18, 12, 24, 15, 21, 10];
+
+function PlaybackWaveMark() {
+  return (
+    <svg className='now-playing__wave-mark' viewBox='0 0 52 28' aria-hidden='true'>
+      <defs>
+        <linearGradient id='now-playing-wave-gradient' x1='0' y1='0' x2='0' y2='1'>
+          <stop offset='0' stopColor='var(--cf-brand)' />
+          <stop offset='1' stopColor='var(--cf-accent-lilac)' />
+        </linearGradient>
+      </defs>
+      {WAVE_BAR_HEIGHTS.map((height, index) => (
+        <rect
+          key={index}
+          x={2 + index * 7}
+          y={(28 - height) / 2}
+          width='4'
+          height={height}
+          rx='2'
+          fill='url(#now-playing-wave-gradient)'
+          style={{ '--wave-index': index }}
+        />
+      ))}
+    </svg>
+  );
+}
 
 export default function NowPlaying({ rec, playbackState = PLAYBACK_STATE.UNKNOWN }) {
   if (!rec) return null;
@@ -8,14 +35,14 @@ export default function NowPlaying({ rec, playbackState = PLAYBACK_STATE.UNKNOWN
   const isPaused = playbackState === PLAYBACK_STATE.PAUSED;
   const isBuffering = playbackState === PLAYBACK_STATE.BUFFERING;
   const label = isPaused ? '일시정지 중' : isBuffering ? '불러오는 중' : '재생 중';
-  const StatusIcon = isPaused ? Pause : isBuffering ? LoaderCircle : AudioLines;
+  const showsWave = !isPaused && !isBuffering;
+  const StatusIcon = isPaused ? Pause : LoaderCircle;
 
   return (
     <section className='now-playing' aria-label={`현재 ${label}인 곡`}>
       <div className={`now-playing__status now-playing__status--${playbackState}`}>
-        <StatusIcon size={16} aria-hidden='true' />
+        {showsWave ? <PlaybackWaveMark /> : <StatusIcon size={16} aria-hidden='true' />}
         <span>{label}</span>
-        {!isPaused && !isBuffering && <span className='now-playing__pulse' aria-hidden='true' />}
       </div>
       <div className='now-playing__content'>
         <SongThumbnail

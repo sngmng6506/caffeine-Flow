@@ -173,14 +173,20 @@
   font-weight: 700;
 }
 
-.now-playing__pulse {
-  width: 7px;
-  height: 7px;
-  margin-left: 1px;
-  background: var(--cf-on-dark-accent);
-  border-radius: 50%;
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-on-dark-accent) 35%, transparent);
-  animation: cf-pulse 1.8s infinite;
+.now-playing__wave-mark {
+  width: 48px;
+  height: 26px;
+  padding: 3px;
+  flex: 0 0 auto;
+  overflow: visible;
+  background: var(--cf-canvas);
+}
+
+.now-playing__wave-mark rect {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cf-wave-mark .9s ease-in-out infinite alternate;
+  animation-delay: calc(var(--wave-index) * -90ms);
 }
 
 .now-playing__content {
@@ -1291,9 +1297,9 @@
   to { transform: rotate(360deg); }
 }
 
-@keyframes cf-pulse {
-  70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--cf-brand) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--cf-brand) 0%, transparent); }
+@keyframes cf-wave-mark {
+  from { opacity: .55; transform: scaleY(.42); }
+  to { opacity: 1; transform: scaleY(1); }
 }
 
 @keyframes cf-tab-forward {
