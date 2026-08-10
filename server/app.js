@@ -126,7 +126,7 @@ app.get('/owner', (_req, res) => res.redirect('/owner/'));
 
 // 운영자 콘솔 정적 자산. admin index의 inline script/style을 없애 CSP에서
 // script-src 'unsafe-inline'을 열지 않도록 별도 경로로 제공한다.
-const adminUiPath = path.join(__dirname, 'admin-ui');
+const adminUiPath = path.join(__dirname, '../admin');
 app.use('/admin-assets', express.static(adminUiPath, { index: false }));
 
 // 운영자 콘솔 — 반드시 아래 손님 SPA catch-all(app.get('*'))보다 먼저 등록해야

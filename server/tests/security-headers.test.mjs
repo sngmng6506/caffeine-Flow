@@ -32,8 +32,8 @@ test('CSP는 필요한 외부 리소스만 허용하고 inline script를 허용�
 });
 
 test('운영자 콘솔은 inline script 없이 Leaflet CDN 자산을 SRI로 고정한다', () => {
-  const html = readFileSync(new URL('../admin-ui/index.html', import.meta.url), 'utf8');
-  const adminJs = readFileSync(new URL('../admin-ui/admin.js', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../../admin/index.html', import.meta.url), 'utf8');
+  const adminJs = readFileSync(new URL('../../admin/admin.js', import.meta.url), 'utf8');
 
   assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.match(html, /href="\/admin-assets\/admin\.css"/);

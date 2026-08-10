@@ -172,6 +172,7 @@ customer build
 ```text
 customer → server/public
 owner    → server/public/owner
+admin    → 서버가 루트 admin 디렉터리를 /admin에서 직접 제공
 ```
 
 customer를 먼저 빌드한 뒤 owner를 빌드한다. customer 빌드가 `server/public`을 비우므로 순서를 바꾸지 않는다.
