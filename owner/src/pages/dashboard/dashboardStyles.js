@@ -33,7 +33,12 @@ export const dashboardStyles = {
   sectionTitle:      { fontSize: 13, fontWeight: 700, color: '#555', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 },
   emptySlot:         { fontSize: 13, color: '#ccc', padding: '12px 0', borderTop: '1px dashed #eee' },
   moreBtn:           { display: 'block', width: '100%', padding: '10px', marginTop: 8, borderRadius: 8, border: '1px solid #eee', background: '#f8f8f8', color: '#888', cursor: 'pointer', fontSize: 13 },
-  historyFilter:     { display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0' },
+  historyFilter:     { display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0', flexWrap: 'wrap' },
+  historyQuickFilters:{ display: 'flex', alignItems: 'center', gap: 4 },
+  historyQuickBtn:   { fontSize: 12, padding: '6px 12px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#777', cursor: 'pointer' },
+  historyQuickBtnActive:{ background: '#1a1a2e', borderColor: '#1a1a2e', color: '#fff', fontWeight: 700 },
   dateInput:         { padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' },
   dateClearBtn:      { fontSize: 12, padding: '5px 12px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', color: '#888' },
+  historyError:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '12px 0', padding: '10px 12px', borderRadius: 8, border: '1px solid #f3c7c2', background: '#fff1f0', color: '#b42318', fontSize: 12 },
+  historyRetryBtn:   { flexShrink: 0, padding: '5px 10px', borderRadius: 7, border: '1px solid #e4a8a1', background: '#fff', color: '#b42318', cursor: 'pointer', fontSize: 12, fontWeight: 600 },
 };

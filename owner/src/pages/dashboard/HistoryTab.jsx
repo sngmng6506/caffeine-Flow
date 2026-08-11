@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getHistory } from '../../api';
 import RecommendCard from '../RecommendCard';
 import OwnerCommentSection from './OwnerCommentSection';
@@ -12,18 +12,29 @@ export default function HistoryTab({ active, slug, onUpdate, onDelete }) {
   const [history, setHistory] = useState([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [date, setDate] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const requestIdRef = useRef(0);
 
   function loadHistory(offset = 0, targetDate = date) {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
-    getHistory(offset, targetDate || null)
+    setError('');
+    return getHistory(offset, targetDate || null)
       .then(({ items, hasMore: nextHasMore }) => {
+        if (requestId !== requestIdRef.current) return;
         setHistory(previous => offset === 0 ? items : [...previous, ...items]);
         setHasMore(nextHasMore);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(fetchError => {
+        if (requestId !== requestIdRef.current) return;
+        console.error(fetchError);
+        setError(fetchError.message || '이력을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (requestId === requestIdRef.current) setLoading(false);
+      });
   }
 
   useEffect(() => {
@@ -33,29 +44,54 @@ export default function HistoryTab({ active, slug, onUpdate, onDelete }) {
   function handleDateChange(nextDate) {
     setDate(nextDate);
     setHistory([]);
+    setHasMore(false);
+    setError('');
     setExpandedId(null);
     loadHistory(0, nextDate || null);
   }
 
   if (!active) return null;
 
+  const today = todayKstString();
+
   return (
     <div>
       <div style={styles.historyFilter}>
+        <div style={styles.historyQuickFilters}>
+          <button
+            onClick={() => handleDateChange('')}
+            aria-pressed={!date}
+            style={{ ...styles.historyQuickBtn, ...(!date ? styles.historyQuickBtnActive : {}) }}
+          >전체</button>
+          <button
+            onClick={() => handleDateChange(today)}
+            aria-pressed={date === today}
+            style={{ ...styles.historyQuickBtn, ...(date === today ? styles.historyQuickBtnActive : {}) }}
+          >오늘</button>
+        </div>
         <input
           type="date"
           value={date}
-          max={todayKstString()}
+          max={today}
+          aria-label="이력 날짜 선택"
           onChange={event => handleDateChange(event.target.value)}
           style={styles.dateInput}
         />
-        {date && (
-          <button onClick={() => handleDateChange('')} style={styles.dateClearBtn}>전체 보기</button>
-        )}
       </div>
 
       {loading && history.length === 0 && <div style={styles.empty}>불러오는 중...</div>}
-      {!loading && history.length === 0 && <div style={styles.empty}>이력이 없습니다.</div>}
+      {!loading && !error && history.length === 0 && <div style={styles.empty}>이력이 없습니다.</div>}
+
+      {error && (
+        <div role="alert" style={styles.historyError}>
+          <span>{error}</span>
+          <button
+            onClick={() => loadHistory(history.length > 0 ? history.length : 0, date)}
+            disabled={loading}
+            style={styles.historyRetryBtn}
+          >다시 불러오기</button>
+        </div>
+      )}
 
       {history.map(rec => (
         <div key={rec.id}>
@@ -75,7 +111,7 @@ export default function HistoryTab({ active, slug, onUpdate, onDelete }) {
         </div>
       ))}
 
-      {hasMore && (
+      {hasMore && !error && (
         <button onClick={() => loadHistory(history.length)} disabled={loading} style={styles.moreBtn}>
           {loading ? '불러오는 중...' : '더 보기'}
         </button>
