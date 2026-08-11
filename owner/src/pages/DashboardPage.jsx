@@ -255,6 +255,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           cafe={cafe}
           onCafePatch={handleCafePatch}
           onLogout={onLogout}
+          defaultVideo={defaultVideo}
+          aiAutoAccept={aiAutoAccept}
+          onOpenQueue={() => setTab('queue')}
           onSlugChanged={handleSlugChanged}
           onSave={async platforms => {
             setPlatformSaving(true);
