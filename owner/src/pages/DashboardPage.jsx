@@ -3,9 +3,6 @@ import { createRec, updateRec, updatePlatforms } from '../api';
 import { VALID_PLATFORMS } from '../constants/platforms';
 import { REC_STATUS } from '../constants/recommendationStatus';
 import SettingsTab from './dashboard/SettingsTab';
-import QRTab from './dashboard/QRTab';
-import ContactTab from './dashboard/ContactTab';
-import ShortcutsTab from './dashboard/ShortcutsTab';
 import DashboardHeader from './dashboard/DashboardHeader';
 import DashboardTabs from './dashboard/DashboardTabs';
 import QueueTab from './dashboard/QueueTab';
@@ -249,19 +246,16 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
         onDelete={handleDelete}
       />
 
-      {tab === 'qr' && (
-        <QRTab
-          url={customerUrl}
-          cafeName={cafe.name}
-          currentSlug={cafe.slug}
-          initialSlug={cafe.initial_slug}
-          onSlugChanged={handleSlugChanged}
-        />
-      )}
       {tab === 'settings' && (
         <SettingsTab
           allowedPlatforms={allowedPlatforms}
           saving={platformSaving}
+          customerUrl={customerUrl}
+          cafeName={cafe.name}
+          currentSlug={cafe.slug}
+          initialSlug={cafe.initial_slug}
+          provider={cafe.provider}
+          onSlugChanged={handleSlugChanged}
           onSave={async platforms => {
             setPlatformSaving(true);
             try {
@@ -275,8 +269,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           }}
         />
       )}
-      {tab === 'contact' && <ContactTab provider={cafe.provider} />}
-      {tab === 'shortcuts' && <ShortcutsTab />}
     </div>
   );
 }
