@@ -4,10 +4,7 @@ import { dashboardStyles as styles } from './dashboardStyles';
 const TABS = [
   ['queue', '신청 목록'],
   ['history', '이력'],
-  ['qr', 'QR 코드'],
   ['settings', '설정'],
-  ['contact', '문의'],
-  ['shortcuts', '바로가기'],
 ];
 
 export default function DashboardTabs({ activeTab, recommendations, onChange }) {

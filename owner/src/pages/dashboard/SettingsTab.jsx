@@ -1,8 +1,33 @@
 import { useState, useEffect } from 'react';
 import MusicFilterSettings from './MusicFilterSettings';
+import QRTab from './QRTab';
+import ContactTab from './ContactTab';
+import ShortcutsTab from './ShortcutsTab';
 import { PLATFORM_OPTIONS } from '../../constants/platforms';
 
-export default function SettingsTab({ allowedPlatforms, saving, onSave }) {
+function CollapsibleSetting({ title, description, children }) {
+  return (
+    <details style={settingsStyles.details}>
+      <summary style={settingsStyles.summary}>
+        <span style={settingsStyles.summaryTitle}>{title}</span>
+        <span style={settingsStyles.summaryDesc}>{description}</span>
+      </summary>
+      <div style={settingsStyles.detailsContent}>{children}</div>
+    </details>
+  );
+}
+
+export default function SettingsTab({
+  allowedPlatforms,
+  saving,
+  customerUrl,
+  cafeName,
+  currentSlug,
+  initialSlug,
+  provider,
+  onSlugChanged,
+  onSave,
+}) {
   const [selected, setSelected] = useState(allowedPlatforms);
 
   useEffect(() => { setSelected(allowedPlatforms); }, [allowedPlatforms]);
@@ -55,14 +80,42 @@ export default function SettingsTab({ allowedPlatforms, saving, onSave }) {
 
       <MusicFilterSettings />
 
-      <div style={settingsStyles.section}>
-        <div style={settingsStyles.title}>디버그</div>
-        <div style={settingsStyles.desc}>오른쪽 브라우저(BGM 플레이어)의 개발자 도구를 엽니다.</div>
+      <CollapsibleSetting
+        title="QR 코드"
+        description="손님 접속용 QR 코드를 확인하거나 변경합니다."
+      >
+        <QRTab
+          url={customerUrl}
+          cafeName={cafeName}
+          currentSlug={currentSlug}
+          initialSlug={initialSlug}
+          onSlugChanged={onSlugChanged}
+        />
+      </CollapsibleSetting>
+
+      <CollapsibleSetting
+        title="음악 서비스 바로가기"
+        description="플랫폼 로그인과 BGM 페이지를 엽니다."
+      >
+        <ShortcutsTab />
+      </CollapsibleSetting>
+
+      <CollapsibleSetting
+        title="문의"
+        description="서비스 이용 중 불편한 점을 문의합니다."
+      >
+        <ContactTab provider={provider} />
+      </CollapsibleSetting>
+
+      <CollapsibleSetting
+        title="개발자 도구"
+        description="문제 진단이 필요할 때만 사용합니다."
+      >
         <button
           onClick={() => window.electronAPI?.openBgmDevTools()}
           style={settingsStyles.saveBtn}
         >BGM DevTools 열기</button>
-      </div>
+      </CollapsibleSetting>
     </div>
   );
 }
@@ -76,4 +129,9 @@ const settingsStyles = {
   platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
   hint:        { fontSize: 12, color: '#ff9800', marginTop: 8 },
   saveBtn:     { marginTop: 16, padding: '10px 28px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
+  details:     { background: '#f8f8f8', borderRadius: 12, border: '1px solid #eee', overflow: 'hidden' },
+  summary:     { display: 'flex', flexDirection: 'column', gap: 4, padding: 20, cursor: 'pointer', listStylePosition: 'inside' },
+  summaryTitle:{ fontSize: 15, fontWeight: 700, color: '#222' },
+  summaryDesc: { fontSize: 13, color: '#888', lineHeight: 1.4 },
+  detailsContent: { borderTop: '1px solid #eee', padding: '4px 20px 20px' },
 };
