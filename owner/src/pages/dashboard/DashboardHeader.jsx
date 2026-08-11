@@ -13,13 +13,15 @@ export default function DashboardHeader({
       <div style={styles.headerRight}>
         <button
           onClick={onToggleAccepting}
-          style={{ ...styles.toggleBtn, background: isAccepting ? '#4caf50' : '#888' }}
+          aria-pressed={isAccepting}
+          style={{ ...styles.toggleBtn, ...(isAccepting ? styles.acceptingOn : styles.toggleOff) }}
         >
           {isAccepting ? '신청 받는 중' : '신청 닫힘'}
         </button>
         <button
           onClick={onToggleAiAutoAccept}
-          style={{ ...styles.toggleBtn, background: aiAutoAccept ? '#ff9800' : '#9e9e9e', fontSize: 12 }}
+          aria-pressed={aiAutoAccept}
+          style={{ ...styles.toggleBtn, ...(aiAutoAccept ? styles.aiOn : styles.toggleOff) }}
         >
           AI 자동 재생 {aiAutoAccept ? 'ON' : 'OFF'}
         </button>

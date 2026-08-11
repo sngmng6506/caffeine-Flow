@@ -138,12 +138,12 @@ export default function CafeProfileSettings({ cafe, onCafePatch }) {
 }
 
 const profileStyles = {
-  section: { background: '#f8f8f8', borderRadius: 12, padding: 20 },
-  title: { fontSize: 15, fontWeight: 700, marginBottom: 4 },
-  desc: { fontSize: 13, color: '#888', marginBottom: 16 },
-  field: { padding: '14px 0', borderTop: '1px solid #e8e8e8' },
-  label: { fontSize: 12, fontWeight: 700, color: '#666', marginBottom: 8 },
-  valueRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  value: { flex: 1, minWidth: 0, fontSize: 13, color: '#333', lineHeight: 1.5, wordBreak: 'break-word' },
-  emptyValue: { flex: 1, fontSize: 13, color: '#aaa' },
+  section: { padding: '4px 0' },
+  title: { fontSize: 14, fontWeight: 700, color: '#344054', marginBottom: 4 },
+  desc: { fontSize: 12, color: '#667085', marginBottom: 14 },
+  field: { padding: '14px 0', borderTop: '1px solid #e4e7ec' },
+  label: { fontSize: 12, fontWeight: 700, color: '#667085', marginBottom: 8 },
+  valueRow: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  value: { flex: '1 1 160px', minWidth: 0, fontSize: 13, color: '#344054', lineHeight: 1.5, wordBreak: 'break-word' },
+  emptyValue: { flex: '1 1 160px', fontSize: 13, color: '#98a2b3' },
 };

@@ -89,14 +89,15 @@ export default function SettingsTab({
                 <button
                   key={p.id}
                   onClick={() => toggle(p.id)}
+                  aria-pressed={active}
                   style={{
                     ...settingsStyles.platformBtn,
                     ...(active
-                      ? { background: p.color, color: '#fff', borderColor: p.color }
-                      : { background: '#f0f0f0', color: '#aaa', borderColor: '#ddd' }),
+                      ? settingsStyles.platformBtnActive
+                      : settingsStyles.platformBtnInactive),
                   }}
                 >
-                  {p.label}
+                  {active ? '✓ ' : ''}{p.label}
                 </button>
               );
             })}
@@ -167,21 +168,23 @@ export default function SettingsTab({
 }
 
 const settingsStyles = {
-  wrap:        { paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 16 },
+  wrap:        { paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 12 },
   innerSection:{ paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid #eee' },
-  title:       { fontSize: 15, fontWeight: 700, marginBottom: 4 },
-  desc:        { fontSize: 13, color: '#888', marginBottom: 16 },
-  platforms:   { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
-  hint:        { fontSize: 12, color: '#ff9800', marginTop: 8 },
-  saveBtn:     { marginTop: 16, padding: '10px 28px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
-  logoutBtn:   { padding: '9px 16px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
-  details:     { background: '#f8f8f8', borderRadius: 12, border: '1px solid #eee', overflow: 'hidden' },
-  summary:     { display: 'flex', flexDirection: 'column', gap: 4, padding: 20, cursor: 'pointer', listStylePosition: 'inside' },
-  summaryTitle:{ fontSize: 15, fontWeight: 700, color: '#222' },
-  summaryDesc: { fontSize: 13, color: '#888', lineHeight: 1.4 },
-  detailsContent: { borderTop: '1px solid #eee', padding: '4px 20px 20px' },
-  divider:     { height: 1, background: '#eee', margin: '20px 0 4px' },
-  accountActions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingTop: 16, borderTop: '1px solid #eee' },
-  accountHint: { fontSize: 12, color: '#888', lineHeight: 1.4 },
+  title:       { fontSize: 14, fontWeight: 700, color: '#344054', marginBottom: 4 },
+  desc:        { fontSize: 12, color: '#667085', marginBottom: 14 },
+  platforms:   { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  platformBtn: { minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  platformBtnActive: { background: '#1f2937', color: '#fff', borderColor: '#1f2937' },
+  platformBtnInactive: { background: '#fff', color: '#667085', borderColor: '#d0d5dd' },
+  hint:        { fontSize: 12, color: '#8a5d00', marginTop: 8 },
+  saveBtn:     { minHeight: 40, marginTop: 16, padding: '9px 20px', borderRadius: 8, background: '#1f2937', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
+  logoutBtn:   { minHeight: 40, padding: '9px 16px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
+  details:     { background: '#fff', borderRadius: 10, border: '1px solid #e4e7ec', overflow: 'hidden' },
+  summary:     { display: 'flex', flexDirection: 'column', gap: 4, padding: 16, cursor: 'pointer', listStylePosition: 'inside' },
+  summaryTitle:{ fontSize: 15, fontWeight: 700, color: '#1f2937' },
+  summaryDesc: { fontSize: 12, color: '#667085', lineHeight: 1.45 },
+  detailsContent: { borderTop: '1px solid #e4e7ec', padding: '16px' },
+  divider:     { height: 1, background: '#e4e7ec', margin: '20px 0 4px' },
+  accountActions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 16, borderTop: '1px solid #e4e7ec' },
+  accountHint: { fontSize: 12, color: '#667085', lineHeight: 1.45 },
 };

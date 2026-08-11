@@ -1,8 +1,10 @@
+import { useState } from 'react';
+import SettingsStatus from './SettingsStatus';
+
 const SHORTCUT_GROUPS = [
   {
     platform: 'YouTube',
     color: '#ff0000',
-    bg: '#fff5f5',
     note: 'YouTube는 계정 불필요 · Music은 로그인 권장',
     links: [
       { label: 'YouTube Music', url: 'https://music.youtube.com', action: 'bgm' },
@@ -18,7 +20,6 @@ const SHORTCUT_GROUPS = [
   {
     platform: 'Spotify',
     color: '#1db954',
-    bg: '#f0fff5',
     note: '계정 필요 (Premium 권장)',
     links: [
       { label: 'Spotify',         url: 'https://open.spotify.com',                       action: 'bgm' },
@@ -30,7 +31,6 @@ const SHORTCUT_GROUPS = [
   {
     platform: 'SoundCloud',
     color: '#ff5500',
-    bg: '#fff8f5',
     note: '계정 불필요',
     links: [
       { label: 'SoundCloud', url: 'https://soundcloud.com', action: 'bgm' },
@@ -62,15 +62,16 @@ export default function ShortcutsTab() {
   }
 
   return (
-    <div style={{ paddingTop: 8 }}>
+    <div style={styles.wrap}>
       <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
-      {SHORTCUT_GROUPS.map(({ platform, color, bg, note, links }) => (
-        <div key={platform} style={{ marginBottom: 14, borderRadius: 10, background: bg, padding: '12px 14px', border: `1px solid ${color}33` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10, letterSpacing: 0.3 }}>
-            {platform}
-            {note && <span style={{ marginLeft: 8, fontWeight: 400, color: '#888', fontSize: 11 }}>· {note}</span>}
+      {SHORTCUT_GROUPS.map(({ platform, color, note, links }) => (
+        <div key={platform} style={styles.group}>
+          <div style={styles.groupHeader}>
+            <span aria-hidden="true" style={{ ...styles.platformDot, background: color }} />
+            <span style={styles.platformName}>{platform}</span>
+            {note && <span style={styles.note}>· {note}</span>}
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={styles.links}>
             {links.map((link) => {
               const isReset = link.action === 'clear-spotify-login';
               return (
@@ -78,15 +79,7 @@ export default function ShortcutsTab() {
                   key={link.label}
                   onClick={() => runShortcutAction(link)}
                   title={isReset ? 'DataDome 봇 차단 마커가 쿠키에 박혔을 때 사용' : undefined}
-                  style={{
-                    padding: '6px 14px', borderRadius: 20,
-                    border: `1px ${isReset ? 'dashed' : 'solid'} ${color}`,
-                    background: '#fff', color,
-                    cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                    transition: 'opacity 0.15s',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
-                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                  style={{ ...styles.linkBtn, ...(isReset ? styles.resetBtn : {}) }}
                 >
                   {link.label}
                 </button>
@@ -95,11 +88,22 @@ export default function ShortcutsTab() {
           </div>
         </div>
       ))}
-      <div style={{ fontSize: 11, color: '#bbb', marginTop: 4 }}>
+      <div style={styles.help}>
         링크 버튼: 오른쪽 화면에서 페이지 열기 · 로그인 버튼: 별도 창 · 점선 테두리: 쿠키 초기화 후 로그인
       </div>
     </div>
   );
 }
-import { useState } from 'react';
-import SettingsStatus from './SettingsStatus';
+
+const styles = {
+  wrap: { paddingTop: 4 },
+  group: { marginBottom: 10, padding: '12px 14px', border: '1px solid #e4e7ec', borderRadius: 8, background: '#fff' },
+  groupHeader: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  platformDot: { width: 8, height: 8, flexShrink: 0, borderRadius: 999 },
+  platformName: { color: '#344054', fontSize: 12, fontWeight: 700 },
+  note: { color: '#667085', fontSize: 11 },
+  links: { display: 'flex', flexWrap: 'wrap', gap: 8 },
+  linkBtn: { minHeight: 36, padding: '7px 12px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontSize: 12, fontWeight: 600 },
+  resetBtn: { borderStyle: 'dashed' },
+  help: { marginTop: 4, color: '#98a2b3', fontSize: 11, lineHeight: 1.5 },
+};
