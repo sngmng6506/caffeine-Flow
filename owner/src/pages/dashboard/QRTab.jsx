@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { changeSlug } from '../../api';
+import SettingsStatus from './SettingsStatus';
 
 export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugChanged }) {
   const [showChange, setShowChange] = useState(false);
   const [customSlug, setCustomSlug] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState(null);
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=280x280&margin=10`;
 
   async function handleDownload() {
@@ -19,9 +20,11 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
       a.download = `caffeine-flow-${cafeName}-qr.jpg`;
       a.click();
       URL.revokeObjectURL(objectUrl);
+      setMessage({ tone: 'success', text: 'QR 이미지를 저장했습니다.' });
     } catch {
       // CORS/네트워크 실패 시 새 탭 fallback
       window.open(src, '_blank');
+      setMessage({ tone: 'info', text: 'QR 이미지를 새 창에서 열었습니다.' });
     }
   }
 
@@ -40,14 +43,15 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
   // onSlugChanged로 위임한다.
   async function handleReissue(slugValue) {
     setLoading(true);
-    setError('');
+    setMessage(null);
     try {
       const updated = await changeSlug(slugValue || null);
       onSlugChanged(updated);
       setShowChange(false);
       setCustomSlug('');
+      setMessage({ tone: 'success', text: '손님용 QR 연결을 변경했습니다.' });
     } catch (e) {
-      setError(e.message);
+      setMessage({ tone: 'error', text: e.message || 'QR 연결을 변경하지 못했습니다.' });
     } finally {
       setLoading(false);
     }
@@ -85,10 +89,10 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
 
       {/* 미리 제작한 아크릴 QR 등으로 교체하고 싶을 때 */}
       <div className="no-print" style={qrStyles.changeSection}>
-        {error && <div style={qrStyles.error}>{error}</div>}
+        <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
         {!showChange ? (
           <div style={qrStyles.changeLinks}>
-            <button onClick={() => setShowChange(true)} disabled={loading} style={qrStyles.changeLink}>
+            <button onClick={() => { setShowChange(true); setMessage(null); }} disabled={loading} style={qrStyles.changeLink}>
               다른 QR 코드로 변경
             </button>
             {initialSlug && initialSlug !== currentSlug && (
@@ -113,7 +117,7 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
               <button onClick={() => handleReissue(customSlug)} disabled={loading} style={qrStyles.btn}>
                 {loading ? '처리 중...' : customSlug ? '이 코드로 연결' : '무작위로 재발급'}
               </button>
-              <button onClick={() => { setShowChange(false); setError(''); }} style={qrStyles.cancelBtn}>취소</button>
+              <button onClick={() => { setShowChange(false); setMessage(null); }} style={qrStyles.cancelBtn}>취소</button>
             </div>
           </div>
         )}
@@ -147,7 +151,6 @@ const qrStyles = {
   changeBox:      { width: '100%', display: 'flex', flexDirection: 'column', gap: 10, background: '#fafafa', border: '1px solid #eee', borderRadius: 10, padding: 16 },
   changeHint:     { fontSize: 12, color: '#888', lineHeight: 1.6, margin: 0 },
   input:          { padding: '10px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14, boxSizing: 'border-box', width: '100%' },
-  error:          { fontSize: 12, color: '#e63946' },
   changeBtnRow:   { display: 'flex', gap: 8 },
   cancelBtn:      { padding: '10px 16px', borderRadius: 8, background: '#fff', color: '#888', border: '1px solid #ddd', cursor: 'pointer', fontSize: 14 },
 };

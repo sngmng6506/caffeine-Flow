@@ -38,25 +38,32 @@ const SHORTCUT_GROUPS = [
   },
 ];
 
-async function runShortcutAction(link) {
-  const { action, url } = link;
-  if (action === 'login') {
-    window.electronAPI?.openLoginWindow(url);
-    return;
-  }
-  if (action === 'clear-spotify-login') {
-    const n = await window.electronAPI?.clearSpotifySession();
-    alert(`Spotify 쿠키 ${n}개 삭제됨. 로그인 창을 엽니다.`);
-    window.electronAPI?.openLoginWindow(url);
-    return;
-  }
-  // default: navigate bgmView
-  window.electronAPI?.setBgmUrl(url);
-}
-
 export default function ShortcutsTab() {
+  const [message, setMessage] = useState(null);
+
+  async function runShortcutAction(link) {
+    const { action, url } = link;
+    setMessage(null);
+    try {
+      if (action === 'login') {
+        window.electronAPI?.openLoginWindow(url);
+        return;
+      }
+      if (action === 'clear-spotify-login') {
+        const count = await window.electronAPI?.clearSpotifySession();
+        setMessage({ tone: 'success', text: `Spotify 로그인 정보 ${count || 0}개를 정리하고 로그인 창을 열었습니다.` });
+        window.electronAPI?.openLoginWindow(url);
+        return;
+      }
+      window.electronAPI?.setBgmUrl(url);
+    } catch (error) {
+      setMessage({ tone: 'error', text: error.message || '음악 서비스 작업을 완료하지 못했습니다.' });
+    }
+  }
+
   return (
     <div style={{ paddingTop: 8 }}>
+      <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
       {SHORTCUT_GROUPS.map(({ platform, color, bg, note, links }) => (
         <div key={platform} style={{ marginBottom: 14, borderRadius: 10, background: bg, padding: '12px 14px', border: `1px solid ${color}33` }}>
           <div style={{ fontSize: 12, fontWeight: 700, color, marginBottom: 10, letterSpacing: 0.3 }}>
@@ -94,3 +101,5 @@ export default function ShortcutsTab() {
     </div>
   );
 }
+import { useState } from 'react';
+import SettingsStatus from './SettingsStatus';

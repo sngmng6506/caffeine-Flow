@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { updateMe, updateNotice } from '../../api';
 import { dashboardStyles as styles } from './dashboardStyles';
+import SettingsStatus from './SettingsStatus';
 
 export default function CafeProfileSettings({ cafe, onCafePatch }) {
   const [editingName, setEditingName] = useState(false);
@@ -9,6 +10,7 @@ export default function CafeProfileSettings({ cafe, onCafePatch }) {
   const [editingNotice, setEditingNotice] = useState(false);
   const [noticeInput, setNoticeInput] = useState('');
   const [noticeLoading, setNoticeLoading] = useState(false);
+  const [message, setMessage] = useState(null);
 
   async function handleNameSave() {
     const name = nameInput.trim();
@@ -18,12 +20,15 @@ export default function CafeProfileSettings({ cafe, onCafePatch }) {
     }
 
     setNameLoading(true);
+    setMessage(null);
     try {
       const updated = await updateMe(name);
       onCafePatch({ name: updated.name });
       setEditingName(false);
+      setMessage({ tone: 'success', text: '카페명을 저장했습니다.' });
     } catch (error) {
       console.error(error);
+      setMessage({ tone: 'error', text: error.message || '카페명을 저장하지 못했습니다. 다시 시도해주세요.' });
     } finally {
       setNameLoading(false);
     }
@@ -31,12 +36,15 @@ export default function CafeProfileSettings({ cafe, onCafePatch }) {
 
   async function saveNotice(value) {
     setNoticeLoading(true);
+    setMessage(null);
     try {
       const { notice } = await updateNotice(value.trim() || null);
       onCafePatch({ notice });
       setEditingNotice(false);
+      setMessage({ tone: 'success', text: notice ? '매장 공지를 저장했습니다.' : '매장 공지를 삭제했습니다.' });
     } catch (error) {
       console.error(error);
+      setMessage({ tone: 'error', text: error.message || '매장 공지를 저장하지 못했습니다. 다시 시도해주세요.' });
     } finally {
       setNoticeLoading(false);
     }
@@ -46,6 +54,7 @@ export default function CafeProfileSettings({ cafe, onCafePatch }) {
     <div style={profileStyles.section}>
       <div style={profileStyles.title}>매장 정보</div>
       <div style={profileStyles.desc}>손님 화면에 표시되는 카페명과 공지를 관리합니다.</div>
+      <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
 
       <div style={profileStyles.field}>
         <div style={profileStyles.label}>카페명</div>
@@ -72,6 +81,7 @@ export default function CafeProfileSettings({ cafe, onCafePatch }) {
             <span style={profileStyles.value}>{cafe.name}</span>
             <button
               onClick={() => {
+                setMessage(null);
                 setNameInput(cafe.name);
                 setEditingName(true);
               }}
@@ -109,6 +119,7 @@ export default function CafeProfileSettings({ cafe, onCafePatch }) {
             </span>
             <button
               onClick={() => {
+                setMessage(null);
                 setNoticeInput(cafe.notice || '');
                 setEditingNotice(true);
               }}
