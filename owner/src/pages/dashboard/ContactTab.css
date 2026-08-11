@@ -1,24 +1,17 @@
-/* ContactTab — 인라인 스타일 → CSS 전환 레퍼런스.
- *
- * 전환 규칙 (다른 컴포넌트에 동일 적용):
- *  1. 정적 스타일 객체 키 → `컴포넌트접두사-키` 클래스 (충돌 방지)
- *  2. 조건부·계산 값이 들어가는 스타일은 인라인으로 남긴다
- *     (인라인이 클래스보다 우선하므로 base 클래스 + 인라인 오버라이드는
- *      기존 {...base, ...dynamic} 스프레드와 동일하게 동작)
- *  3. px 숫자값은 그대로 px 단위로
- */
-.contact-wrap  { padding-top: 16px; }
-.contact-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
-.contact-box   { background: #f8f8f8; border-radius: 12px; padding: 24px; }
-.contact-desc  { font-size: 14px; color: #666; line-height: 1.8; margin-bottom: 20px; }
+.contact-wrap  { padding-top: 4px; }
+.contact-title { margin: 0 0 8px; color: #344054; font-size: 14px; font-weight: 700; }
+.contact-box   { padding: 14px; border: 1px solid #e4e7ec; border-radius: 8px; background: #f9fafb; }
+.contact-desc  { margin: 0 0 14px; color: #667085; font-size: 12px; line-height: 1.6; }
 .contact-btn   {
   display: block;
-  background: #1a1a2e;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #1f2937;
   color: #fff;
   text-align: center;
-  border-radius: 8px;
-  padding: 13px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   text-decoration: none;
 }

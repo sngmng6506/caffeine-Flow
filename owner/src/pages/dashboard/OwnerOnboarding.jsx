@@ -116,13 +116,13 @@ export default function OwnerOnboarding({
 }
 
 const styles = {
-  wrap: { padding: 16, borderRadius: 12, border: '1px solid #d9e3f0', background: '#f8fbff' },
-  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 },
+  wrap: { padding: 16, borderRadius: 10, border: '1px solid #e4e7ec', background: '#f9fafb' },
+  header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 },
   title: { fontSize: 15, fontWeight: 800, color: '#1f2937' },
   desc: { marginTop: 4, fontSize: 12, color: '#667085', lineHeight: 1.45 },
-  dismissBtn: { flexShrink: 0, padding: '5px 9px', borderRadius: 7, border: '1px solid #d0d5dd', background: '#fff', color: '#667085', cursor: 'pointer', fontSize: 11 },
+  dismissBtn: { flexShrink: 0, minHeight: 34, padding: '6px 10px', borderRadius: 7, border: '1px solid #d0d5dd', background: '#fff', color: '#667085', cursor: 'pointer', fontSize: 11 },
   steps: { display: 'flex', flexDirection: 'column' },
-  step: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderTop: '1px solid #e4ebf3' },
+  step: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, padding: '11px 0', borderTop: '1px solid #e4e7ec' },
   stepNumber: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, flexShrink: 0, borderRadius: 999, background: '#e9eef5', color: '#667085', fontSize: 11, fontWeight: 800 },
   stepNumberComplete: { background: '#dcf5e8', color: '#1f7a4d' },
   stepInfo: { flex: 1, minWidth: 0 },
@@ -131,6 +131,6 @@ const styles = {
   stepDesc: { marginTop: 3, color: '#667085', fontSize: 11, lineHeight: 1.4 },
   status: { padding: '2px 6px', borderRadius: 999, background: '#eef1f5', color: '#667085', fontSize: 10, fontWeight: 700 },
   statusComplete: { background: '#dcf5e8', color: '#1f7a4d' },
-  actionBtn: { flexShrink: 0, padding: '6px 9px', borderRadius: 7, border: '1px solid #cfd8e5', background: '#fff', color: '#344054', cursor: 'pointer', fontSize: 11, fontWeight: 600 },
-  reopenBtn: { alignSelf: 'flex-start', padding: '7px 11px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#667085', cursor: 'pointer', fontSize: 12 },
+  actionBtn: { flexShrink: 0, minHeight: 34, padding: '6px 10px', borderRadius: 7, border: '1px solid #d0d5dd', background: '#fff', color: '#344054', cursor: 'pointer', fontSize: 11, fontWeight: 600 },
+  reopenBtn: { alignSelf: 'flex-start', minHeight: 36, padding: '7px 11px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#667085', cursor: 'pointer', fontSize: 12 },
 };
