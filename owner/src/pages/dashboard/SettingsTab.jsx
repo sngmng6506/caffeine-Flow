@@ -4,6 +4,7 @@ import QRTab from './QRTab';
 import ContactTab from './ContactTab';
 import ShortcutsTab from './ShortcutsTab';
 import CafeProfileSettings from './CafeProfileSettings';
+import SettingsStatus from './SettingsStatus';
 import { PLATFORM_OPTIONS } from '../../constants/platforms';
 
 function CollapsibleSetting({ id, title, description, children }) {
@@ -33,10 +34,12 @@ export default function SettingsTab({
   onSave,
 }) {
   const [selected, setSelected] = useState(allowedPlatforms);
+  const [platformMessage, setPlatformMessage] = useState(null);
 
   useEffect(() => { setSelected(allowedPlatforms); }, [allowedPlatforms]);
 
   function toggle(id) {
+    setPlatformMessage(null);
     setSelected(prev => {
       if (prev.includes(id)) {
         if (prev.length <= 1) return prev; // 최소 1개
@@ -47,6 +50,16 @@ export default function SettingsTab({
   }
 
   const changed = JSON.stringify([...selected].sort()) !== JSON.stringify([...allowedPlatforms].sort());
+
+  async function handlePlatformSave() {
+    setPlatformMessage(null);
+    try {
+      await onSave(selected);
+      setPlatformMessage({ tone: 'success', text: '허용 플랫폼을 저장했습니다.' });
+    } catch (error) {
+      setPlatformMessage({ tone: 'error', text: error.message || '허용 플랫폼을 저장하지 못했습니다.' });
+    }
+  }
 
   return (
     <div style={settingsStyles.wrap}>
@@ -80,8 +93,9 @@ export default function SettingsTab({
           {selected.length === 1 && (
             <div style={settingsStyles.hint}>최소 1개 플랫폼은 활성화해야 합니다.</div>
           )}
+          <SettingsStatus tone={platformMessage?.tone}>{platformMessage?.text}</SettingsStatus>
           {changed && (
-            <button onClick={() => onSave(selected)} disabled={saving} style={settingsStyles.saveBtn}>
+            <button onClick={handlePlatformSave} disabled={saving} style={settingsStyles.saveBtn}>
               {saving ? '저장 중...' : '저장'}
             </button>
           )}

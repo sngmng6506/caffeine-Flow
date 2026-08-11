@@ -261,8 +261,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
             try {
               const { allowed_platforms } = await updatePlatforms(platforms);
               setAllowedPlatforms(allowed_platforms);
-            } catch (error) {
-              alert(error.message);
             } finally {
               setPlatformSaving(false);
             }

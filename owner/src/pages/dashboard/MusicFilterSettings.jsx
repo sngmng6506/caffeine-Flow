@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getMe, testMusicFilter, updateMusicFilter } from '../../api';
 import { DEFAULT_MUSIC_FILTER_PROMPT } from '../../constants/musicFilterPolicy';
+import SettingsStatus from './SettingsStatus';
 
 // ON/OFF는 대시보드의 'AI 자동수락' 버튼이 담당 — 이 화면은 프롬프트만 편집한다.
 function normalize(latest = {}) {
@@ -164,7 +165,7 @@ export default function MusicFilterSettings() {
         </div>
 
         <div style={styles.actions}>
-          {message && <span style={message.includes('저장했습니다') ? styles.okMsg : styles.errMsg}>{message}</span>}
+          <SettingsStatus tone={message.includes('저장했습니다') ? 'success' : 'error'}>{message}</SettingsStatus>
           <button onClick={() => setForm(initial)} disabled={!changed || saving} style={styles.cancelBtn}>되돌리기</button>
           <button onClick={handleSave} disabled={!canSave} style={{ ...styles.saveBtn, ...(!canSave ? styles.disabledBtn : {}) }}>
             {saving ? '저장 중...' : '저장'}
