@@ -3,6 +3,7 @@ import MusicFilterSettings from './MusicFilterSettings';
 import QRTab from './QRTab';
 import ContactTab from './ContactTab';
 import ShortcutsTab from './ShortcutsTab';
+import CafeProfileSettings from './CafeProfileSettings';
 import { PLATFORM_OPTIONS } from '../../constants/platforms';
 
 function CollapsibleSetting({ title, description, children }) {
@@ -25,6 +26,9 @@ export default function SettingsTab({
   currentSlug,
   initialSlug,
   provider,
+  cafe,
+  onCafePatch,
+  onLogout,
   onSlugChanged,
   onSave,
 }) {
@@ -78,6 +82,8 @@ export default function SettingsTab({
         )}
       </div>
 
+      <CafeProfileSettings cafe={cafe} onCafePatch={onCafePatch} />
+
       <MusicFilterSettings />
 
       <CollapsibleSetting
@@ -107,6 +113,12 @@ export default function SettingsTab({
         <ContactTab provider={provider} />
       </CollapsibleSetting>
 
+      <div style={settingsStyles.section}>
+        <div style={settingsStyles.title}>계정</div>
+        <div style={settingsStyles.desc}>이 기기의 사장님 계정에서 로그아웃합니다.</div>
+        <button onClick={onLogout} style={settingsStyles.logoutBtn}>로그아웃</button>
+      </div>
+
       <CollapsibleSetting
         title="개발자 도구"
         description="문제 진단이 필요할 때만 사용합니다."
@@ -129,6 +141,7 @@ const settingsStyles = {
   platformBtn: { padding: '10px 20px', borderRadius: 10, border: '2px solid', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' },
   hint:        { fontSize: 12, color: '#ff9800', marginTop: 8 },
   saveBtn:     { marginTop: 16, padding: '10px 28px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
+  logoutBtn:   { padding: '9px 16px', borderRadius: 8, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
   details:     { background: '#f8f8f8', borderRadius: 12, border: '1px solid #eee', overflow: 'hidden' },
   summary:     { display: 'flex', flexDirection: 'column', gap: 4, padding: 20, cursor: 'pointer', listStylePosition: 'inside' },
   summaryTitle:{ fontSize: 15, fontWeight: 700, color: '#222' },

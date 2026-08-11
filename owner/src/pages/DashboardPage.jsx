@@ -208,13 +208,10 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
 
       <DashboardHeader
         cafe={cafe}
-        customerUrl={customerUrl}
         isAccepting={isAccepting}
         aiAutoAccept={aiAutoAccept}
-        onCafePatch={handleCafePatch}
         onToggleAccepting={toggleAccepting}
         onToggleAiAutoAccept={toggleAiAutoAccept}
-        onLogout={onLogout}
       />
 
       <DashboardTabs activeTab={tab} recommendations={recommendations} onChange={setTab} />
@@ -255,6 +252,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           currentSlug={cafe.slug}
           initialSlug={cafe.initial_slug}
           provider={cafe.provider}
+          cafe={cafe}
+          onCafePatch={handleCafePatch}
+          onLogout={onLogout}
           onSlugChanged={handleSlugChanged}
           onSave={async platforms => {
             setPlatformSaving(true);
