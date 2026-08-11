@@ -5,6 +5,7 @@ import ContactTab from './ContactTab';
 import ShortcutsTab from './ShortcutsTab';
 import CafeProfileSettings from './CafeProfileSettings';
 import SettingsStatus from './SettingsStatus';
+import OwnerOnboarding from './OwnerOnboarding';
 import { PLATFORM_OPTIONS } from '../../constants/platforms';
 
 function CollapsibleSetting({ id, title, description, children }) {
@@ -30,6 +31,9 @@ export default function SettingsTab({
   cafe,
   onCafePatch,
   onLogout,
+  defaultVideo,
+  aiAutoAccept,
+  onOpenQueue,
   onSlugChanged,
   onSave,
 }) {
@@ -63,6 +67,13 @@ export default function SettingsTab({
 
   return (
     <div style={settingsStyles.wrap}>
+      <OwnerOnboarding
+        hasDefaultBgm={!!defaultVideo}
+        allowedPlatformCount={selected.length}
+        aiAutoAccept={aiAutoAccept}
+        onOpenQueue={onOpenQueue}
+      />
+
       <CollapsibleSetting
         id="owner-operation-settings"
         title="운영 설정"
