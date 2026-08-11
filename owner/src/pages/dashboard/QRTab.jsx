@@ -72,6 +72,11 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
         </div>
       </div>
 
+      <div style={qrStyles.urlBox} className="no-print">
+        <div style={qrStyles.urlLabel}>손님 접속 주소</div>
+        <div style={qrStyles.urlValue}>{url}</div>
+      </div>
+
       {/* 버튼 (프린트 시 숨김) */}
       <div style={qrStyles.btnRow} className="no-print">
         <button onClick={handlePrint} style={qrStyles.btn}>프린트</button>
@@ -131,6 +136,9 @@ const qrStyles = {
   posterFooter:   { background: '#f8f8f8', padding: '10px 24px', textAlign: 'center', borderTop: '1px solid #eee' },
   devInfo:        { fontSize: 10, color: '#bbb', fontFamily: 'monospace' },
   btnRow:         { display: 'flex', gap: 10 },
+  urlBox:         { width: '100%', maxWidth: 360, padding: '10px 12px', borderRadius: 8, background: '#fff', border: '1px solid #eee', boxSizing: 'border-box' },
+  urlLabel:       { fontSize: 11, color: '#999', marginBottom: 4 },
+  urlValue:       { fontSize: 12, color: '#555', lineHeight: 1.4, wordBreak: 'break-all' },
   btn:            { padding: '10px 24px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14 },
   changeSection:  { marginTop: 4, width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' },
   changeLinks:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },

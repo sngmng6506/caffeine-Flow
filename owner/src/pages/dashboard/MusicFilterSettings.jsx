@@ -172,40 +172,40 @@ export default function MusicFilterSettings() {
         </div>
       </div>
 
-      <div style={styles.section}>
-        <div style={styles.headerRow}>
-          <div>
-            <div style={styles.title}>AI 필터 테스트</div>
+      <details style={styles.advancedSection}>
+        <summary style={styles.advancedSummary}>AI 필터 테스트</summary>
+        <div style={styles.advancedBody}>
+          <div style={styles.headerRow}>
             <div style={styles.desc}>곡 URL을 입력하면 현재 화면의 매장 분위기 설명으로 수락/거절 판단을 미리 확인합니다.</div>
+            <span style={styles.badge}>OpenRouter</span>
           </div>
-          <span style={styles.badge}>OpenRouter</span>
+
+          <label style={styles.label}>테스트 곡 URL</label>
+          <div style={styles.testInputRow}>
+            <input
+              type="url"
+              value={testUrl}
+              onChange={event => {
+                setTestUrl(event.target.value);
+                setTestMessage('');
+                setTestResult(null);
+              }}
+              placeholder="https://www.youtube.com/watch?v=..."
+              style={styles.input}
+            />
+            <button onClick={handleTest} disabled={!canTest} style={{ ...styles.testBtn, ...(!canTest ? styles.disabledBtn : {}) }}>
+              {testLoading ? '테스트 중...' : '테스트하기'}
+            </button>
+          </div>
+
+          {!form.prompt.trim() && (
+            <div style={styles.warn}>테스트하려면 먼저 매장 분위기 설명을 입력해주세요.</div>
+          )}
+          {testMessage && <div style={styles.testNotice}>{testMessage}</div>}
+
+          <TestResultCard result={testResult} />
         </div>
-
-        <label style={styles.label}>테스트 곡 URL</label>
-        <div style={styles.testInputRow}>
-          <input
-            type="url"
-            value={testUrl}
-            onChange={event => {
-              setTestUrl(event.target.value);
-              setTestMessage('');
-              setTestResult(null);
-            }}
-            placeholder="https://www.youtube.com/watch?v=..."
-            style={styles.input}
-          />
-          <button onClick={handleTest} disabled={!canTest} style={{ ...styles.testBtn, ...(!canTest ? styles.disabledBtn : {}) }}>
-            {testLoading ? '테스트 중...' : '테스트하기'}
-          </button>
-        </div>
-
-        {!form.prompt.trim() && (
-          <div style={styles.warn}>테스트하려면 먼저 매장 분위기 설명을 입력해주세요.</div>
-        )}
-        {testMessage && <div style={styles.testNotice}>{testMessage}</div>}
-
-        <TestResultCard result={testResult} />
-      </div>
+      </details>
     </div>
   );
 }
@@ -213,6 +213,9 @@ export default function MusicFilterSettings() {
 const styles = {
   wrapper: { display: 'grid', gap: 16 },
   section: { background: '#f8f8f8', borderRadius: 12, padding: 20 },
+  advancedSection: { background: '#fff', border: '1px solid #e5e5e5', borderRadius: 10, overflow: 'hidden' },
+  advancedSummary: { padding: '14px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#555' },
+  advancedBody: { padding: '2px 16px 16px', borderTop: '1px solid #eee' },
   headerRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 16 },
   title: { fontSize: 15, fontWeight: 700, marginBottom: 4 },
   desc: { fontSize: 13, color: '#888', lineHeight: 1.45 },
