@@ -17,6 +17,7 @@
 flowchart LR
     G["손님 모바일 웹"] -->|"신청·투표·댓글"| S
     O["사장님 React/Electron"] -->|"큐 관리·재생 상태"| S
+    A["플랫폼 운영자 콘솔"] -->|"카페 모니터링·관리"| S
 
     subgraph Railway
         S["Express + Socket.IO"] --- DB[("PostgreSQL")]
@@ -36,6 +37,7 @@ flowchart LR
 | `customer/` | 손님용 SPA, 신청·투표·댓글·큐 조회 |
 | `owner/src/` | 사장님 UI, 큐 상태 전이와 운영 설정 |
 | `owner/electron/` | 창 관리, 실제 음악 재생, 종료 감지 |
+| `admin/` | 플랫폼 운영자용 카페 모니터링·정지·삭제 UI |
 | `server/` | 인증, 검증, 영속화, 실시간 이벤트, 통계, AI 판단 |
 
 서버는 판단과 데이터 일관성을 책임지고, Electron 앱은 실제 외부 플랫폼 재생을 책임진다.
@@ -125,9 +127,11 @@ stateDiagram-v2
 | `cafes` | 카페 계정, slug, 운영 설정, AI 필터 정책, 하트비트 |
 | `recommendations` | 신청곡, 일반 상태, AI 판단, 신청·재생 시각 |
 | `votes` | 곡별 투표와 중복 방지 |
-| `comments` | 곡 댓글과 답글 |
+| `comments` | 개별 신청곡에 달린 댓글 |
+| `song_comments` | 같은 곡을 카페 간 공유하는 댓글과 답글 |
 | `cafe_visits` | 카페·IP·KST 날짜 기준 방문 집계 |
 | `daily_stats` | KST 기준 운영 통계와 피크 동시접속 |
+| `cafe_slug_history` | QR slug 변경 이력과 이전 주소 이동 안내 |
 
 `recommendations.id`는 UUID다. UUID의 순서를 가정한 `MIN/MAX(id)` 집계는 사용하지 않는다.
 

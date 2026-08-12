@@ -10,20 +10,9 @@
 
 ## 재생 안정성
 
-### 플랫폼 어댑터 분리
-
-`owner/electron/main.js`의 창 관리와 플랫폼별 재생 로직을 분리한다.
-
-완료 조건:
-
-- YouTube·Spotify·SoundCloud별 모듈 경계
-- 기존 overlay/takeover 동작 유지
-- 플랫폼 변경 시 영향 범위가 해당 어댑터로 제한
-- 수동 회귀 체크리스트 마련
-
 ### 재생 관측성
 
-재생 시작·실패·종료·BGM 복귀 이벤트를 구조화해 운영 장애를 추적한다.
+현재 Electron 콘솔 로그와 실시간 `playback_state`는 영속되지 않는다. 재생 시작·실패·종료·BGM 복귀 이벤트를 구조화해 운영 장애를 추적한다.
 
 완료 조건:
 
@@ -35,16 +24,22 @@
 
 ### 평가 데이터셋
 
-수동 라벨링한 곡으로 필터 품질을 측정한다.
+실제 신청과 LLM 판단을 운영자가 전수 검수해 골드 라벨을 만들고 필터 품질을 측정한다. LLM 출력을 보기 전 독립적으로 판단할 수 있는 검수 흐름을 우선한다.
 
 예시 필드:
 
 ```text
+recommendation_id
+platform
+video_id
 song_title
 artist
-cafe_policy
-expected_decision
-reason
+cafe_policy_snapshot
+llm_decision
+human_decision
+human_reason_code
+metadata_sufficient
+reviewed_at
 ```
 
 지표 후보:
@@ -53,6 +48,7 @@ reason
 accuracy
 false_accept
 false_reject
+metadata_sufficient별 성능
 ```
 
 ### 프롬프트 버전 관리
@@ -66,7 +62,39 @@ filter_prompt_version
 filter_prompt_snapshot
 ```
 
-### 판단 캐시
+모델과 판단 시각은 현재 저장하지만 판단 당시 정책은 저장하지 않으므로, 프롬프트 변경 뒤에도 과거 결과를 재현할 수 있게 한다.
+
+### Exact 검수 결과 재사용
+
+동일 콘텐츠와 동일 정책에 사람이 확정한 결과가 있으면 LLM을 다시 호출하지 않고 검수 라벨을 재사용한다. 이 경로는 이후 유사 사례 검색을 도입해도 가장 먼저 실행한다.
+
+검토 키:
+
+```text
+canonical track identity + policy_hash
+```
+
+완료 조건:
+
+- 플랫폼별 원본 ID와 정규화된 곡 식별자를 구분
+- live·remix처럼 버전에 따라 판단이 달라지는 콘텐츠를 무리하게 병합하지 않음
+- 판단 출처를 `exact`로 기록
+- 정책이 달라지면 자동 재사용하지 않음
+
+### 유사 검수 사례 검색
+
+Exact 결과가 없는 신청에서 사람이 검수한 유사 곡·유사 정책 사례를 검색해 LLM 판단 문맥으로 제공한다. LLM이 만든 과거 판정은 검색 정답으로 사용하지 않는다.
+
+도입 조건:
+
+- 다양한 검수 사례가 쌓여 유사 사례가 반복적으로 검색됨
+- 별도 골드 테스트셋에서 기본 LLM보다 `false_accept` 또는 `false_reject`가 개선됨
+- 검색 유사도가 낮거나 정책이 크게 다르면 기본 LLM으로 fallback
+- 검색에 사용한 검수 ID와 판단 출처를 감사 데이터로 기록
+
+초기에는 PostgreSQL과 애플리케이션 수준 유사도 계산으로 검증하고, 데이터 규모와 검색 지연이 실제 문제가 될 때 `pgvector` 같은 벡터 인덱스를 검토한다.
+
+### LLM 판단 캐시
 
 동일 카페·곡·정책의 반복 호출 비용을 줄인다.
 
@@ -77,6 +105,8 @@ cafe_id + video_id + prompt_hash + model
 ```
 
 정책 변경과 모델 변경 시 캐시가 자동 무효화되어야 한다.
+
+사람이 확정한 Exact 검수 결과를 우선하고, 이 캐시는 검수 결과가 없는 동일 입력의 LLM 응답에만 적용한다.
 
 ### 거절 사유 요약
 

@@ -21,6 +21,7 @@
 | 시스템 경계, 앱 책임, 데이터 흐름, 상태 모델 변경 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Electron, BrowserView, 재생·종료 감지, 플랫폼 우회 변경 | [docs/PLAYBACK.md](docs/PLAYBACK.md) |
 | HTTP 라우트, 요청·응답, 인증, 상태 코드 변경 | [docs/API.md](docs/API.md) |
+| 플랫폼 운영자 콘솔 화면·상태·관리 동작 변경 | [admin/README.md](admin/README.md) |
 | 환경변수, 실행 명령, 테스트, 마이그레이션, 배포 변경 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 | 음악 필터, 프롬프트, 모델 호출, 판단·오류 정책 변경 | [docs/LLM_FILTER.md](docs/LLM_FILTER.md) |
 | CSP, CORS, Socket origin, 외부 스크립트·iframe, IPC·preload 보안 변경 | [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) |
