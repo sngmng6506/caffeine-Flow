@@ -1,23 +1,13 @@
 const db = require('../db/knex');
-const { kstStartOfDay } = require('../utils/kst');
 const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM } = require('../constants/platforms');
-const { ACTIVE_QUEUE_LOOKBACK_DAYS, MS_PER_DAY } = require('../constants/time-policy');
 const { canonicalizeVideoId } = require('../utils/video-id');
-
-// 최근 7일: KST 기준 6일 전 00:00 ~ 오늘 23:59:59.999
-function lastSevenDaysRange() {
-  const start = kstStartOfDay(ACTIVE_QUEUE_LOOKBACK_DAYS);
-  const end   = new Date(kstStartOfDay(0).getTime() + MS_PER_DAY - 1);
-  return [start, end];
-}
 
 async function getRecommendations(cafeId) {
   return db('recommendations')
     .where({ cafe_id: cafeId })
     .whereIn('status', ACTIVE_STATUSES)
-    .whereBetween('requested_at', lastSevenDaysRange())
     .orderBy('vote_count', 'desc')
     .orderBy('requested_at', 'asc');
 }
@@ -54,7 +44,7 @@ async function countActive(cafeId) {
   return parseInt(row.n);
 }
 
-async function add(cafeId, {
+async function insertRecommendation(dbOrTrx, cafeId, {
   videoId,
   title,
   channelTitle,
@@ -72,7 +62,7 @@ async function add(cafeId, {
   filterErrorCode = null,
 }) {
   const hasFilterResult = filterStatus && filterStatus !== FILTER_STATUS.SKIPPED;
-  const [rec] = await db('recommendations')
+  const [rec] = await dbOrTrx('recommendations')
     .insert({
       cafe_id:        cafeId,
       video_id:       canonicalizeVideoId(videoId),
@@ -94,6 +84,39 @@ async function add(cafeId, {
     })
     .returning('*');
   return rec;
+}
+
+async function add(cafeId, payload) {
+  return insertRecommendation(db, cafeId, payload);
+}
+
+// 공개 신청은 cafe 행 잠금 안에서 최종 중복·큐 한도와 insert를 묶는다.
+// 라우트의 사전 체크는 불필요한 LLM 호출을 줄일 뿐, 동시 요청에 대한 최종
+// 일관성은 이 트랜잭션이 보장한다.
+async function addWithinQueueLimit(cafeId, payload, maxQueueSize) {
+  return db.transaction(async (trx) => {
+    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
+    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+
+    const duplicate = await trx('recommendations')
+      .where({ cafe_id: cafeId, video_id: canonicalizeVideoId(payload.videoId) })
+      .whereIn('status', ACTIVE_STATUSES)
+      .first();
+    if (duplicate) {
+      throw Object.assign(new Error('이미 대기 중인 곡입니다'), { code: 'ACTIVE_RECOMMENDATION_DUPLICATE', status: 409 });
+    }
+
+    const row = await trx('recommendations')
+      .where({ cafe_id: cafeId })
+      .whereIn('status', ACTIVE_STATUSES)
+      .count('id as n')
+      .first();
+    if (Number(row.n) >= maxQueueSize) {
+      throw Object.assign(new Error(`대기열이 가득 찼습니다 (최대 ${maxQueueSize}곡)`), { code: 'QUEUE_FULL', status: 429 });
+    }
+
+    return insertRecommendation(trx, cafeId, payload);
+  });
 }
 
 // 종료 상태(played/skipped/rejected)에서는 어떤 전이도 불가.
@@ -212,12 +235,14 @@ async function vote(cafeId, recommendationId, voterIp, visitorId) {
   });
 }
 
-async function unvote(cafeId, recommendationId, voterIp) {
+async function unvote(cafeId, recommendationId, voterIp, visitorId) {
   return db.transaction(async (trx) => {
     await requireForCafe(trx, cafeId, recommendationId);
-    const deleted = await trx('votes')
-      .where({ recommendation_id: recommendationId, voter_ip: voterIp })
-      .delete();
+    let query = trx('votes').where({ recommendation_id: recommendationId });
+    query = visitorId
+      ? query.where({ visitor_id: visitorId })
+      : query.whereNull('visitor_id').where({ voter_ip: voterIp });
+    const deleted = await query.delete();
     if (!deleted) throw Object.assign(new Error('투표 기록이 없습니다'), { status: 404 });
     const [rec] = await trx('recommendations')
       .where({ id: recommendationId, cafe_id: cafeId })
@@ -245,6 +270,7 @@ module.exports = {
   findActiveByVideoId,
   countActive,
   add,
+  addWithinQueueLimit,
   updateStatus,
   setPlaying,
   clearPlaying,

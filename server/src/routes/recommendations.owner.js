@@ -5,7 +5,6 @@
 // 라우팅 의도가 한눈에 보이고 path 충돌 위험이 없다.
 const router = require('express').Router({ mergeParams: true });
 const { requireAuth, requireCafeOwner } = require('../middleware/auth');
-const cafeService = require('../services/cafe.service');
 const recService  = require('../services/recommendation.service');
 const { broadcast, getClientIp } = require('./_recommendations.shared');
 const { validateInEnum, validateRecommendationBody } = require('../utils/validate');
@@ -15,8 +14,7 @@ const { PLATFORM, VALID_PLATFORMS } = require('../constants/platforms');
 const ownerOnly = [requireAuth, requireCafeOwner];
 
 router.post('/owner', ownerOnly, async (req, res) => {
-  const cafe = await cafeService.findBySlug(req.params.slug);
-  if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
+  const cafe = req.cafe;
 
   const body = req.body || {};
   const bodyCheck = validateRecommendationBody(body);

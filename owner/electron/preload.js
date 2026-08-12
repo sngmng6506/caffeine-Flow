@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { isAllowedOwnerRendererUrl } = require('./navigation-policy');
 
 function subscribe(channel, callback, project = (...args) => args[0]) {
   const listener = (_event, ...args) => callback(project(...args));
@@ -6,7 +7,7 @@ function subscribe(channel, callback, project = (...args) => args[0]) {
   return () => ipcRenderer.removeListener(channel, listener);
 }
 
-contextBridge.exposeInMainWorld('electronAPI', {
+const electronAPI = {
   // 신청곡 시작/종료 — bgmView는 백그라운드 유지 + 음소거 토글
   playRec:          (videoIdOrUrl) => ipcRenderer.send('play-rec', videoIdOrUrl),
   endRec:           ()             => ipcRenderer.send('end-rec'),
@@ -44,4 +45,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 처리 후 'cleanup-done' 회신. main이 회신 받으면 quit 진행 (3초 timeout fallback).
   onCleanupBeforeQuit: (cb) => subscribe('cleanup-before-quit', cb, () => undefined),
   cleanupDone:         ()   => ipcRenderer.send('cleanup-done'),
-});
+};
+
+// 같은 BrowserWindow가 OAuth 외부 페이지로 이동해도 preload는 다시 실행된다.
+// 사장님 앱 origin이 아닌 문서에는 IPC bridge 자체를 노출하지 않는다.
+if (isAllowedOwnerRendererUrl(window.location.href, process.env.OWNER_URL)) {
+  contextBridge.exposeInMainWorld('electronAPI', electronAPI);
+}

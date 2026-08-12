@@ -15,11 +15,11 @@ const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platfo
 const { TERMINAL_STATUSES } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
+const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
-  const cafe = await cafeService.findBySlug(req.owner.slug);
-  if (!cafe) return res.status(404).json({ error: 'Not found' });
+  const cafe = req.cafe;
   const initialSlug = await cafeService.findInitialSlug(cafe.id) || cafe.slug;
   const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
   res.json({
@@ -216,7 +216,8 @@ router.put('/me/status', requireAuth, async (req, res) => {
 
 // GET /api/v1/cafes/me/history?offset=0&date=YYYY-MM-DD
 router.get('/me/history', requireAuth, async (req, res) => {
-  const offset = parseInt(req.query.offset) || 0;
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
   const limit = 20;
   let query = db('recommendations')
     .where({ cafe_id: req.owner.cafeId })
@@ -233,7 +234,7 @@ router.get('/me/history', requireAuth, async (req, res) => {
     query = query.whereBetween('requested_at', [start, end]);
   }
 
-  const items = await query.limit(limit + 1).offset(offset);
+  const items = await query.limit(limit + 1).offset(offset.value);
   res.json({ items: items.slice(0, limit), hasMore: items.length > limit });
 });
 
@@ -265,18 +266,20 @@ router.get('/me/stats/weekday', requireAuth, async (req, res) => {
 
 // GET /api/v1/cafes/me/stats/hourly-songs?hour=0&offset=0  (해당 시간대 신청곡, 최근 30일)
 router.get('/me/stats/hourly-songs', requireAuth, async (req, res) => {
-  const hour = parseInt(req.query.hour);
-  if (isNaN(hour) || hour < 0 || hour > 23) return res.status(400).json({ error: 'hour는 0~23' });
-  const offset = parseInt(req.query.offset) || 0;
-  res.json(await statsService.getSongsByHour(req.owner.cafeId, hour, offset));
+  const hour = parseBoundedInteger(req.query.hour, { name: 'hour', defaultValue: null, min: 0, max: 23 });
+  if (hour.error || hour.value === null) return res.status(400).json({ error: 'hour는 0~23 사이의 정수여야 합니다' });
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+  res.json(await statsService.getSongsByHour(req.owner.cafeId, hour.value, offset.value));
 });
 
 // GET /api/v1/cafes/me/stats/weekday-songs?day=0&offset=0  (해당 요일 신청곡, 최근 30일)
 router.get('/me/stats/weekday-songs', requireAuth, async (req, res) => {
-  const day = parseInt(req.query.day);
-  if (isNaN(day) || day < 0 || day > 6) return res.status(400).json({ error: 'day는 0~6' });
-  const offset = parseInt(req.query.offset) || 0;
-  res.json(await statsService.getSongsByWeekday(req.owner.cafeId, day, offset));
+  const day = parseBoundedInteger(req.query.day, { name: 'day', defaultValue: null, min: 0, max: 6 });
+  if (day.error || day.value === null) return res.status(400).json({ error: 'day는 0~6 사이의 정수여야 합니다' });
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+  res.json(await statsService.getSongsByWeekday(req.owner.cafeId, day.value, offset.value));
 });
 
 module.exports = router;

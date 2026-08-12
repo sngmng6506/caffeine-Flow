@@ -4,7 +4,6 @@ import {
   KST_OFFSET_HOURS,
   MS_PER_DAY,
   KST_OFFSET_MS,
-  ACTIVE_QUEUE_LOOKBACK_DAYS,
   MUSIC_FILTER_STATS_LOOKBACK_DAYS,
   STATS_PATTERN_LOOKBACK_DAYS,
   PLAYBACK_STATE_TTL_MS,
@@ -27,8 +26,7 @@ describe('KST 시간 정책 계약', () => {
     expect(KST_OFFSET_MS).toBe(9 * 60 * 60 * 1000);
   });
 
-  it('최근 7일 계열 정책은 오늘 포함 6일 전 KST 자정부터 시작한다', () => {
-    expect(ACTIVE_QUEUE_LOOKBACK_DAYS).toBe(6);
+  it('음악 필터 통계는 오늘 포함 6일 전 KST 자정부터 시작한다', () => {
     expect(MUSIC_FILTER_STATS_LOOKBACK_DAYS).toBe(6);
   });
 

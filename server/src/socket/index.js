@@ -4,18 +4,21 @@ const { kstTodayString } = require('../utils/kst');
 const { isUuid } = require('../utils/validate');
 const { HEARTBEAT_REFRESH_MS, PLAYBACK_STATE_TTL_MS } = require('../constants/time-policy');
 const { PLAYBACK_STATE, PLAYBACK_STATES } = require('../constants/playback-state');
+const cafeService = require('../services/cafe.service');
 
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 
 // role=owner는 handshake query만으로 신뢰할 수 없음 (손님이 위조해서
 // 붙으면 peak concurrent 통계에서 자기 자신을 owner로 차감시켜 왜곡 가능).
 // auth.token의 JWT를 검증하고 slug 일치까지 확인 — 실패 시 손님으로 취급.
-function verifyOwner(socket, slug) {
+async function verifyOwner(socket, slug) {
   try {
     const token = socket.handshake.auth?.token;
     if (!token) return null;
     const payload = jwt.verify(token, JWT_SECRET);
-    return payload.slug === slug ? payload : null; // truthy payload = 인증 성공
+    if (!payload.cafeId || !payload.slug || payload.pending || payload.slug !== slug) return null;
+    const cafe = await cafeService.findById(payload.cafeId);
+    return cafe?.slug === slug ? payload : null; // truthy payload = 인증 성공
   } catch {
     return null;
   }
@@ -56,13 +59,12 @@ function initSocket(io) {
     const { slug, role } = socket.handshake.query;
     if (!slug) return socket.disconnect();
 
-    const ownerPayload = role === 'owner' ? verifyOwner(socket, slug) : null;
+    const ownerPayload = role === 'owner' ? await verifyOwner(socket, slug) : null;
 
     // 손님은 정지·미존재 카페 room에 붙지 못하게 막는다 — HTTP findActiveBySlug와
     // 동일 경계. 붙게 두면 정지 카페의 큐 변경 브로드캐스트를 엿볼 수 있다.
     // 검증된 사장님은 오조치 복구를 위해 정지 중에도 접속 가능해야 하므로 예외.
     if (!ownerPayload) {
-      const cafeService = require('../services/cafe.service');
       let active;
       try {
         active = await cafeService.findActiveBySlug(slug);

@@ -1,5 +1,17 @@
 import { useState } from 'react';
 
+const MUSIC_HOSTS = ['youtube.com', 'youtu.be', 'soundcloud.com', 'spotify.com', 'spotify.link'];
+
+function isSupportedMusicUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && MUSIC_HOSTS.some(host =>
+      parsed.hostname === host || parsed.hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
 export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatus }) {
   const [inputUrl, setInputUrl] = useState('');
   const [setting, setSetting]   = useState(false);
@@ -7,7 +19,10 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
 
   async function handleSet() {
     const url = inputUrl.trim();
-    if (!/^https?:\/\//i.test(url)) { setError('http(s)로 시작하는 URL을 입력하세요'); return; }
+    if (!isSupportedMusicUrl(url)) {
+      setError('YouTube, SoundCloud, Spotify의 HTTPS 링크를 입력하세요');
+      return;
+    }
     setSetting(true); setError('');
     try {
       // YouTube/SoundCloud/Spotify는 서버 oembed로 메타데이터 시도, 그 외 또는 플레이리스트는 URL만 저장

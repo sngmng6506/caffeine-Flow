@@ -105,18 +105,18 @@ function visible() {
   return list.sort((a, b) => (
     sortKey === 'created_at'
       ? new Date(b.created_at) - new Date(a.created_at)
-      : b.today_unique_visitors - a.today_unique_visitors
+      : b.today_unique_browsers - a.today_unique_browsers
   ));
 }
 
 function renderSummary() {
   const live = cafes.filter((c) => c.status === 'active' && !c.is_suspended).length;
-  const reach = cafes.reduce((s, c) => s + (c.is_suspended ? 0 : c.today_unique_visitors), 0);
+  const reach = cafes.reduce((s, c) => s + (c.is_suspended ? 0 : c.today_unique_browsers), 0);
   const never = cafes.filter((c) => c.status === 'never' && !c.is_suspended).length;
   $('#summary').innerHTML = `
     <span>카페 <b>${cafes.length}</b></span>
     <span>사용 중 <b>${live}</b></span>
-    <span>오늘 방문자 <b>${reach}</b></span>
+    <span>오늘 익명 브라우저 <b>${reach}</b></span>
     <span>미사용 <b>${never}</b></span>`;
 }
 
@@ -131,7 +131,7 @@ function renderList() {
         <div class="sub">/${esc(c.slug)} · ${esc(c.owner_email || '—')}</div>
       </td>
       <td class="sub">${esc([c.region, c.district, c.dong].filter(Boolean).join(' ') || '미등록')}</td>
-      <td class="num">${c.today_unique_visitors}</td>
+      <td class="num">${c.today_unique_browsers}</td>
       <td class="num">${c.today_requests}</td>
       <td class="sub">${fmtAgo(c.last_heartbeat_at)}</td>
       <td class="sub">${fmtDate(c.created_at)}</td>
@@ -164,7 +164,7 @@ function renderMap() {
       fillOpacity: c.is_suspended ? 0.15 : 0.7, weight: 2,
     }).bindPopup(`
       <b>${esc(c.name)}</b><br>${STATUS_LABEL[c.status]}${c.is_suspended ? ' · 정지됨' : ''}<br>
-      오늘 방문자 ${c.today_unique_visitors} · 신청 ${c.today_requests}`).addTo(markers);
+      오늘 익명 브라우저 ${c.today_unique_browsers} · 신청 ${c.today_requests}`).addTo(markers);
   });
   if (pts.length) {
     map.fitBounds(L.latLngBounds(pts.map((c) => [+c.latitude, +c.longitude])).pad(0.2));

@@ -7,21 +7,46 @@ function withCafeName(query) {
     .select('song_comments.*', 'cafes.name as cafe_name');
 }
 
-// 전체 카페 공유 댓글 (video_id 기준, 추적 파라미터 무시하고 곡 단위로 통합)
-async function getComments(videoId) {
-  // split_part 로 ? 이전만 비교 → 과거 raw 저장분(abc?si=1)과 신규 canonical(abc) 모두 매칭.
-  // (canonicalizeVideoId 와 동일 규칙. 댓글은 곡당 소량이라 인덱스 미사용 부담 없음.)
-  const all = await withCafeName(
-    db('song_comments').whereRaw(`split_part(song_comments.video_id, ?, 1) = ?`, ['?', canonicalizeVideoId(videoId)])
-  ).orderBy('song_comments.created_at', 'asc');
+// 전체 카페 공유 댓글. 최상위 댓글만 페이지 단위로 고른 뒤 그 부모들의
+// 답글을 한 번에 조회한다. 과거 데이터는 canonicalize migration으로 보정돼
+// 있어 exact match가 가능하고, 복합 인덱스를 그대로 사용할 수 있다.
+async function getComments(videoId, { offset, limit }) {
+  const canonicalVideoId = canonicalizeVideoId(videoId);
+  const rows = await withCafeName(
+    db('song_comments')
+      .where('song_comments.video_id', canonicalVideoId)
+      .whereNull('song_comments.parent_id'),
+  )
+    .orderBy('song_comments.created_at', 'desc')
+    .orderBy('song_comments.id', 'desc')
+    .limit(limit + 1)
+    .offset(offset);
 
-  const topLevel = all.filter(c => c.parent_id === null);
-  const replies  = all.filter(c => c.parent_id !== null);
+  const items = rows.slice(0, limit);
+  const parentIds = items.map(comment => comment.id);
+  const repliesByParent = new Map(parentIds.map(id => [id, []]));
 
-  return topLevel.map(c => ({
-    ...c,
-    replies: replies.filter(r => r.parent_id === c.id),
-  })).reverse();
+  if (parentIds.length > 0) {
+    const replies = await withCafeName(
+      db('song_comments')
+        .where('song_comments.video_id', canonicalVideoId)
+        .whereIn('song_comments.parent_id', parentIds),
+    )
+      .orderBy('song_comments.created_at', 'asc')
+      .orderBy('song_comments.id', 'asc');
+
+    for (const reply of replies) repliesByParent.get(reply.parent_id)?.push(reply);
+  }
+
+  const hasMore = rows.length > limit;
+  return {
+    items: items.map(comment => ({
+      ...comment,
+      replies: repliesByParent.get(comment.id) || [],
+    })),
+    hasMore,
+    nextOffset: hasMore ? offset + items.length : null,
+  };
 }
 
 async function addComment(videoId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {

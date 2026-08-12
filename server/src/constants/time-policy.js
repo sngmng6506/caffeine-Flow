@@ -3,8 +3,6 @@ const KST_OFFSET_HOURS = 9;
 const MS_PER_DAY = 86_400_000;
 const KST_OFFSET_MS = KST_OFFSET_HOURS * 60 * 60 * 1000;
 
-// 오늘 포함 최근 7일: 오늘 KST 자정에서 6일 전부터 시작한다.
-const ACTIVE_QUEUE_LOOKBACK_DAYS = 6;
 const MUSIC_FILTER_STATS_LOOKBACK_DAYS = 6;
 
 // 기존 통계 패턴은 현재 동작을 유지하기 위해 30일 전 KST 자정부터 집계한다.
@@ -25,7 +23,6 @@ module.exports = {
   KST_OFFSET_HOURS,
   MS_PER_DAY,
   KST_OFFSET_MS,
-  ACTIVE_QUEUE_LOOKBACK_DAYS,
   MUSIC_FILTER_STATS_LOOKBACK_DAYS,
   STATS_PATTERN_LOOKBACK_DAYS,
   HEARTBEAT_REFRESH_MS,

@@ -5,9 +5,11 @@ export default defineConfig({
     include: [
       'tests/ai-guardrails-docs.test.mjs',
       'tests/api-docs.test.mjs',
+      'tests/electron-navigation-policy.test.mjs',
       'tests/kst.test.mjs',
       'tests/limits.test.mjs',
       'tests/music-filter.test.mjs',
+      'tests/pagination.test.mjs',
       'tests/platforms.test.mjs',
       'tests/security-headers.test.mjs',
       'tests/time-policy.test.mjs',

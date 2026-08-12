@@ -32,6 +32,7 @@ const autoUpdateManager = createAutoUpdateManager({
   ipcMain,
   isDev,
   safeSend: windowManager.safeSend,
+  isTrustedSender: windowManager.isFromMainRenderer,
 });
 
 windowManager.registerIpcHandlers(ipcMain);
@@ -79,7 +80,8 @@ app.on('before-quit', (event) => {
   }, 3000);
 });
 
-ipcMain.on('cleanup-done', () => {
+ipcMain.on('cleanup-done', (event) => {
+  if (!windowManager.isFromMainRenderer(event.sender)) return;
   isQuitting = true;
   app.quit();
 });

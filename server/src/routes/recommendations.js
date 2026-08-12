@@ -5,14 +5,16 @@ const cafeService   = require('../services/cafe.service');
 const recService    = require('../services/recommendation.service');
 const statsService  = require('../services/stats.service');
 const musicFilter   = require('../features/music-filter');
+const { verifyTrackMetadataToken } = require('../services/track-metadata-token.service');
 const db            = require('../db/knex');
 const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
-const { validateString, validateInEnum, validateRecommendationBody } = require('../utils/validate');
+const { validateString } = require('../utils/validate');
 const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_ACTION, FILTER_STATUS } = require('../constants/music-filter-status');
-const { PLATFORM, VALID_PLATFORMS, parseAllowedPlatforms, platformLabel } = require('../constants/platforms');
+const { parseAllowedPlatforms, platformLabel } = require('../constants/platforms');
 const { RECOMMENDATION_REQUEST_LIMIT, VOTE_LIMIT, COMMENT_LIMIT } = require('../constants/limits');
 const { KST_VISIT_DATE_SQL } = require('../db/sql-fragments');
+const { parseOffset } = require('../utils/pagination');
 
 const requestLimiters = makeDualLimiter({ ...RECOMMENDATION_REQUEST_LIMIT, message: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' });
 const voteLimiters = makeDualLimiter({ ...VOTE_LIMIT, message: '잠시 후 다시 시도해주세요 (투표 한도 초과)' });
@@ -54,9 +56,15 @@ router.get('/', async (req, res) => {
   }
   const recs = await recService.getRecommendations(cafe.id);
   const ip = getClientIp(req);
-  const visitorId = req.headers['x-visitor-id'] || null;
-  db('cafe_visits').insert({ cafe_id: cafe.id, visitor_ip: ip, visitor_id: visitorId, visit_date: db.raw(KST_VISIT_DATE_SQL) })
-    .onConflict(['cafe_id', 'visitor_ip', 'visit_date']).ignore().catch(() => {});
+  const visitorId = safeVisitorId(req);
+  try {
+    await db('cafe_visits')
+      .insert({ cafe_id: cafe.id, visitor_ip: ip, visitor_id: visitorId, visit_date: db.raw(KST_VISIT_DATE_SQL) })
+      .onConflict()
+      .ignore();
+  } catch {
+    // 방문 통계 실패가 큐 조회를 막아서는 안 된다.
+  }
   const allowed_platforms = parseAllowedPlatforms(cafe.allowed_platforms);
   res.json({ recommendations: recs, is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name, allowed_platforms });
 });
@@ -66,12 +74,16 @@ router.post('/', requestLimiters, async (req, res) => {
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   if (!cafe.is_accepting) return res.status(403).json({ error: '현재 추천을 받지 않습니다' });
   const body = req.body || {};
-  const bodyCheck = validateRecommendationBody(body);
-  if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
-  const platformCheck = validateInEnum(body.platform || PLATFORM.YOUTUBE, VALID_PLATFORMS, { name: 'platform' });
-  if (platformCheck.error) return res.status(400).json({ error: platformCheck.error });
-  const { videoId, title, channelTitle, thumbnail, duration, requesterName } = bodyCheck.value;
-  const platform = platformCheck.value;
+  const nameCheck = validateString(body.requesterName, { max: 50, allowNull: true, name: 'requesterName' });
+  if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
+  let track;
+  try {
+    track = verifyTrackMetadataToken(body.metadataToken);
+  } catch (error) {
+    return res.status(error.status || 400).json({ error: error.message });
+  }
+  const { videoId, title, channelTitle, thumbnail, duration, platform } = track;
+  const requesterName = nameCheck.value;
   const allowed = parseAllowedPlatforms(cafe.allowed_platforms);
   if (!allowed.includes(platform)) return res.status(403).json({ error: `이 카페에서는 ${platformLabel(platform)} 신청을 받지 않습니다` });
   const duplicate = await recService.findActiveByVideoId(cafe.id, videoId);
@@ -83,13 +95,14 @@ router.post('/', requestLimiters, async (req, res) => {
   const visitorId = safeVisitorId(req);
   let rec;
   try {
-    rec = await recService.add(cafe.id, {
+    rec = await recService.addWithinQueueLimit(cafe.id, {
       videoId, title, channelTitle, thumbnail, duration, requesterIp: ip, requesterName, platform, visitorId,
       status: filterResult.action === FILTER_ACTION.REJECT ? REC_STATUS.REJECTED : REC_STATUS.PENDING,
       ...filterPayload(filterResult),
-    });
+    }, MAX_QUEUE_SIZE);
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
+    if (sendServiceError(res, err)) return;
     throw err;
   }
   if (filterResult.action === FILTER_ACTION.REJECT) {
@@ -106,8 +119,9 @@ router.post('/', requestLimiters, async (req, res) => {
 router.get('/top10', async (req, res) => {
   const cafe = await cafeService.findActiveBySlug(req.params.slug);
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
-  const offset = parseInt(req.query.offset) || 0;
-  res.json(await statsService.getCafeTop10(cafe.id, offset));
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+  res.json(await statsService.getCafeTop10(cafe.id, offset.value));
 });
 
 router.delete('/:id/cancel', async (req, res) => {
@@ -118,7 +132,9 @@ router.delete('/:id/cancel', async (req, res) => {
   if (![REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(rec.status)) return res.status(409).json({ error: '이미 처리된 추천곡은 취소할 수 없습니다' });
   const ip = getClientIp(req);
   const visitorId = safeVisitorId(req);
-  const isOwner = (rec.visitor_id && visitorId && rec.visitor_id === visitorId) || (rec.requester_ip && rec.requester_ip === ip);
+  const isOwner = rec.visitor_id
+    ? Boolean(visitorId && rec.visitor_id === visitorId)
+    : Boolean(rec.requester_ip && rec.requester_ip === ip);
   if (!isOwner) return res.status(403).json({ error: '본인이 신청한 곡만 취소할 수 있습니다' });
   const deleted = await recService.remove(cafe.id, rec.id);
   if (!deleted) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
@@ -130,7 +146,7 @@ router.post('/:id/vote', voteLimiters, async (req, res) => {
   const cafe = await findCafeForMutation(req, res);
   if (!cafe) return;
   const ip = getClientIp(req);
-  const visitorId = req.headers['x-visitor-id'] || null;
+  const visitorId = safeVisitorId(req);
   try {
     const rec = await recService.vote(cafe.id, req.params.id, ip, visitorId);
     broadcast(req, req.params.slug, 'recommendations_update', { action: 'vote', rec });
@@ -146,7 +162,7 @@ router.delete('/:id/vote', voteLimiters, async (req, res) => {
   const cafe = await findCafeForMutation(req, res);
   if (!cafe) return;
   try {
-    const rec = await recService.unvote(cafe.id, req.params.id, getClientIp(req));
+    const rec = await recService.unvote(cafe.id, req.params.id, getClientIp(req), safeVisitorId(req));
     broadcast(req, req.params.slug, 'recommendations_update', { action: 'vote', rec });
     res.json(rec);
   } catch (err) {

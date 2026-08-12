@@ -31,6 +31,7 @@ customer/src/constants/recommendationStatus.js
 - 활성 상태는 `pending`, `accepted`, `playing`이다.
 - 종료 상태는 다시 활성 상태로 되돌리지 않는다.
 - 손님 큐에는 활성 상태만 노출한다.
+- 활성 상태는 신청 시각으로 숨기지 않는다. 목록·개수·중복 제약이 같은 active 범위를 사용한다.
 - 동일 카페·동일 곡의 활성 중복은 DB 제약으로도 막는다.
 - 상태 문자열을 라우트나 UI에 새로 직접 작성하지 않는다.
 
@@ -90,6 +91,7 @@ customer/src/constants/platforms.js
 - 지원 플랫폼은 `youtube`, `soundcloud`, `spotify`다.
 - URL 파싱·표시·허용 여부에서 같은 상수를 사용한다.
 - 사용자 URL fetch는 `safeAxiosGet`을 거쳐 SSRF를 방어한다.
+- 손님 신청은 `/tracks/oembed`가 발급한 단기 `metadataToken`으로 곡 정보를 고정한다. POST body의 제목·플랫폼·ID를 신뢰하지 않는다.
 - 외부 플랫폼 DOM 우회는 플랫폼별 경계 안에 둔다.
 - Electron IPC와 preload 노출을 임의로 넓히지 않는다.
 
@@ -117,6 +119,9 @@ owner/electron/preload.js
 - Electron 운영 앱은 HTTP(S) owner 페이지를 로드하므로 정상 origin이 존재한다. `file://` 기반으로 구조를 바꾸면 origin 정책을 먼저 재설계한다.
 - 외부 음악 페이지는 Electron BrowserView 경계 안에서 열며 서버 SPA CSP에 음악 플랫폼 도메인을 추가하지 않는다.
 - preload/IPC 채널을 추가할 때 renderer에서 필요한 최소 기능만 노출하고 임의 코드 실행·파일 시스템 접근을 직접 노출하지 않는다.
+- Electron IPC mutation은 사장님 메인 renderer sender를 확인한다.
+- 외부 WebContents는 `sandbox: true`, `nodeIntegration: false`가 기본이다. `contextIsolation: false`는 외부 플랫폼 main world를 보정하는 `stealth-preload.js`에만 허용하며 새 예외는 실제 호환성 근거와 수동 재생 검증이 필요하다.
+- 외부 음악 WebContents에 `media` 권한을 포괄 허용하지 않는다. DRM은 음악 origin allowlist 안에서만 허용한다.
 
 보안 경계를 바꾸면 `server/tests/security-headers.test.mjs`와 관련 빌드를 함께 확인한다.
 
@@ -196,6 +201,7 @@ server/src/features/music-filter/decision.policy.js
 - slug는 변경 가능하다.
 - slug 변경 응답에는 새 JWT를 포함하고 클라이언트가 즉시 교체한다.
 - slug를 장기 캐시하거나 카페의 불변 ID로 사용하지 않는다.
+- 사장님 HTTP·Socket 인증은 JWT의 `cafeId`로 현재 카페를 조회하고 현재 slug 일치까지 검증한다. slug 변경 전 토큰은 거절한다.
 - 정지 카페의 손님 HTTP·소켓 접근을 우회하지 않는다.
 
 ## Recommendation Tenant Isolation Contract
@@ -214,6 +220,13 @@ server/tests/auth-boundary.test.mjs
 - 사장님 JWT의 `cafeId`와 손님 URL의 `:slug`에서 조회한 `cafe.id`가 tenant boundary의 기준이다.
 - 다른 카페에 속한 recommendation ID는 존재 여부를 노출하지 않고 404로 처리한다.
 - 이 검증은 라우트의 사전 체크에만 의존하지 않고 서비스 계층에서도 강제한다.
+
+## Anonymous Visitor Identity Contract
+
+- visitor ID가 있는 요청의 취소·투표·방문 중복 제거는 visitor ID를 기준으로 한다.
+- IP 기반 소유권·중복 제거는 visitor ID가 없는 레거시 행에만 fallback으로 사용한다.
+- IP rate limit은 visitor ID 위조를 막는 별도 방어선이므로 유지한다.
+- visitor ID 입력 길이는 DB 컬럼 길이와 일치시킨다.
 
 ## App Boundary Contract
 

@@ -51,8 +51,10 @@ sequenceDiagram
     participant A as AI 필터
     participant O as 사장님 앱
 
-    G->>S: 음악 링크 신청
-    S->>S: 카페·입력·플랫폼·중복·한도 검증
+    G->>S: 음악 링크 메타데이터 확인
+    S-->>G: 정규화 메타데이터 + 단기 서명 토큰
+    G->>S: 서명 토큰으로 신청
+    S->>S: 카페·서명·플랫폼·중복·한도 검증
     opt AI 필터 ON
         S->>A: 매장 정책과 곡 메타데이터 전달
         A-->>S: accept / reject
@@ -91,6 +93,7 @@ stateDiagram-v2
 - 활성 상태는 `pending`, `accepted`, `playing`이다.
 - 종료 상태는 `played`, `skipped`, `rejected`이며 다시 활성 상태로 돌리지 않는다.
 - 같은 카페·같은 곡은 활성 상태로 동시에 두 개 존재할 수 없다.
+- 활성 큐는 신청 시각과 관계없이 모두 노출하며, 목록·한도·중복이 같은 범위를 사용한다.
 - 상태 전이의 실제 허용 범위는 서버 상태 전이 정책이 기준이다.
 
 변경 시 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md#recommendation-status-contract)를 먼저 확인한다.
@@ -116,7 +119,11 @@ stateDiagram-v2
 - 사장님: Google/Naver 로그인 후 JWT
 - 신규 가입: 제한시간이 있는 pending token으로 가입 완료
 - 운영자: `role=admin` 전용 토큰과 별도 미들웨어
-- 손님: 계정 없이 `visitor_id`와 IP를 요청 제한·본인 취소에 사용
+- 손님: 계정 없이 브라우저 localStorage의 `visitor_id`와 IP를 요청 제한·본인 취소에 사용. 식별·중복 제거는 `visitor_id` 우선이며 없는 레거시 요청만 IP를 사용. 사람이나 물리 기기의 고유 식별자는 아니다
+
+사장님 권한은 JWT의 불변 `cafeId`로 현재 카페를 조회한 뒤 현재 slug까지
+일치할 때만 부여한다. 변경된 옛 slug가 다른 카페에 재사용되어도 옛 토큰은
+새 소유자의 데이터나 Socket.IO owner room에 접근할 수 없다.
 
 사장님 토큰과 운영자 토큰은 같은 권한으로 취급하지 않는다.
 
@@ -126,10 +133,10 @@ stateDiagram-v2
 | --- | --- |
 | `cafes` | 카페 계정, slug, 운영 설정, AI 필터 정책, 하트비트 |
 | `recommendations` | 신청곡, 일반 상태, AI 판단, 신청·재생 시각 |
-| `votes` | 곡별 투표와 중복 방지 |
+| `votes` | 곡별 투표와 중복 방지. visitor ID 우선, 레거시 요청은 IP fallback |
 | `comments` | 개별 신청곡에 달린 댓글 |
 | `song_comments` | 같은 곡을 카페 간 공유하는 댓글과 답글 |
-| `cafe_visits` | 카페·IP·KST 날짜 기준 방문 집계 |
+| `cafe_visits` | 카페·visitor ID·KST 날짜 기준 익명 브라우저 집계. visitor ID가 없을 때만 IP fallback |
 | `daily_stats` | KST 기준 운영 통계와 피크 동시접속 |
 | `cafe_slug_history` | QR slug 변경 이력과 이전 주소 이동 안내 |
 

@@ -12,6 +12,7 @@ process.env.NODE_ENV = 'test';
 
 const { app } = await import('../app.js');
 const db = (await import('../src/db/knex.js')).default ?? (await import('../src/db/knex.js'));
+const { issueTrackMetadataToken } = await import('../src/services/track-metadata-token.service.js');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -23,10 +24,16 @@ function guestHeaders(visitorId = 'test-visitor-1') {
 }
 
 async function postRec(videoId, visitorId, overrides = {}) {
+  const track = {
+    videoId,
+    title: `곡 ${videoId}`,
+    platform: 'youtube',
+    ...(overrides.track || {}),
+  };
   return request(app)
     .post(`/api/v1/cafes/${cafe.slug}/recommendations`)
     .set(guestHeaders(visitorId))
-    .send({ videoId, title: `곡 ${videoId}`, platform: 'youtube', ...overrides });
+    .send({ metadataToken: issueTrackMetadataToken(track), ...overrides.body });
 }
 
 function ownerPostRec(body) {
@@ -73,6 +80,26 @@ describe('추천곡 신청', () => {
     expect(res.status).toBe(400);
   });
 
+  it('서명된 서버 메타데이터를 사용하고 클라이언트의 위조 필드는 무시한다', async () => {
+    const res = await postRec('signed_safe', 'signed-visitor', {
+      track: { title: '서버가 확인한 제목', channelTitle: '서버 채널' },
+      body: { videoId: 'spoofed-id', title: '위조 제목', platform: 'spotify' },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.video_id).toBe('signed_safe');
+    expect(res.body.title).toBe('서버가 확인한 제목');
+    expect(res.body.platform).toBe('youtube');
+  });
+
+  it('변조되거나 만료된 메타데이터 토큰 → 400', async () => {
+    const token = issueTrackMetadataToken({ videoId: 'tampered', title: '원본', platform: 'youtube' });
+    const res = await request(app)
+      .post(`/api/v1/cafes/${cafe.slug}/recommendations`)
+      .set(guestHeaders('tampered-visitor'))
+      .send({ metadataToken: `${token}x` });
+    expect(res.status).toBe(400);
+  });
+
   it('대기열 30곡 초과 → 429', async () => {
     const rows = Array.from({ length: 30 }, (_, i) => ({
       cafe_id: cafe.id, video_id: `bulk_${i}`, title: `벌크 ${i}`, status: 'pending',
@@ -81,6 +108,36 @@ describe('추천곡 신청', () => {
     const res = await postRec('vid_overflow');
     expect(res.status).toBe(429);
     await db('recommendations').whereIn('video_id', rows.map(r => r.video_id)).del();
+  });
+
+  it('29곡 상태의 동시 신청도 최종 active 큐를 30곡 이하로 유지한다', async () => {
+    const [raceCafe] = await db('cafes').insert({
+      name: '동시성 카페', slug: 'queuerace1', owner_email: 'race@t.com',
+    }).returning('*');
+    await db('recommendations').insert(Array.from({ length: 29 }, (_, index) => ({
+      cafe_id: raceCafe.id,
+      video_id: `race_existing_${index}`,
+      title: `기존 곡 ${index}`,
+      status: 'pending',
+    })));
+
+    const submit = (videoId, visitorId) => request(app)
+      .post(`/api/v1/cafes/${raceCafe.slug}/recommendations`)
+      .set(guestHeaders(visitorId))
+      .send({ metadataToken: issueTrackMetadataToken({ videoId, title: videoId, platform: 'youtube' }) });
+    const responses = await Promise.all([
+      submit('race_new_a', 'race-visitor-a'),
+      submit('race_new_b', 'race-visitor-b'),
+    ]);
+
+    expect(responses.map(response => response.status).sort()).toEqual([201, 429]);
+    const count = await db('recommendations')
+      .where({ cafe_id: raceCafe.id })
+      .whereIn('status', ['pending', 'accepted', 'playing'])
+      .count('* as n')
+      .first();
+    expect(Number(count.n)).toBe(30);
+    await db('cafes').where({ id: raceCafe.id }).del();
   });
 
   it('손님 큐 조회는 active 상태만 노출한다', async () => {
@@ -98,6 +155,19 @@ describe('추천곡 신청', () => {
     expect(ids).not.toContain('hidden_played');
     expect(ids).not.toContain('hidden_skipped');
     expect(ids).not.toContain('hidden_rejected');
+  });
+
+  it('7일이 지난 active 곡도 큐·한도에서 동일하게 노출한다', async () => {
+    const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    await db('recommendations').insert({
+      cafe_id: cafe.id,
+      video_id: 'old_but_active',
+      title: '오래된 활성 곡',
+      status: 'pending',
+      requested_at: old,
+    });
+    const res = await request(app).get(`/api/v1/cafes/${cafe.slug}/recommendations`);
+    expect(res.body.recommendations.map(rec => rec.video_id)).toContain('old_but_active');
   });
 });
 
@@ -134,6 +204,17 @@ describe('손님 취소 — 소유권 검증', () => {
     expect(res.status).toBe(403);
   });
 
+  it('같은 IP여도 visitor_id가 다른 손님은 취소할 수 없다', async () => {
+    const [rec] = await db('recommendations').insert({
+      cafe_id: cafe.id, video_id: 'cancel_shared_wifi', title: '공용 와이파이 곡',
+      status: 'pending', visitor_id: 'wifi-owner', requester_ip: '203.0.113.10',
+    }).returning('*');
+    const res = await request(app)
+      .delete(`/api/v1/cafes/${cafe.slug}/recommendations/${rec.id}/cancel`)
+      .set({ ...guestHeaders('wifi-attacker'), 'X-Forwarded-For': '203.0.113.10' });
+    expect(res.status).toBe(403);
+  });
+
   it('본인 신청(visitor_id 일치) 취소 → 200', async () => {
     const [rec] = await db('recommendations').insert({
       cafe_id: cafe.id, video_id: 'cancel_mine', title: '내 곡',
@@ -157,6 +238,46 @@ describe('투표', () => {
     expect(first.status).toBe(200);
     const second = await request(app).post(url).set(guestHeaders());
     expect(second.status).toBe(409);
+  });
+
+  it('같은 IP의 서로 다른 visitor는 각각 투표·취소할 수 있다', async () => {
+    const [rec] = await db('recommendations').insert({
+      cafe_id: cafe.id, video_id: 'vote_shared_wifi', title: '공용 와이파이 투표', status: 'pending',
+    }).returning('*');
+    const url = `/api/v1/cafes/${cafe.slug}/recommendations/${rec.id}/vote`;
+    const sharedIp = '203.0.113.20';
+    expect((await request(app).post(url).set({ ...guestHeaders('wifi-voter-a'), 'X-Forwarded-For': sharedIp })).status).toBe(200);
+    expect((await request(app).post(url).set({ ...guestHeaders('wifi-voter-b'), 'X-Forwarded-For': sharedIp })).status).toBe(200);
+    const removed = await request(app).delete(url).set({ ...guestHeaders('wifi-voter-a'), 'X-Forwarded-For': sharedIp });
+    expect(removed.status).toBe(200);
+    expect(removed.body.vote_count).toBe(1);
+  });
+});
+
+describe('방문자 집계 식별자', () => {
+  it('같은 IP의 서로 다른 visitor는 각각 한 명으로 기록한다', async () => {
+    const sharedIp = '203.0.113.30';
+    for (const visitor of ['visit-wifi-a', 'visit-wifi-b', 'visit-wifi-a']) {
+      await request(app)
+        .get(`/api/v1/cafes/${cafe.slug}/recommendations`)
+        .set({ ...guestHeaders(visitor), 'X-Forwarded-For': sharedIp });
+    }
+    const rows = await db('cafe_visits')
+      .where({ cafe_id: cafe.id })
+      .whereIn('visitor_id', ['visit-wifi-a', 'visit-wifi-b']);
+    expect(rows).toHaveLength(2);
+  });
+
+  it('운영자 API는 사람 수가 아닌 익명 브라우저 수로 명시한다', async () => {
+    const adminToken = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
+    const res = await request(app)
+      .get('/api/v1/admin/cafes')
+      .set({ Authorization: `Bearer ${adminToken}` });
+
+    expect(res.status).toBe(200);
+    const item = res.body.find(row => row.id === cafe.id);
+    expect(item).toHaveProperty('today_unique_browsers');
+    expect(item).not.toHaveProperty('today_unique_visitors');
   });
 });
 
@@ -183,6 +304,55 @@ describe('곡 댓글 경로 검증', () => {
 
     expect(res.status).toBe(400);
     expect(Number((await db('song_comments').where({ parent_id: parent.id }).count('* as n').first()).n)).toBe(0);
+  });
+
+  it('최상위 댓글을 최신순 페이지로 반환하고 해당 답글만 묶는다', async () => {
+    const videoId = 'paged_comments';
+    const baseTime = Date.now() - 60_000;
+    const parents = await db('song_comments').insert(Array.from({ length: 23 }, (_, index) => ({
+      video_id: videoId,
+      cafe_id: cafe.id,
+      body: `부모 ${index}`,
+      created_at: new Date(baseTime + index * 1000),
+    }))).returning('*');
+    const newest = parents.find(parent => parent.body === '부모 22');
+    await db('song_comments').insert({
+      video_id: videoId,
+      cafe_id: cafe.id,
+      parent_id: newest.id,
+      body: '최신 글 답글',
+      created_at: new Date(baseTime + 30_000),
+    });
+
+    const first = await request(app).get(`/api/v1/songs/${videoId}/comments?offset=0&limit=10`);
+    expect(first.status).toBe(200);
+    expect(first.body.items).toHaveLength(10);
+    expect(first.body.items[0].body).toBe('부모 22');
+    expect(first.body.items[0].replies.map(reply => reply.body)).toEqual(['최신 글 답글']);
+    expect(first.body).toMatchObject({ hasMore: true, nextOffset: 10 });
+
+    const last = await request(app).get(`/api/v1/songs/${videoId}/comments?offset=20&limit=10`);
+    expect(last.status).toBe(200);
+    expect(last.body.items).toHaveLength(3);
+    expect(last.body).toMatchObject({ hasMore: false, nextOffset: null });
+  });
+});
+
+describe('API 페이지 경계와 404 계약', () => {
+  it.each([
+    '/api/v1/top10?offset=-1',
+    `/api/v1/cafes/${cafe?.slug || 'testcafe1'}/recommendations/top10?offset=1abc`,
+    '/api/v1/songs/any/comments?limit=51',
+  ])('잘못된 페이지 파라미터를 400으로 거절한다: %s', async (path) => {
+    const res = await request(app).get(path);
+    expect(res.status).toBe(400);
+  });
+
+  it('없는 API는 SPA HTML이 아니라 JSON 404를 반환한다', async () => {
+    const res = await request(app).get('/api/v1/not-a-real-endpoint');
+    expect(res.status).toBe(404);
+    expect(res.type).toBe('application/json');
+    expect(res.body.error).toBe('API endpoint not found');
   });
 });
 
@@ -237,9 +407,9 @@ describe('사장님 상태 변경 — 인증·전이 검증', () => {
     expect((await put(null, 'accepted')).status).toBe(401);
   });
 
-  it('다른 카페 토큰 → 403', async () => {
+  it('DB의 현재 slug와 다른 토큰 → 401', async () => {
     const wrong = jwt.sign({ cafeId: cafe.id, slug: 'othercafe' }, JWT_SECRET, { expiresIn: '1h' });
-    expect((await put(wrong, 'accepted')).status).toBe(403);
+    expect((await put(wrong, 'accepted')).status).toBe(401);
   });
 
   it('pending → playing → played 정상 전이', async () => {

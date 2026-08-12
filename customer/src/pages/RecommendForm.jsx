@@ -95,11 +95,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
 
     try {
       const rec = await postRecommendation(slug, {
-        videoId: preview.videoId,
-        title: preview.title,
-        channelTitle: preview.channelTitle,
-        thumbnail: preview.thumbnail,
-        platform: preview.platform,
+        metadataToken: preview.metadataToken,
         requesterName: getDeviceName(),
       });
       onAdded(rec);

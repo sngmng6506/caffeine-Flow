@@ -1,5 +1,6 @@
 const { dialog, session, shell } = require('electron');
 const fs = require('fs');
+const { isAllowedMusicUrl } = require('./navigation-policy');
 
 function createSessionTools({ ipcMain, windowManager }) {
   async function clearDomainSession(domains) {
@@ -93,14 +94,19 @@ function createSessionTools({ ipcMain, windowManager }) {
   }
 
   function registerIpcHandlers() {
-    ipcMain.handle('clear-soundcloud-session', () =>
-      clearDomainSession(['soundcloud.com', 'datadome.co', 'datadome.com']));
-    ipcMain.handle('clear-spotify-session', () =>
-      clearDomainSession(['spotify.com', 'scdn.co']));
-    ipcMain.handle('import-cookies-from-file', importCookiesFromFile);
-    ipcMain.on('open-external', (_event, url) => {
+    const trusted = (event) => windowManager.isFromMainRenderer(event.sender);
+    ipcMain.handle('clear-soundcloud-session', (event) => trusted(event)
+      ? clearDomainSession(['soundcloud.com', 'datadome.co', 'datadome.com'])
+      : 0);
+    ipcMain.handle('clear-spotify-session', (event) => trusted(event)
+      ? clearDomainSession(['spotify.com', 'scdn.co'])
+      : 0);
+    ipcMain.handle('import-cookies-from-file', (event) => trusted(event)
+      ? importCookiesFromFile()
+      : { error: 'Forbidden' });
+    ipcMain.on('open-external', (event, url) => {
       try {
-        if (typeof url === 'string' && /^https?:\/\//i.test(url)) shell.openExternal(url);
+        if (trusted(event) && typeof url === 'string' && /^https?:\/\//i.test(url)) shell.openExternal(url);
       } catch (error) {
         console.error('[open-external]', error);
       }
@@ -110,12 +116,17 @@ function createSessionTools({ ipcMain, windowManager }) {
   function configureDefaultSession() {
     const activeSession = session.defaultSession;
 
-    activeSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-      callback(['media', 'mediaKeySystem'].includes(permission));
+    // 오디오 재생에는 camera/microphone을 포함하는 media 권한이 필요하지
+    // 않다. DRM만 음악 BrowserView의 허용된 플랫폼 origin에 한해 승인한다.
+    const allowProtectedMedia = (webContents, permission) => permission === 'mediaKeySystem'
+      && windowManager.isFromMusicView(webContents)
+      && isAllowedMusicUrl(webContents.getURL());
+
+    activeSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      callback(allowProtectedMedia(webContents, permission));
     });
-    activeSession.setPermissionCheckHandler((_webContents, permission) => {
-      if (['media', 'mediaKeySystem'].includes(permission)) return true;
-      return null;
+    activeSession.setPermissionCheckHandler((webContents, permission) => {
+      return allowProtectedMedia(webContents, permission);
     });
 
     activeSession.webRequest.onBeforeRequest(

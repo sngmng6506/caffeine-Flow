@@ -17,7 +17,9 @@ function getClientIp(req) {
 // x-visitor-id 헤더 정규화 — 문자열이 아니거나 과도하게 길면 무시
 function safeVisitorId(req) {
   const v = req.headers['x-visitor-id'];
-  return typeof v === 'string' && v.length <= VISITOR_ID_MAX_LENGTH ? v : null;
+  if (typeof v !== 'string') return null;
+  const normalized = v.trim();
+  return normalized && normalized.length <= VISITOR_ID_MAX_LENGTH ? normalized : null;
 }
 
 // visitor_id + IP 이중 rate limiter 생성기 — 신청 라우트에서 검증된 패턴을
@@ -34,7 +36,7 @@ function makeDualLimiter({ windowMs = ONE_MINUTE_MS, visitorMax, ipMax, message 
     rateLimit({
       windowMs,
       max: visitorMax,
-      keyGenerator: (req) => req.headers['x-visitor-id'] || `ip:${ipKeyGenerator(req.ip)}`,
+      keyGenerator: (req) => safeVisitorId(req) || `ip:${ipKeyGenerator(req.ip)}`,
       message: msg,
       skip: skipInTest,
     }),

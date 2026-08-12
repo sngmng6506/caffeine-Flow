@@ -39,7 +39,7 @@ async function test() {
     .join('cafes as c', 'v.cafe_id', 'c.id')
     .select('c.name', 'c.slug')
     .count('v.id as total_visits')
-    .countDistinct('v.visitor_ip as unique_visitors')
+    .select(db.raw('COUNT(DISTINCT COALESCE(v.visitor_id, v.visitor_ip::text)) AS unique_browsers'))
     .where('v.visited_at', '>=', db.raw("NOW() - INTERVAL '7 days'"))
     .groupBy('c.id', 'c.name', 'c.slug');
 
@@ -47,14 +47,14 @@ async function test() {
     console.log('  방문 기록 없음 (손님 페이지 접속 필요)');
   } else {
     visits.forEach(v => {
-      console.log(`  ${v.name}: 최근 7일 ${v.total_visits}회 방문 / ${v.unique_visitors}명`);
+      console.log(`  ${v.name}: 최근 7일 ${v.total_visits} 브라우저-일 / ${v.unique_browsers} 익명 브라우저`);
     });
   }
 
   // 4. 오늘 방문 기록 상세
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const todayVisits = await db('cafe_visits').where('visited_at', '>=', today).count('id as n').first();
-  console.log(`\n[ 4. 오늘 전체 방문 수: ${todayVisits.n}회 ]`);
+  console.log(`\n[ 4. 오늘 전체 카페 방문 레코드: ${todayVisits.n}건 ]`);
 
   console.log('\n=== 완료 ===\n');
   process.exit(0);

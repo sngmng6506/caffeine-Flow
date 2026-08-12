@@ -1,5 +1,10 @@
 const { BrowserWindow, BrowserView, screen } = require('electron');
 const path = require('path');
+const { isAllowedLoginUrl, isAllowedOwnerRendererUrl } = require('./navigation-policy');
+const {
+  ISOLATED_EXTERNAL_WEB_PREFERENCES,
+  STEALTH_EXTERNAL_WEB_PREFERENCES,
+} = require('./web-preferences');
 
 function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
   let leftRatio = 0.42;
@@ -35,7 +40,9 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
         overrideBrowserWindowOptions: {
           width: 500,
           height: 700,
-          webPreferences: { contextIsolation: false, nodeIntegration: false },
+          webPreferences: {
+            ...ISOLATED_EXTERNAL_WEB_PREFERENCES,
+          },
         },
       };
     });
@@ -54,8 +61,9 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
 
     bgmView = new BrowserView({
       webPreferences: {
-        contextIsolation: false,
-        nodeIntegration: false,
+        // stealth-preload가 외부 서비스의 main world 속성을 보정해야 하므로
+        // contextIsolation 예외는 유지하되 Chromium sandbox로 Node 접근을 차단한다.
+        ...STEALTH_EXTERNAL_WEB_PREFERENCES,
         preload: path.join(__dirname, 'stealth-preload.js'),
         backgroundThrottling: false,
       },
@@ -70,8 +78,9 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
 
     recView = new BrowserView({
       webPreferences: {
-        contextIsolation: false,
-        nodeIntegration: false,
+        // YouTube preload는 DOM 관찰과 제한된 ipcRenderer 전송만 필요하므로
+        // 외부 페이지의 main world와 완전히 분리한다.
+        ...ISOLATED_EXTERNAL_WEB_PREFERENCES,
         preload: path.join(__dirname, 'youtube-preload.js'),
       },
     });
@@ -177,6 +186,7 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
         nodeIntegration: false,
+        sandbox: false, // preload가 로컬 navigation-policy 모듈을 사용한다.
       },
       title: 'Caffeine Flow — owner',
     });
@@ -203,6 +213,7 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
   }
 
   function openLoginWindow(url) {
+    if (!isAllowedLoginUrl(url)) return;
     if (loginWin && !loginWin.isDestroyed()) {
       loginWin.focus();
       return;
@@ -213,8 +224,9 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
       height: 720,
       title: '로그인',
       webPreferences: {
-        contextIsolation: false,
-        nodeIntegration: false,
+        // 로그인 호환용 stealth-preload는 main world 접근이 필요하다.
+        // Node integration은 끄고 sandbox를 켜 예외 범위를 좁힌다.
+        ...STEALTH_EXTERNAL_WEB_PREFERENCES,
         preload: path.join(__dirname, 'stealth-preload.js'),
       },
     });
@@ -253,11 +265,20 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
   }
 
   function registerIpcHandlers(ipcMain) {
-    ipcMain.on('open-login-window', (_event, url) => openLoginWindow(url));
-    ipcMain.on('set-panel-ratio', (_event, ratio) => setPanelRatio(ratio));
-    ipcMain.on('divider-drag-start', dividerDragStart);
-    ipcMain.on('divider-drag-end', dividerDragEnd);
-    ipcMain.on('open-bgm-devtools', () => {
+    ipcMain.on('open-login-window', (event, url) => {
+      if (isFromMainRenderer(event.sender)) openLoginWindow(url);
+    });
+    ipcMain.on('set-panel-ratio', (event, ratio) => {
+      if (isFromMainRenderer(event.sender) && Number.isFinite(ratio)) setPanelRatio(ratio);
+    });
+    ipcMain.on('divider-drag-start', (event) => {
+      if (isFromMainRenderer(event.sender)) dividerDragStart();
+    });
+    ipcMain.on('divider-drag-end', (event) => {
+      if (isFromMainRenderer(event.sender)) dividerDragEnd();
+    });
+    ipcMain.on('open-bgm-devtools', (event) => {
+      if (!isFromMainRenderer(event.sender)) return;
       if (bgmView && !bgmView.webContents.isDestroyed()) {
         bgmView.webContents.openDevTools({ mode: 'detach' });
       }
@@ -272,6 +293,15 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
     return matches(recView) || matches(bgmView);
   }
 
+  function isFromMainRenderer(webContents) {
+    return Boolean(webContents
+      && mainWindow
+      && !mainWindow.isDestroyed()
+      && !mainWindow.webContents.isDestroyed()
+      && mainWindow.webContents.id === webContents.id
+      && isAllowedOwnerRendererUrl(webContents.getURL(), ownerUrl));
+  }
+
   return {
     attachBgmPanel,
     attachRecView,
@@ -284,6 +314,7 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
     getMainWindow: () => mainWindow,
     getRecView: () => recView,
     isFromMusicView,
+    isFromMainRenderer,
     isPanelVisible: () => panelVisible,
     isRecViewAttached: () => recViewAttached,
     registerIpcHandlers,

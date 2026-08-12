@@ -6,6 +6,7 @@ const {
   createSpotifyTakeoverDetector,
 } = require('./end-detection');
 const { PLAYBACK_STATE, createPlaybackStateDetector } = require('./playback-state');
+const { isAllowedMusicUrl, toRecommendationUrl } = require('./navigation-policy');
 
 function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   let currentBgmUrl = null;
@@ -50,6 +51,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   }
 
   function setBgmUrl(url) {
+    if (!isAllowedMusicUrl(url)) return;
     currentBgmUrl = url;
     const bgmView = windowManager.createBgmView();
     if (!windowManager.isPanelVisible()) showPanel();
@@ -70,11 +72,9 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   }
 
   async function playRecommendation(videoIdOrUrl) {
+    const url = toRecommendationUrl(videoIdOrUrl);
+    if (!url) return;
     stopDetectors();
-
-    const url = videoIdOrUrl.startsWith('http')
-      ? videoIdOrUrl
-      : `https://www.youtube.com/watch?v=${videoIdOrUrl}`;
     const isSpotifyRecommendation = spotify.isSpotifyUrl(url);
     const bgmIsSpotify = spotify.isSpotifyUrl(currentBgmUrl);
     const bgmView = windowManager.getBgmView();
@@ -160,12 +160,13 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   }
 
   function registerIpcHandlers() {
-    ipcMain.on('show-youtube', showPanel);
-    ipcMain.on('hide-youtube', hidePanel);
-    ipcMain.on('set-bgm-url', (_event, url) => setBgmUrl(url));
-    ipcMain.on('clear-bgm', clearBgm);
-    ipcMain.on('play-rec', (_event, videoIdOrUrl) => playRecommendation(videoIdOrUrl));
-    ipcMain.on('end-rec', endRecommendation);
+    const trusted = (event) => windowManager.isFromMainRenderer(event.sender);
+    ipcMain.on('show-youtube', (event) => { if (trusted(event)) showPanel(); });
+    ipcMain.on('hide-youtube', (event) => { if (trusted(event)) hidePanel(); });
+    ipcMain.on('set-bgm-url', (event, url) => { if (trusted(event)) setBgmUrl(url); });
+    ipcMain.on('clear-bgm', (event) => { if (trusted(event)) clearBgm(); });
+    ipcMain.on('play-rec', (event, videoIdOrUrl) => { if (trusted(event)) playRecommendation(videoIdOrUrl); });
+    ipcMain.on('end-rec', (event) => { if (trusted(event)) endRecommendation(); });
   }
 
   return {

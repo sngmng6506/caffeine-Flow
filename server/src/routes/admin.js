@@ -2,7 +2,7 @@
 //
 // 사장님 라우트(cafes.js)가 "내 카페 하나"만 보는 것과 달리, 여기는 전체
 // 카페를 가로질러 본다. 목적:
-//  (1) 광고 재고 판단 — 실제로 켜서 쓰는 카페와 그 도달(순수 방문자)
+//  (1) 광고 재고 판단 — 실제로 켜서 쓰는 카페와 그 도달(익명 브라우저 수)
 //  (2) 사후 관리 — 가입만 하고 안 쓰는 계정·장난 카페 탐지 후 정지/삭제
 //
 // 인증은 사장님 JWT와 분리된 경계를 쓴다(middleware/auth.js requireAdmin).
@@ -90,11 +90,11 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
     )
     .orderBy('created_at', 'desc');
 
-  // cafe_visits는 (cafe_id, visitor_ip, visit_date) UNIQUE라 이미 하루 단위 중복이 제거됨.
-  // 광고주에게 제시할 도달은 "중복 뺀 실제 방문자"이므로 visitor_ip 기준 distinct.
+  // cafe_visits는 localStorage의 visitor_id 우선, 레거시 요청은 IP fallback으로
+  // 하루 단위 중복이 제거된다. 계정·사람 수가 아니라 익명 브라우저 프로필 수다.
   const visits = await db('cafe_visits')
     .select('cafe_id')
-    .countDistinct('visitor_ip as unique_visitors')
+    .count('id as unique_browsers')
     .where('visit_date', today)
     .groupBy('cafe_id');
 
@@ -104,7 +104,7 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
     .where('requested_at', '>=', todayStart)
     .groupBy('cafe_id');
 
-  const visitMap = new Map(visits.map((v) => [v.cafe_id, Number(v.unique_visitors)]));
+  const visitMap = new Map(visits.map((v) => [v.cafe_id, Number(v.unique_browsers)]));
   const requestMap = new Map(requests.map((r) => [r.cafe_id, Number(r.requests)]));
 
   const now = Date.now();
@@ -113,7 +113,7 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
   res.json(cafes.map((c) => ({
     ...c,
     status: cafeStatus(c.last_heartbeat_at, now, todayStartMs),
-    today_unique_visitors: visitMap.get(c.id) || 0,
+    today_unique_browsers: visitMap.get(c.id) || 0,
     today_requests: requestMap.get(c.id) || 0,
   })));
 });

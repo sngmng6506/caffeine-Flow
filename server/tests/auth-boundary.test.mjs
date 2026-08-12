@@ -40,6 +40,27 @@ describe('requireAuth 토큰 경계', () => {
     const token = jwt.sign({ cafeId: cafe.id }, JWT_SECRET, { expiresIn: '1h' });
     expect((await request(app).get('/api/v1/cafes/me').set({ Authorization: `Bearer ${token}` })).status).toBe(401);
   });
+
+  it('slug 변경 후 버려진 slug를 다른 카페가 가져가도 옛 토큰은 접근하지 못한다', async () => {
+    const [former] = await db('cafes').insert({ name: '이전 소유자', slug: 'staleold', owner_email: 'stale-a@t.com' }).returning('*');
+    const [next] = await db('cafes').insert({ name: '다음 소유자', slug: 'stalenew', owner_email: 'stale-b@t.com' }).returning('*');
+    const staleToken = jwt.sign({ cafeId: former.id, slug: former.slug }, JWT_SECRET, { expiresIn: '1h' });
+    const nextToken = jwt.sign({ cafeId: next.id, slug: next.slug }, JWT_SECRET, { expiresIn: '1h' });
+
+    expect((await request(app).put('/api/v1/cafes/me/slug')
+      .set({ Authorization: `Bearer ${staleToken}` }).send({ slug: 'staleafter' })).status).toBe(200);
+    expect((await request(app).put('/api/v1/cafes/me/slug')
+      .set({ Authorization: `Bearer ${nextToken}` }).send({ slug: 'staleold' })).status).toBe(200);
+
+    expect((await request(app).get('/api/v1/cafes/me')
+      .set({ Authorization: `Bearer ${staleToken}` })).status).toBe(401);
+    expect((await request(app).post('/api/v1/cafes/staleold/recommendations/owner')
+      .set({ Authorization: `Bearer ${staleToken}` })
+      .send({ videoId: 'cross-tenant', title: '침범 시도' })).status).toBe(401);
+
+    expect(Number((await db('recommendations').where({ cafe_id: next.id }).count('* as n').first()).n)).toBe(0);
+    await db('cafes').whereIn('id', [former.id, next.id]).del();
+  });
 });
 
 describe('추천곡 tenant isolation', () => {

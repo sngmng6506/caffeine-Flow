@@ -23,6 +23,10 @@ async function findBySlug(slug) {
   return db('cafes').where({ slug }).first();
 }
 
+async function findById(id) {
+  return db('cafes').where({ id }).first();
+}
+
 // 손님 노출용 조회 — 정지된 카페를 제외한다.
 //
 // findBySlug에 정지 필터를 넣지 않는 이유: uniqueSlug()가 충돌 검사에
@@ -136,6 +140,7 @@ async function findMovedSlug(oldSlug) {
 }
 
 module.exports = {
+  findById,
   findBySlug,
   findActiveBySlug,
   findByEmail,

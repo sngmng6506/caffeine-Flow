@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 const { APP_URL } = require('./src/config');
 const statsService = require('./src/services/stats.service');
 const { GLOBAL_API_RATE_LIMIT } = require('./src/constants/limits');
+const { parseOffset } = require('./src/utils/pagination');
 
 // app 생성을 server.js(리슨·소켓)와 분리 — supertest가 포트 없이
 // app만 import해 통합 테스트를 돌릴 수 있게 한다.
@@ -111,12 +112,19 @@ app.use('/api/v1/admin',                         require('./src/routes/admin'));
 
 // GET /api/v1/top10  (전체 카페 통합 TOP10, 인증 불필요)
 app.get('/api/v1/top10', async (req, res) => {
-  const offset = parseInt(req.query.offset) || 0;
-  res.json(await statsService.getGlobalTop10(offset));
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+  res.json(await statsService.getGlobalTop10(offset.value));
 });
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', version: 'v2' }));
+
+// 존재하지 않는 API를 손님 SPA의 HTML로 돌려주면 클라이언트가 JSON parse
+// 오류로 실패 원인을 잃는다. 모든 API 404는 일관된 JSON 계약으로 종료한다.
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
 
 // Owner SPA fallback
 app.get('/owner/*', (_req, res) => {

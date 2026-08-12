@@ -41,8 +41,8 @@ export const getCafeTop10   = (slug, offset = 0) =>
 export const getGlobalTop10 = (offset = 0) =>
   apiFetch('GET', `/top10?offset=${offset}`);
 
-export const getSongComments = (videoId) =>
-  apiFetch('GET', `/songs/${videoId}/comments`);
+export const getSongComments = (videoId, offset = 0, limit = 20) =>
+  apiFetch('GET', `/songs/${videoId}/comments?offset=${offset}&limit=${limit}`);
 
 export const postSongComment = (videoId, slug = null, body) =>
   slug

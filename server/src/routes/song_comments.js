@@ -3,8 +3,10 @@ const cafeService = require('../services/cafe.service');
 const svc         = require('../services/song_comments.service');
 const { validateString } = require('../utils/validate');
 const { getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
+const { COMMENT_LIMIT, COMMENT_PAGE_SIZE, COMMENT_PAGE_MAX_SIZE } = require('../constants/limits');
+const { parseLimit, parseOffset } = require('../utils/pagination');
 
-const commentLimiters = makeDualLimiter({ visitorMax: 5, ipMax: 15, message: '잠시 후 다시 댓글을 남겨주세요 (1분에 5개 제한)' });
+const commentLimiters = makeDualLimiter({ ...COMMENT_LIMIT, message: '잠시 후 다시 댓글을 남겨주세요 (1분에 5개 제한)' });
 
 // 카페 경로로 접근하면 활성 카페를 반드시 확인한다. 잘못된 slug를
 // cafe_id=null인 전역 댓글로 조용히 바꾸지 않는다.
@@ -22,7 +24,18 @@ router.use(async (req, res, next) => {
 // GET  /api/v1/cafes/:slug/songs/:videoId/comments
 // GET  /api/v1/songs/:videoId/comments
 router.get('/', async (req, res) => {
-  res.json(await svc.getComments(req.params.videoId));
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+  const limit = parseLimit(req.query.limit, {
+    defaultValue: COMMENT_PAGE_SIZE,
+    max: COMMENT_PAGE_MAX_SIZE,
+  });
+  if (limit.error) return res.status(400).json({ error: limit.error });
+
+  res.json(await svc.getComments(req.params.videoId, {
+    offset: offset.value,
+    limit: limit.value,
+  }));
 });
 
 // POST /api/v1/cafes/:slug/songs/:videoId/comments

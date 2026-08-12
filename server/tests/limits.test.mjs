@@ -7,6 +7,9 @@ import {
   RECOMMENDATION_REQUEST_LIMIT,
   VOTE_LIMIT,
   COMMENT_LIMIT,
+  MAX_PAGINATION_OFFSET,
+  COMMENT_PAGE_SIZE,
+  COMMENT_PAGE_MAX_SIZE,
   ADMIN_LOGIN_LIMIT,
 } from '../src/constants/limits.js';
 
@@ -19,8 +22,8 @@ describe('운영 한도 정책 상수', () => {
     expect(QUEUE_MAX_SIZE).toBe(30);
   });
 
-  it('visitor id 헤더 최대 길이는 64자다', () => {
-    expect(VISITOR_ID_MAX_LENGTH).toBe(64);
+  it('visitor id 헤더 최대 길이는 DB 컬럼과 같은 36자다', () => {
+    expect(VISITOR_ID_MAX_LENGTH).toBe(36);
   });
 
   it('신청 rate limit은 visitor 3회/min, IP 10회/min이다', () => {
@@ -45,6 +48,12 @@ describe('운영 한도 정책 상수', () => {
       visitorMax: 5,
       ipMax: 15,
     });
+  });
+
+  it('목록 offset과 댓글 페이지 크기에 상한이 있다', () => {
+    expect(MAX_PAGINATION_OFFSET).toBe(10_000);
+    expect(COMMENT_PAGE_SIZE).toBe(20);
+    expect(COMMENT_PAGE_MAX_SIZE).toBe(50);
   });
 
   it('운영자 로그인은 15분 동안 10회로 제한한다', () => {

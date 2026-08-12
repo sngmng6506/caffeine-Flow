@@ -294,8 +294,14 @@ export default function useRecommendationQueue({
   function handleUpdate(updated, context) {
     storeRecommendation(updated);
 
-    if (context === REC_STATUS.PLAYING && updated.status === REC_STATUS.SKIPPED) {
-      playNextOrStop(recommendationsRef.current);
+    if (context === REC_STATUS.PLAYING && updated.status !== REC_STATUS.PLAYING) {
+      if ([REC_STATUS.PLAYED, REC_STATUS.SKIPPED].includes(updated.status)) {
+        playNextOrStop(recommendationsRef.current);
+      } else {
+        // 재생 중 곡을 대기/신청 영역으로 되돌린 경우 같은 곡을 즉시 다시
+        // 시작하지 않고 실제 플레이어도 BGM으로 복귀시킨다.
+        window.electronAPI?.endRec();
+      }
       return;
     }
 

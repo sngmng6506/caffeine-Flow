@@ -1,8 +1,10 @@
 const { autoUpdater } = require('electron-updater');
 
-function createAutoUpdateManager({ ipcMain, isDev, safeSend }) {
+function createAutoUpdateManager({ ipcMain, isDev, safeSend, isTrustedSender }) {
   function registerIpcHandlers() {
-    ipcMain.on('restart-app', () => autoUpdater.quitAndInstall());
+    ipcMain.on('restart-app', (event) => {
+      if (isTrustedSender(event.sender)) autoUpdater.quitAndInstall();
+    });
   }
 
   function start() {

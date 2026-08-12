@@ -2,24 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  Heart,
   Info,
   LoaderCircle,
-  MessageCircle,
-  Music2,
   PauseCircle,
-  Reply,
-  Send,
 } from 'lucide-react';
 import {
   getRecommendations,
   getCafeTop10,
   getGlobalTop10,
-  getSongComments,
-  postSongComment,
-  postSongReply,
 } from '../api';
 import { getDeviceName } from '../deviceName';
 import { getSocket, disconnectSocket } from '../socket';
@@ -29,8 +19,9 @@ import { PLAYBACK_STATE } from '../constants/playbackState';
 import NowPlaying from './NowPlaying';
 import RecommendForm from './RecommendForm';
 import SongCard from './SongCard';
-import SongThumbnail from '../components/SongThumbnail';
-import LongPressCopy from '../components/LongPressCopy';
+import CafeComments from './CafeComments';
+import StatePanel from './StatePanel';
+import Top10List from './Top10List';
 
 function getTabs(cafeName) {
   return [
@@ -39,18 +30,6 @@ function getTabs(cafeName) {
     { id: 'cafeTop', label: cafeName ? `${cafeName} TOP` : '매장 TOP' },
     { id: 'globalTop', label: '전체 TOP' },
   ];
-}
-
-function StatePanel({ icon: Icon = Music2, title, description, loading = false }) {
-  return (
-    <div className='empty-state' role={loading ? 'status' : undefined}>
-      <span className='empty-state__icon' aria-hidden='true'>
-        <Icon size={24} className={loading ? 'spin' : ''} />
-      </span>
-      <strong>{title}</strong>
-      {description && <p>{description}</p>}
-    </div>
-  );
 }
 
 export default function CafePage({ slug }) {
@@ -387,7 +366,7 @@ export default function CafePage({ slug }) {
                     hideStatus
                     expanded={queueExpanded === rec.id}
                   />
-                  {queueExpanded === rec.id && <CommentSection videoId={rec.video_id} slug={slug} />}
+                  {queueExpanded === rec.id && <CafeComments videoId={rec.video_id} slug={slug} />}
                 </div>
               ))}
             </QueueSection>
@@ -409,7 +388,7 @@ export default function CafePage({ slug }) {
                     hideStatus
                     expanded={queueExpanded === rec.id}
                   />
-                  {queueExpanded === rec.id && <CommentSection videoId={rec.video_id} slug={slug} />}
+                  {queueExpanded === rec.id && <CafeComments videoId={rec.video_id} slug={slug} />}
                 </div>
               ))}
             </QueueSection>
@@ -442,7 +421,7 @@ export default function CafePage({ slug }) {
                       showDate
                       expanded={historyExpanded === rec.id}
                     />
-                    {historyExpanded === rec.id && <CommentSection videoId={rec.video_id} slug={slug} />}
+                    {historyExpanded === rec.id && <CafeComments videoId={rec.video_id} slug={slug} />}
                   </div>
                 ))}
               </div>
@@ -501,196 +480,5 @@ function QueueSection({ title, description, count, children }) {
       </div>
       <div className='song-list'>{children}</div>
     </section>
-  );
-}
-
-function Top10List({ items, hasMore, loading, slug, onLoadMore, onCopyResult }) {
-  const [expanded, setExpanded] = useState(null);
-  const [sortBy, setSortBy] = useState('count');
-
-  if (loading && items.length === 0) {
-    return <StatePanel icon={LoaderCircle} title='인기곡을 불러오고 있어요.' loading />;
-  }
-  if (!loading && items.length === 0) {
-    return <StatePanel title='아직 순위를 만들 데이터가 없어요.' description='신청이 쌓이면 인기곡을 보여 드릴게요.' />;
-  }
-
-  const sorted = [...items].sort((a, b) => {
-    if (sortBy === 'votes') {
-      const voteDifference = (b.total_votes || 0) - (a.total_votes || 0);
-      return voteDifference !== 0 ? voteDifference : b.count - a.count;
-    }
-    const countDifference = b.count - a.count;
-    return countDifference !== 0 ? countDifference : (b.total_votes || 0) - (a.total_votes || 0);
-  });
-
-  return (
-    <section className='content-section'>
-      <div className='section-heading'>
-        <div><h2>인기곡</h2><p>신청과 좋아요를 기준으로 모았어요.</p></div>
-      </div>
-      <div className='segmented-control' aria-label='인기곡 정렬'>
-        <button type='button' aria-pressed={sortBy === 'count'} onClick={() => setSortBy('count')}>신청순</button>
-        <button type='button' aria-pressed={sortBy === 'votes'} onClick={() => setSortBy('votes')}>좋아요순</button>
-      </div>
-      <ol className='rank-list'>
-        {sorted.map((item, index) => {
-          const rowKey = `${item.video_id}__${index}`;
-          const isExpanded = expanded === rowKey;
-          return (
-            <li className='rank-list__item' key={rowKey}>
-              <LongPressCopy videoId={item.video_id} onResult={onCopyResult}>
-                <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
-                  <span className='rank-row__number'>{index + 1}</span>
-                  <SongThumbnail
-                    src={item.thumbnail}
-                    className='rank-row__thumbnail'
-                    fallbackClassName='rank-row__thumbnail--empty'
-                    iconSize={18}
-                  />
-                  <span className='rank-row__info'>
-                    <strong>{item.title}</strong>
-                    <small>{item.channel_title} · {item.count}회 신청</small>
-                  </span>
-                  <span className='rank-row__votes'><Heart size={14} aria-hidden='true' /> {item.total_votes || 0}</span>
-                  {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
-                </button>
-              </LongPressCopy>
-              {isExpanded && <CommentSection videoId={item.video_id} slug={slug} />}
-            </li>
-          );
-        })}
-      </ol>
-      {hasMore && (
-        <button type='button' className='button button--secondary button--full' onClick={onLoadMore} disabled={loading}>
-          {loading ? '불러오는 중...' : '더 보기'}
-        </button>
-      )}
-    </section>
-  );
-}
-
-function CommentSection({ videoId, slug }) {
-  const [comments, setComments] = useState(null);
-  const [body, setBody] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const deviceName = getDeviceName();
-
-  useEffect(() => {
-    getSongComments(videoId).then(setComments).catch(() => setComments([]));
-  }, [videoId]);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    if (!body.trim()) return;
-    setLoading(true);
-    setError('');
-    try {
-      const comment = await postSongComment(videoId, slug, { commenterName: deviceName, body: body.trim() });
-      setComments(previous => [comment, ...(previous || [])]);
-      setBody('');
-    } catch (caught) {
-      setError(caught.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <section className='comments' aria-label='댓글'>
-      <div className='comments__heading'>
-        <span><MessageCircle size={17} aria-hidden='true' /> 댓글</span>
-        <small>내 닉네임 · {deviceName}</small>
-      </div>
-      <form className='comment-form' onSubmit={handleSubmit}>
-        <label className='sr-only' htmlFor={`comment-${videoId}`}>댓글</label>
-        <input id={`comment-${videoId}`} value={body} onChange={event => setBody(event.target.value)} placeholder='댓글을 남겨 보세요' maxLength={200} required />
-        {error && <p className='form-error' role='alert'>{error}</p>}
-        {body.trim() && (
-          <div className='comment-form__actions'>
-            <button type='button' className='button button--text' onClick={() => setBody('')}>돌아가기</button>
-            <button type='submit' className='button button--primary button--compact' disabled={loading}>
-              <Send size={15} aria-hidden='true' /> {loading ? '등록 중...' : '댓글 등록하기'}
-            </button>
-          </div>
-        )}
-      </form>
-
-      {comments === null && <p className='comments__state'>댓글을 불러오고 있어요.</p>}
-      {comments?.length === 0 && <p className='comments__state'>아직 댓글이 없어요.<br />첫 번째 이야기를 남겨 보세요.</p>}
-      {comments?.map(comment => (
-        <CommentItem
-          key={comment.id}
-          comment={comment}
-          videoId={videoId}
-          slug={slug}
-          deviceName={deviceName}
-          onReplyAdded={reply => setComments(previous => previous.map(item => item.id === comment.id ? { ...item, replies: [...item.replies, reply] } : item))}
-        />
-      ))}
-    </section>
-  );
-}
-
-function CommentItem({ comment, videoId, slug, deviceName, onReplyAdded }) {
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [body, setBody] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleReply(event) {
-    event.preventDefault();
-    if (!body.trim()) return;
-    setLoading(true);
-    setError('');
-    try {
-      const reply = await postSongReply(videoId, comment.id, slug, { commenterName: deviceName, body: body.trim() });
-      onReplyAdded(reply);
-      setBody('');
-      setReplyOpen(false);
-    } catch (caught) {
-      setError(caught.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <article className='comment-item'>
-      <div className='comment-item__meta'>
-        <strong>{comment.commenter_name || '익명'}{comment.cafe_name && <small> · {comment.cafe_name}</small>}</strong>
-        <time>{new Date(comment.created_at).toLocaleDateString('ko-KR')}</time>
-      </div>
-      <p>{comment.body}</p>
-      <button type='button' className='reply-button' aria-expanded={replyOpen} onClick={() => setReplyOpen(value => !value)}><Reply size={14} aria-hidden='true' /> 답글</button>
-
-      {(comment.replies?.length > 0 || replyOpen) && (
-        <div className='replies'>
-          {comment.replies?.map(reply => (
-            <article className='reply-item' key={reply.id}>
-              <div className='comment-item__meta'>
-                <strong>{reply.commenter_name || '익명'}{reply.cafe_name && <small> · {reply.cafe_name}</small>}</strong>
-                <time>{new Date(reply.created_at).toLocaleDateString('ko-KR')}</time>
-              </div>
-              <p>{reply.body}</p>
-              <button type='button' className='reply-button' onClick={() => setReplyOpen(true)}><Reply size={14} aria-hidden='true' /> 답글</button>
-            </article>
-          ))}
-
-          {replyOpen && (
-            <form className='reply-form' onSubmit={handleReply}>
-              <label className='sr-only' htmlFor={`reply-${comment.id}`}>답글</label>
-              <input id={`reply-${comment.id}`} value={body} onChange={event => setBody(event.target.value)} placeholder='답글을 남겨 보세요' maxLength={200} required autoFocus />
-              {error && <p className='form-error' role='alert'>{error}</p>}
-              <div className='comment-form__actions'>
-                <button type='button' className='button button--text' onClick={() => { setReplyOpen(false); setBody(''); }}>돌아가기</button>
-                <button type='submit' className='button button--primary button--compact' disabled={loading}>{loading ? '등록 중...' : '답글 등록하기'}</button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-    </article>
   );
 }

@@ -71,7 +71,11 @@ Electron은 DRM 재생을 위해 CastLabs Electron과 Widevine을 사용한다. 
 외부 페이지 대응 코드는 공격면을 넓히기 쉬우므로 다음 원칙을 지킨다.
 
 - IPC 채널을 임의로 확장하지 않는다.
-- 사용자 입력 URL은 서버 검증을 거친 결과만 재생한다.
+- 신청곡은 서버가 서명한 메타데이터의 플랫폼·ID만 재생한다.
+- 기본 BGM URL은 YouTube·SoundCloud·Spotify HTTPS host allowlist를 통과해야 한다.
+- Electron IPC는 사장님 메인 renderer에서 온 이벤트만 처리한다.
+- 외부 음악·팝업 WebContents는 Chromium sandbox를 사용한다. YouTube preload는 `contextIsolation`을 켜고, main world 보정이 필요한 Spotify/SoundCloud·로그인 stealth preload만 격리 예외로 둔다.
+- 외부 음악 페이지에는 camera/microphone을 포함하는 `media` 권한을 주지 않으며, DRM 권한만 허용된 음악 origin에 한해 부여한다.
 - 외부 페이지 DOM 조작은 플랫폼별 어댑터 경계 안에 둔다.
 - 로그인 정보와 토큰을 로그에 남기지 않는다.
 

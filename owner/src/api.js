@@ -47,4 +47,5 @@ export const deleteRec = (slug, id) =>
 
 export const getHistory = (offset = 0, date = null) =>
   apiFetch('GET', `/cafes/me/history?offset=${offset}${date ? `&date=${date}` : ''}`);
-export const getSongComments = videoId => apiFetch('GET', `/songs/${videoId}/comments`);
+export const getSongComments = (videoId, offset = 0, limit = 20) =>
+  apiFetch('GET', `/songs/${videoId}/comments?offset=${offset}&limit=${limit}`);

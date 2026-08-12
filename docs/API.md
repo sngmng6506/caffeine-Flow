@@ -53,7 +53,7 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
 | GET | `/` | 🔓 | 활성 큐 조회와 방문 기록 |
-| POST | `/` | 🔓 ⏱ | 신청곡 등록. 중복·큐 한도·AI 필터 적용 |
+| POST | `/` | 🔓 ⏱ | 신청곡 등록. 서버가 발급한 `metadataToken`·선택적 `requesterName`을 받아 중복·큐 한도·AI 필터 적용 |
 | GET | `/top10` | 🔓 | 매장 TOP10 `?offset=` |
 | DELETE | `/:id/cancel` | 🔓 | 본인 신청 취소 |
 | POST | `/:id/vote` | 🔓 ⏱ | 투표 |
@@ -70,6 +70,10 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 사장님 라우터가 public 라우터보다 먼저 마운트되어야 한다.
 
+손님 신청의 `metadataToken`은 `GET /tracks/oembed`가 확인한 곡 정보에 5분
+유효 서명을 붙인 값이다. POST body의 임의 `videoId`, `title`, `platform`은
+곡 정보로 신뢰하지 않는다. 만료·변조 토큰은 400이다.
+
 `/:id`를 사용하는 모든 추천곡 mutation은 URL의 `:slug`가 가리키는 카페 범위에서만 해당 recommendation을 조회·수정한다. 다른 카페의 recommendation ID를 전달하면 리소스 존재 여부와 무관하게 404로 처리한다.
 
 ## 곡 댓글 — `/songs/:videoId/comments`
@@ -84,20 +88,27 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/` | 🔓 ⏱ | 댓글 작성 |
 | POST | `/:commentId/replies` | 🔓 ⏱ | 답글 작성 |
 
+댓글 GET은 `?offset=0&limit=20`을 받으며 `limit` 최대값은 50이다. 응답은
+`{ items, hasMore, nextOffset }` 형태다. 최상위 댓글은 최신순이고 각 항목의
+`replies`는 작성순이다.
+
 ## 트랙 메타데이터 — `/tracks`
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
-| GET | `/tracks/oembed?url=` | 🔓 | 음악 URL을 공통 트랙 메타데이터로 변환 |
+| GET | `/tracks/oembed?url=` | 🔓 | 음악 URL을 공통 트랙 메타데이터로 변환하고 5분 유효 `metadataToken` 발급 |
 
 사용자 URL 요청은 `safeAxiosGet`을 거쳐 SSRF를 방어한다.
+
+사장님 JWT는 불변 `cafeId`로 현재 카페를 조회하고 토큰의 slug가 현재 slug와
+같은지 확인한다. QR slug 변경 전에 발급된 토큰은 재사용 여부와 관계없이 401이다.
 
 ## 운영자 — `/admin`
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
 | POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. 15분 10회 제한, 차단 시 `retry_after_seconds` 반환 |
-| GET | `/admin/cafes` | 🛡 | 전체 카페와 운영 상태 조회 |
+| GET | `/admin/cafes` | 🛡 | 전체 카페와 운영 상태, 오늘 익명 브라우저 수(`today_unique_browsers`) 조회 |
 | GET | `/admin/cafes/:id/stats` | 🛡 | 특정 카페의 오늘·누적·시간대·요일·AI 필터 통계 |
 | PUT | `/admin/cafes/:id/suspend` | 🛡 | 카페 정지·해제 |
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
@@ -109,6 +120,10 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
 | GET | `/api/v1/top10?offset=` | 🔓 | 정지 카페를 제외한 전체 TOP10 |
+
+모든 `offset`은 0 이상 10,000 이하의 정수만 허용한다. 음수, 일부만 숫자인
+문자열, 상한 초과 값은 400이다. 존재하지 않는 `/api/*` 경로도 SPA HTML이
+아닌 `{ "error": "API endpoint not found" }` JSON 404를 반환한다.
 
 ## 헬스체크
 
