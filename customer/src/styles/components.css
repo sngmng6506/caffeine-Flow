@@ -179,7 +179,7 @@
   padding: 3px;
   flex: 0 0 auto;
   overflow: visible;
-  background: var(--cf-canvas);
+  background: transparent;
 }
 
 .now-playing__wave-mark rect {
@@ -575,8 +575,8 @@
   height: 44px;
   display: grid;
   place-items: center;
-  background: var(--cf-layer-pink);
-  border: 1px solid var(--cf-layer-pink);
+  background: transparent;
+  border: 1px solid var(--cf-on-dark);
   border-radius: var(--cf-radius-control);
   text-decoration: none;
   transition: transform var(--cf-motion-fast), background var(--cf-motion-fast);
@@ -584,6 +584,7 @@
 
 .platform-shortcut:hover {
   transform: translateY(-1px);
+  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
 }
 
 .platform-shortcut--disabled {
