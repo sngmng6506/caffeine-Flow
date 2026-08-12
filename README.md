@@ -7,6 +7,7 @@
 Express 서버    → 검증·저장·Socket.IO 동기화
 사장님 앱       → 수락·재생·스킵·운영 설정
 Electron        → YouTube·SoundCloud·Spotify 실제 재생
+운영자 콘솔     → 전체 카페 상태·사용량·정지 관리
 ```
 
 ## 핵심 기능
@@ -56,6 +57,7 @@ server/           API·Socket.IO·PostgreSQL
 customer/         손님 React SPA
 owner/src/        사장님 React UI
 owner/electron/   데스크톱 재생 엔진
+admin/            플랫폼 운영자 정적 콘솔
 ```
 
 ## 문서
@@ -67,6 +69,7 @@ owner/electron/   데스크톱 재생 엔진
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | 시스템 경계·데이터 흐름·상태 모델 |
 | [PLAYBACK.md](docs/PLAYBACK.md) | Electron 재생 엔진과 플랫폼 제약 |
 | [API.md](docs/API.md) | REST 엔드포인트 레퍼런스 |
+| [admin/README.md](admin/README.md) | 플랫폼 운영자 콘솔의 화면과 API 경계 |
 | [DEVELOPMENT.md](docs/DEVELOPMENT.md) | 환경변수·테스트·배포 |
 | [LLM_FILTER.md](docs/LLM_FILTER.md) | 현재 AI 음악 필터 동작 |
 | [AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) | 변경 시 유지할 코드 계약 |

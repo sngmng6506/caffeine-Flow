@@ -36,7 +36,7 @@ music_filter_prompt      매장 분위기 설명
 
 ## 입력과 출력
 
-곡 제목, 아티스트·채널, 플랫폼, 신청자명은 모두 신뢰할 수 없는 데이터로 취급한다.
+곡 제목, 아티스트·채널, 플랫폼, 길이, 신청자명은 모두 신뢰할 수 없는 데이터로 취급한다. 필터는 실제 음원을 듣지 않고 이 메타데이터만으로 판단한다.
 
 LLM 출력은 JSON Schema로 제한한다.
 
@@ -71,6 +71,8 @@ filter_status = accepted
 ```
 
 필터가 꺼져 있을 때 들어온 `filter_status=skipped` 곡은 자동 승격하지 않는다.
+
+사장님 화면에서는 대시보드의 `AI 자동수락` 버튼이 `music_filter_enabled`를 켜고 끈다. 설정 화면은 매장 분위기 설명을 편집하며, 활성 상태에서는 설명을 비워 저장할 수 없다.
 
 ## Fail-closed
 
@@ -123,6 +125,7 @@ filter_checked_at
 ```
 
 이 데이터는 오류 추적과 정책 개선에 사용한다. 자연어 사유는 원본을 보존하며, 통계 화면에서는 최근 처리량·수락·거절·오류를 집계한다.
+`filter_confidence`는 LLM이 스스로 보고한 값이며 보정된 확률이 아니다. 현재 자동수락 조건이나 운영 임계값에는 사용하지 않고 감사 데이터로만 보존한다.
 
 ## 구현 위치
 
@@ -139,7 +142,8 @@ server/src/features/music-filter/
 ```text
 owner/src/pages/dashboard/MusicFilterSettings.jsx
 owner/src/pages/dashboard/useRecommendationQueue.js
-owner/src/pages/StatsPanel.jsx
+owner/src/pages/RecommendCard.jsx
+admin/admin.js
 ```
 
 ## 설정과 API

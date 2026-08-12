@@ -55,3 +55,7 @@ pull_request → base.sha..head.sha
 ```
 
 자동 merge/revert 커밋은 검사에서 제외한다.
+
+`pull_request` 실행에서 PR 내부 커밋을 먼저 검사하므로, GitHub가 squash merge 뒤
+`main` push에 생성한 `... (#PR번호)` 형식의 단일 커밋은 중복 검사에서 제외한다.
+일반 직접 push 커밋은 기존 본문 규칙을 그대로 적용한다.
