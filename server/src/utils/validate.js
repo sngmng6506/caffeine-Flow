@@ -34,6 +34,32 @@ function validateBool(value, { name = 'field' } = {}) {
   return { error: `${name} 형식 오류` };
 }
 
+function validateDateString(value, { name = 'date' } = {}) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return { error: `${name}는 YYYY-MM-DD 형식이어야 합니다` };
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1
+    || date.getUTCDate() !== day
+  ) {
+    return { error: `${name}는 유효한 날짜여야 합니다` };
+  }
+  return { value };
+}
+
+function validateCoordinate(value, { min, max, allowNull = true, name = '좌표' } = {}) {
+  if (value === undefined || value === null || value === '') {
+    return allowNull ? { value: null } : { error: `${name} 누락` };
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+    return { error: `${name}는 ${min}~${max} 사이의 숫자여야 합니다` };
+  }
+  return { value };
+}
+
 // 추천곡 신청/등록 body 공통 검증 — public·owner 라우트에 복붙돼 있던
 // 6필드 블록을 한 곳으로. 실패 시 { error }, 성공 시 { value: {...} }.
 function validateRecommendationBody(body = {}) {
@@ -53,4 +79,12 @@ function validateRecommendationBody(body = {}) {
   return { value };
 }
 
-module.exports = { validateString, validateInEnum, validateBool, validateRecommendationBody, isUuid };
+module.exports = {
+  validateString,
+  validateInEnum,
+  validateBool,
+  validateDateString,
+  validateCoordinate,
+  validateRecommendationBody,
+  isUuid,
+};

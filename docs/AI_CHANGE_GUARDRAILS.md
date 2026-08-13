@@ -125,6 +125,24 @@ owner/electron/preload.js
 
 보안 경계를 바꾸면 `server/tests/security-headers.test.mjs`와 관련 빌드를 함께 확인한다.
 
+## Public Response Boundary Contract
+
+기준 파일:
+
+```text
+server/src/utils/public-response.js
+server/src/routes/_recommendations.shared.js
+server/src/routes/recommendations.js
+server/src/routes/song_comments.js
+```
+
+- 공개 HTTP·Socket 응답에 DB row를 그대로 반환하지 않는다. 명시적인 allowlist 직렬화만 사용한다.
+- `requester_ip`, `commenter_ip`, `visitor_id`, 모델명, confidence, 내부 오류 코드를 손님에게 노출하지 않는다.
+- 사장님 응답에도 운영에 필요 없는 IP와 visitor ID를 노출하지 않는다.
+- AI 판단 상세와 필터 오류 실시간 이벤트는 JWT 검증 후 입장하는 `owner:<slug>` room으로만 보낸다.
+- 손님 취소 권한은 공개 응답 값이 아니라 요청 헤더의 visitor ID와 저장된 visitor ID가 일치하는지로 판단한다.
+- 공개 필드를 추가할 때는 개인정보·내부 판단 정보 여부를 먼저 검토하고 통합 테스트로 비노출을 고정한다.
+
 ## Limit Policy Contract
 
 기준 파일:
@@ -223,8 +241,8 @@ server/tests/auth-boundary.test.mjs
 
 ## Anonymous Visitor Identity Contract
 
-- visitor ID가 있는 요청의 취소·투표·방문 중복 제거는 visitor ID를 기준으로 한다.
-- IP 기반 소유권·중복 제거는 visitor ID가 없는 레거시 행에만 fallback으로 사용한다.
+- 취소는 저장된 visitor ID와 요청 visitor ID가 모두 있고 일치할 때만 허용한다. IP 소유권 fallback은 사용하지 않는다.
+- 투표·방문 중복 제거는 visitor ID를 우선하고, visitor ID가 없는 레거시 요청만 IP로 fallback한다.
 - IP rate limit은 visitor ID 위조를 막는 별도 방어선이므로 유지한다.
 - visitor ID 입력 길이는 DB 컬럼 길이와 일치시킨다.
 

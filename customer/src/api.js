@@ -20,6 +20,9 @@ async function apiFetch(method, path, body) {
 export const getRecommendations = (slug) =>
   apiFetch('GET', `/cafes/${slug}/recommendations`);
 
+export const getRecentHistory = (slug, offset = 0) =>
+  apiFetch('GET', `/cafes/${slug}/recommendations/history?offset=${offset}`);
+
 export const postRecommendation = (slug, body) =>
   apiFetch('POST', `/cafes/${slug}/recommendations`, body);
 
@@ -35,11 +38,11 @@ export const cancelRecommendation = (slug, id) =>
 export const getOembed = (url) =>
   apiFetch('GET', `/tracks/oembed?url=${encodeURIComponent(url)}`);
 
-export const getCafeTop10   = (slug, offset = 0) =>
-  apiFetch('GET', `/cafes/${slug}/recommendations/top10?offset=${offset}`);
+export const getCafeTop10   = (slug, offset = 0, sort = 'count') =>
+  apiFetch('GET', `/cafes/${slug}/recommendations/top10?offset=${offset}&sort=${sort}`);
 
-export const getGlobalTop10 = (offset = 0) =>
-  apiFetch('GET', `/top10?offset=${offset}`);
+export const getGlobalTop10 = (offset = 0, sort = 'count') =>
+  apiFetch('GET', `/top10?offset=${offset}&sort=${sort}`);
 
 export const getSongComments = (videoId, offset = 0, limit = 20) =>
   apiFetch('GET', `/songs/${videoId}/comments?offset=${offset}&limit=${limit}`);

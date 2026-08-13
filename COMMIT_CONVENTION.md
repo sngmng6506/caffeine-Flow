@@ -34,28 +34,4 @@ Decision: <여러 선택지 중 이 방식을 택한 이유. 기각한 대안과
 7. **논리적 변경 1개 = 커밋 1개.** 보안 수정 + UI 수정을 한 커밋에 섞지 않는다.
 8. 제목은 72자 이내, 본문은 자연 줄바꿈.
 
-## CI 검사
-
-`.github/workflows/ci.yml`의 `commit-message` job이 신규 커밋 메시지를 검사한다.
-
-검사 범위:
-
-```txt
-push        → github.event.before..github.sha
-pull_request → base.sha..head.sha
-```
-
-즉, 과거 전체 히스토리를 검사하지 않고 이번 push 또는 PR에 포함된 신규 커밋만 검사한다.
-기존 main에 이미 들어간 비준수 커밋을 고치려면 로컬에서 `git rebase -i` 또는 `git filter-repo`로 history를 rewrite한 뒤 force-push해야 한다.
-
-검사 스크립트:
-
-```txt
-.github/scripts/validate-commit-messages.mjs
-```
-
-자동 merge/revert 커밋은 검사에서 제외한다.
-
-`pull_request` 실행에서 PR 내부 커밋을 먼저 검사하므로, GitHub가 squash merge 뒤
-`main` push에 생성한 `... (#PR번호)` 형식의 단일 커밋은 중복 검사에서 제외한다.
-일반 직접 push 커밋은 기존 본문 규칙을 그대로 적용한다.
+이 형식은 변경 이력을 읽기 쉽게 만들기 위한 권장 규칙이며 CI에서 강제하지 않는다.

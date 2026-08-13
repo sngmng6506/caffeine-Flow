@@ -1,42 +1,7 @@
 import { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
-
-function parseInitialState() {
-  // OAuth 콜백 파라미터는 fragment(#) 우선 — 토큰이 서버 로그/Referer에
-  // 남지 않도록 서버가 fragment로 보냄. query는 구버전 서버 호환 폴백.
-  const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  const fromQuery = new URLSearchParams(window.location.search);
-  const params = { get: (k) => fromHash.get(k) ?? fromQuery.get(k) };
-
-  if (params.get('token') && params.get('cafe')) {
-    const token    = params.get('token');
-    const cafeData = JSON.parse(decodeURIComponent(params.get('cafe')));
-    localStorage.setItem('token', token);
-    localStorage.setItem('cafe', JSON.stringify(cafeData));
-    window.history.replaceState({}, '', window.location.pathname);
-    return { cafe: cafeData, pending: null, oauthError: '' };
-  }
-
-  if (params.get('pending')) {
-    const pending = params.get('pending');
-    window.history.replaceState({}, '', window.location.pathname);
-    return { cafe: null, pending, oauthError: '' };
-  }
-
-  if (params.get('error')) {
-    window.history.replaceState({}, '', window.location.pathname);
-    return { cafe: null, pending: null, oauthError: '소셜 로그인에 실패했어요. 다시 시도해 주세요.' };
-  }
-
-  const token   = localStorage.getItem('token');
-  const cafeRaw = localStorage.getItem('cafe');
-  return {
-    cafe:       token && cafeRaw ? JSON.parse(cafeRaw) : null,
-    pending:    null,
-    oauthError: '',
-  };
-}
+import { parseInitialState } from './utils/initialSession.mjs';
 
 const initialState = parseInitialState();
 

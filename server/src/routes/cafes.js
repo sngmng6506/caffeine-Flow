@@ -8,7 +8,7 @@ const { getTrackMetadata } = require('../services/track-metadata.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { issueToken } = require('../utils/jwt');
 const { APP_URL } = require('../config');
-const { validateString, validateBool, validateInEnum } = require('../utils/validate');
+const { validateString, validateBool, validateInEnum, validateDateString, validateCoordinate } = require('../utils/validate');
 const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
 const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
@@ -16,6 +16,7 @@ const { TERMINAL_STATUSES } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
+const { ownerRecommendation } = require('../utils/public-response');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -97,7 +98,7 @@ router.put('/me/notice', requireAuth, async (req, res) => {
 
 // PUT /api/v1/cafes/me/platforms  (허용 플랫폼 설정)
 router.put('/me/platforms', requireAuth, async (req, res) => {
-  const { allowed_platforms } = req.body;
+  const { allowed_platforms } = req.body || {};
   if (!Array.isArray(allowed_platforms) || allowed_platforms.length === 0) {
     return res.status(400).json({ error: '최소 1개 플랫폼을 선택해주세요' });
   }
@@ -183,15 +184,27 @@ router.post('/me/music-filter/test', requireAuth, async (req, res) => {
 
 // PUT /api/v1/cafes/me/address  (주소 변경)
 router.put('/me/address', requireAuth, async (req, res) => {
-  const { address, roadAddress, region, district, latitude, longitude } = req.body;
-  if (!address && !roadAddress) return res.status(400).json({ error: '주소를 입력해주세요' });
+  const { address, roadAddress, region, district, latitude, longitude } = req.body || {};
+  const addressCheck = validateString(address, { max: 255, allowNull: true, name: '지번 주소' });
+  if (addressCheck.error) return res.status(400).json({ error: addressCheck.error });
+  const roadAddressCheck = validateString(roadAddress, { max: 255, allowNull: true, name: '도로명 주소' });
+  if (roadAddressCheck.error) return res.status(400).json({ error: roadAddressCheck.error });
+  if (!addressCheck.value && !roadAddressCheck.value) return res.status(400).json({ error: '주소를 입력해주세요' });
+  const regionCheck = validateString(region, { max: 50, allowNull: true, name: '시/도' });
+  if (regionCheck.error) return res.status(400).json({ error: regionCheck.error });
+  const districtCheck = validateString(district, { max: 50, allowNull: true, name: '시/군/구' });
+  if (districtCheck.error) return res.status(400).json({ error: districtCheck.error });
+  const latitudeCheck = validateCoordinate(latitude, { min: -90, max: 90, name: '위도' });
+  if (latitudeCheck.error) return res.status(400).json({ error: latitudeCheck.error });
+  const longitudeCheck = validateCoordinate(longitude, { min: -180, max: 180, name: '경도' });
+  if (longitudeCheck.error) return res.status(400).json({ error: longitudeCheck.error });
   const cafe = await cafeService.update(req.owner.cafeId, {
-    address: address || null,
-    road_address: roadAddress || null,
-    region: region || null,
-    district: district || null,
-    latitude: latitude || null,
-    longitude: longitude || null,
+    address: addressCheck.value,
+    road_address: roadAddressCheck.value,
+    region: regionCheck.value,
+    district: districtCheck.value,
+    latitude: latitudeCheck.value,
+    longitude: longitudeCheck.value,
   });
   res.json({
     address: cafe.address,
@@ -227,6 +240,8 @@ router.get('/me/history', requireAuth, async (req, res) => {
     .orderBy('id', 'desc');
 
   if (req.query.date) {
+    const dateCheck = validateDateString(req.query.date);
+    if (dateCheck.error) return res.status(400).json({ error: dateCheck.error });
     // KST 경계 사용 — UTC 자정 기준이면 KST 09:00~다음날 08:59가 잡혀
     // 통계 탭(KST 기준)과 이력 날짜 필터가 서로 다른 하루를 보게 됨
     const start = kstStartOfDateString(req.query.date);
@@ -235,7 +250,7 @@ router.get('/me/history', requireAuth, async (req, res) => {
   }
 
   const items = await query.limit(limit + 1).offset(offset.value);
-  res.json({ items: items.slice(0, limit), hasMore: items.length > limit });
+  res.json({ items: items.slice(0, limit).map(ownerRecommendation), hasMore: items.length > limit });
 });
 
 // GET /api/v1/cafes/me/stats
@@ -251,6 +266,8 @@ router.get('/me/stats/music-filter', requireAuth, async (req, res) => {
 // GET /api/v1/cafes/me/stats/daily?date=YYYY-MM-DD
 router.get('/me/stats/daily', requireAuth, async (req, res) => {
   const date = req.query.date || kstTodayString();
+  const dateCheck = validateDateString(date);
+  if (dateCheck.error) return res.status(400).json({ error: dateCheck.error });
   res.json(await statsService.getDailyStats(req.owner.cafeId, date));
 });
 

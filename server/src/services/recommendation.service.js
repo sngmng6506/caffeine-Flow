@@ -3,6 +3,9 @@ const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES } = require('../constants
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM } = require('../constants/platforms');
 const { canonicalizeVideoId } = require('../utils/video-id');
+const { kstStartOfDay } = require('../utils/kst');
+const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
+const { RECENT_HISTORY_LOOKBACK_DAYS } = require('../constants/time-policy');
 
 async function getRecommendations(cafeId) {
   return db('recommendations')
@@ -10,6 +13,19 @@ async function getRecommendations(cafeId) {
     .whereIn('status', ACTIVE_STATUSES)
     .orderBy('vote_count', 'desc')
     .orderBy('requested_at', 'asc');
+}
+
+async function getRecentHistory(cafeId, offset = 0, limit = 20) {
+  const rows = await db('recommendations')
+    .where({ cafe_id: cafeId })
+    .whereIn('status', [REC_STATUS.PLAYED, REC_STATUS.SKIPPED])
+    .whereRaw(`${HISTORY_SORT_AT_SQL} >= ?`, [kstStartOfDay(RECENT_HISTORY_LOOKBACK_DAYS)])
+    .orderByRaw(`${HISTORY_SORT_AT_SQL} DESC`)
+    .orderBy('requested_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(limit + 1)
+    .offset(offset);
+  return { items: rows.slice(0, limit), hasMore: rows.length > limit };
 }
 
 async function findById(id) {
@@ -265,6 +281,7 @@ async function addComment(cafeId, recommendationId, { commenterIp, commenterName
 
 module.exports = {
   getRecommendations,
+  getRecentHistory,
   findById,
   findByIdForCafe,
   findActiveByVideoId,

@@ -13,6 +13,7 @@ process.env.NODE_ENV = 'test';
 const { app } = await import('../app.js');
 const db = (await import('../src/db/knex.js')).default ?? (await import('../src/db/knex.js'));
 const { issueTrackMetadataToken } = await import('../src/services/track-metadata-token.service.js');
+const { issuePendingToken } = await import('../src/utils/jwt.js');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -64,6 +65,10 @@ describe('추천곡 신청', () => {
     expect(res.status).toBe(201);
     expect(res.body.video_id).toBe('vid_ok');
     expect(res.body.status).toBe('pending');
+    expect(res.body.is_mine).toBe(true);
+    expect(res.body).not.toHaveProperty('requester_ip');
+    expect(res.body).not.toHaveProperty('visitor_id');
+    expect(res.body).not.toHaveProperty('filter_model');
   });
 
   it('같은 곡 중복 신청 → 409 (사전 체크 + unique index)', async () => {
@@ -155,6 +160,22 @@ describe('추천곡 신청', () => {
     expect(ids).not.toContain('hidden_played');
     expect(ids).not.toContain('hidden_skipped');
     expect(ids).not.toContain('hidden_rejected');
+    for (const item of res.body.recommendations) {
+      expect(item).not.toHaveProperty('requester_ip');
+      expect(item).not.toHaveProperty('visitor_id');
+      expect(item).not.toHaveProperty('filter_status');
+      expect(item).not.toHaveProperty('filter_error_code');
+    }
+  });
+
+  it('사장님 큐 조회는 AI 판단 정보만 추가하고 익명 식별자는 노출하지 않는다', async () => {
+    const res = await request(app)
+      .get(`/api/v1/cafes/${cafe.slug}/recommendations/owner`)
+      .set({ Authorization: `Bearer ${ownerToken}` });
+    expect(res.status).toBe(200);
+    expect(res.body.recommendations[0]).toHaveProperty('filter_status');
+    expect(res.body.recommendations[0]).not.toHaveProperty('requester_ip');
+    expect(res.body.recommendations[0]).not.toHaveProperty('visitor_id');
   });
 
   it('7일이 지난 active 곡도 큐·한도에서 동일하게 노출한다', async () => {
@@ -225,6 +246,17 @@ describe('손님 취소 — 소유권 검증', () => {
       .set(guestHeaders('me-visitor'));
     expect(res.status).toBe(200);
     expect((await db('recommendations').where({ id: rec.id }).first())).toBeUndefined();
+  });
+
+  it('visitor_id가 없는 레거시·사장님 신청은 IP만으로 취소할 수 없다', async () => {
+    const [rec] = await db('recommendations').insert({
+      cafe_id: cafe.id, video_id: 'cancel_legacy_ip', title: '레거시 곡',
+      status: 'pending', requester_ip: '203.0.113.40', visitor_id: null,
+    }).returning('*');
+    const res = await request(app)
+      .delete(`/api/v1/cafes/${cafe.slug}/recommendations/${rec.id}/cancel`)
+      .set({ ...guestHeaders('new-visitor'), 'X-Forwarded-For': '203.0.113.40' });
+    expect(res.status).toBe(403);
   });
 });
 
@@ -335,6 +367,19 @@ describe('곡 댓글 경로 검증', () => {
     expect(last.status).toBe(200);
     expect(last.body.items).toHaveLength(3);
     expect(last.body).toMatchObject({ hasMore: false, nextOffset: null });
+    expect(first.body.items[0]).not.toHaveProperty('commenter_ip');
+    expect(first.body.items[0]).not.toHaveProperty('visitor_id');
+    expect(first.body.items[0].replies[0]).not.toHaveProperty('commenter_ip');
+  });
+
+  it('댓글 작성 응답도 익명 식별자를 노출하지 않는다', async () => {
+    const res = await request(app)
+      .post('/api/v1/songs/privacy_comment/comments')
+      .set(guestHeaders('comment-private-visitor'))
+      .send({ body: '공개 댓글' });
+    expect(res.status).toBe(201);
+    expect(res.body).not.toHaveProperty('commenter_ip');
+    expect(res.body).not.toHaveProperty('visitor_id');
   });
 });
 
@@ -343,6 +388,7 @@ describe('API 페이지 경계와 404 계약', () => {
     '/api/v1/top10?offset=-1',
     `/api/v1/cafes/${cafe?.slug || 'testcafe1'}/recommendations/top10?offset=1abc`,
     '/api/v1/songs/any/comments?limit=51',
+    '/api/v1/top10?sort=count%20desc',
   ])('잘못된 페이지 파라미터를 400으로 거절한다: %s', async (path) => {
     const res = await request(app).get(path);
     expect(res.status).toBe(400);
@@ -353,6 +399,28 @@ describe('API 페이지 경계와 404 계약', () => {
     expect(res.status).toBe(404);
     expect(res.type).toBe('application/json');
     expect(res.body.error).toBe('API endpoint not found');
+  });
+});
+
+describe('손님 최근 재생 이력', () => {
+  it('최근 7일 played/skipped만 새로고침 가능한 페이지로 반환한다', async () => {
+    const recent = new Date();
+    const old = new Date(Date.now() - 9 * 24 * 60 * 60 * 1000);
+    await db('recommendations').insert([
+      { cafe_id: cafe.id, video_id: 'history_recent_played', title: '최근 재생', status: 'played', played_at: recent },
+      { cafe_id: cafe.id, video_id: 'history_recent_skipped', title: '최근 건너뜀', status: 'skipped', played_at: recent },
+      { cafe_id: cafe.id, video_id: 'history_old_played', title: '오래된 재생', status: 'played', played_at: old, requested_at: old },
+      { cafe_id: cafe.id, video_id: 'history_rejected', title: '거절', status: 'rejected', played_at: recent },
+    ]);
+
+    const res = await request(app).get(`/api/v1/cafes/${cafe.slug}/recommendations/history`);
+    expect(res.status).toBe(200);
+    const ids = res.body.items.map(item => item.video_id);
+    expect(ids).toContain('history_recent_played');
+    expect(ids).toContain('history_recent_skipped');
+    expect(ids).not.toContain('history_old_played');
+    expect(ids).not.toContain('history_rejected');
+    expect(res.body.items[0]).not.toHaveProperty('visitor_id');
   });
 });
 
@@ -375,6 +443,33 @@ describe('통계 — knex raw ? 바인딩 회귀 (split_part 이스케이프)', 
     expect(merged.count).toBe(2);
   });
 
+  it('TOP은 played만 집계하고 정렬을 전체 결과에 적용한 뒤 페이지를 자른다', async () => {
+    const [topCafe] = await db('cafes').insert({ name: '정렬 카페', slug: 'topsortcafe', owner_email: 'topsort@t.com' }).returning('*');
+    const rows = [];
+    for (let index = 0; index < 11; index++) {
+      rows.push(
+        { cafe_id: topCafe.id, video_id: `count_${index}`, title: `재생 ${index}`, status: 'played', vote_count: 0 },
+        { cafe_id: topCafe.id, video_id: `count_${index}`, title: `재생 ${index}`, status: 'played', vote_count: 0 },
+      );
+    }
+    rows.push(
+      { cafe_id: topCafe.id, video_id: 'vote_winner', title: '좋아요 우승', status: 'played', vote_count: 100 },
+      { cafe_id: topCafe.id, video_id: 'rejected_spam', title: '거절 스팸', status: 'rejected', vote_count: 1000 },
+      { cafe_id: topCafe.id, video_id: 'pending_spam', title: '대기 스팸', status: 'pending', vote_count: 1000 },
+    );
+    await db('recommendations').insert(rows);
+
+    const countRes = await request(app).get(`/api/v1/cafes/${topCafe.slug}/recommendations/top10?sort=count`);
+    const voteRes = await request(app).get(`/api/v1/cafes/${topCafe.slug}/recommendations/top10?sort=votes`);
+    expect(countRes.status).toBe(200);
+    expect(countRes.body.items.map(item => item.video_id)).not.toContain('vote_winner');
+    expect(voteRes.body.items[0].video_id).toBe('vote_winner');
+    expect(voteRes.body.items.map(item => item.video_id)).not.toContain('rejected_spam');
+    expect(voteRes.body.items.map(item => item.video_id)).not.toContain('pending_spam');
+
+    await db('cafes').where({ id: topCafe.id }).del();
+  });
+
   it('GET /cafes/me/stats → 200 (topSongs 집계)', async () => {
     const res = await authed('/api/v1/cafes/me/stats');
     expect(res.status).toBe(200);
@@ -386,6 +481,45 @@ describe('통계 — knex raw ? 바인딩 회귀 (split_part 이스케이프)', 
       const res = await authed(`/api/v1/cafes/me/stats${p}`);
       expect(res.status, p).toBe(200);
     }
+  });
+
+  it('유효하지 않은 날짜는 history와 daily stats에서 400을 반환한다', async () => {
+    expect((await authed('/api/v1/cafes/me/history?date=2026-02-29')).status).toBe(400);
+    expect((await authed('/api/v1/cafes/me/stats/daily?date=not-a-date')).status).toBe(400);
+  });
+
+  it('사장님 이력·일별 통계도 IP와 visitor ID를 반환하지 않는다', async () => {
+    const history = await authed('/api/v1/cafes/me/history');
+    expect(history.status).toBe(200);
+    for (const item of history.body.items) {
+      expect(item).not.toHaveProperty('requester_ip');
+      expect(item).not.toHaveProperty('visitor_id');
+    }
+
+    const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const daily = await authed(`/api/v1/cafes/me/stats/daily?date=${today}`);
+    expect(daily.status).toBe(200);
+    for (const item of daily.body.byHour.flat()) {
+      expect(item).not.toHaveProperty('requester_ip');
+      expect(item).not.toHaveProperty('visitor_id');
+    }
+  });
+});
+
+describe('가입 완료 경합', () => {
+  it('같은 pending token 재사용은 500 대신 409로 복구 안내한다', async () => {
+    const pendingToken = issuePendingToken({ naverId: `replay-${Date.now()}`, email: 'replay@example.com', name: '재사용' });
+    const body = {
+      pendingToken,
+      cafeName: '가입 재사용 테스트',
+      agreed: true,
+      agreements: { age: true, service: true, privacy: true, copyright: true },
+      location: { region: '서울', district: '마포구', dong: '서교동' },
+    };
+    const first = await request(app).post('/api/v1/auth/complete').send(body);
+    const replay = await request(app).post('/api/v1/auth/complete').send(body);
+    expect(first.status).toBe(201);
+    expect(replay.status).toBe(409);
   });
 });
 

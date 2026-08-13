@@ -1,9 +1,31 @@
 // recommendations.public.js와 recommendations.owner.js가 공유하는 유틸.
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { ONE_MINUTE_MS, QUEUE_MAX_SIZE, VISITOR_ID_MAX_LENGTH } = require('../constants/limits');
+const {
+  publicRecommendation,
+  ownerRecommendation,
+} = require('../utils/public-response');
+
+function ownerRoom(slug) {
+  return `owner:${slug}`;
+}
 
 function broadcast(req, slug, event, data) {
   req.app.get('io')?.of('/cafe').to(slug).emit(event, data);
+}
+
+function broadcastToOwners(req, slug, event, data) {
+  req.app.get('io')?.of('/cafe').to(ownerRoom(slug)).emit(event, data);
+}
+
+function serializeRecommendationEvent(data, serialize) {
+  if (!data?.rec) return data;
+  return { ...data, rec: serialize(data.rec) };
+}
+
+function broadcastRecommendation(req, slug, data) {
+  broadcast(req, slug, 'recommendations_update', serializeRecommendationEvent(data, publicRecommendation));
+  broadcastToOwners(req, slug, 'owner_recommendations_update', serializeRecommendationEvent(data, ownerRecommendation));
 }
 
 // 클라이언트 IP는 반드시 req.ip 사용 — server.js에서 trust proxy 1을 설정했으므로
@@ -50,4 +72,14 @@ function makeDualLimiter({ windowMs = ONE_MINUTE_MS, visitorMax, ipMax, message 
   ];
 }
 
-module.exports = { MAX_QUEUE_SIZE: QUEUE_MAX_SIZE, QUEUE_MAX_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter };
+module.exports = {
+  MAX_QUEUE_SIZE: QUEUE_MAX_SIZE,
+  QUEUE_MAX_SIZE,
+  broadcast,
+  broadcastToOwners,
+  broadcastRecommendation,
+  ownerRoom,
+  getClientIp,
+  safeVisitorId,
+  makeDualLimiter,
+};

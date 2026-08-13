@@ -5,6 +5,7 @@ const { isUuid } = require('../utils/validate');
 const { HEARTBEAT_REFRESH_MS, PLAYBACK_STATE_TTL_MS } = require('../constants/time-policy');
 const { PLAYBACK_STATE, PLAYBACK_STATES } = require('../constants/playback-state');
 const cafeService = require('../services/cafe.service');
+const { ownerRoom } = require('../routes/_recommendations.shared');
 
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 
@@ -82,6 +83,7 @@ function initSocket(io) {
     let heartbeatTimer = null;
 
     if (ownerPayload) {
+      socket.join(ownerRoom(slug));
       if (!ownerSockets.has(slug)) ownerSockets.set(slug, new Set());
       ownerSockets.get(slug).add(socket.id);
 

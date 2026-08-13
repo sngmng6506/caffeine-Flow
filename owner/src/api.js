@@ -37,7 +37,7 @@ export const updateMusicFilter = ({ enabled, prompt }) =>
 export const testMusicFilter = ({ url, prompt }) =>
   apiFetch('POST', '/cafes/me/music-filter/test', { url, prompt });
 
-export const getRecommendations = slug => apiFetch('GET', `/cafes/${slug}/recommendations`);
+export const getRecommendations = slug => apiFetch('GET', `/cafes/${slug}/recommendations/owner`);
 export const createRec = (slug, data) =>
   apiFetch('POST', `/cafes/${slug}/recommendations/owner`, data);
 export const updateRec = (slug, id, status) =>

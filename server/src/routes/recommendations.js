@@ -7,14 +7,15 @@ const statsService  = require('../services/stats.service');
 const musicFilter   = require('../features/music-filter');
 const { verifyTrackMetadataToken } = require('../services/track-metadata-token.service');
 const db            = require('../db/knex');
-const { MAX_QUEUE_SIZE, broadcast, getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
-const { validateString } = require('../utils/validate');
+const { MAX_QUEUE_SIZE, broadcast, broadcastToOwners, broadcastRecommendation, getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
+const { validateString, isUuid } = require('../utils/validate');
 const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_ACTION, FILTER_STATUS } = require('../constants/music-filter-status');
 const { parseAllowedPlatforms, platformLabel } = require('../constants/platforms');
 const { RECOMMENDATION_REQUEST_LIMIT, VOTE_LIMIT, COMMENT_LIMIT } = require('../constants/limits');
 const { KST_VISIT_DATE_SQL } = require('../db/sql-fragments');
-const { parseOffset } = require('../utils/pagination');
+const { parseOffset, parseTopSort } = require('../utils/pagination');
+const { publicRecommendation, recommendationComment } = require('../utils/public-response');
 
 const requestLimiters = makeDualLimiter({ ...RECOMMENDATION_REQUEST_LIMIT, message: '잠시 후 다시 추천해주세요 (1분에 3곡 제한)' });
 const voteLimiters = makeDualLimiter({ ...VOTE_LIMIT, message: '잠시 후 다시 시도해주세요 (투표 한도 초과)' });
@@ -47,6 +48,11 @@ function sendServiceError(res, err) {
   return false;
 }
 
+router.param('id', (req, res, next, id) => {
+  if (!isUuid(id)) return res.status(400).json({ error: '추천곡 ID 형식 오류' });
+  next();
+});
+
 router.get('/', async (req, res) => {
   const cafe = await cafeService.findActiveBySlug(req.params.slug);
   if (!cafe) {
@@ -66,7 +72,7 @@ router.get('/', async (req, res) => {
     // 방문 통계 실패가 큐 조회를 막아서는 안 된다.
   }
   const allowed_platforms = parseAllowedPlatforms(cafe.allowed_platforms);
-  res.json({ recommendations: recs, is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name, allowed_platforms });
+  res.json({ recommendations: recs.map(rec => publicRecommendation(rec, { visitorId })), is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name, allowed_platforms });
 });
 
 router.post('/', requestLimiters, async (req, res) => {
@@ -107,13 +113,22 @@ router.post('/', requestLimiters, async (req, res) => {
   }
   if (filterResult.action === FILTER_ACTION.REJECT) {
     if (filterResult.filterStatus === FILTER_STATUS.ERROR_REJECTED) {
-      broadcast(req, req.params.slug, 'music_filter_error', { title, platform, reason: filterResult.reason, errorCode: filterResult.errorCode, occurredAt: new Date().toISOString() });
+      broadcastToOwners(req, req.params.slug, 'music_filter_error', { title, platform, reason: filterResult.reason, errorCode: filterResult.errorCode, occurredAt: new Date().toISOString() });
       return res.status(503).json({ error: 'AI 필터 확인 중 문제가 발생해 신청할 수 없습니다. 잠시 후 다시 시도해주세요.' });
     }
     return res.status(403).json({ error: '이 곡은 매장 분위기와 맞지 않아 신청할 수 없습니다.' });
   }
-  broadcast(req, req.params.slug, 'recommendations_update', { action: 'add', rec });
-  res.status(201).json(rec);
+  broadcastRecommendation(req, req.params.slug, { action: 'add', rec });
+  res.status(201).json(publicRecommendation(rec, { visitorId }));
+});
+
+router.get('/history', async (req, res) => {
+  const cafe = await cafeService.findActiveBySlug(req.params.slug);
+  if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+  const page = await recService.getRecentHistory(cafe.id, offset.value);
+  res.json({ ...page, items: page.items.map(publicRecommendation) });
 });
 
 router.get('/top10', async (req, res) => {
@@ -121,7 +136,9 @@ router.get('/top10', async (req, res) => {
   if (!cafe) return res.status(404).json({ error: 'Cafe not found' });
   const offset = parseOffset(req.query.offset);
   if (offset.error) return res.status(400).json({ error: offset.error });
-  res.json(await statsService.getCafeTop10(cafe.id, offset.value));
+  const sort = parseTopSort(req.query.sort);
+  if (sort.error) return res.status(400).json({ error: sort.error });
+  res.json(await statsService.getCafeTop10(cafe.id, offset.value, sort.value));
 });
 
 router.delete('/:id/cancel', async (req, res) => {
@@ -130,15 +147,12 @@ router.delete('/:id/cancel', async (req, res) => {
   const rec = await recService.findByIdForCafe(cafe.id, req.params.id);
   if (!rec) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
   if (![REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(rec.status)) return res.status(409).json({ error: '이미 처리된 추천곡은 취소할 수 없습니다' });
-  const ip = getClientIp(req);
   const visitorId = safeVisitorId(req);
-  const isOwner = rec.visitor_id
-    ? Boolean(visitorId && rec.visitor_id === visitorId)
-    : Boolean(rec.requester_ip && rec.requester_ip === ip);
+  const isOwner = Boolean(rec.visitor_id && visitorId && rec.visitor_id === visitorId);
   if (!isOwner) return res.status(403).json({ error: '본인이 신청한 곡만 취소할 수 있습니다' });
   const deleted = await recService.remove(cafe.id, rec.id);
   if (!deleted) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
-  broadcast(req, req.params.slug, 'recommendations_update', { action: 'delete', id: rec.id });
+  broadcastRecommendation(req, req.params.slug, { action: 'delete', id: rec.id });
   res.json({ ok: true });
 });
 
@@ -149,8 +163,8 @@ router.post('/:id/vote', voteLimiters, async (req, res) => {
   const visitorId = safeVisitorId(req);
   try {
     const rec = await recService.vote(cafe.id, req.params.id, ip, visitorId);
-    broadcast(req, req.params.slug, 'recommendations_update', { action: 'vote', rec });
-    res.json(rec);
+    broadcastRecommendation(req, req.params.slug, { action: 'vote', rec });
+    res.json(publicRecommendation(rec, { visitorId }));
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: '이미 투표했습니다' });
     if (sendServiceError(res, err)) return;
@@ -161,10 +175,11 @@ router.post('/:id/vote', voteLimiters, async (req, res) => {
 router.delete('/:id/vote', voteLimiters, async (req, res) => {
   const cafe = await findCafeForMutation(req, res);
   if (!cafe) return;
+  const visitorId = safeVisitorId(req);
   try {
-    const rec = await recService.unvote(cafe.id, req.params.id, getClientIp(req), safeVisitorId(req));
-    broadcast(req, req.params.slug, 'recommendations_update', { action: 'vote', rec });
-    res.json(rec);
+    const rec = await recService.unvote(cafe.id, req.params.id, getClientIp(req), visitorId);
+    broadcastRecommendation(req, req.params.slug, { action: 'vote', rec });
+    res.json(publicRecommendation(rec, { visitorId }));
   } catch (err) {
     if (sendServiceError(res, err)) return;
     throw err;
@@ -180,8 +195,9 @@ router.post('/:id/comments', commentLimiters, async (req, res) => {
   if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
   try {
     const comment = await recService.addComment(cafe.id, req.params.id, { commenterIp: getClientIp(req), commenterName: nameCheck.value, body: bodyCheck.value });
-    broadcast(req, req.params.slug, 'comment_added', { recommendationId: req.params.id, comment });
-    res.status(201).json(comment);
+    const safeComment = recommendationComment(comment);
+    broadcast(req, req.params.slug, 'comment_added', { recommendationId: req.params.id, comment: safeComment });
+    res.status(201).json(safeComment);
   } catch (err) {
     if (sendServiceError(res, err)) return;
     throw err;

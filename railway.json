@@ -1,11 +1,14 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
+  "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS",
-    "buildCommand": "cd customer && npm install && npm run build && cd ../owner && npm install && rm -rf node_modules/.cache dist && printf 'VITE_GOOGLE_CLIENT_ID=%s\\nVITE_NAVER_ENABLED=%s\\n' \"$VITE_GOOGLE_CLIENT_ID\" \"$VITE_NAVER_ENABLED\" > .env && cat .env && VITE_GOOGLE_CLIENT_ID=\"$VITE_GOOGLE_CLIENT_ID\" VITE_NAVER_ENABLED=\"$VITE_NAVER_ENABLED\" npm run build && cd ../server && npm install"
+    "builder": "RAILPACK",
+    "buildCommand": "cd customer && npm ci --include=dev && npm run build && cd ../owner && npm ci --include=dev && VITE_GOOGLE_CLIENT_ID=\"$VITE_GOOGLE_CLIENT_ID\" VITE_NAVER_ENABLED=\"$VITE_NAVER_ENABLED\" npm run build && cd ../server && npm ci --omit=dev"
   },
   "deploy": {
-    "startCommand": "npm run migrate --prefix server && node server/server.js",
+    "preDeployCommand": ["npm run migrate --prefix server"],
+    "startCommand": "node server/server.js",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }

@@ -1,5 +1,6 @@
 const db = require('../db/knex');
 const { canonicalizeVideoId } = require('../utils/video-id');
+const { songComment } = require('../utils/public-response');
 
 function withCafeName(query) {
   return query
@@ -40,7 +41,7 @@ async function getComments(videoId, { offset, limit }) {
 
   const hasMore = rows.length > limit;
   return {
-    items: items.map(comment => ({
+    items: items.map(comment => songComment({
       ...comment,
       replies: repliesByParent.get(comment.id) || [],
     })),
@@ -53,7 +54,7 @@ async function addComment(videoId, cafeId = null, { commenterIp, commenterName, 
   const [comment] = await db('song_comments')
     .insert({ video_id: canonicalizeVideoId(videoId), cafe_id: cafeId, commenter_ip: commenterIp, commenter_name: commenterName, body, visitor_id: visitorId || null })
     .returning('*');
-  return { ...comment, cafe_name: null, replies: [] };
+  return songComment({ ...comment, cafe_name: null, replies: [] });
 }
 
 async function addReply(videoId, parentId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {
@@ -77,7 +78,7 @@ async function addReply(videoId, parentId, cafeId = null, { commenterIp, comment
       visitor_id:     visitorId || null,
     })
     .returning('*');
-  return { ...reply, cafe_name: null };
+  return songComment({ ...reply, cafe_name: null });
 }
 
 module.exports = { getComments, addComment, addReply };

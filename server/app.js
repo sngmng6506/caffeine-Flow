@@ -9,7 +9,7 @@ const cookieParser = require('cookie-parser');
 const { APP_URL } = require('./src/config');
 const statsService = require('./src/services/stats.service');
 const { GLOBAL_API_RATE_LIMIT } = require('./src/constants/limits');
-const { parseOffset } = require('./src/utils/pagination');
+const { parseOffset, parseTopSort } = require('./src/utils/pagination');
 
 // app 생성을 server.js(리슨·소켓)와 분리 — supertest가 포트 없이
 // app만 import해 통합 테스트를 돌릴 수 있게 한다.
@@ -114,7 +114,9 @@ app.use('/api/v1/admin',                         require('./src/routes/admin'));
 app.get('/api/v1/top10', async (req, res) => {
   const offset = parseOffset(req.query.offset);
   if (offset.error) return res.status(400).json({ error: offset.error });
-  res.json(await statsService.getGlobalTop10(offset.value));
+  const sort = parseTopSort(req.query.sort);
+  if (sort.error) return res.status(400).json({ error: sort.error });
+  res.json(await statsService.getGlobalTop10(offset.value, sort.value));
 });
 
 // Health check

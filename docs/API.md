@@ -20,6 +20,7 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/auth/complete` | 🔓 | pending token으로 신규 가입 완료 |
 
 기존 회원 응답은 `{ token, cafe }`, 신규 회원은 `{ needsSetup: true, pendingToken }` 형태다.
+가입 완료된 pending token을 다시 사용하거나 동일 provider 가입이 경합하면 409로 로그인 재시도를 안내한다.
 
 ## 카페 관리 — `/cafes`
 
@@ -54,7 +55,8 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | --- | --- | :-: | --- |
 | GET | `/` | 🔓 | 활성 큐 조회와 방문 기록 |
 | POST | `/` | 🔓 ⏱ | 신청곡 등록. 서버가 발급한 `metadataToken`·선택적 `requesterName`을 받아 중복·큐 한도·AI 필터 적용 |
-| GET | `/top10` | 🔓 | 매장 TOP10 `?offset=` |
+| GET | `/history` | 🔓 | 최근 7일의 재생·건너뜀 이력 `?offset=` |
+| GET | `/top10` | 🔓 | 실제 재생된 곡의 매장 순위 `?offset=&sort=count\|votes` |
 | DELETE | `/:id/cancel` | 🔓 | 본인 신청 취소 |
 | POST | `/:id/vote` | 🔓 ⏱ | 투표 |
 | DELETE | `/:id/vote` | 🔓 ⏱ | 투표 취소 |
@@ -64,11 +66,19 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
+| GET | `/owner` | 🏪 | AI 판단 정보를 포함한 사장님용 활성 큐 조회 |
 | POST | `/owner` | 🏪 | 사장님 직접 신청. AI 필터 우회 |
 | PUT | `/:id` | 🏪 | 상태 변경 |
 | DELETE | `/:id` | 🏪 | 신청곡 삭제 |
 
 사장님 라우터가 public 라우터보다 먼저 마운트되어야 한다.
+
+공개 추천곡 응답은 화면에 필요한 곡·상태·투표·시각 필드만 반환한다.
+`requester_ip`, `visitor_id`, AI 모델·confidence·오류 코드는 공개 HTTP와
+공용 Socket.IO 이벤트에 포함하지 않는다. 사장님용 응답도 IP와 visitor ID는
+반환하지 않는다. 공개 큐 조회·쓰기 응답의 `is_mine`은 요청의 visitor ID와
+저장값을 서버에서 비교해 계산한 boolean이다. 손님 취소는 공개 응답으로 식별자를 전달받는 방식이 아니라
+신청 당시 브라우저가 보관한 `X-Visitor-Id`가 DB의 `visitor_id`와 일치할 때만 허용한다.
 
 손님 신청의 `metadataToken`은 `GET /tracks/oembed`가 확인한 곡 정보에 5분
 유효 서명을 붙인 값이다. POST body의 임의 `videoId`, `title`, `platform`은
@@ -90,7 +100,7 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 댓글 GET은 `?offset=0&limit=20`을 받으며 `limit` 최대값은 50이다. 응답은
 `{ items, hasMore, nextOffset }` 형태다. 최상위 댓글은 최신순이고 각 항목의
-`replies`는 작성순이다.
+`replies`는 작성순이다. 모든 댓글 응답은 `commenter_ip`와 `visitor_id`를 제외한다.
 
 ## 트랙 메타데이터 — `/tracks`
 
@@ -119,11 +129,17 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
-| GET | `/api/v1/top10?offset=` | 🔓 | 정지 카페를 제외한 전체 TOP10 |
+| GET | `/api/v1/top10?offset=&sort=count\|votes` | 🔓 | 정지 카페를 제외하고 실제 재생된 곡만 집계한 전체 순위 |
 
 모든 `offset`은 0 이상 10,000 이하의 정수만 허용한다. 음수, 일부만 숫자인
 문자열, 상한 초과 값은 400이다. 존재하지 않는 `/api/*` 경로도 SPA HTML이
 아닌 `{ "error": "API endpoint not found" }` JSON 404를 반환한다.
+`sort=count`는 재생 횟수, `sort=votes`는 좋아요 합계 기준이며 서버가 전체
+집계를 정렬한 뒤 페이지를 자른다. 동률은 다른 지표와 정규화 곡 ID 순으로
+결정해 페이지 사이 순서가 흔들리지 않는다.
+
+`date` query는 실제 달력에 존재하는 `YYYY-MM-DD`만 허용한다. 좌표 입력은
+위도 -90~90, 경도 -180~180 범위의 유한한 숫자만 허용한다.
 
 ## 헬스체크
 

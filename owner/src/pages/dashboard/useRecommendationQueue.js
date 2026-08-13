@@ -174,7 +174,7 @@ export default function useRecommendationQueue({
         .catch(() => {});
     });
 
-    socket.on('recommendations_update', ({ action, rec, id }) => {
+    socket.on('owner_recommendations_update', ({ action, rec, id }) => {
       if (action === 'add') {
         // 서버 판단과 별개로 클라이언트에서도 filter_status=accepted를 재확인한다.
         if (aiAutoAcceptRef.current && isAutoAcceptEligible(rec)) {

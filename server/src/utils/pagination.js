@@ -39,4 +39,12 @@ function parseLimit(raw, { defaultValue, max }) {
   });
 }
 
-module.exports = { parseBoundedInteger, parseOffset, parseLimit };
+function parseTopSort(raw) {
+  if (raw === undefined || raw === null || raw === '') return { value: 'count' };
+  if (Array.isArray(raw) || !['count', 'votes'].includes(raw)) {
+    return { error: 'sort는 count 또는 votes여야 합니다' };
+  }
+  return { value: raw };
+}
+
+module.exports = { parseBoundedInteger, parseOffset, parseLimit, parseTopSort };

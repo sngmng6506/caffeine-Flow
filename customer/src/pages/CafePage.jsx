@@ -8,10 +8,10 @@ import {
 } from 'lucide-react';
 import {
   getRecommendations,
+  getRecentHistory,
   getCafeTop10,
   getGlobalTop10,
 } from '../api';
-import { getDeviceName } from '../deviceName';
 import { getSocket, disconnectSocket } from '../socket';
 import { VALID_PLATFORMS } from '../constants/platforms';
 import { ACTIVE_STATUSES, HISTORY_STATUSES, REC_STATUS } from '../constants/recommendationStatus';
@@ -47,11 +47,17 @@ export default function CafePage({ slug }) {
   const [globalTopHasMore, setGlobalTopHasMore] = useState(false);
   const [topLoading, setTopLoading] = useState(false);
   const [topLoaded, setTopLoaded] = useState({ cafeTop: false, globalTop: false });
+  const [topSort, setTopSort] = useState({ cafeTop: 'count', globalTop: 'count' });
   const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [successMsg, setSuccessMsg] = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
   const [copyNotice, setCopyNotice] = useState(null);
-  const [historyLimit, setHistoryLimit] = useState(10);
+  const [historyRecs, setHistoryRecs] = useState([]);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyRetry, setHistoryRetry] = useState(0);
   const [historyExpanded, setHistoryExpanded] = useState(null);
   const [queueExpanded, setQueueExpanded] = useState(null);
   const [playbackState, setPlaybackState] = useState({
@@ -61,13 +67,22 @@ export default function CafePage({ slug }) {
   const swipeStart = useRef(null);
   const swipeClickTimer = useRef(null);
   const copyNoticeTimer = useRef(null);
-  const deviceName = getDeviceName();
   const tabs = getTabs(cafeName);
 
   useEffect(() => () => {
     if (swipeClickTimer.current) clearTimeout(swipeClickTimer.current);
     if (copyNoticeTimer.current) clearTimeout(copyNoticeTimer.current);
   }, []);
+
+  useEffect(() => {
+    setHistoryRecs([]);
+    setHistoryHasMore(false);
+    setHistoryLoaded(false);
+    setHistoryError('');
+    setCafeTop([]);
+    setGlobalTop([]);
+    setTopLoaded({ cafeTop: false, globalTop: false });
+  }, [slug]);
 
   const nowPlaying = recs.find(rec => rec.status === REC_STATUS.PLAYING) || null;
   const waitingQueue = recs
@@ -76,8 +91,7 @@ export default function CafePage({ slug }) {
   const pendingQueue = recs
     .filter(rec => rec.status === REC_STATUS.PENDING)
     .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-  const history = recs
-    .filter(rec => HISTORY_STATUSES.includes(rec.status))
+  const history = [...historyRecs]
     .sort((a, b) => new Date(b.played_at || b.requested_at) - new Date(a.played_at || a.requested_at));
 
   useEffect(() => {
@@ -114,7 +128,16 @@ export default function CafePage({ slug }) {
 
     socket.on('recommendations_update', ({ action, rec, id }) => {
       if (action === 'add') setRecs(previous => previous.some(item => item.id === rec.id) ? previous : [rec, ...previous]);
-      if (action === 'update' || action === 'vote') setRecs(previous => previous.map(item => item.id === rec.id ? rec : item));
+      if (action === 'update' || action === 'vote') {
+        if (HISTORY_STATUSES.includes(rec.status)) {
+          setRecs(previous => previous.filter(item => item.id !== rec.id));
+          setHistoryRecs(previous => previous.some(item => item.id === rec.id)
+            ? previous.map(item => item.id === rec.id ? rec : item)
+            : [rec, ...previous]);
+        } else {
+          setRecs(previous => previous.map(item => item.id === rec.id ? { ...rec, is_mine: item.is_mine } : item));
+        }
+      }
       if (action === 'delete') setRecs(previous => previous.filter(item => item.id !== id));
     });
 
@@ -137,9 +160,23 @@ export default function CafePage({ slug }) {
   }, [slug]);
 
   useEffect(() => {
+    if (tab !== 'history' || historyLoaded) return;
+    setHistoryLoading(true);
+    setHistoryError('');
+    getRecentHistory(slug, 0)
+      .then(({ items, hasMore }) => {
+        setHistoryRecs(items);
+        setHistoryHasMore(hasMore);
+        setHistoryLoaded(true);
+      })
+      .catch(() => setHistoryError('최근 재생을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'))
+      .finally(() => setHistoryLoading(false));
+  }, [tab, slug, historyLoaded, historyRetry]);
+
+  useEffect(() => {
     if (tab === 'cafeTop' && !topLoaded.cafeTop) {
       setTopLoading(true);
-      getCafeTop10(slug, 0)
+      getCafeTop10(slug, 0, topSort.cafeTop)
         .then(({ items, hasMore }) => {
           setCafeTop(items);
           setCafeTopHasMore(hasMore);
@@ -151,7 +188,7 @@ export default function CafePage({ slug }) {
 
     if (tab === 'globalTop' && !topLoaded.globalTop) {
       setTopLoading(true);
-      getGlobalTop10(0)
+      getGlobalTop10(0, topSort.globalTop)
         .then(({ items, hasMore }) => {
           setGlobalTop(items);
           setGlobalTopHasMore(hasMore);
@@ -160,17 +197,17 @@ export default function CafePage({ slug }) {
         .catch(() => {})
         .finally(() => setTopLoading(false));
     }
-  }, [tab, slug, topLoaded.cafeTop, topLoaded.globalTop]);
+  }, [tab, slug, topLoaded.cafeTop, topLoaded.globalTop, topSort.cafeTop, topSort.globalTop]);
 
   async function loadMoreTop() {
     setTopLoading(true);
     try {
       if (tab === 'cafeTop') {
-        const { items, hasMore } = await getCafeTop10(slug, cafeTop.length);
+        const { items, hasMore } = await getCafeTop10(slug, cafeTop.length, topSort.cafeTop);
         setCafeTop(previous => [...previous, ...items]);
         setCafeTopHasMore(hasMore);
       } else {
-        const { items, hasMore } = await getGlobalTop10(globalTop.length);
+        const { items, hasMore } = await getGlobalTop10(globalTop.length, topSort.globalTop);
         setGlobalTop(previous => [...previous, ...items]);
         setGlobalTopHasMore(hasMore);
       }
@@ -181,8 +218,47 @@ export default function CafePage({ slug }) {
     }
   }
 
+  async function changeTopSort(sort) {
+    if (!['count', 'votes'].includes(sort) || sort === topSort[tab]) return;
+    setTopSort(previous => ({ ...previous, [tab]: sort }));
+    setTopLoading(true);
+    try {
+      const result = tab === 'cafeTop'
+        ? await getCafeTop10(slug, 0, sort)
+        : await getGlobalTop10(0, sort);
+      if (tab === 'cafeTop') {
+        setCafeTop(result.items);
+        setCafeTopHasMore(result.hasMore);
+      } else {
+        setGlobalTop(result.items);
+        setGlobalTopHasMore(result.hasMore);
+      }
+    } catch {
+      setTopSort(previous => ({ ...previous, [tab]: topSort[tab] }));
+    } finally {
+      setTopLoading(false);
+    }
+  }
+
+  async function loadMoreHistory() {
+    setHistoryLoading(true);
+    try {
+      const { items, hasMore } = await getRecentHistory(slug, historyRecs.length);
+      setHistoryRecs(previous => [...previous, ...items.filter(item => !previous.some(existing => existing.id === item.id))]);
+      setHistoryHasMore(hasMore);
+    } catch {
+      // 기존 이력은 유지하고 다시 시도할 수 있게 둔다.
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   function handleUpdate(updated) {
-    setRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
+    if (HISTORY_STATUSES.includes(updated.status)) {
+      setHistoryRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
+    } else {
+      setRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
+    }
   }
 
   function handleDelete(id) {
@@ -196,7 +272,9 @@ export default function CafePage({ slug }) {
   }
 
   function handleAdded(rec) {
-    setRecs(previous => previous.some(item => item.id === rec.id) ? previous : [rec, ...previous]);
+    setRecs(previous => previous.some(item => item.id === rec.id)
+      ? previous.map(item => item.id === rec.id ? rec : item)
+      : [rec, ...previous]);
     const position = recs.filter(item => [REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(item.status)).length + 1;
     setSuccessMsg(`신청했어요. 현재 ${position}번째로 기다리고 있어요.`);
     if (successTimer) clearTimeout(successTimer);
@@ -362,7 +440,7 @@ export default function CafePage({ slug }) {
                     onToggle={() => setQueueExpanded(value => value === rec.id ? null : rec.id)}
                     onLinkCopyResult={handleCopyResult}
                     position={index + 1}
-                    isMyRequest={rec.requester_name === deviceName}
+                    isMyRequest={rec.is_mine}
                     hideStatus
                     expanded={queueExpanded === rec.id}
                   />
@@ -384,7 +462,7 @@ export default function CafePage({ slug }) {
                     onToggle={() => setQueueExpanded(value => value === rec.id ? null : rec.id)}
                     onLinkCopyResult={handleCopyResult}
                     position={waitingQueue.length + index + 1}
-                    isMyRequest={rec.requester_name === deviceName}
+                    isMyRequest={rec.is_mine}
                     hideStatus
                     expanded={queueExpanded === rec.id}
                   />
@@ -402,7 +480,16 @@ export default function CafePage({ slug }) {
 
       {tab === 'history' && (
         <div key='history' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
-          {history.length === 0 ? (
+          {historyLoading && history.length === 0 ? (
+            <StatePanel icon={LoaderCircle} title='최근 재생을 불러오고 있어요.' loading />
+          ) : historyError && history.length === 0 ? (
+            <>
+              <StatePanel title='최근 재생을 불러오지 못했어요.' description={historyError} />
+              <button type='button' className='button button--secondary button--full' onClick={() => setHistoryRetry(value => value + 1)}>
+                다시 시도
+              </button>
+            </>
+          ) : history.length === 0 ? (
             <StatePanel title='최근 재생한 곡이 없어요.' description='재생이 끝난 곡은 여기에서 다시 볼 수 있어요.' />
           ) : (
             <section className='content-section'>
@@ -410,7 +497,7 @@ export default function CafePage({ slug }) {
                 <div><h2>최근 재생</h2><p>최근 7일 동안 매장에서 들은 곡이에요.</p></div>
               </div>
               <div className='song-list'>
-                {history.slice(0, historyLimit).map(rec => (
+                {history.map(rec => (
                   <div className='song-list__item' key={rec.id}>
                     <SongCard
                       slug={slug}
@@ -425,9 +512,9 @@ export default function CafePage({ slug }) {
                   </div>
                 ))}
               </div>
-              {historyLimit < history.length && (
-                <button type='button' className='button button--secondary button--full' onClick={() => setHistoryLimit(value => value + 10)}>
-                  더 보기 · {history.length - historyLimit}곡 남음
+              {historyHasMore && (
+                <button type='button' className='button button--secondary button--full' onClick={loadMoreHistory} disabled={historyLoading}>
+                  {historyLoading ? '불러오는 중...' : '더 보기'}
                 </button>
               )}
             </section>
@@ -442,6 +529,8 @@ export default function CafePage({ slug }) {
             hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}
             loading={topLoading}
             slug={tab === 'cafeTop' ? slug : null}
+            sortBy={topSort[tab]}
+            onSortChange={changeTopSort}
             onLoadMore={loadMoreTop}
             onCopyResult={handleCopyResult}
           />

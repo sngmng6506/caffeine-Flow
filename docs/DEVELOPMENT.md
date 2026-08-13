@@ -9,7 +9,7 @@
 ## 요구사항
 
 ```text
-Node.js 20+
+Node.js 20.19+ 또는 22.12+
 PostgreSQL 16 권장
 npm
 ```
@@ -17,10 +17,9 @@ npm
 ## 설치와 실행
 
 ```bash
-npm install
-npm install --prefix server
-npm install --prefix customer
-npm install --prefix owner
+npm ci --prefix server
+npm ci --prefix customer
+npm ci --prefix owner
 
 npm run migrate --prefix server
 npm run dev:server
@@ -39,7 +38,7 @@ npm run electron:dev --prefix owner
 기본 포트:
 
 ```text
-server    3001
+server    3000
 customer  5173
 owner     5174
 ```
@@ -63,20 +62,19 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 | 키 | 설명 |
 | --- | --- |
-| `PORT` | 서버 포트, 기본 3001 |
+| `PORT` | 서버 포트, 기본 3000 |
 | `APP_URL` | OAuth 이동·Socket.IO CORS 기준 URL |
 | `SERVER_URL` | Naver callback 기준 서버 URL |
 | `DATABASE_SSL` | `disable`, `no-verify`, `verify` |
 | `ADMIN_PASSWORD` | 운영자 콘솔 비밀번호 |
 
-### 인증과 음악 메타데이터
+### 인증
 
 | 키 | 설명 |
 | --- | --- |
 | `GOOGLE_CLIENT_ID` | Google 로그인 |
 | `NAVER_CLIENT_ID` | Naver 로그인 |
 | `NAVER_CLIENT_SECRET` | Naver 로그인 |
-| `YOUTUBE_API_KEY` | YouTube 길이·라이브 확인 |
 
 owner Vite 빌드:
 
@@ -150,7 +148,6 @@ npm run build --prefix owner
 CI는 다음을 실행한다.
 
 ```text
-commit-message  커밋 규칙 검사
 server-test     PostgreSQL + 문법 + 단위·통합 테스트
 frontend-build  customer·owner Vite 빌드
 ```
@@ -159,11 +156,17 @@ frontend-build  customer·owner Vite 빌드
 
 `main` push 시 Railway가 `railway.json`에 따라 배포한다.
 
+Railway 서비스 설정에서 **Wait for CI**를 반드시 켠다. 이 항목은
+`railway.json` 설정 대상이 아니라 Railway의 GitHub autodeploy 설정이다.
+켜져 있으면 GitHub Actions가 실패한 커밋은 배포가 `SKIPPED`되고, 모든
+workflow가 성공한 커밋만 배포된다. 설정 위치와 요구사항은
+[Railway 공식 문서](https://docs.railway.com/deployments/github-autodeploys#wait-for-ci)를 따른다.
+
 ```text
 customer build
 → owner build
 → server install
-→ migration
+→ pre-deploy migration
 → server/server.js 실행
 ```
 
@@ -176,6 +179,8 @@ admin    → 서버가 루트 admin 디렉터리를 /admin에서 직접 제공
 ```
 
 customer를 먼저 빌드한 뒤 owner를 빌드한다. customer 빌드가 `server/public`을 비우므로 순서를 바꾸지 않는다.
+배포 전 마이그레이션은 `preDeployCommand`에서 실행하고, `/health`가 성공해야
+새 배포를 정상 상태로 판정한다.
 
 ## Electron 배포
 

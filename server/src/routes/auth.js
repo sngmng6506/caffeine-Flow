@@ -6,7 +6,7 @@ const { OAuth2Client } = require('google-auth-library');
 const { JWT_SECRET, GOOGLE_CLIENT_ID, NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, APP_URL, SERVER_URL } = require('../config');
 const cafeService = require('../services/cafe.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
-const { validateString, validateBool } = require('../utils/validate');
+const { validateString, validateBool, validateCoordinate } = require('../utils/validate');
 
 const NAVER_STATE_COOKIE = 'cf_naver_state';
 const STATE_COOKIE_OPTS = { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/api/v1/auth' };
@@ -23,7 +23,7 @@ async function checkEmailOverlap(email) {
   if (!email) return null;
   const existing = await cafeService.findByEmail(email);
   if (!existing) return null;
-  console.warn(`[auth] 이메일 중복 가입: ${email} — 기존 카페 "${existing.name}" (${existing.google_id ? 'google' : 'naver'})와 별도 계정 생성`);
+  console.warn(`[auth] 동일 이메일의 다른 provider 계정 감지 (${existing.google_id ? 'google' : 'naver'})`);
   return '같은 이메일로 가입된 다른 소셜 로그인 계정이 있습니다. 기존 카페를 찾으시면 이전에 쓰던 로그인 방식을 사용해주세요.';
 }
 
@@ -33,7 +33,7 @@ async function checkEmailOverlap(email) {
 // 기존 회원 → { token, cafe } / 신규 회원 → { needsSetup, pendingToken } (가입은 /complete에서)
 // ────────────────────────────────────────────
 router.post('/google', async (req, res) => {
-  const { idToken } = req.body;
+  const { idToken } = req.body || {};
   const idTokenCheck = validateString(idToken, { max: 4096, name: 'idToken' });
   if (idTokenCheck.error) return res.status(400).json({ error: idTokenCheck.error });
 
@@ -140,18 +140,21 @@ router.get('/naver/callback', async (req, res) => {
 // body: { pendingToken, cafeName, agreed: true }
 // ────────────────────────────────────────────
 router.post('/complete', async (req, res) => {
-  const { pendingToken, cafeName, agreed, agreements, location } = req.body;
+  const { pendingToken, cafeName, agreed, agreements, location } = req.body || {};
   const tokenCheck = validateString(pendingToken, { max: 4096, name: 'pendingToken' });
   if (tokenCheck.error) return res.status(400).json({ error: tokenCheck.error });
   const nameCheck = validateString(cafeName, { max: 100, name: '카페명' });
   if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
-  if (!agreed) return res.status(400).json({ error: '약관 동의 필수' });
+  const agreedCheck = validateBool(agreed, { name: 'agreed' });
+  if (agreedCheck.error || !agreedCheck.value) return res.status(400).json({ error: '약관 동의 필수' });
 
   // 필수 약관 동의 검증
-  if (!agreements?.age)
+  if (agreements?.age !== true)
     return res.status(400).json({ error: '만 14세 이상 확인이 필요합니다' });
-  if (!agreements?.service || !agreements?.privacy || !agreements?.copyright)
+  if (agreements?.service !== true || agreements?.privacy !== true || agreements?.copyright !== true)
     return res.status(400).json({ error: '필수 약관에 모두 동의해야 합니다' });
+  if (agreements.marketing !== undefined && typeof agreements.marketing !== 'boolean')
+    return res.status(400).json({ error: '마케팅 동의 형식 오류' });
 
   // 카페 동네 필수 (시/구/동)
   if (!location?.region || !location?.district)
@@ -162,26 +165,49 @@ router.post('/complete', async (req, res) => {
     const check = validateString(location[key], { max: 50, allowNull: true, name: label });
     if (check.error) return res.status(400).json({ error: check.error });
   }
+  const latitudeCheck = validateCoordinate(location.latitude, { min: -90, max: 90, name: '위도' });
+  if (latitudeCheck.error) return res.status(400).json({ error: latitudeCheck.error });
+  const longitudeCheck = validateCoordinate(location.longitude, { min: -180, max: 180, name: '경도' });
+  if (longitudeCheck.error) return res.status(400).json({ error: longitudeCheck.error });
 
   let pending;
   try {
     pending = jwt.verify(pendingToken, JWT_SECRET);
-    if (!pending.pending) throw new Error();
+    if (!pending.pending || (!pending.googleId && !pending.naverId) || (pending.googleId && pending.naverId)) throw new Error();
   } catch {
     return res.status(401).json({ error: '만료되었거나 유효하지 않은 요청입니다. 다시 시도해주세요.' });
   }
 
+  const existingProviderCafe = pending.googleId
+    ? await cafeService.findByGoogleId(pending.googleId)
+    : await cafeService.findByNaverId(pending.naverId);
+  if (existingProviderCafe) {
+    return res.status(409).json({ error: '이미 가입이 완료된 계정입니다. 로그인 화면에서 다시 로그인해주세요.' });
+  }
+
   const emailWarning = await checkEmailOverlap(pending.email);
-  const cafe = await cafeService.create({
-    name:                 nameCheck.value,
-    ownerEmail:           pending.email || null,
-    googleId:             pending.googleId || null,
-    naverId:              pending.naverId  || null,
-    disclaimerAcceptedAt: new Date(),
-    lastLoginAt:          new Date(),
-    agreements,
-    location,
-  });
+  let cafe;
+  try {
+    cafe = await cafeService.create({
+      name:                 nameCheck.value,
+      ownerEmail:           pending.email || null,
+      googleId:             pending.googleId || null,
+      naverId:              pending.naverId  || null,
+      disclaimerAcceptedAt: new Date(),
+      lastLoginAt:          new Date(),
+      agreements,
+      location: {
+        ...location,
+        latitude: latitudeCheck.value,
+        longitude: longitudeCheck.value,
+      },
+    });
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: '이미 가입이 완료된 계정이거나 사용 중인 가입 정보입니다. 다시 로그인해주세요.' });
+    }
+    throw error;
+  }
 
   res.status(201).json({ token: issueToken(cafe), cafe: safeCafe(cafe), emailWarning });
 });

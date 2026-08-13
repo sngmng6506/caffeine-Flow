@@ -4,6 +4,7 @@ const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_STATUS, FILTER_REJECT_STATUSES } = require('../constants/music-filter-status');
 const { MUSIC_FILTER_STATS_LOOKBACK_DAYS, STATS_PATTERN_LOOKBACK_DAYS } = require('../constants/time-policy');
 const { CANONICAL_VIDEO_ID_SQL, KST_HOUR_SQL, KST_DOW_SQL } = require('../db/sql-fragments');
+const { ownerRecommendation } = require('../utils/public-response');
 
 async function getStats(cafeId) {
   const [total, played, skipped] = await Promise.all([
@@ -41,7 +42,7 @@ async function getDailyStats(cafeId, dateStr) {
     .orderBy('requested_at', 'asc');
 
   const byHour = Array(24).fill(null).map(() => []);
-  for (const r of recs) byHour[getKstHour(new Date(r.requested_at))].push(r);
+  for (const r of recs) byHour[getKstHour(new Date(r.requested_at))].push(ownerRecommendation(r));
 
   return {
     date:    dateStr,
@@ -57,8 +58,11 @@ const TOP_PAGE_SIZE = 10;
 // 정규화 video_id 기준 SQL 그룹 집계 + limit+1 페이지네이션.
 // 이전 구현은 전체 그룹 행을 메모리에 올려 JS에서 병합·정렬·slice —
 // 무인증 공개 엔드포인트(/api/v1/top10)라 데이터 누적 시 요청당 풀스캔이었음.
-function topQuery(builder, offset) {
+function topQuery(builder, offset, sort = 'count') {
+  const primary = sort === 'votes' ? 'total_votes' : 'count';
+  const secondary = sort === 'votes' ? 'count' : 'total_votes';
   return builder
+    .where({ status: REC_STATUS.PLAYED })
     .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
@@ -66,7 +70,9 @@ function topQuery(builder, offset) {
     .count('id as count')
     .sum('vote_count as total_votes')
     .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL))
-    .orderBy('count', 'desc')
+    .orderBy(primary, 'desc')
+    .orderBy(secondary, 'desc')
+    .orderByRaw(`${CANONICAL_VIDEO_ID_SQL} ASC`)
     .limit(TOP_PAGE_SIZE + 1)
     .offset(offset);
 }
@@ -80,18 +86,19 @@ function pageRows(rows) {
   return { items, hasMore: rows.length > TOP_PAGE_SIZE };
 }
 
-async function getCafeTop10(cafeId, offset = 0) {
-  const rows = await topQuery(db('recommendations').where({ cafe_id: cafeId }), offset);
+async function getCafeTop10(cafeId, offset = 0, sort = 'count') {
+  const rows = await topQuery(db('recommendations').where({ cafe_id: cafeId }), offset, sort);
   return pageRows(rows);
 }
 
-async function getGlobalTop10(offset = 0) {
+async function getGlobalTop10(offset = 0, sort = 'count') {
   // 정지(is_suspended) 카페의 곡은 공개 TOP10에서 제외한다 — 정지의 목적이
   // 손님 노출 차단인데 여기만 남으면 구멍. join 대신 whereIn 서브쿼리를
   // 쓰는 이유: topQuery가 count('id')를 쓰므로 join 시 id가 모호해짐.
   const rows = await topQuery(
     db('recommendations').whereIn('cafe_id', db('cafes').select('id').where({ is_suspended: false })),
     offset,
+    sort,
   );
   return pageRows(rows);
 }

@@ -61,7 +61,7 @@ sequenceDiagram
     end
     S->>S: 신청곡과 판단 결과 저장
     S-->>G: 접수 또는 거절 응답
-    S-->>O: recommendations_update
+    S-->>O: owner_recommendations_update
     S-->>G: recommendations_update
     O->>S: accepted / playing / played 상태 전이
 ```
@@ -100,17 +100,21 @@ stateDiagram-v2
 
 ## 실시간 동기화
 
-카페별 Socket.IO room을 사용한다.
+카페별 공용 Socket.IO room과 인증된 사장님 전용 `owner:<slug>` room을 사용한다.
 
 ```text
 손님 추가·투표·취소
 → 서버 트랜잭션
 → DB 반영
-→ recommendations_update
+→ recommendations_update (공개 allowlist)
+→ owner_recommendations_update (인증된 사장님 전용)
 → 손님·사장님 화면 갱신
 ```
 
 재연결 시 클라이언트는 서버에서 현재 큐를 다시 조회한다. 소켓 이벤트만으로 영구 상태를 복원하지 않는다.
+AI 필터 오류와 모델 판단 상세는 사장님 room으로만 전송한다. 공개 응답과
+공용 이벤트는 DB row 전체가 아니라 `server/src/utils/public-response.js`의
+허용 필드만 직렬화한다.
 
 정지되거나 존재하지 않는 카페는 손님 HTTP 요청과 소켓 입장을 모두 차단한다. 검증된 사장님 연결은 운영 복구를 위해 유지할 수 있다.
 
@@ -119,7 +123,7 @@ stateDiagram-v2
 - 사장님: Google/Naver 로그인 후 JWT
 - 신규 가입: 제한시간이 있는 pending token으로 가입 완료
 - 운영자: `role=admin` 전용 토큰과 별도 미들웨어
-- 손님: 계정 없이 브라우저 localStorage의 `visitor_id`와 IP를 요청 제한·본인 취소에 사용. 식별·중복 제거는 `visitor_id` 우선이며 없는 레거시 요청만 IP를 사용. 사람이나 물리 기기의 고유 식별자는 아니다
+- 손님: 계정 없이 브라우저 localStorage의 `visitor_id`와 IP를 사용. 본인 취소는 `visitor_id` 일치가 필수이고, 투표·방문 중복 제거는 `visitor_id` 우선이며 없는 레거시 요청만 IP를 사용한다. 사람이나 물리 기기의 고유 식별자는 아니다
 
 사장님 권한은 JWT의 불변 `cafeId`로 현재 카페를 조회한 뒤 현재 slug까지
 일치할 때만 부여한다. 변경된 옛 slug가 다른 카페에 재사용되어도 옛 토큰은

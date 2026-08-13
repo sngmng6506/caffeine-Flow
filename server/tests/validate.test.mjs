@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateString, validateInEnum, validateBool, validateRecommendationBody } from '../src/utils/validate.js';
+import { validateString, validateInEnum, validateBool, validateDateString, validateCoordinate, validateRecommendationBody } from '../src/utils/validate.js';
 
 describe('validateString', () => {
   it('정상 문자열은 trim된 value 반환', () => {
@@ -36,6 +36,26 @@ describe('validateBool', () => {
     expect(validateBool('false')).toEqual({ value: false });
     expect(validateBool(1).error).toBeTruthy();
     expect(validateBool('yes').error).toBeTruthy();
+  });
+});
+
+describe('validateDateString', () => {
+  it('실제 달력 날짜만 허용한다', () => {
+    expect(validateDateString('2026-02-28')).toEqual({ value: '2026-02-28' });
+    expect(validateDateString('2024-02-29')).toEqual({ value: '2024-02-29' });
+    expect(validateDateString('2026-02-29').error).toBeTruthy();
+    expect(validateDateString('2026-13-01').error).toBeTruthy();
+    expect(validateDateString('2026-8-01').error).toBeTruthy();
+  });
+});
+
+describe('validateCoordinate', () => {
+  it('유한한 숫자와 좌표 범위를 검증한다', () => {
+    expect(validateCoordinate(0, { min: -90, max: 90 })).toEqual({ value: 0 });
+    expect(validateCoordinate(undefined, { min: -90, max: 90 })).toEqual({ value: null });
+    expect(validateCoordinate('37.5', { min: -90, max: 90 }).error).toBeTruthy();
+    expect(validateCoordinate(91, { min: -90, max: 90 }).error).toBeTruthy();
+    expect(validateCoordinate(Number.NaN, { min: -90, max: 90 }).error).toBeTruthy();
   });
 });
 

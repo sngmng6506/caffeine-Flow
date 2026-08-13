@@ -70,8 +70,8 @@ async function create({ name, ownerEmail, googleId, naverId, disclaimerAcceptedA
       region:                 location?.region       || null,
       district:               location?.district     || null,
       dong:                   location?.dong         || null,
-      latitude:               location?.latitude     || null,
-      longitude:              location?.longitude    || null,
+      latitude:               location?.latitude     ?? null,
+      longitude:              location?.longitude    ?? null,
     })
     .returning('*');
   return cafe;

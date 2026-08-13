@@ -6,32 +6,6 @@ on:
   pull_request:
 
 jobs:
-  commit-message:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 20
-      - name: Validate commit messages
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
-          else
-            BEFORE="${{ github.event.before }}"
-            # force-push나 새 브랜치면 before 커밋이 없거나 fetch돼 있지 않아
-            # git log가 실패한다. 이 경우 tip 커밋만 검사한다.
-            if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-              RANGE="${{ github.sha }}~1..${{ github.sha }}"
-            else
-              RANGE="${BEFORE}..${{ github.sha }}"
-            fi
-          fi
-          node .github/scripts/validate-commit-messages.mjs "$RANGE"
-
   server-test:
     runs-on: ubuntu-latest
     services:

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import pagination from '../src/utils/pagination.js';
 
-const { parseBoundedInteger, parseLimit, parseOffset } = pagination;
+const { parseBoundedInteger, parseLimit, parseOffset, parseTopSort } = pagination;
 
 describe('페이지네이션 입력 검증', () => {
   it('offset 기본값과 정상 정수를 반환한다', () => {
@@ -22,5 +22,11 @@ describe('페이지네이션 입력 검증', () => {
   it('범위가 있는 일반 정수 파라미터도 엄격히 검증한다', () => {
     expect(parseBoundedInteger('23', { name: 'hour', defaultValue: 0, min: 0, max: 23 })).toEqual({ value: 23 });
     expect(parseBoundedInteger('23시', { name: 'hour', defaultValue: 0, min: 0, max: 23 }).error).toContain('hour');
+  });
+
+  it('TOP 정렬 키를 allowlist로 제한한다', () => {
+    expect(parseTopSort(undefined)).toEqual({ value: 'count' });
+    expect(parseTopSort('votes')).toEqual({ value: 'votes' });
+    expect(parseTopSort('count desc').error).toBeTruthy();
   });
 });

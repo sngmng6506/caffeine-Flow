@@ -30,10 +30,9 @@ React · Vite · Node.js · Express · Knex · Socket.IO · PostgreSQL · Electr
 
 ```bash
 # 의존성 설치
-npm install
-npm install --prefix server
-npm install --prefix customer
-npm install --prefix owner
+npm ci --prefix server
+npm ci --prefix customer
+npm ci --prefix owner
 
 # 루트 .env에 DATABASE_URL, JWT_SECRET 설정
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"

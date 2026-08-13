@@ -17,10 +17,9 @@ const OPENROUTER_API_KEY = env('OPENROUTER_API_KEY');
 const OPENROUTER_BASE_URL = env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 
 module.exports = {
-  PORT: env('PORT', '3001'),
+  PORT: env('PORT', '3000'),
   DATABASE_URL,
   JWT_SECRET,
-  YOUTUBE_API_KEY: env('YOUTUBE_API_KEY'),
   GOOGLE_CLIENT_ID: env('GOOGLE_CLIENT_ID'),
   NAVER_CLIENT_ID: env('NAVER_CLIENT_ID'),
   NAVER_CLIENT_SECRET: env('NAVER_CLIENT_SECRET'),

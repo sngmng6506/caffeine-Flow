@@ -5,6 +5,7 @@ import {
   MS_PER_DAY,
   KST_OFFSET_MS,
   MUSIC_FILTER_STATS_LOOKBACK_DAYS,
+  RECENT_HISTORY_LOOKBACK_DAYS,
   STATS_PATTERN_LOOKBACK_DAYS,
   PLAYBACK_STATE_TTL_MS,
 } from '../src/constants/time-policy.js';
@@ -28,6 +29,7 @@ describe('KST 시간 정책 계약', () => {
 
   it('음악 필터 통계는 오늘 포함 6일 전 KST 자정부터 시작한다', () => {
     expect(MUSIC_FILTER_STATS_LOOKBACK_DAYS).toBe(6);
+    expect(RECENT_HISTORY_LOOKBACK_DAYS).toBe(6);
   });
 
   it('시간대/요일 패턴 통계는 기존 동작대로 30일 전 KST 자정부터 집계한다', () => {

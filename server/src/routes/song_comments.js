@@ -1,7 +1,7 @@
 const router      = require('express').Router({ mergeParams: true });
 const cafeService = require('../services/cafe.service');
 const svc         = require('../services/song_comments.service');
-const { validateString } = require('../utils/validate');
+const { validateString, isUuid } = require('../utils/validate');
 const { getClientIp, safeVisitorId, makeDualLimiter } = require('./_recommendations.shared');
 const { COMMENT_LIMIT, COMMENT_PAGE_SIZE, COMMENT_PAGE_MAX_SIZE } = require('../constants/limits');
 const { parseLimit, parseOffset } = require('../utils/pagination');
@@ -11,6 +11,9 @@ const commentLimiters = makeDualLimiter({ ...COMMENT_LIMIT, message: '잠시 후
 // 카페 경로로 접근하면 활성 카페를 반드시 확인한다. 잘못된 slug를
 // cafe_id=null인 전역 댓글로 조용히 바꾸지 않는다.
 router.use(async (req, res, next) => {
+  const videoIdCheck = validateString(req.params.videoId, { max: 1000, name: 'videoId' });
+  if (videoIdCheck.error) return res.status(400).json({ error: videoIdCheck.error });
+  req.commentVideoId = videoIdCheck.value;
   if (!req.params.slug) {
     req.commentCafeId = null;
     return next();
@@ -32,7 +35,7 @@ router.get('/', async (req, res) => {
   });
   if (limit.error) return res.status(400).json({ error: limit.error });
 
-  res.json(await svc.getComments(req.params.videoId, {
+  res.json(await svc.getComments(req.commentVideoId, {
     offset: offset.value,
     limit: limit.value,
   }));
@@ -46,7 +49,7 @@ router.post('/', commentLimiters, async (req, res) => {
   const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });
   if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
 
-  const comment = await svc.addComment(req.params.videoId, req.commentCafeId, {
+  const comment = await svc.addComment(req.commentVideoId, req.commentCafeId, {
     commenterIp:   getClientIp(req),
     commenterName: nameCheck.value || undefined,
     body:          bodyCheck.value,
@@ -58,13 +61,14 @@ router.post('/', commentLimiters, async (req, res) => {
 // POST /api/v1/cafes/:slug/songs/:videoId/comments/:commentId/replies
 // POST /api/v1/songs/:videoId/comments/:commentId/replies
 router.post('/:commentId/replies', commentLimiters, async (req, res) => {
+  if (!isUuid(req.params.commentId)) return res.status(400).json({ error: '댓글 ID 형식 오류' });
   const bodyCheck = validateString(req.body?.body, { max: 200, name: 'body' });
   if (bodyCheck.error) return res.status(400).json({ error: bodyCheck.error });
   const nameCheck = validateString(req.body?.commenterName, { max: 50, allowNull: true, name: 'commenterName' });
   if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
 
   try {
-    const reply = await svc.addReply(req.params.videoId, req.params.commentId, req.commentCafeId, {
+    const reply = await svc.addReply(req.commentVideoId, req.params.commentId, req.commentCafeId, {
       commenterIp:   getClientIp(req),
       commenterName: nameCheck.value || undefined,
       body:          bodyCheck.value,
