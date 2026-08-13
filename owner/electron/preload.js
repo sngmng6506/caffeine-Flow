@@ -12,10 +12,12 @@ const electronAPI = {
   supportsPlayRecAck: true,
   playRec:          (videoIdOrUrl) => ipcRenderer.invoke('play-rec', videoIdOrUrl),
   endRec:           ()             => ipcRenderer.send('end-rec'),
+  isRecActive:      ()             => ipcRenderer.invoke('is-rec-active'),
 
   // 매장 BGM URL 설정/해제
-  setBgmUrl:        (url) => ipcRenderer.send('set-bgm-url', url),
-  clearBgm:         ()    => ipcRenderer.send('clear-bgm'),
+  supportsBgmAck:   true,
+  setBgmUrl:        (url) => ipcRenderer.invoke('set-bgm-url', url),
+  clearBgm:         ()    => ipcRenderer.invoke('clear-bgm'),
 
   showYoutube:      () => ipcRenderer.send('show-youtube'),
   hideYoutube:      () => ipcRenderer.send('hide-youtube'),

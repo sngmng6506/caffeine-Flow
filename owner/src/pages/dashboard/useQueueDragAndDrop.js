@@ -57,11 +57,13 @@ export default function useQueueDragAndDrop({
         let rec = created;
         if (targetStatus === REC_STATUS.PLAYING) {
           const { type: _type, ...defaultSnapshot } = data;
+          let defaultCleared = false;
           try {
             // Spotify 기본 BGM을 같은 bgmView에서 takeover한 뒤 clear하면
             // 신청곡까지 중단된다. 먼저 기본 BGM을 해제해 recView 재생으로 전환한다.
             rec = await runPlaybackTransition(async () => {
-              onClearDefault();
+              await onClearDefault();
+              defaultCleared = true;
               try {
                 const result = await requestElectronPlayback(window.electronAPI, created.video_id);
                 if (!result?.ok) throw new Error(result?.error || '신청곡 재생을 시작하지 못했습니다.');
@@ -72,7 +74,15 @@ export default function useQueueDragAndDrop({
               }
             });
           } catch (error) {
-            onSetDefault(defaultSnapshot);
+            if (defaultCleared) await onSetDefault(defaultSnapshot).catch(console.error);
+            await deleteRec(cafeSlug, created.id).catch(() => null);
+            throw error;
+          }
+        }
+        if (targetStatus !== REC_STATUS.PLAYING) {
+          try {
+            await onClearDefault();
+          } catch (error) {
             await deleteRec(cafeSlug, created.id).catch(() => null);
             throw error;
           }
@@ -83,7 +93,6 @@ export default function useQueueDragAndDrop({
             : previous;
           return cleared.some(item => item.id === rec.id) ? cleared : [...cleared, rec];
         });
-        if (targetStatus !== REC_STATUS.PLAYING) onClearDefault();
         return;
       }
 
@@ -145,7 +154,7 @@ export default function useQueueDragAndDrop({
       await updateRec(cafeSlug, rec.id, terminalStatus);
       if (rec.status === REC_STATUS.PLAYING) window.electronAPI?.endRec();
       setRecommendations(previous => previous.filter(item => item.id !== rec.id));
-      onSetDefault(recommendationToDefault(rec));
+      await onSetDefault(recommendationToDefault(rec));
     } catch (error) {
       console.error(error);
       setError(error.message || '기본 BGM을 변경하지 못했어요. 다시 시도해 주세요.');

@@ -185,12 +185,17 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     windowManager.safeSend('now-playing', null);
   }
 
+  function isRecommendationActive() {
+    return currentRecMode !== null;
+  }
+
   function registerIpcHandlers() {
     const trusted = (event) => windowManager.isFromMainRenderer(event.sender);
     ipcMain.on('show-youtube', (event) => { if (trusted(event)) showPanel(); });
     ipcMain.on('hide-youtube', (event) => { if (trusted(event)) hidePanel(); });
-    ipcMain.on('set-bgm-url', (event, url) => { if (trusted(event)) setBgmUrl(url); });
-    ipcMain.on('clear-bgm', (event) => { if (trusted(event)) clearBgm(); });
+    ipcMain.handle('set-bgm-url', (event, url) => trusted(event) && setBgmUrl(url));
+    ipcMain.handle('clear-bgm', (event) => trusted(event) && clearBgm());
+    ipcMain.handle('is-rec-active', (event) => trusted(event) && isRecommendationActive());
     ipcMain.handle('play-rec', (event, videoIdOrUrl) => trusted(event)
       ? playRecommendation(videoIdOrUrl)
       : { ok: false, error: 'Forbidden' });
@@ -201,6 +206,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     cleanupForQuit: stopDetectors,
     clearBgm,
     endRecommendation,
+    isRecommendationActive,
     playRecommendation,
     registerIpcHandlers,
     setBgmUrl,

@@ -53,4 +53,18 @@ describe('playback leader registry', () => {
     expect(registry.completeRecovery('cafe', 'socket-a')).toBe(false);
     registry.clear();
   });
+
+  it('로그아웃 뒤 새 실행 세션은 lease 만료 후 복구가 필요한 리더가 된다', () => {
+    vi.useFakeTimers();
+    const registry = createPlaybackLeaderRegistry({ graceMs: 1000, onRoleChange: () => {} });
+    registry.add('cafe', 'socket-a', 'session-a');
+    registry.completeRecovery('cafe', 'socket-a');
+    registry.remove('cafe', 'socket-a');
+
+    expect(registry.add('cafe', 'socket-b', 'session-b')).toBe(false);
+    vi.advanceTimersByTime(1000);
+    expect(registry.isLeader('cafe', 'socket-b')).toBe(true);
+    expect(registry.needsRecovery('cafe', 'socket-b')).toBe(true);
+    registry.clear();
+  });
 });

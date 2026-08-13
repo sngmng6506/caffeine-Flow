@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { defaultToRecommendationPayload, metadataToDefault } from './musicResource.mjs';
+import { requestSetBgmUrl } from './bgmBridge.mjs';
 
 const MUSIC_HOSTS = ['youtube.com', 'youtu.be', 'soundcloud.com', 'spotify.com', 'spotify.link'];
 
@@ -50,12 +51,32 @@ export default function DefaultSection({
       } catch {
         // 메타데이터 조회에 실패해도 입력한 링크는 기본 BGM으로 사용할 수 있다.
       }
-      onSet(info);
+      await onSet(info);
       setInputUrl('');
-    } catch {
-      setError('기본 BGM을 설정하지 못했어요. 링크를 확인하고 다시 시도해 주세요.');
+    } catch (error) {
+      setError(error.message || '기본 BGM을 설정하지 못했어요. 링크를 확인하고 다시 시도해 주세요.');
     } finally {
       setSetting(false);
+    }
+  }
+
+  async function handleClear() {
+    setError('');
+    try {
+      await onClear();
+    } catch (clearError) {
+      setError(clearError.message || '기본 BGM을 해제하지 못했어요. 다시 시도해 주세요.');
+    }
+  }
+
+  async function handleOpen(url) {
+    setError('');
+    try {
+      if (!await requestSetBgmUrl(window.electronAPI, url)) {
+        setError('신청곡 재생이 끝난 뒤 기본 BGM 화면을 열 수 있어요.');
+      }
+    } catch (openError) {
+      setError(openError.message || '기본 BGM 화면을 열지 못했어요.');
     }
   }
 
@@ -118,7 +139,7 @@ export default function DefaultSection({
         <div className="owner-default-card__actions">
           <button
             type="button"
-            onClick={() => window.electronAPI?.setBgmUrl(url)}
+            onClick={() => handleOpen(url)}
             disabled={recommendationPlaying}
             draggable={false}
             onDragStart={event => event.stopPropagation()}
@@ -135,13 +156,14 @@ export default function DefaultSection({
           )}
           <button
             type="button"
-            onClick={onClear}
+            onClick={handleClear}
             disabled={recommendationPlaying}
             draggable={false}
             onDragStart={event => event.stopPropagation()}
             className="owner-btn owner-btn--danger"
           >기본 BGM 해제</button>
         </div>
+        {error && <div role="alert" className="owner-form-error">{error}</div>}
       </div>
     );
   }

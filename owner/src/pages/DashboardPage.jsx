@@ -11,6 +11,7 @@ import usePanelDivider from './dashboard/usePanelDivider';
 import useQueueDragAndDrop from './dashboard/useQueueDragAndDrop';
 import { readSavedBgm, savedToBgmUrl } from './dashboard/bgmStorage';
 import { REC_STATUS } from '../constants/recommendationStatus';
+import { requestClearBgm, requestSetBgmUrl } from './dashboard/bgmBridge.mjs';
 
 export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanner }) {
   const [cafe, setCafe] = useState(initialCafe);
@@ -32,6 +33,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     canControlPlayback,
     toggleAccepting,
     toggleAiAutoAccept,
+    finishPlaybackForExit,
     handleUpdate,
     handleDelete,
   } = useRecommendationQueue({
@@ -66,19 +68,37 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     setCustomerUrl(updated.customer_url);
   }
 
-  function handleSetDefault(info) {
-    if (recommendations.some(rec => rec.status === REC_STATUS.PLAYING)) return;
+  async function handleSetDefault(info) {
+    if (recommendations.some(rec => rec.status === REC_STATUS.PLAYING)) {
+      throw new Error('신청곡 재생이 끝난 뒤 기본 BGM을 설정할 수 있어요.');
+    }
+    const url = savedToBgmUrl(info);
+    if (url && !await requestSetBgmUrl(window.electronAPI, url)) {
+      throw new Error('신청곡 재생이 시작되어 기본 BGM을 변경하지 않았어요.');
+    }
     setDefaultVideo(info);
     localStorage.setItem('cf_default_video', JSON.stringify(info));
-    const url = savedToBgmUrl(info);
-    if (url) window.electronAPI?.setBgmUrl(url);
   }
 
-  function handleClearDefault() {
-    if (recommendations.some(rec => rec.status === REC_STATUS.PLAYING)) return;
+  async function handleClearDefault() {
+    if (recommendations.some(rec => rec.status === REC_STATUS.PLAYING)) {
+      throw new Error('신청곡 재생이 끝난 뒤 기본 BGM을 해제할 수 있어요.');
+    }
+    if (!await requestClearBgm(window.electronAPI)) {
+      throw new Error('신청곡 재생이 시작되어 기본 BGM을 해제하지 않았어요.');
+    }
     setDefaultVideo(null);
     localStorage.removeItem('cf_default_video');
-    window.electronAPI?.clearBgm();
+  }
+
+  async function handleLogout() {
+    try {
+      await finishPlaybackForExit();
+    } catch (error) {
+      console.error('[logout playback cleanup]', error);
+    } finally {
+      onLogout();
+    }
   }
 
   const {
@@ -172,7 +192,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           provider={cafe.provider}
           cafe={cafe}
           onCafePatch={handleCafePatch}
-          onLogout={onLogout}
+          onLogout={handleLogout}
           defaultVideo={defaultVideo}
           aiAutoAccept={aiAutoAccept}
           onOpenQueue={() => setTab('queue')}

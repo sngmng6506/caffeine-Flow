@@ -9,6 +9,11 @@ import { byPriority, isAutoAcceptEligible } from './queuePolicy';
 import { requestElectronPlayback } from './playbackBridge.mjs';
 import { acknowledgePlaybackRecovery } from './playbackRecovery.mjs';
 import { runPlaybackTransition } from './playbackTransition.mjs';
+import { finishCurrentPlayback } from './playbackCleanup.mjs';
+import {
+  markPlaybackSessionRecovered,
+  needsPlaybackStateReset,
+} from './playbackSession.mjs';
 
 export default function useRecommendationQueue({
   cafe,
@@ -196,13 +201,31 @@ export default function useRecommendationQueue({
         const shouldDrain = pendingRecoveredAutoAccept;
         pendingRecoveredSnapshot = null;
         pendingRecoveredAutoAccept = false;
+        markPlaybackSessionRecovered(cafe.slug);
         if (shouldDrain) await drainPendingAndPlay(recovered);
         return;
       }
-      if (!shouldRecover) return;
+      if (!shouldRecover) {
+        markPlaybackSessionRecovered(cafe.slug);
+        return;
+      }
       recoveryInProgressRef.current = true;
 
       try {
+        // 서버 프로세스만 재시작되면 registry는 새 리더로 보지만 Electron의
+        // BrowserView와 sessionStorage는 계속 살아 있다. 완료된 같은 실행
+        // 세션은 DB playing을 되돌리지 않고 새 registry에 ACK만 보낸다.
+        let playbackActive = null;
+        try {
+          if (typeof window.electronAPI?.isRecActive === 'function') {
+            playbackActive = await window.electronAPI.isRecActive();
+          }
+        } catch {}
+        if (!needsPlaybackStateReset(cafe.slug, shouldRecover, { playbackActive })) {
+          await acknowledgePlaybackRecovery(socket);
+          markPlaybackSessionRecovered(cafe.slug);
+          return;
+        }
         const [{ recommendations: latest, is_accepting }, latestCafe] = await Promise.all([
           getRecommendations(cafe.slug),
           cafeLoaded,
@@ -218,6 +241,7 @@ export default function useRecommendationQueue({
         pendingRecoveredSnapshot = reset;
         pendingRecoveredAutoAccept = !!latestCafe?.music_filter_enabled;
         await acknowledgePlaybackRecovery(socket);
+        markPlaybackSessionRecovered(cafe.slug);
         pendingRecoveredSnapshot = null;
         pendingRecoveredAutoAccept = false;
         if (latestCafe?.music_filter_enabled) await drainPendingAndPlay(reset);
@@ -295,12 +319,7 @@ export default function useRecommendationQueue({
 
     const removeCleanupBeforeQuit = window.electronAPI?.onCleanupBeforeQuit?.(async () => {
       try {
-        const playing = playbackLeaderRef.current
-          ? recommendationsRef.current.filter(rec => rec.status === REC_STATUS.PLAYING)
-          : [];
-        await Promise.all(
-          playing.map(rec => updateRec(cafe.slug, rec.id, REC_STATUS.PLAYED).catch(() => null))
-        );
+        await finishPlaybackForExit();
       } catch {}
       window.electronAPI?.cleanupDone?.();
     });
@@ -382,6 +401,21 @@ export default function useRecommendationQueue({
     setRecommendations(previous => previous.filter(rec => rec.id !== id));
   }
 
+  async function finishPlaybackForExit() {
+    const updated = await finishCurrentPlayback({
+      isLeader: playbackLeaderRef.current,
+      recommendations: recommendationsRef.current,
+      markPlayed: rec => updateRec(cafe.slug, rec.id, REC_STATUS.PLAYED),
+      endPlayback: () => window.electronAPI?.endRec(),
+    });
+    if (updated.length > 0) {
+      const updateMap = Object.fromEntries(updated.map(rec => [rec.id, rec]));
+      recommendationsRef.current = recommendationsRef.current.map(rec => updateMap[rec.id] || rec);
+      setRecommendations(recommendationsRef.current);
+    }
+    return updated;
+  }
+
   return {
     recommendations,
     setRecommendations,
@@ -394,6 +428,7 @@ export default function useRecommendationQueue({
     canControlPlayback: playbackAvailable && isPlaybackLeader,
     toggleAccepting,
     toggleAiAutoAccept,
+    finishPlaybackForExit,
     handleUpdate,
     handleDelete,
   };

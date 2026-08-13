@@ -51,10 +51,13 @@ describe('Electron playback controller acknowledgment', () => {
     const rec = 'https://open.spotify.com/track/recommendation';
 
     expect(controller.setBgmUrl(bgm)).toBe(true);
+    expect(controller.isRecommendationActive()).toBe(false);
     await expect(controller.playRecommendation(rec)).resolves.toEqual({ ok: true });
+    expect(controller.isRecommendationActive()).toBe(true);
     expect(controller.clearBgm()).toBe(false);
     expect(controller.setBgmUrl('https://open.spotify.com/playlist/other')).toBe(false);
     controller.endRecommendation();
+    expect(controller.isRecommendationActive()).toBe(false);
     expect(controller.clearBgm()).toBe(true);
 
     expect(loadedUrls).toEqual([bgm, rec, bgm, 'https://www.google.com']);
