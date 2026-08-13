@@ -49,10 +49,10 @@ export default function ShortcutsTab() {
     setMessage(null);
     try {
       const count = await window.electronAPI?.clearSpotifySession();
-      setMessage({ tone: 'success', text: `Spotify 로그인 정보 ${count || 0}개를 정리했습니다.` });
+      setMessage({ tone: 'success', text: `Spotify 로그인 정보 ${count || 0}개를 정리했어요.` });
       window.electronAPI?.openLoginWindow('https://accounts.spotify.com/ko/login');
     } catch (error) {
-      setMessage({ tone: 'error', text: error.message || 'Spotify 로그인 정보를 정리하지 못했습니다.' });
+      setMessage({ tone: 'error', text: error.message || 'Spotify 로그인 정보를 정리하지 못했어요. 다시 시도해 주세요.' });
     }
   }
 
@@ -74,10 +74,10 @@ export default function ShortcutsTab() {
               <span style={styles.note}>{service.note}</span>
             </div>
             <div style={styles.actions}>
-              <button onClick={() => openService(service.url)} style={styles.openBtn}>
+              <button type="button" onClick={() => openService(service.url)} style={styles.openBtn}>
                 오른쪽 화면에서 열기
               </button>
-              <button onClick={() => openLogin(service.loginUrl)} style={styles.loginBtn}>
+              <button type="button" onClick={() => openLogin(service.loginUrl)} style={styles.loginBtn}>
                 로그인
               </button>
             </div>
@@ -88,8 +88,8 @@ export default function ShortcutsTab() {
       <details style={styles.troubleshooting}>
         <summary style={styles.troubleshootingSummary}>로그인 문제 해결</summary>
         <div style={styles.troubleshootingBody}>
-          <span style={styles.troubleshootingText}>Spotify 로그인이 반복해서 막힐 때만 사용하세요.</span>
-          <button onClick={resetSpotifyLogin} style={styles.resetBtn}>Spotify 로그인 정보 초기화</button>
+          <span style={styles.troubleshootingText}>Spotify 로그인이 반복해서 막힐 때만 사용해 주세요.</span>
+          <button type="button" onClick={resetSpotifyLogin} style={styles.resetBtn}>Spotify 로그인 정보 초기화</button>
         </div>
       </details>
     </div>
@@ -98,20 +98,20 @@ export default function ShortcutsTab() {
 
 const styles = {
   wrap: { paddingTop: 4 },
-  serviceList: { overflow: 'hidden', border: '1px solid #e4e7ec', borderRadius: 8, background: '#fff' },
-  serviceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, padding: '14px', borderBottom: '1px solid #e4e7ec' },
+  serviceList: { overflow: 'hidden', border: '1px solid var(--owner-stroke)', borderRadius: 10, background: '#fff' },
+  serviceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, padding: '14px', borderBottom: '1px solid var(--owner-stroke)' },
   lastServiceRow: { borderBottom: 'none' },
   serviceInfo: { display: 'flex', minWidth: 180, flex: '1 1 220px', flexDirection: 'column', gap: 4 },
   serviceTitleRow: { display: 'flex', alignItems: 'center', gap: 7 },
   platformDot: { width: 8, height: 8, flexShrink: 0, borderRadius: 999 },
-  serviceName: { color: '#344054', fontSize: 13, fontWeight: 700 },
-  note: { color: '#667085', fontSize: 11 },
+  serviceName: { color: 'var(--owner-text)', fontSize: 13, fontWeight: 700 },
+  note: { color: 'var(--owner-text-muted)', fontSize: 12 },
   actions: { display: 'flex', flex: '0 1 auto', flexWrap: 'wrap', gap: 8 },
-  openBtn: { minHeight: 38, padding: '8px 13px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
-  loginBtn: { minHeight: 38, padding: '8px 13px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
-  troubleshooting: { marginTop: 10, border: '1px solid #e4e7ec', borderRadius: 8, background: '#fff', overflow: 'hidden' },
-  troubleshootingSummary: { padding: '12px 14px', color: '#667085', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
-  troubleshootingBody: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, padding: '12px 14px', borderTop: '1px solid #e4e7ec' },
-  troubleshootingText: { color: '#667085', fontSize: 11 },
-  resetBtn: { minHeight: 36, padding: '7px 11px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontSize: 11, fontWeight: 700 },
+  openBtn: { minHeight: 40, padding: '8px 13px', borderRadius: 8, border: 'none', background: 'var(--owner-primary)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
+  loginBtn: { minHeight: 40, padding: '8px 13px', borderRadius: 8, border: '1px solid var(--owner-stroke)', background: '#fff', color: 'var(--owner-text)', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
+  troubleshooting: { marginTop: 10, border: '1px solid var(--owner-stroke)', borderRadius: 8, background: '#fff', overflow: 'hidden' },
+  troubleshootingSummary: { padding: '12px 14px', color: 'var(--owner-text-muted)', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
+  troubleshootingBody: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, padding: '12px 14px', borderTop: '1px solid var(--owner-stroke)' },
+  troubleshootingText: { color: 'var(--owner-text-muted)', fontSize: 12 },
+  resetBtn: { minHeight: 40, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--owner-stroke)', background: '#fff', color: 'var(--owner-text)', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
 };

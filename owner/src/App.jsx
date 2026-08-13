@@ -26,7 +26,7 @@ function parseInitialState() {
 
   if (params.get('error')) {
     window.history.replaceState({}, '', window.location.pathname);
-    return { cafe: null, pending: null, oauthError: '소셜 로그인에 실패했습니다. 다시 시도해주세요.' };
+    return { cafe: null, pending: null, oauthError: '소셜 로그인에 실패했어요. 다시 시도해 주세요.' };
   }
 
   const token   = localStorage.getItem('token');
@@ -75,10 +75,14 @@ export default function App() {
     : {};
 
   const updateBanner = updateVersion && (
-    <div style={bannerStyle}>
-      v{updateVersion} 업데이트 준비 완료
-      <button onClick={() => window.electronAPI?.restartApp()} style={bannerBtnStyle}>
-        지금 재시작
+    <div className="owner-update-banner">
+      v{updateVersion} 업데이트를 설치할 수 있어요.
+      <button
+        type="button"
+        onClick={() => window.electronAPI?.restartApp()}
+        className="owner-btn owner-btn--primary"
+      >
+        앱 다시 시작
       </button>
     </div>
   );
@@ -95,15 +99,3 @@ export default function App() {
     </div>
   );
 }
-
-const bannerStyle = {
-  position: 'sticky', top: 0, zIndex: 9999,
-  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap',
-  width: '100%', boxSizing: 'border-box', textAlign: 'center',
-  background: '#1a1a2e', color: '#fff', fontSize: 13, fontWeight: 600,
-  padding: '10px 16px',
-};
-const bannerBtnStyle = {
-  padding: '5px 14px', borderRadius: 6, border: 'none',
-  background: '#4caf50', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13,
-};

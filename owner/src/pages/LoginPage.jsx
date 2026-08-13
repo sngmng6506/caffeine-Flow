@@ -287,7 +287,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
 
           {error && <div style={styles.error}>{error}</div>}
           <button type="submit" disabled={loading || !allRequired || !cafeName.trim() || !location} style={styles.btn}>
-            {loading ? '처리 중...' : '가입 완료'}
+            {loading ? '처리 중…' : '가입 완료'}
           </button>
         </form>
         <div style={styles.policyFooter}>
@@ -322,7 +322,7 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
       </div>
 
       {error && <div style={styles.error}>{error}</div>}
-      {loading && <div style={styles.loading}>처리 중...</div>}
+      {loading && <div style={styles.loading}>처리 중…</div>}
 
       <div style={styles.policyFooter}>
         <a href="/owner/privacy.html" target="_blank" rel="noreferrer" style={styles.policyLink}>개인정보 처리방침</a>

@@ -41,8 +41,8 @@ export default function OwnerCommentSection({ videoId }) {
     }
   }
 
-  if (comments === null) return <div style={commentStyles.wrap}><div style={commentStyles.loading}>댓글 불러오는 중...</div></div>;
-  if (comments.length === 0) return <div style={commentStyles.wrap}><div style={commentStyles.empty}>{error || '댓글이 없습니다.'}</div></div>;
+  if (comments === null) return <div style={commentStyles.wrap}><div style={commentStyles.loading}>댓글을 불러오고 있어요.</div></div>;
+  if (comments.length === 0) return <div style={commentStyles.wrap}><div style={commentStyles.empty}>{error || '등록된 댓글이 없어요.'}</div></div>;
 
   return (
     <div style={commentStyles.wrap}>
@@ -71,7 +71,7 @@ export default function OwnerCommentSection({ videoId }) {
       {error && <div style={commentStyles.error}>{error}</div>}
       {hasMore && (
         <button type="button" style={commentStyles.more} onClick={loadMore} disabled={loadingMore}>
-          {loadingMore ? '불러오는 중...' : '댓글 더 보기'}
+          {loadingMore ? '불러오는 중…' : '댓글 더 보기'}
         </button>
       )}
     </div>
@@ -79,16 +79,16 @@ export default function OwnerCommentSection({ videoId }) {
 }
 
 const commentStyles = {
-  wrap:      { padding: '12px 12px 16px 16px', background: '#fafafa', borderRadius: 8, marginBottom: 4 },
-  loading:   { fontSize: 13, color: '#aaa', padding: '8px 0' },
-  empty:     { fontSize: 13, color: '#aaa', padding: '8px 0' },
+  wrap:      { padding: '12px 12px 16px 16px', background: 'var(--owner-surface-subtle)', borderRadius: 8, marginBottom: 4 },
+  loading:   { fontSize: 13, color: 'var(--owner-text-muted)', padding: '8px 0' },
+  empty:     { fontSize: 13, color: 'var(--owner-text-muted)', padding: '8px 0' },
   item:      { marginTop: 12 },
   meta:      { display: 'flex', gap: 8, alignItems: 'baseline', marginBottom: 2 },
   name:      { fontSize: 13, fontWeight: 700 },
-  date:      { fontSize: 11, color: '#aaa' },
+  date:      { fontSize: 11, color: 'var(--owner-text-disabled)' },
   body:      { fontSize: 13, lineHeight: 1.5 },
-  replies:   { marginTop: 8, paddingLeft: 16, borderLeft: '2px solid #eee' },
+  replies:   { marginTop: 8, paddingLeft: 16, borderLeft: '2px solid var(--owner-stroke)' },
   replyItem: { marginTop: 8 },
-  error:     { marginTop: 10, fontSize: 12, color: '#dc2626' },
-  more:      { width: '100%', marginTop: 12, padding: '8px 10px', border: '1px solid #ddd', borderRadius: 6, background: '#fff', cursor: 'pointer' },
+  error:     { marginTop: 10, fontSize: 12, color: 'var(--owner-danger)' },
+  more:      { width: '100%', minHeight: 40, marginTop: 12, padding: '8px 10px', border: '1px solid var(--owner-stroke)', borderRadius: 8, background: '#fff', color: 'var(--owner-text)', cursor: 'pointer' },
 };

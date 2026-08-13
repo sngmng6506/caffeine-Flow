@@ -59,9 +59,9 @@ export default function SettingsTab({
     setPlatformMessage(null);
     try {
       await onSave(selected);
-      setPlatformMessage({ tone: 'success', text: '허용 플랫폼을 저장했습니다.' });
+      setPlatformMessage({ tone: 'success', text: '손님 신청 플랫폼을 저장했어요.' });
     } catch (error) {
-      setPlatformMessage({ tone: 'error', text: error.message || '허용 플랫폼을 저장하지 못했습니다.' });
+      setPlatformMessage({ tone: 'error', text: error.message || '손님 신청 플랫폼을 저장하지 못했어요. 다시 시도해 주세요.' });
     }
   }
 
@@ -77,17 +77,18 @@ export default function SettingsTab({
       <CollapsibleSetting
         id="owner-operation-settings"
         title="운영 설정"
-        description="신청 플랫폼과 AI 자동 재생 기준을 관리합니다."
+        description="손님 신청 플랫폼과 AI 자동수락 기준을 관리해요."
       >
         <div style={settingsStyles.innerSection}>
-          <div style={settingsStyles.title}>허용 플랫폼</div>
-          <div style={settingsStyles.desc}>손님이 신청할 수 있는 음악 플랫폼을 선택하세요.</div>
+          <div style={settingsStyles.title}>손님 신청 플랫폼</div>
+          <div style={settingsStyles.desc}>손님이 신청곡을 찾을 음악 플랫폼을 선택해 주세요.</div>
           <div style={settingsStyles.platforms}>
             {PLATFORM_OPTIONS.map(p => {
               const active = selected.includes(p.id);
               return (
                 <button
                   key={p.id}
+                  type="button"
                   onClick={() => toggle(p.id)}
                   aria-pressed={active}
                   style={{
@@ -97,18 +98,18 @@ export default function SettingsTab({
                       : settingsStyles.platformBtnInactive),
                   }}
                 >
-                  {active ? '✓ ' : ''}{p.label}
+                  {p.label}
                 </button>
               );
             })}
           </div>
           {selected.length === 1 && (
-            <div style={settingsStyles.hint}>최소 1개 플랫폼은 활성화해야 합니다.</div>
+            <div style={settingsStyles.hint}>손님 신청 플랫폼을 1개 이상 선택해 주세요.</div>
           )}
           <SettingsStatus tone={platformMessage?.tone}>{platformMessage?.text}</SettingsStatus>
           {changed && (
-            <button onClick={handlePlatformSave} disabled={saving} style={settingsStyles.saveBtn}>
-              {saving ? '저장 중...' : '저장'}
+            <button type="button" onClick={handlePlatformSave} disabled={saving} style={settingsStyles.saveBtn}>
+              {saving ? '저장 중…' : '저장'}
             </button>
           )}
         </div>
@@ -118,7 +119,7 @@ export default function SettingsTab({
       <CollapsibleSetting
         id="owner-store-settings"
         title="매장 정보"
-        description="카페명, 공지, 손님용 QR 코드를 관리합니다."
+        description="카페명, 공지, 손님용 QR 코드를 관리해요."
       >
         <CafeProfileSettings cafe={cafe} onCafePatch={onCafePatch} />
         <div style={settingsStyles.divider} />
@@ -134,7 +135,7 @@ export default function SettingsTab({
       <CollapsibleSetting
         id="owner-music-service-settings"
         title="음악 서비스"
-        description="플랫폼 로그인과 BGM 페이지를 엽니다."
+        description="음악 서비스 로그인과 재생 화면을 열어요."
       >
         <ShortcutsTab />
       </CollapsibleSetting>
@@ -142,12 +143,12 @@ export default function SettingsTab({
       <CollapsibleSetting
         id="owner-account-settings"
         title="계정 및 도움말"
-        description="서비스 문의와 이 기기의 로그아웃을 관리합니다."
+        description="서비스 문의와 이 기기의 로그아웃을 관리해요."
       >
         <ContactTab provider={provider} />
         <div style={settingsStyles.accountActions}>
-          <span style={settingsStyles.accountHint}>이 기기의 사장님 계정에서 로그아웃합니다.</span>
-          <button onClick={onLogout} style={settingsStyles.logoutBtn}>로그아웃</button>
+          <span style={settingsStyles.accountHint}>이 기기의 사장님 계정에서 로그아웃해요.</span>
+          <button type="button" onClick={onLogout} style={settingsStyles.logoutBtn}>로그아웃</button>
         </div>
       </CollapsibleSetting>
 
@@ -155,9 +156,10 @@ export default function SettingsTab({
         <CollapsibleSetting
           id="owner-advanced-settings"
           title="개발자 도구"
-          description="개발 환경에서 재생 문제를 진단합니다."
+          description="개발 환경에서 재생 문제를 진단해요."
         >
           <button
+            type="button"
             onClick={() => window.electronAPI?.openBgmDevTools()}
             style={settingsStyles.saveBtn}
           >BGM DevTools 열기</button>
@@ -170,21 +172,21 @@ export default function SettingsTab({
 const settingsStyles = {
   wrap:        { paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 12 },
   innerSection:{ paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid #eee' },
-  title:       { fontSize: 14, fontWeight: 700, color: '#344054', marginBottom: 4 },
-  desc:        { fontSize: 12, color: '#667085', marginBottom: 14 },
+  title:       { fontSize: 15, fontWeight: 700, color: 'var(--owner-text-strong)', marginBottom: 4 },
+  desc:        { fontSize: 12, color: 'var(--owner-text-muted)', marginBottom: 14 },
   platforms:   { display: 'flex', gap: 8, flexWrap: 'wrap' },
   platformBtn: { minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  platformBtnActive: { background: '#1f2937', color: '#fff', borderColor: '#1f2937' },
-  platformBtnInactive: { background: '#fff', color: '#667085', borderColor: '#d0d5dd' },
-  hint:        { fontSize: 12, color: '#8a5d00', marginTop: 8 },
-  saveBtn:     { minHeight: 40, marginTop: 16, padding: '9px 20px', borderRadius: 8, background: '#1f2937', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
-  logoutBtn:   { minHeight: 40, padding: '9px 16px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
-  details:     { background: '#fff', borderRadius: 10, border: '1px solid #e4e7ec', overflow: 'hidden' },
+  platformBtnActive: { background: 'var(--owner-primary)', color: '#fff', borderColor: 'var(--owner-primary)' },
+  platformBtnInactive: { background: '#fff', color: 'var(--owner-text-muted)', borderColor: 'var(--owner-stroke)' },
+  hint:        { fontSize: 12, color: '#9c6500', marginTop: 8 },
+  saveBtn:     { minHeight: 40, marginTop: 16, padding: '9px 20px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 650, fontSize: 13 },
+  logoutBtn:   { minHeight: 40, padding: '9px 16px', borderRadius: 8, border: '1px solid var(--owner-stroke)', background: '#fff', color: 'var(--owner-text)', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
+  details:     { background: '#fff', borderRadius: 12, border: '1px solid var(--owner-stroke)', overflow: 'hidden' },
   summary:     { display: 'flex', flexDirection: 'column', gap: 4, padding: 16, cursor: 'pointer', listStylePosition: 'inside' },
-  summaryTitle:{ fontSize: 15, fontWeight: 700, color: '#1f2937' },
-  summaryDesc: { fontSize: 12, color: '#667085', lineHeight: 1.45 },
-  detailsContent: { borderTop: '1px solid #e4e7ec', padding: '16px' },
-  divider:     { height: 1, background: '#e4e7ec', margin: '20px 0 4px' },
-  accountActions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 16, borderTop: '1px solid #e4e7ec' },
-  accountHint: { fontSize: 12, color: '#667085', lineHeight: 1.45 },
+  summaryTitle:{ fontSize: 15, fontWeight: 700, color: 'var(--owner-text-strong)' },
+  summaryDesc: { fontSize: 12, color: 'var(--owner-text-muted)', lineHeight: 1.45 },
+  detailsContent: { borderTop: '1px solid var(--owner-stroke)', padding: '16px' },
+  divider:     { height: 1, background: 'var(--owner-stroke)', margin: '20px 0 4px' },
+  accountActions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 16, borderTop: '1px solid var(--owner-stroke)' },
+  accountHint: { fontSize: 12, color: 'var(--owner-text-muted)', lineHeight: 1.45 },
 };

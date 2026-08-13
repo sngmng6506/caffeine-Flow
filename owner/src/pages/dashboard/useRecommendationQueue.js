@@ -256,6 +256,7 @@ export default function useRecommendationQueue({
       await setStatus(next);
     } catch {
       setIsAccepting(!next);
+      alert('신청 상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.');
     }
   }
 
@@ -266,13 +267,13 @@ export default function useRecommendationQueue({
     try {
       latest = await getMe();
     } catch {
-      alert('설정을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      alert('설정을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
       return;
     }
 
     const prompt = (latest.music_filter_prompt || '').trim();
     if (next && !prompt) {
-      alert('AI 자동수락을 켜려면 설정 탭에서 매장 분위기 설명을 먼저 입력해주세요.');
+      alert('AI 자동수락을 켜려면 설정에서 매장 분위기 설명을 먼저 입력해 주세요.');
       onPromptRequired();
       return;
     }
@@ -283,7 +284,7 @@ export default function useRecommendationQueue({
         prompt: prompt || null,
       });
     } catch (error) {
-      alert(error.message || 'AI 자동수락 설정 저장에 실패했습니다.');
+      alert(error.message || 'AI 자동수락 설정을 저장하지 못했어요. 다시 시도해 주세요.');
       return;
     }
 

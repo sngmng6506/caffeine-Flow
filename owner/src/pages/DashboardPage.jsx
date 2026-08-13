@@ -10,7 +10,6 @@ import useRecommendationQueue from './dashboard/useRecommendationQueue';
 import usePanelDivider from './dashboard/usePanelDivider';
 import useQueueDragAndDrop from './dashboard/useQueueDragAndDrop';
 import { readSavedBgm, savedToBgmUrl } from './dashboard/bgmStorage';
-import { dashboardStyles as styles } from './dashboard/dashboardStyles';
 
 export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanner }) {
   const [cafe, setCafe] = useState(initialCafe);
@@ -84,6 +83,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     handleDragOver,
     handleDrop,
     handleDropToDefault,
+    error: queueError,
   } = useQueueDragAndDrop({
     cafeSlug: cafe.slug,
     recommendations,
@@ -94,7 +94,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
   });
 
   return (
-    <div style={{ ...styles.page, width: `${(panelRatio * 100).toFixed(2)}vw` }}>
+    <div className="owner-dashboard" style={{ width: `${(panelRatio * 100).toFixed(2)}vw` }}>
       {updateBanner}
       {/* BrowserView 경계보다 8px 왼쪽에 renderer 드래그 영역을 둔다. */}
       <div
@@ -114,7 +114,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           background: 'transparent',
         }}
       >
-        <div style={{ width: 2, height: '100%', background: '#ddd', borderRadius: 2 }} />
+        <div className="owner-panel-divider-line" />
       </div>
 
       <DashboardHeader
@@ -136,6 +136,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           nowPlaying={nowPlaying}
           widevineStatus={widevineStatus}
           slug={cafe.slug}
+          error={queueError}
           onDragOver={handleDragOver}
           onDragLeave={clearDragOver}
           onDrop={handleDrop}

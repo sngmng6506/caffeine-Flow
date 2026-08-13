@@ -20,11 +20,11 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
       a.download = `caffeine-flow-${cafeName}-qr.jpg`;
       a.click();
       URL.revokeObjectURL(objectUrl);
-      setMessage({ tone: 'success', text: 'QR 이미지를 저장했습니다.' });
+      setMessage({ tone: 'success', text: 'QR 이미지를 저장했어요.' });
     } catch {
       // CORS/네트워크 실패 시 새 탭 fallback
       window.open(src, '_blank');
-      setMessage({ tone: 'info', text: 'QR 이미지를 새 창에서 열었습니다.' });
+      setMessage({ tone: 'info', text: 'QR 이미지를 새 창에서 열었어요.' });
     }
   }
 
@@ -33,7 +33,7 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
   function handleRestore() {
     if (!initialSlug || initialSlug === currentSlug) return;
     const confirmed = window.confirm(
-      `최초 QR 코드(${initialSlug})로 돌아갈까요?\n현재 QR 코드는 더 이상 동작하지 않습니다.`
+      `최초 QR 코드(${initialSlug})로 돌아갈까요?\n현재 QR 코드는 더 이상 동작하지 않아요.`
     );
     if (confirmed) handleReissue(initialSlug);
   }
@@ -49,9 +49,9 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
       onSlugChanged(updated);
       setShowChange(false);
       setCustomSlug('');
-      setMessage({ tone: 'success', text: '손님용 QR 연결을 변경했습니다.' });
+      setMessage({ tone: 'success', text: '손님용 QR 연결을 변경했어요.' });
     } catch (e) {
-      setMessage({ tone: 'error', text: e.message || 'QR 연결을 변경하지 못했습니다.' });
+      setMessage({ tone: 'error', text: e.message || 'QR 연결을 변경하지 못했어요. 다시 시도해 주세요.' });
     } finally {
       setLoading(false);
     }
@@ -77,14 +77,14 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
       </div>
 
       <div style={qrStyles.urlBox} className="no-print">
-        <div style={qrStyles.urlLabel}>손님 접속 주소</div>
+        <div style={qrStyles.urlLabel}>손님용 주소</div>
         <div style={qrStyles.urlValue}>{url}</div>
       </div>
 
       {/* 버튼 (프린트 시 숨김) */}
       <div style={qrStyles.btnRow} className="no-print">
-        <button onClick={handlePrint} style={qrStyles.btn}>프린트</button>
-        <button onClick={handleDownload} style={{ ...qrStyles.btn, background: '#fff', color: '#1a1a2e', border: '1px solid #ddd' }}>이미지 저장</button>
+        <button type="button" onClick={handlePrint} style={qrStyles.btn}>인쇄</button>
+        <button type="button" onClick={handleDownload} style={qrStyles.secondaryBtn}>이미지 저장</button>
       </div>
 
       {/* 미리 제작한 아크릴 QR 등으로 교체하고 싶을 때 */}
@@ -92,20 +92,20 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
         <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
         {!showChange ? (
           <div style={qrStyles.changeLinks}>
-            <button onClick={() => { setShowChange(true); setMessage(null); }} disabled={loading} style={qrStyles.changeLink}>
+            <button type="button" onClick={() => { setShowChange(true); setMessage(null); }} disabled={loading} style={qrStyles.changeLink}>
               다른 QR 코드로 변경
             </button>
             {initialSlug && initialSlug !== currentSlug && (
-              <button onClick={handleRestore} disabled={loading} style={qrStyles.restoreLink}>
-                {loading ? '처리 중...' : '최초 QR 코드로 돌아가기'}
+              <button type="button" onClick={handleRestore} disabled={loading} style={qrStyles.restoreLink}>
+                {loading ? '처리 중…' : '최초 QR 코드로 돌아가기'}
               </button>
             )}
           </div>
         ) : (
           <div style={qrStyles.changeBox}>
             <p style={qrStyles.changeHint}>
-              이미 인쇄·제작된 QR(아크릴 등)이 있다면 그 코드를 입력해 연결하세요.
-              비워두면 무작위로 새 QR을 발급합니다. 기존 QR은 더 이상 동작하지 않습니다.
+              이미 인쇄하거나 제작한 QR이 있다면 코드를 입력해 연결해 주세요.
+              비워두면 무작위로 새 QR을 발급해요. 기존 QR은 더 이상 동작하지 않아요.
             </p>
             <input
               placeholder="영문 소문자·숫자 (비우면 자동 발급)"
@@ -114,10 +114,10 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
               style={qrStyles.input}
             />
             <div style={qrStyles.changeBtnRow}>
-              <button onClick={() => handleReissue(customSlug)} disabled={loading} style={qrStyles.btn}>
-                {loading ? '처리 중...' : customSlug ? '이 코드로 연결' : '무작위로 재발급'}
+              <button type="button" onClick={() => handleReissue(customSlug)} disabled={loading} style={qrStyles.btn}>
+                {loading ? '처리 중…' : customSlug ? '이 코드로 연결' : '무작위로 재발급'}
               </button>
-              <button onClick={() => { setShowChange(false); setMessage(null); }} style={qrStyles.cancelBtn}>취소</button>
+              <button type="button" onClick={() => { setShowChange(false); setMessage(null); }} style={qrStyles.cancelBtn}>취소</button>
             </div>
           </div>
         )}
@@ -128,21 +128,22 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
 
 const qrStyles = {
   outer:          { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 12 },
-  poster:         { maxWidth: '100%', borderRadius: 12, overflow: 'hidden', border: '1px solid #e4e7ec', display: 'inline-flex' },
+  poster:         { maxWidth: '100%', borderRadius: 12, overflow: 'hidden', border: '1px solid var(--owner-stroke)', display: 'inline-flex' },
   qrWrap:         { maxWidth: '100%', boxSizing: 'border-box', background: '#fff', padding: 20 },
   qrImg:          { display: 'block', width: 220, maxWidth: '100%', height: 'auto', aspectRatio: '1' },
   btnRow:         { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
-  urlBox:         { width: '100%', maxWidth: 360, padding: '10px 12px', borderRadius: 8, background: '#f9fafb', border: '1px solid #e4e7ec', boxSizing: 'border-box' },
-  urlLabel:       { fontSize: 11, color: '#667085', marginBottom: 4 },
-  urlValue:       { fontSize: 12, color: '#344054', lineHeight: 1.4, wordBreak: 'break-all' },
-  btn:            { minHeight: 40, padding: '9px 20px', borderRadius: 8, background: '#1f2937', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
+  urlBox:         { width: '100%', maxWidth: 360, padding: '10px 12px', borderRadius: 8, background: 'var(--owner-surface-subtle)', border: '1px solid var(--owner-stroke)', boxSizing: 'border-box' },
+  urlLabel:       { fontSize: 12, color: 'var(--owner-text-muted)', marginBottom: 4 },
+  urlValue:       { fontSize: 12, color: 'var(--owner-text)', lineHeight: 1.4, wordBreak: 'break-all' },
+  btn:            { minHeight: 40, padding: '9px 20px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 650, fontSize: 13 },
+  secondaryBtn:   { minHeight: 40, padding: '9px 20px', borderRadius: 8, background: '#fff', color: 'var(--owner-text)', border: '1px solid var(--owner-stroke)', cursor: 'pointer', fontWeight: 650, fontSize: 13 },
   changeSection:  { marginTop: 4, width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' },
   changeLinks:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
-  changeLink:     { fontSize: 12, color: '#999', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' },
-  restoreLink:    { minHeight: 36, fontSize: 12, color: '#344054', background: '#fff', border: '1px solid #d0d5dd', borderRadius: 7, padding: '7px 12px', cursor: 'pointer', fontWeight: 600 },
-  changeBox:      { width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10, background: '#f9fafb', border: '1px solid #e4e7ec', borderRadius: 8, padding: 14 },
-  changeHint:     { fontSize: 12, color: '#667085', lineHeight: 1.6, margin: 0 },
-  input:          { minHeight: 40, padding: '9px 12px', borderRadius: 8, border: '1px solid #d0d5dd', fontSize: 13, boxSizing: 'border-box', width: '100%' },
+  changeLink:     { minHeight: 40, padding: '8px 10px', fontSize: 12, color: 'var(--owner-text-muted)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer' },
+  restoreLink:    { minHeight: 40, fontSize: 12, color: 'var(--owner-text)', background: '#fff', border: '1px solid var(--owner-stroke)', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontWeight: 600 },
+  changeBox:      { width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--owner-surface-subtle)', border: '1px solid var(--owner-stroke)', borderRadius: 10, padding: 14 },
+  changeHint:     { fontSize: 12, color: 'var(--owner-text-muted)', lineHeight: 1.6, margin: 0 },
+  input:          { minHeight: 40, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--owner-stroke)', fontSize: 13, boxSizing: 'border-box', width: '100%' },
   changeBtnRow:   { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  cancelBtn:      { minHeight: 40, padding: '9px 16px', borderRadius: 8, background: '#fff', color: '#667085', border: '1px solid #d0d5dd', cursor: 'pointer', fontSize: 13 },
+  cancelBtn:      { minHeight: 40, padding: '9px 16px', borderRadius: 8, background: '#fff', color: 'var(--owner-text-muted)', border: '1px solid var(--owner-stroke)', cursor: 'pointer', fontSize: 13 },
 };

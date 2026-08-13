@@ -1,7 +1,6 @@
 import { REC_STATUS } from '../../constants/recommendationStatus';
 import RecommendCard from '../RecommendCard';
 import DefaultSection from './DefaultSection';
-import { dashboardStyles as styles } from './dashboardStyles';
 import { byPriority } from './queuePolicy';
 
 const DEFAULT_DROP_TARGET = 'default';
@@ -14,6 +13,7 @@ export default function QueueTab({
   nowPlaying,
   widevineStatus,
   slug,
+  error,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -26,17 +26,20 @@ export default function QueueTab({
   const playing = recommendations.filter(r => r.status === REC_STATUS.PLAYING);
   const accepted = recommendations.filter(r => r.status === REC_STATUS.ACCEPTED).sort(byPriority);
   const pending = recommendations.filter(r => r.status === REC_STATUS.PENDING).sort(byPriority);
-  const hasPlaying = playing.length > 0;
 
   return (
-    <div>
-      <div
-        style={{ ...styles.section, ...(dragOver === DEFAULT_DROP_TARGET ? styles.sectionDragOver : {}) }}
+    <>
+      {error && <div role="alert" className="owner-queue-error">{error}</div>}
+      <div className="owner-queue">
+      <section
+        className={`owner-queue-section ${dragOver === DEFAULT_DROP_TARGET ? 'owner-queue-section--drag-over' : ''}`}
         onDragOver={event => onDragOver(event, DEFAULT_DROP_TARGET)}
         onDragLeave={onDragLeave}
         onDrop={onDropToDefault}
       >
-        <div style={styles.sectionTitle}>기본</div>
+        <div className="owner-queue-section__header">
+          <h2 className="owner-queue-section__title">기본 BGM</h2>
+        </div>
         <DefaultSection
           defaultVideo={defaultVideo}
           isPlaying={!nowPlaying && !!defaultVideo}
@@ -44,17 +47,19 @@ export default function QueueTab({
           onClear={onClearDefault}
           widevineStatus={widevineStatus}
         />
-      </div>
+      </section>
 
-      <div
-        style={{ ...styles.section, ...(dragOver === REC_STATUS.PLAYING ? styles.sectionDragOver : {}) }}
+      <section
+        className={`owner-queue-section owner-queue-section--playing ${dragOver === REC_STATUS.PLAYING ? 'owner-queue-section--drag-over' : ''}`}
         onDragOver={event => onDragOver(event, REC_STATUS.PLAYING)}
         onDragLeave={onDragLeave}
         onDrop={event => onDrop(event, REC_STATUS.PLAYING)}
       >
-        <div style={styles.sectionTitle}>수락</div>
+        <div className="owner-queue-section__header">
+          <h2 className="owner-queue-section__title">재생 중</h2>
+        </div>
         {loading
-          ? <div style={styles.emptySlot}>불러오는 중...</div>
+          ? <div className="owner-empty">신청곡을 불러오고 있어요.</div>
           : playing.length > 0
             ? playing.map(rec => (
                 <RecommendCard
@@ -66,19 +71,22 @@ export default function QueueTab({
                   context={REC_STATUS.PLAYING}
                 />
               ))
-            : <div style={styles.emptySlot}>재생 중인 신청곡 없음</div>
+            : <div className="owner-empty">재생 중인 신청곡이 없어요.</div>
         }
-      </div>
+      </section>
 
-      <div
-        style={{ ...styles.section, ...(dragOver === REC_STATUS.ACCEPTED ? styles.sectionDragOver : {}) }}
+      <section
+        className={`owner-queue-section ${dragOver === REC_STATUS.ACCEPTED ? 'owner-queue-section--drag-over' : ''}`}
         onDragOver={event => onDragOver(event, REC_STATUS.ACCEPTED)}
         onDragLeave={onDragLeave}
         onDrop={event => onDrop(event, REC_STATUS.ACCEPTED)}
       >
-        <div style={styles.sectionTitle}>대기 곡</div>
+        <div className="owner-queue-section__header">
+          <h2 className="owner-queue-section__title">대기 곡</h2>
+          {accepted.length > 0 && <span className="owner-count">{accepted.length}</span>}
+        </div>
         {loading
-          ? <div style={styles.emptySlot}>불러오는 중...</div>
+          ? <div className="owner-empty">신청곡을 불러오고 있어요.</div>
           : accepted.length > 0
             ? accepted.map((rec, index) => (
                 <RecommendCard
@@ -91,21 +99,22 @@ export default function QueueTab({
                   context={REC_STATUS.ACCEPTED}
                 />
               ))
-            : <div style={styles.emptySlot}>대기 중인 곡 없음</div>
+            : <div className="owner-empty">대기 중인 곡이 없어요.</div>
         }
-      </div>
+      </section>
 
-      <div
-        style={{ ...styles.section, ...(dragOver === REC_STATUS.PENDING ? styles.sectionDragOver : {}) }}
+      <section
+        className={`owner-queue-section ${dragOver === REC_STATUS.PENDING ? 'owner-queue-section--drag-over' : ''}`}
         onDragOver={event => onDragOver(event, REC_STATUS.PENDING)}
         onDragLeave={onDragLeave}
         onDrop={event => onDrop(event, REC_STATUS.PENDING)}
       >
-        <div style={styles.sectionTitle}>
-          신청곡 {pending.length > 0 && <span style={styles.badge}>{pending.length}</span>}
+        <div className="owner-queue-section__header">
+          <h2 className="owner-queue-section__title">새 신청</h2>
+          {pending.length > 0 && <span className="owner-count">{pending.length}</span>}
         </div>
         {loading
-          ? <div style={styles.emptySlot}>불러오는 중...</div>
+          ? <div className="owner-empty">신청곡을 불러오고 있어요.</div>
           : pending.length > 0
             ? pending.map((rec, index) => (
                 <RecommendCard
@@ -116,12 +125,12 @@ export default function QueueTab({
                   onUpdate={onUpdate}
                   onDelete={onDelete}
                   context={REC_STATUS.PENDING}
-                  hasPlaying={hasPlaying}
                 />
               ))
-            : <div style={styles.emptySlot}>신청된 곡 없음</div>
+            : <div className="owner-empty">새로 들어온 신청곡이 없어요.</div>
         }
+      </section>
       </div>
-    </div>
+    </>
   );
 }

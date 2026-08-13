@@ -2,9 +2,9 @@ export default function SettingsStatus({ tone = 'info', children }) {
   if (!children) return null;
 
   const palette = {
-    success: { color: '#1f7a4d', background: '#edf8f2', border: '#ccebd9' },
-    error: { color: '#b42318', background: '#fff1f0', border: '#f3c7c2' },
-    info: { color: '#475467', background: '#f7f8fa', border: '#e4e7ec' },
+    success: { color: '#087d5c', background: '#eefaf6', border: '#c9eee2', accent: 'var(--owner-success)' },
+    error: { color: '#b7202d', background: '#fff7f7', border: '#f4c4c8', accent: 'var(--owner-danger)' },
+    info: { color: 'var(--owner-text)', background: 'var(--owner-surface-subtle)', border: 'var(--owner-stroke)', accent: 'var(--owner-primary)' },
   }[tone] || {};
 
   return (
@@ -18,10 +18,17 @@ export default function SettingsStatus({ tone = 'info', children }) {
         border: `1px solid ${palette.border}`,
         background: palette.background,
         color: palette.color,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
         fontSize: 12,
         lineHeight: 1.45,
       }}
     >
+      <span
+        aria-hidden="true"
+        style={{ width: 7, height: 7, marginTop: 5, flex: '0 0 7px', borderRadius: 999, background: palette.accent }}
+      />
       {children}
     </div>
   );

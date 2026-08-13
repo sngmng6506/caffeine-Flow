@@ -13,10 +13,12 @@ export default function useQueueDragAndDrop({
   onClearDefault,
 }) {
   const [dragOver, setDragOver] = useState(null);
+  const [error, setError] = useState('');
 
   async function handleDrop(event, targetStatus) {
     event.preventDefault();
     setDragOver(null);
+    setError('');
 
     try {
       const data = JSON.parse(event.dataTransfer.getData('text/plain'));
@@ -56,12 +58,14 @@ export default function useQueueDragAndDrop({
       if (targetStatus === REC_STATUS.PLAYING) window.electronAPI?.playRec(rec.video_id);
     } catch (error) {
       console.error(error);
+      setError('곡 위치를 변경하지 못했어요. 다시 시도해 주세요.');
     }
   }
 
   function handleDropToDefault(event) {
     event.preventDefault();
     setDragOver(null);
+    setError('');
 
     try {
       const data = JSON.parse(event.dataTransfer.getData('text/plain'));
@@ -71,6 +75,7 @@ export default function useQueueDragAndDrop({
       onSetDefault({ videoId: rec.video_id, title: rec.title, thumbnail: rec.thumbnail });
     } catch (error) {
       console.error(error);
+      setError('기본 BGM을 변경하지 못했어요. 다시 시도해 주세요.');
     }
   }
 
@@ -85,5 +90,6 @@ export default function useQueueDragAndDrop({
     handleDragOver,
     handleDrop,
     handleDropToDefault,
+    error,
   };
 }

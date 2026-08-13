@@ -16,7 +16,7 @@ customer-design-lab/index.html 파일을 브라우저로 직접 열면 된다.
 
 - A · Threads Minimal: 무채색, 얇은 구분선, 콘텐츠 중심
 - B · Disquiet Feed: 따뜻한 배경, 분명한 섹션, 커뮤니티 피드 밀도
-- C · Toss Compact: 선명한 블루, 굵은 정보 위계, 빠른 행동 탐색
+- C · Clear Compact: 선명한 블루, 굵은 정보 위계, 빠른 행동 탐색
 - D · Midnight Radio: 전체 다크, 온에어형 현재 재생, 몰입감
 - E · Paper Zine: 종이와 세리프 타이포, 매거진형 정보 구조
 - F · Messenger Queue: 대화 흐름처럼 이어지는 신청곡 목록

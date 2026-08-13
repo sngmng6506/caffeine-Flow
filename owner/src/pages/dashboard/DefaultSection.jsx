@@ -14,31 +14,34 @@ function isSupportedMusicUrl(value) {
 
 export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatus }) {
   const [inputUrl, setInputUrl] = useState('');
-  const [setting, setSetting]   = useState(false);
-  const [error, setError]       = useState('');
+  const [setting, setSetting] = useState(false);
+  const [error, setError] = useState('');
+  const [imageError, setImageError] = useState(false);
 
   async function handleSet() {
     const url = inputUrl.trim();
     if (!isSupportedMusicUrl(url)) {
-      setError('YouTube, SoundCloud, Spotify의 HTTPS 링크를 입력하세요');
+      setError('YouTube, Spotify, SoundCloud의 HTTPS 링크를 입력해 주세요.');
       return;
     }
-    setSetting(true); setError('');
+    setSetting(true);
+    setError('');
     try {
-      // YouTube/SoundCloud/Spotify는 서버 oembed로 메타데이터 시도, 그 외 또는 플레이리스트는 URL만 저장
       let info = { url, title: url, thumbnail: null };
       try {
         const base = import.meta.env.VITE_SERVER_URL ? `${import.meta.env.VITE_SERVER_URL}/api/v1` : '/api/v1';
-        const res  = await fetch(`${base}/tracks/oembed?url=${encodeURIComponent(url)}`);
-        if (res.ok) {
-          const data = await res.json();
+        const response = await fetch(`${base}/tracks/oembed?url=${encodeURIComponent(url)}`);
+        if (response.ok) {
+          const data = await response.json();
           info = { url, title: data.title || url, thumbnail: data.thumbnail || null };
         }
-      } catch { /* oembed 실패는 무시하고 URL만 저장 */ }
+      } catch {
+        // 메타데이터 조회에 실패해도 입력한 링크는 기본 BGM으로 사용할 수 있다.
+      }
       onSet(info);
       setInputUrl('');
     } catch {
-      setError('등록에 실패했습니다');
+      setError('기본 BGM을 설정하지 못했어요. 링크를 확인하고 다시 시도해 주세요.');
     } finally {
       setSetting(false);
     }
@@ -48,93 +51,102 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
     const url = defaultVideo.url || (defaultVideo.videoId?.startsWith('http')
       ? defaultVideo.videoId
       : `https://www.youtube.com/watch?v=${defaultVideo.videoId}`);
+    const isSpotify = /spotify\.(com|link)/i.test(url);
+
     return (
       <div
-        style={dfStyles.card}
-        draggable={true}
-        onDragStart={e => {
-          e.dataTransfer.setData('text/plain', JSON.stringify({
+        className="owner-default-card"
+        draggable
+        onDragStart={event => {
+          if (event.target.closest('button')) {
+            event.preventDefault();
+            return;
+          }
+          event.dataTransfer.setData('text/plain', JSON.stringify({
             type: 'default',
-            videoId:   defaultVideo.videoId || url,
-            title:     defaultVideo.title,
+            videoId: defaultVideo.videoId || url,
+            title: defaultVideo.title,
             thumbnail: defaultVideo.thumbnail,
           }));
-          e.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.effectAllowed = 'move';
         }}
       >
-        <div
-          style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, cursor: 'pointer' }}
-          onClick={() => window.electronAPI?.setBgmUrl(url)}
-          title="클릭하면 해당 링크로 이동"
-          draggable={false}
-          onDragStart={e => e.stopPropagation()}
-        >
-        {defaultVideo.thumbnail
-          ? <img src={defaultVideo.thumbnail} alt="" style={dfStyles.thumb} />
-          : <div style={{ ...dfStyles.thumb, background: '#eee' }} />
-        }
-        <div style={dfStyles.info}>
-          {isPlaying && <span style={dfStyles.playing}>▶ 재생 중</span>}
-          <div style={dfStyles.title}>{defaultVideo.title}</div>
-          <div style={dfStyles.hint}>클릭하면 해당 플레이어로 이동 · 신청곡 없을 때 자동 재생</div>
-          {/spotify\.com/i.test(url) && (
-            <div style={{ ...dfStyles.hint, color: '#1db954' }}>※ Spotify 계정 로그인 필요 (Premium 권장)</div>
+        <div className="owner-default-card__content">
+          {defaultVideo.thumbnail && !imageError ? (
+            <img
+              src={defaultVideo.thumbnail}
+              alt=""
+              className="owner-default-card__thumb"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div className="owner-default-card__thumb owner-thumb-placeholder" aria-hidden="true">CF</div>
           )}
-          {/spotify\.com/i.test(url) && widevineStatus === 'not_found' && (
-            <div style={dfStyles.warn}>⚠️ Chrome 미설치 — Spotify 재생 불가</div>
-          )}
-          {/spotify\.com/i.test(url) && widevineStatus?.startsWith('loaded') && (
-            <div style={{ ...dfStyles.hint, color: '#1db954' }}>✓ Widevine 로드됨</div>
-          )}
+          <div className="owner-default-card__info">
+            {isPlaying && <span className="owner-inline-status">재생 중</span>}
+            <div className="owner-default-card__title">{defaultVideo.title}</div>
+            <div className="owner-default-card__hint">끌어서 재생 중이나 대기 곡으로 옮길 수 있어요.</div>
+            {isSpotify && (
+              <div className="owner-default-card__hint">Spotify 로그인 필요 · Premium 계정 필요</div>
+            )}
+            {isSpotify && widevineStatus === 'not_found' && (
+              <div className="owner-default-card__warning">
+                Spotify 재생 환경을 준비하지 못했어요. Chrome 설치 상태를 확인해 주세요.
+              </div>
+            )}
+          </div>
         </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-          {/spotify\.com/i.test(url) && (
+        <div className="owner-default-card__actions">
+          <button
+            type="button"
+            onClick={() => window.electronAPI?.setBgmUrl(url)}
+            draggable={false}
+            onDragStart={event => event.stopPropagation()}
+            className="owner-btn owner-btn--secondary"
+          >오른쪽 화면에서 열기</button>
+          {isSpotify && (
             <button
+              type="button"
               onClick={() => window.electronAPI?.openLoginWindow('https://accounts.spotify.com/ko/login')}
-              draggable={false} onDragStart={e => e.stopPropagation()}
-              style={{ ...dfStyles.clearBtn, background: '#1db954', color: '#fff', border: 'none' }}
+              draggable={false}
+              onDragStart={event => event.stopPropagation()}
+              className="owner-btn owner-btn--secondary"
             >Spotify 로그인</button>
           )}
           <button
+            type="button"
             onClick={onClear}
             draggable={false}
-            onDragStart={e => e.stopPropagation()}
-            style={dfStyles.clearBtn}
-          >해제</button>
+            onDragStart={event => event.stopPropagation()}
+            className="owner-btn owner-btn--danger"
+          >기본 BGM 해제</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={dfStyles.inputRow}>
+    <div className="owner-bgm-form">
+      <label htmlFor="owner-bgm-url" className="owner-bgm-form__label">
+        기본 BGM에는 재생목록 사용을 권장해요.
+      </label>
       <input
+        id="owner-bgm-url"
         value={inputUrl}
-        onChange={e => { setInputUrl(e.target.value); setError(''); }}
-        onKeyDown={e => e.key === 'Enter' && handleSet()}
-        placeholder="YouTube/Spotify/SoundCloud 링크 — 플레이리스트도 OK"
-        style={dfStyles.input}
+        onChange={event => { setInputUrl(event.target.value); setError(''); }}
+        onKeyDown={event => event.key === 'Enter' && handleSet()}
+        placeholder="음악 또는 재생목록 링크를 입력하세요"
+        className="owner-input"
       />
-      <button onClick={handleSet} disabled={setting || !inputUrl.trim()} style={dfStyles.setBtn}>
-        {setting ? '...' : '설정'}
+      <button
+        type="button"
+        onClick={handleSet}
+        disabled={setting || !inputUrl.trim()}
+        className="owner-btn owner-btn--primary"
+      >
+        {setting ? '설정 중…' : '기본 BGM 설정'}
       </button>
-      {error && <div style={dfStyles.error}>{error}</div>}
+      {error && <div role="alert" className="owner-form-error">{error}</div>}
     </div>
   );
 }
-
-const dfStyles = {
-  card:     { display: 'flex', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: '1px solid #eee' },
-  thumb:    { width: 80, height: 56, borderRadius: 6, objectFit: 'cover', flexShrink: 0 },
-  info:     { flex: 1, minWidth: 0 },
-  playing:  { fontSize: 11, fontWeight: 700, color: '#2196f3', display: 'block', marginBottom: 2 },
-  title:    { fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  hint:     { fontSize: 11, color: '#aaa', marginTop: 2 },
-  warn:     { fontSize: 11, color: '#e63946', marginTop: 2 },
-  clearBtn: { fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', flexShrink: 0 },
-  inputRow: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', paddingTop: 8, borderTop: '1px solid #eee' },
-  input:    { flex: 1, fontSize: 13, padding: '6px 10px', borderRadius: 8, border: '1px solid #ddd', outline: 'none', minWidth: 0 },
-  setBtn:   { fontSize: 12, padding: '6px 14px', borderRadius: 8, background: '#1a1a2e', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, flexShrink: 0 },
-  error:    { fontSize: 12, color: '#e63946', width: '100%' },
-};

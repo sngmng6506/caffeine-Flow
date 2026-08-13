@@ -1,5 +1,3 @@
-import { dashboardStyles as styles } from './dashboardStyles';
-
 export default function DashboardHeader({
   cafe,
   isAccepting,
@@ -8,24 +6,38 @@ export default function DashboardHeader({
   onToggleAiAutoAccept,
 }) {
   return (
-    <div style={styles.header}>
-      <div style={styles.cafeName}>{cafe.name}</div>
-      <div style={styles.headerRight}>
+    <header className="owner-header">
+      <div className="owner-header__identity">
+        <h1 className="owner-header__name">{cafe.name}</h1>
+        <div className="owner-header__status-list" aria-label="운영 상태">
+          <span className={`owner-status ${isAccepting ? 'owner-status--success' : ''}`}>
+            <span className="owner-status__dot" aria-hidden="true" />
+            {isAccepting ? '신청 받는 중' : '신청 닫힘'}
+          </span>
+          <span className={`owner-status ${aiAutoAccept ? 'owner-status--primary' : ''}`}>
+            <span className="owner-status__dot" aria-hidden="true" />
+            AI 자동수락 {aiAutoAccept ? '켜짐' : '꺼짐'}
+          </span>
+        </div>
+      </div>
+      <div className="owner-header__actions" aria-label="운영 상태 변경">
         <button
+          type="button"
           onClick={onToggleAccepting}
           aria-pressed={isAccepting}
-          style={{ ...styles.toggleBtn, ...(isAccepting ? styles.acceptingOn : styles.toggleOff) }}
+          className="owner-btn owner-btn--secondary"
         >
-          {isAccepting ? '신청 받는 중' : '신청 닫힘'}
+          {isAccepting ? '신청 닫기' : '신청 열기'}
         </button>
         <button
+          type="button"
           onClick={onToggleAiAutoAccept}
           aria-pressed={aiAutoAccept}
-          style={{ ...styles.toggleBtn, ...(aiAutoAccept ? styles.aiOn : styles.toggleOff) }}
+          className="owner-btn owner-btn--secondary"
         >
-          AI 자동 재생 {aiAutoAccept ? 'ON' : 'OFF'}
+          AI 자동수락 {aiAutoAccept ? '끄기' : '켜기'}
         </button>
       </div>
-    </div>
+    </header>
   );
 }
