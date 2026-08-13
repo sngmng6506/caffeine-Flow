@@ -76,6 +76,8 @@ admin/            플랫폼 운영자 정적 콘솔
 | [ROADMAP.md](docs/ROADMAP.md) | 아직 구현되지 않은 개선 후보 |
 | [Customer Design Guide](customer/DESIGN_GUIDE.md) | 손님 화면 Soft Streaming 디자인 기준 |
 | [Customer Writing Guide](customer/WRITING_GUIDE.md) | 손님 화면 목소리·용어·UI 문구 기준 |
+| [Owner Design Guide](owner/DESIGN_GUIDE.md) | 사장님 화면 Calm Operations 디자인 기준 |
+| [Owner Writing Guide](owner/WRITING_GUIDE.md) | 사장님 화면 목소리·용어·UI 문구 기준 |
 | [AGENTS.md](AGENTS.md) | 사람·AI 도구 공통 작업 규칙 |
 
 ## 라이선스
