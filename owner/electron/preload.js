@@ -9,7 +9,8 @@ function subscribe(channel, callback, project = (...args) => args[0]) {
 
 const electronAPI = {
   // 신청곡 시작/종료 — bgmView는 백그라운드 유지 + 음소거 토글
-  playRec:          (videoIdOrUrl) => ipcRenderer.send('play-rec', videoIdOrUrl),
+  supportsPlayRecAck: true,
+  playRec:          (videoIdOrUrl) => ipcRenderer.invoke('play-rec', videoIdOrUrl),
   endRec:           ()             => ipcRenderer.send('end-rec'),
 
   // 매장 BGM URL 설정/해제

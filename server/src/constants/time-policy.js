@@ -18,6 +18,9 @@ const HEARTBEAT_REFRESH_MS = 2 * 60 * 1000;
 const HEARTBEAT_ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 // Electron은 5초마다 재생 상태를 재전송한다. 두 번의 누락을 허용한 뒤 손님 화면을 초기화한다.
 const PLAYBACK_STATE_TTL_MS = 15 * 1000;
+// 재연결 중인 현재 재생 앱이 lease를 회수할 유예 시간. 이 시간이 지난
+// 뒤에만 대기 중인 다른 Electron 앱을 재생 리더로 승격한다.
+const PLAYBACK_LEADER_GRACE_MS = 15 * 1000;
 
 module.exports = {
   TIMEZONE,
@@ -30,4 +33,5 @@ module.exports = {
   HEARTBEAT_REFRESH_MS,
   HEARTBEAT_ACTIVE_WINDOW_MS,
   PLAYBACK_STATE_TTL_MS,
+  PLAYBACK_LEADER_GRACE_MS,
 };

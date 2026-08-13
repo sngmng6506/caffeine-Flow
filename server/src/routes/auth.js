@@ -9,7 +9,15 @@ const { safeCafe } = require('../utils/cafe-sanitize');
 const { validateString, validateBool, validateCoordinate } = require('../utils/validate');
 
 const NAVER_STATE_COOKIE = 'cf_naver_state';
-const STATE_COOKIE_OPTS = { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 10 * 60 * 1000, path: '/api/v1/auth' };
+// README의 localhost HTTP 개발 흐름에서도 OAuth state 쿠키가 왕복해야 한다.
+// 운영은 NODE_ENV 또는 공개 SERVER_URL이 HTTPS이면 Secure를 강제한다.
+const STATE_COOKIE_OPTS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production' || SERVER_URL.startsWith('https://'),
+  sameSite: 'lax',
+  maxAge: 10 * 60 * 1000,
+  path: '/api/v1/auth',
+};
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 

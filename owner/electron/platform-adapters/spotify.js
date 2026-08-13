@@ -84,11 +84,11 @@ async function clickPlayIfPaused(view) {
   await view.webContents.executeJavaScript(SPOTIFY_CLICK_PLAY_IF_PAUSED).catch(() => {});
 }
 
-function navigateAndPlay(view, targetUrl, resumeMeta = null) {
-  if (!view || view.webContents.isDestroyed() || !targetUrl) return;
+async function navigateAndPlay(view, targetUrl, resumeMeta = null) {
+  if (!view || view.webContents.isDestroyed() || !targetUrl) {
+    throw new Error('Spotify 재생 뷰를 사용할 수 없습니다.');
+  }
   console.log('[bgmNav] loadURL →', targetUrl, resumeMeta ? '(with resume meta)' : '');
-  view.webContents.loadURL(targetUrl);
-
   let retries = 0;
   const maxRetries = 10;
   const tryPlay = async () => {
@@ -124,6 +124,7 @@ function navigateAndPlay(view, targetUrl, resumeMeta = null) {
   view.webContents.once('did-finish-load', () => {
     setTimeout(tryPlay, 2000);
   });
+  await view.webContents.loadURL(targetUrl);
   setTimeout(tryPlay, 5000);
 }
 

@@ -35,7 +35,7 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | PUT | `/cafes/me/address` | 🔒 | 지역·좌표 변경 |
 | PUT | `/cafes/me/slug` | 🔒 | QR slug 재발급·지정. 새 `token` 포함 |
 | PUT | `/cafes/me/status` | 🔒 | 신청 접수 ON/OFF |
-| GET | `/cafes/me/history` | 🔒 | 재생 이력. 처리 최신순, `?date=`는 신청일의 KST 기준 |
+| GET | `/cafes/me/history` | 🔒 | 재생 이력. 처리 최신순, `?date=`는 처리일의 KST 기준 |
 | GET | `/cafes/me/stats` | 🔒 | 종합 통계와 TOP10 |
 | GET | `/cafes/me/stats/music-filter` | 🔒 | 최근 AI 필터 처리 현황 |
 | GET | `/cafes/me/stats/daily` | 🔒 | 일별 통계 `?date=` |
@@ -101,6 +101,8 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 댓글 GET은 `?offset=0&limit=20`을 받으며 `limit` 최대값은 50이다. 응답은
 `{ items, hasMore, nextOffset }` 형태다. 최상위 댓글은 최신순이고 각 항목의
 `replies`는 작성순이다. 모든 댓글 응답은 `commenter_ip`와 `visitor_id`를 제외한다.
+SoundCloud·Spotify처럼 `videoId`가 전체 URL인 경우 클라이언트는 `:videoId`를
+단일 path segment로 URL 인코딩해 전달한다.
 
 ## 트랙 메타데이터 — `/tracks`
 

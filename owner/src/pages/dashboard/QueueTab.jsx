@@ -14,6 +14,7 @@ export default function QueueTab({
   widevineStatus,
   slug,
   error,
+  canControlPlayback,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -30,6 +31,11 @@ export default function QueueTab({
   return (
     <>
       {error && <div role="alert" className="owner-queue-error">{error}</div>}
+      {!canControlPlayback && (
+        <div role="status" className="owner-queue-error">
+          이 화면은 재생 대기 상태입니다. 실제 재생 조작은 현재 리더 Electron 앱에서만 가능합니다.
+        </div>
+      )}
       <div className="owner-queue">
       <section
         className={`owner-queue-section ${dragOver === DEFAULT_DROP_TARGET ? 'owner-queue-section--drag-over' : ''}`}
@@ -69,6 +75,7 @@ export default function QueueTab({
                   onUpdate={onUpdate}
                   onDelete={onDelete}
                   context={REC_STATUS.PLAYING}
+                  playbackControlDisabled={!canControlPlayback}
                 />
               ))
             : <div className="owner-empty">재생 중인 신청곡이 없어요.</div>

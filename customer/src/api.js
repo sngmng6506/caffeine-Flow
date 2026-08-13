@@ -45,14 +45,14 @@ export const getGlobalTop10 = (offset = 0, sort = 'count') =>
   apiFetch('GET', `/top10?offset=${offset}&sort=${sort}`);
 
 export const getSongComments = (videoId, offset = 0, limit = 20) =>
-  apiFetch('GET', `/songs/${videoId}/comments?offset=${offset}&limit=${limit}`);
+  apiFetch('GET', `/songs/${encodeURIComponent(videoId)}/comments?offset=${offset}&limit=${limit}`);
 
 export const postSongComment = (videoId, slug = null, body) =>
   slug
-    ? apiFetch('POST', `/cafes/${slug}/songs/${videoId}/comments`, body)
-    : apiFetch('POST', `/songs/${videoId}/comments`, body);
+    ? apiFetch('POST', `/cafes/${slug}/songs/${encodeURIComponent(videoId)}/comments`, body)
+    : apiFetch('POST', `/songs/${encodeURIComponent(videoId)}/comments`, body);
 
 export const postSongReply = (videoId, commentId, slug = null, body) =>
   slug
-    ? apiFetch('POST', `/cafes/${slug}/songs/${videoId}/comments/${commentId}/replies`, body)
-    : apiFetch('POST', `/songs/${videoId}/comments/${commentId}/replies`, body);
+    ? apiFetch('POST', `/cafes/${slug}/songs/${encodeURIComponent(videoId)}/comments/${commentId}/replies`, body)
+    : apiFetch('POST', `/songs/${encodeURIComponent(videoId)}/comments/${commentId}/replies`, body);

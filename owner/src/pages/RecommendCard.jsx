@@ -40,6 +40,7 @@ export default function RecommendCard({
   position,
   expanded,
   onToggle,
+  playbackControlDisabled = false,
 }) {
   const [loading, setLoading] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -135,7 +136,7 @@ export default function RecommendCard({
             <button
               type="button"
               onClick={() => handle(OWNER_ACTION_STATUS.SKIPPED)}
-              disabled={loading}
+              disabled={loading || playbackControlDisabled}
               className="owner-btn owner-btn--secondary"
             >건너뛰기</button>
           </div>

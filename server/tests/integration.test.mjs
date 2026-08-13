@@ -424,6 +424,38 @@ describe('손님 최근 재생 이력', () => {
   });
 });
 
+describe('사장님 이력·로컬 OAuth 회귀', () => {
+  it('날짜별 이력은 신청일이 아니라 처리일 KST 기준으로 필터한다', async () => {
+    await db('recommendations').insert({
+      cafe_id: cafe.id,
+      video_id: 'history_processed_date',
+      title: '처리일 기준 곡',
+      status: 'played',
+      requested_at: new Date('2026-07-01T03:00:00.000Z'),
+      played_at: new Date('2026-07-09T03:00:00.000Z'),
+    });
+
+    const onProcessedDate = await request(app)
+      .get('/api/v1/cafes/me/history?date=2026-07-09')
+      .set({ Authorization: `Bearer ${ownerToken}` });
+    const onRequestedDate = await request(app)
+      .get('/api/v1/cafes/me/history?date=2026-07-01')
+      .set({ Authorization: `Bearer ${ownerToken}` });
+
+    expect(onProcessedDate.body.items.map(item => item.video_id)).toContain('history_processed_date');
+    expect(onRequestedDate.body.items.map(item => item.video_id)).not.toContain('history_processed_date');
+  });
+
+  it('localhost HTTP의 Naver OAuth state 쿠키는 Secure 없이 설정한다', async () => {
+    const res = await request(app).get('/api/v1/auth/naver');
+    expect(res.status).toBe(302);
+    const stateCookie = res.headers['set-cookie']?.find(value => value.startsWith('cf_naver_state='));
+    expect(stateCookie).toContain('HttpOnly');
+    expect(stateCookie).toContain('SameSite=Lax');
+    expect(stateCookie).not.toContain('Secure');
+  });
+});
+
 describe('통계 — knex raw ? 바인딩 회귀 (split_part 이스케이프)', () => {
   beforeAll(async () => {
     // '?si=' 추적 파라미터가 붙은 곡과 원곡이 하나로 병합되는지까지 검증
