@@ -1,109 +1,117 @@
 import { useState } from 'react';
 import SettingsStatus from './SettingsStatus';
 
-const SHORTCUT_GROUPS = [
+const MUSIC_SERVICES = [
   {
-    platform: 'YouTube',
+    name: 'YouTube',
+    note: '로그인 없이 재생 가능',
     color: '#ff0000',
-    note: 'YouTube는 계정 불필요 · Music은 로그인 권장',
-    links: [
-      { label: 'YouTube Music', url: 'https://music.youtube.com', action: 'bgm' },
-      { label: 'YouTube', url: 'https://www.youtube.com' },
-      { label: '인기 음악 차트', url: 'https://www.youtube.com/feed/trending?bp=4gINGgt5dG1hX2NoYXJ0cw%3D%3D' },
-      {
-        label: 'YouTube Music 로그인',
-        url: 'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmusic.youtube.com%2F',
-        action: 'login',
-      },
-    ],
+    url: 'https://www.youtube.com',
+    loginUrl: 'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fwww.youtube.com%2F',
   },
   {
-    platform: 'Spotify',
+    name: 'YouTube Music',
+    note: '무료 재생 가능 · 로그인 권장',
+    color: '#ff0000',
+    url: 'https://music.youtube.com',
+    loginUrl: 'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmusic.youtube.com%2F',
+  },
+  {
+    name: 'Spotify',
+    note: '로그인 필요 · Premium 계정 필요',
     color: '#1db954',
-    note: '계정 필요 (Premium 권장)',
-    links: [
-      { label: 'Spotify',         url: 'https://open.spotify.com',                       action: 'bgm' },
-      { label: '카페 플레이리스트', url: 'https://open.spotify.com/search/cafe%20playlist', action: 'bgm' },
-      { label: '로그인',           url: 'https://accounts.spotify.com/ko/login',          action: 'login' },
-      { label: '쿠키 초기화 후 로그인', url: 'https://accounts.spotify.com/ko/login',     action: 'clear-spotify-login' },
-    ],
+    url: 'https://open.spotify.com',
+    loginUrl: 'https://accounts.spotify.com/ko/login',
   },
   {
-    platform: 'SoundCloud',
+    name: 'SoundCloud',
+    note: '로그인 없이 재생 가능',
     color: '#ff5500',
-    note: '계정 불필요',
-    links: [
-      { label: 'SoundCloud', url: 'https://soundcloud.com', action: 'bgm' },
-    ],
+    url: 'https://soundcloud.com',
+    loginUrl: 'https://soundcloud.com/signin',
   },
 ];
 
 export default function ShortcutsTab() {
   const [message, setMessage] = useState(null);
 
-  async function runShortcutAction(link) {
-    const { action, url } = link;
+  function openService(url) {
+    setMessage(null);
+    window.electronAPI?.setBgmUrl(url);
+  }
+
+  function openLogin(url) {
+    setMessage(null);
+    window.electronAPI?.openLoginWindow(url);
+  }
+
+  async function resetSpotifyLogin() {
     setMessage(null);
     try {
-      if (action === 'login') {
-        window.electronAPI?.openLoginWindow(url);
-        return;
-      }
-      if (action === 'clear-spotify-login') {
-        const count = await window.electronAPI?.clearSpotifySession();
-        setMessage({ tone: 'success', text: `Spotify 로그인 정보 ${count || 0}개를 정리하고 로그인 창을 열었습니다.` });
-        window.electronAPI?.openLoginWindow(url);
-        return;
-      }
-      window.electronAPI?.setBgmUrl(url);
+      const count = await window.electronAPI?.clearSpotifySession();
+      setMessage({ tone: 'success', text: `Spotify 로그인 정보 ${count || 0}개를 정리했습니다.` });
+      window.electronAPI?.openLoginWindow('https://accounts.spotify.com/ko/login');
     } catch (error) {
-      setMessage({ tone: 'error', text: error.message || '음악 서비스 작업을 완료하지 못했습니다.' });
+      setMessage({ tone: 'error', text: error.message || 'Spotify 로그인 정보를 정리하지 못했습니다.' });
     }
   }
 
   return (
     <div style={styles.wrap}>
       <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
-      {SHORTCUT_GROUPS.map(({ platform, color, note, links }) => (
-        <div key={platform} style={styles.group}>
-          <div style={styles.groupHeader}>
-            <span aria-hidden="true" style={{ ...styles.platformDot, background: color }} />
-            <span style={styles.platformName}>{platform}</span>
-            {note && <span style={styles.note}>· {note}</span>}
+
+      <div style={styles.serviceList}>
+        {MUSIC_SERVICES.map((service, index) => (
+          <div
+            key={service.name}
+            style={{ ...styles.serviceRow, ...(index === MUSIC_SERVICES.length - 1 ? styles.lastServiceRow : {}) }}
+          >
+            <div style={styles.serviceInfo}>
+              <div style={styles.serviceTitleRow}>
+                <span aria-hidden="true" style={{ ...styles.platformDot, background: service.color }} />
+                <span style={styles.serviceName}>{service.name}</span>
+              </div>
+              <span style={styles.note}>{service.note}</span>
+            </div>
+            <div style={styles.actions}>
+              <button onClick={() => openService(service.url)} style={styles.openBtn}>
+                오른쪽 화면에서 열기
+              </button>
+              <button onClick={() => openLogin(service.loginUrl)} style={styles.loginBtn}>
+                로그인
+              </button>
+            </div>
           </div>
-          <div style={styles.links}>
-            {links.map((link) => {
-              const isReset = link.action === 'clear-spotify-login';
-              return (
-                <button
-                  key={link.label}
-                  onClick={() => runShortcutAction(link)}
-                  title={isReset ? 'DataDome 봇 차단 마커가 쿠키에 박혔을 때 사용' : undefined}
-                  style={{ ...styles.linkBtn, ...(isReset ? styles.resetBtn : {}) }}
-                >
-                  {link.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-      <div style={styles.help}>
-        링크 버튼: 오른쪽 화면에서 페이지 열기 · 로그인 버튼: 별도 창 · 점선 테두리: 쿠키 초기화 후 로그인
+        ))}
       </div>
+
+      <details style={styles.troubleshooting}>
+        <summary style={styles.troubleshootingSummary}>로그인 문제 해결</summary>
+        <div style={styles.troubleshootingBody}>
+          <span style={styles.troubleshootingText}>Spotify 로그인이 반복해서 막힐 때만 사용하세요.</span>
+          <button onClick={resetSpotifyLogin} style={styles.resetBtn}>Spotify 로그인 정보 초기화</button>
+        </div>
+      </details>
     </div>
   );
 }
 
 const styles = {
   wrap: { paddingTop: 4 },
-  group: { marginBottom: 10, padding: '12px 14px', border: '1px solid #e4e7ec', borderRadius: 8, background: '#fff' },
-  groupHeader: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  serviceList: { overflow: 'hidden', border: '1px solid #e4e7ec', borderRadius: 8, background: '#fff' },
+  serviceRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, padding: '14px', borderBottom: '1px solid #e4e7ec' },
+  lastServiceRow: { borderBottom: 'none' },
+  serviceInfo: { display: 'flex', minWidth: 180, flex: '1 1 220px', flexDirection: 'column', gap: 4 },
+  serviceTitleRow: { display: 'flex', alignItems: 'center', gap: 7 },
   platformDot: { width: 8, height: 8, flexShrink: 0, borderRadius: 999 },
-  platformName: { color: '#344054', fontSize: 12, fontWeight: 700 },
+  serviceName: { color: '#344054', fontSize: 13, fontWeight: 700 },
   note: { color: '#667085', fontSize: 11 },
-  links: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  linkBtn: { minHeight: 36, padding: '7px 12px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontSize: 12, fontWeight: 600 },
-  resetBtn: { borderStyle: 'dashed' },
-  help: { marginTop: 4, color: '#98a2b3', fontSize: 11, lineHeight: 1.5 },
+  actions: { display: 'flex', flex: '0 1 auto', flexWrap: 'wrap', gap: 8 },
+  openBtn: { minHeight: 38, padding: '8px 13px', borderRadius: 8, border: 'none', background: '#1f2937', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
+  loginBtn: { minHeight: 38, padding: '8px 13px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
+  troubleshooting: { marginTop: 10, border: '1px solid #e4e7ec', borderRadius: 8, background: '#fff', overflow: 'hidden' },
+  troubleshootingSummary: { padding: '12px 14px', color: '#667085', cursor: 'pointer', fontSize: 12, fontWeight: 700 },
+  troubleshootingBody: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, padding: '12px 14px', borderTop: '1px solid #e4e7ec' },
+  troubleshootingText: { color: '#667085', fontSize: 11 },
+  resetBtn: { minHeight: 36, padding: '7px 11px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#475467', cursor: 'pointer', fontSize: 11, fontWeight: 700 },
 };
