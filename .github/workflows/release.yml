@@ -4,15 +4,28 @@ name: Release Desktop App
 # 웹(owner/customer SPA)과 서버는 Railway가 git push로 자동 배포하지만, 데스크톱 앱은
 # 설치 바이너리에 구워지는 owner/electron/main.js 등을 포함하므로 별도 릴리즈가 필요하다.
 #
-# 트리거: v* 태그 (예: v2.5.21). 태그는 owner/package.json version과 일치해야 한다.
+# 트리거: v* 태그 (예: v2.5.21) 또는 기존 태그를 지정한 수동 복구 실행.
+# 두 경우 모두 태그를 checkout하며 owner/package.json version과 일치해야 한다.
 # 필요한 repo secrets: EVS_ACCOUNT_NAME, EVS_PASSWD (CastLabs EVS 계정).
-#   GITHUB_TOKEN은 Actions가 자동 주입 — electron-builder가 GH_TOKEN으로 읽어 Release를 만든다.
+#   GITHUB_TOKEN은 Actions가 자동 주입 — gh CLI가 Release와 자산을 멱등적으로 갱신한다.
 
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: {} # 태그를 다시 밀지 않고 수동 재실행할 때 사용
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '다시 발행할 기존 태그 (예: v2.5.23)'
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+concurrency:
+  group: desktop-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 permissions:
   contents: write # GitHub Release 생성·자산 업로드에 필요
@@ -34,14 +47,34 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: '22.12'
           cache: npm
           cache-dependency-path: |
             server/package-lock.json
             customer/package-lock.json
             owner/package-lock.json
+      - name: 태그 · 버전 · 커밋 확인
+        shell: bash
+        working-directory: owner
+        run: |
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          TAG_COMMIT="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          HEAD_COMMIT="$(git rev-parse HEAD)"
+
+          echo "release tag = ${RELEASE_TAG} / package.json = ${PKG_VERSION}"
+          if [ "${RELEASE_TAG}" != "${PKG_VERSION}" ]; then
+            echo "::error::태그(${RELEASE_TAG})와 owner/package.json 버전(${PKG_VERSION})이 다릅니다."
+            exit 1
+          fi
+          if [ "${HEAD_COMMIT}" != "${TAG_COMMIT}" ]; then
+            echo "::error::checkout 커밋(${HEAD_COMMIT})이 태그 커밋(${TAG_COMMIT})과 다릅니다."
+            exit 1
+          fi
       - name: 서버 검증
         working-directory: server
         env:
@@ -62,31 +95,19 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: '22.12'
           cache: npm
           cache-dependency-path: owner/package-lock.json
 
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
-      # 태그로 트리거된 경우, 태그와 owner/package.json version이 어긋나면 중단한다.
-      # (electron-builder는 package.json 버전으로 릴리즈를 만들므로 불일치 시 태그와 다른
-      #  릴리즈가 생겨 autoUpdater가 혼란스러워진다.)
-      - name: 태그와 package.json 버전 일치 확인
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        working-directory: owner
-        run: |
-          PKG_VERSION="v$(node -p "require('./package.json').version")"
-          echo "pushed tag = ${GITHUB_REF_NAME} / package.json = ${PKG_VERSION}"
-          if [ "${GITHUB_REF_NAME}" != "${PKG_VERSION}" ]; then
-            echo "::error::태그(${GITHUB_REF_NAME})와 owner/package.json 버전(${PKG_VERSION})이 다릅니다. 버전을 맞춘 뒤 태그를 다시 미세요."
-            exit 1
-          fi
 
       # CastLabs EVS — Widevine VMP 서명(Spotify 재생용). 비대화형 로그인.
       - name: CastLabs EVS 설치
@@ -102,10 +123,51 @@ jobs:
         working-directory: owner
         run: npm ci
 
-      # vite build → electron-builder → afterPack(evs-sign.js)로 EVS 서명 → GitHub Release 발행.
-      # electron-builder는 GH_TOKEN으로 Release를 만들고 자산·latest.yml을 업로드한다.
-      - name: 빌드 · 서명 · 릴리즈 발행
+      # electron-builder는 빌드·서명·업데이트 메타데이터 생성까지만 담당한다.
+      # Release 생성과 자산 교체를 gh CLI 한 단계로 직렬화해 동시 생성 경합을 막는다.
+      - name: 빌드 · 서명
         working-directory: owner
+        run: npm run electron:build -- --publish never
+
+      - name: 릴리스 자산 확인
+        shell: bash
+        run: |
+          shopt -s nullglob
+          INSTALLERS=(owner/dist/*.exe)
+          BLOCKMAPS=(owner/dist/*.exe.blockmap)
+
+          if [ "${#INSTALLERS[@]}" -ne 1 ]; then
+            echo "::error::설치 파일은 정확히 1개여야 합니다. 발견: ${#INSTALLERS[@]}"
+            exit 1
+          fi
+          if [ "${#BLOCKMAPS[@]}" -ne 1 ]; then
+            echo "::error::blockmap은 정확히 1개여야 합니다. 발견: ${#BLOCKMAPS[@]}"
+            exit 1
+          fi
+          if [ ! -f owner/dist/latest.yml ]; then
+            echo "::error::자동 업데이트 메타데이터(owner/dist/latest.yml)가 없습니다."
+            exit 1
+          fi
+
+      - name: GitHub Release 발행
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run electron:build -- --publish always
+        run: |
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --draft \
+              --verify-tag \
+              --title "${RELEASE_TAG}" \
+              --generate-notes
+          fi
+
+          gh release upload "${RELEASE_TAG}" \
+            owner/dist/*.exe \
+            owner/dist/*.exe.blockmap \
+            owner/dist/latest.yml \
+            --clobber
+
+          if [ "$(gh release view "${RELEASE_TAG}" --json isDraft --jq '.isDraft')" = 'true' ]; then
+            gh release edit "${RELEASE_TAG}" --draft=false
+          fi

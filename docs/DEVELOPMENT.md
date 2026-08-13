@@ -188,10 +188,37 @@ customer를 먼저 빌드한 뒤 owner를 빌드한다. customer 빌드가 `serv
 
 ```bash
 cd owner
-GH_TOKEN=<github_pat> npm run electron:build -- --publish always
+npm run electron:build -- --publish never
 ```
 
-결과물은 GitHub Release에 게시되고 실행 중인 앱이 업데이트를 확인한다. DRM·서명·플랫폼 제약은 [PLAYBACK.md](PLAYBACK.md)를 참고한다.
+로컬 명령은 설치 파일과 업데이트 메타데이터만 만들며 GitHub Release를 직접
+수정하지 않는다. 공식 배포는 `owner/package.json` 버전과 같은 `v*` 태그를
+push하면 `.github/workflows/release.yml`이 수행한다.
+
+수동 복구는 Actions의 `Release Desktop App`에서 `Run workflow`를 선택하고
+이미 존재하는 태그를 입력한다. 수동 실행도 해당 태그를 checkout하고 다음을
+검증하므로 `main`의 최신 커밋을 임의로 같은 버전에 재발행하지 않는다.
+
+- 입력 태그와 `owner/package.json` 버전 일치
+- checkout 커밋과 태그 커밋 일치
+- 서버 테스트와 customer·owner 빌드 성공
+- EVS 서명 성공
+
+워크플로는 `electron-builder --publish never`로 빌드한 뒤 GitHub CLI로 Release를
+생성하거나 재사용하고 자산을 `--clobber` 업로드한다. 따라서 실패한 동일 버전을
+재실행해도 Release 생성 경합이나 기존 자산 충돌 없이 복구할 수 있다. 새 Release는
+자산 업로드가 끝날 때까지 draft로 유지한다.
+
+정상 Release에는 다음 파일이 모두 있어야 한다.
+
+```text
+<installer>.exe
+<installer>.exe.blockmap
+latest.yml
+```
+
+실행 중인 앱은 `latest.yml`과 blockmap을 이용해 업데이트를 확인한다.
+DRM·서명·플랫폼 제약은 [PLAYBACK.md](PLAYBACK.md)를 참고한다.
 
 릴리스 전 확인:
 
