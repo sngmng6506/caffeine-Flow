@@ -14,6 +14,8 @@ export default defineConfig({
       'tests/owner-session.test.mjs',
       'tests/owner-music-resource.test.mjs',
       'tests/owner-playback-bridge.test.mjs',
+      'tests/owner-playback-recovery.test.mjs',
+      'tests/owner-playback-transition.test.mjs',
       'tests/playback-leader-registry.test.mjs',
       'tests/pagination.test.mjs',
       'tests/platforms.test.mjs',

@@ -10,6 +10,7 @@ import useRecommendationQueue from './dashboard/useRecommendationQueue';
 import usePanelDivider from './dashboard/usePanelDivider';
 import useQueueDragAndDrop from './dashboard/useQueueDragAndDrop';
 import { readSavedBgm, savedToBgmUrl } from './dashboard/bgmStorage';
+import { REC_STATUS } from '../constants/recommendationStatus';
 
 export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanner }) {
   const [cafe, setCafe] = useState(initialCafe);
@@ -66,6 +67,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
   }
 
   function handleSetDefault(info) {
+    if (recommendations.some(rec => rec.status === REC_STATUS.PLAYING)) return;
     setDefaultVideo(info);
     localStorage.setItem('cf_default_video', JSON.stringify(info));
     const url = savedToBgmUrl(info);
@@ -73,6 +75,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
   }
 
   function handleClearDefault() {
+    if (recommendations.some(rec => rec.status === REC_STATUS.PLAYING)) return;
     setDefaultVideo(null);
     localStorage.removeItem('cf_default_video');
     window.electronAPI?.clearBgm();

@@ -114,6 +114,8 @@ setPanelRatio    렌더러/BrowserView 경계 조정
 - 리더 연결이 끊기면 같은 세션의 재연결을 15초 기다린 뒤 follower를 승격한다.
 - renderer reload로 같은 세션이 돌아오면 진행 중인 `playing` 상태를 초기화하지 않는다.
 - 완전히 새 리더가 선출된 경우에만 서버에 남은 `playing`을 `accepted`로 복구한다.
+- 서버는 복구 필요 상태를 DB 복구 성공 ACK 전까지 유지한다. API·소켓 오류로
+  ACK하지 못하면 같은 리더가 복구를 재시도한다.
 - 브라우저나 follower가 보낸 `playback_state`는 서버가 무시한다.
 
 재생 시작 순서는 `playRec` 확인 응답이 먼저다. `{ ok: true }`는 실제 음원이 이미
@@ -130,10 +132,15 @@ DB 갱신이 실패하면 `endRec`으로 플레이어를 되돌린다.
 - follower·브라우저·renderer reload는 기존 `playing` 상태를 변경하지 않는다.
 - Electron이 navigation을 거절하거나 실패하면 DB를 `playing`으로 바꾸지 않는다.
 - 신청곡 재생 실패 시 두 곡을 동시에 `playing`으로 만들지 않는다.
+- 자동재생과 드래그 재생은 하나의 renderer 전환 잠금을 공유한다. 전환 중 들어온
+  다른 시작 요청은 거절해 BrowserView navigation과 DB 갱신 순서가 엇갈리지 않게 한다.
+- 재생 중인 곡을 다른 곡으로 즉시 덮어쓰지 않는다. 현재 곡을 먼저 종료한 뒤 다음 곡을 시작한다.
 - 종료 이벤트가 중복되어도 종료 상태를 다시 활성 상태로 되돌리지 않는다.
 - 앱 종료 전 현재 재생곡을 종료 상태로 정리한다.
 - BGM 복구 실패는 신청곡 큐 상태와 분리해 다룬다.
 - 기본 BGM 해제는 뷰뿐 아니라 takeover 복구용 URL·메타데이터도 함께 비운다.
+- 신청곡 재생 중에는 기본 BGM 설정·해제·드래그를 잠근다. Electron 메인도 같은
+  조건을 검사해 Spotify takeover의 `bgmView`가 중간에 교체되지 않게 한다.
 
 상태 전이 규칙은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md)의 Recommendation Status Contract를 따른다.
 

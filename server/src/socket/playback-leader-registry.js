@@ -97,7 +97,12 @@ function createPlaybackLeaderRegistry({ graceMs, onRoleChange }) {
     return leaders.get(slug)?.socketId === socketId;
   }
 
-  function claimRecovery(slug, socketId) {
+  function needsRecovery(slug, socketId) {
+    const leader = leaders.get(slug);
+    return Boolean(leader && leader.socketId === socketId && leader.needsRecovery);
+  }
+
+  function completeRecovery(slug, socketId) {
     const leader = leaders.get(slug);
     if (!leader || leader.socketId !== socketId || !leader.needsRecovery) return false;
     leader.needsRecovery = false;
@@ -112,7 +117,7 @@ function createPlaybackLeaderRegistry({ graceMs, onRoleChange }) {
     candidates.clear();
   }
 
-  return { add, remove, isLeader, claimRecovery, clear };
+  return { add, remove, isLeader, needsRecovery, completeRecovery, clear };
 }
 
 module.exports = { createPlaybackLeaderRegistry };

@@ -15,8 +15,11 @@ describe('playback leader registry', () => {
 
     expect(registry.add('cafe', 'socket-a', 'session-a')).toBe(true);
     expect(registry.add('cafe', 'socket-b', 'session-b')).toBe(false);
-    expect(registry.claimRecovery('cafe', 'socket-a')).toBe(true);
-    expect(registry.claimRecovery('cafe', 'socket-a')).toBe(false);
+    expect(registry.needsRecovery('cafe', 'socket-a')).toBe(true);
+    expect(registry.completeRecovery('cafe', 'socket-b')).toBe(false);
+    expect(registry.needsRecovery('cafe', 'socket-a')).toBe(true);
+    expect(registry.completeRecovery('cafe', 'socket-a')).toBe(true);
+    expect(registry.needsRecovery('cafe', 'socket-a')).toBe(false);
     expect(roles.get('socket-a')).toBe(true);
     expect(roles.get('socket-b')).toBe(false);
     registry.clear();
@@ -31,11 +34,23 @@ describe('playback leader registry', () => {
     registry.remove('cafe', 'socket-a');
     expect(registry.isLeader('cafe', 'socket-b')).toBe(false);
     expect(registry.add('cafe', 'socket-a2', 'session-a')).toBe(true);
-    expect(registry.claimRecovery('cafe', 'socket-a2')).toBe(true);
+    expect(registry.needsRecovery('cafe', 'socket-a2')).toBe(true);
 
     registry.remove('cafe', 'socket-a2');
     vi.advanceTimersByTime(1000);
     expect(registry.isLeader('cafe', 'socket-b')).toBe(true);
+    expect(registry.needsRecovery('cafe', 'socket-b')).toBe(true);
+    registry.clear();
+  });
+
+  it('복구 완료 ACK 전에는 같은 리더가 계속 복구를 재시도할 수 있다', () => {
+    const registry = createPlaybackLeaderRegistry({ graceMs: 1000, onRoleChange: () => {} });
+    registry.add('cafe', 'socket-a', 'session-a');
+
+    expect(registry.needsRecovery('cafe', 'socket-a')).toBe(true);
+    expect(registry.needsRecovery('cafe', 'socket-a')).toBe(true);
+    expect(registry.completeRecovery('cafe', 'socket-a')).toBe(true);
+    expect(registry.completeRecovery('cafe', 'socket-a')).toBe(false);
     registry.clear();
   });
 });
