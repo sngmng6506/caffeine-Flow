@@ -7,6 +7,13 @@ import { PLAYBACK_STATE } from '../../constants/playbackState';
 import { readSavedBgm, savedToBgmUrl } from './bgmStorage';
 import { byPriority, isAutoAcceptEligible } from './queuePolicy';
 import { requestElectronPlayback } from './playbackBridge.mjs';
+import { acknowledgePlaybackRecovery } from './playbackRecovery.mjs';
+import { runPlaybackTransition } from './playbackTransition.mjs';
+import { finishCurrentPlayback } from './playbackCleanup.mjs';
+import {
+  markPlaybackSessionRecovered,
+  needsPlaybackStateReset,
+} from './playbackSession.mjs';
 
 export default function useRecommendationQueue({
   cafe,
@@ -25,7 +32,7 @@ export default function useRecommendationQueue({
   const [isPlaybackLeader, setIsPlaybackLeader] = useState(false);
   const aiAutoAcceptRef = useRef(aiAutoAccept);
   const playbackLeaderRef = useRef(false);
-  const playingTransitionRef = useRef(false);
+  const recoveryInProgressRef = useRef(false);
   const playbackAvailable = typeof window.electronAPI?.playRec === 'function';
 
   recommendationsRef.current = recommendations;
@@ -45,11 +52,8 @@ export default function useRecommendationQueue({
   // playing 전환을 요청한다. 서버도 카페 잠금으로 최종 불변식을 보장한다.
   async function startPlaying(rec) {
     if (!playbackAvailable || !playbackLeaderRef.current) return null;
-    if (playingTransitionRef.current) return null;
-    if (recommendationsRef.current.some(item => item.status === REC_STATUS.PLAYING)) return null;
-
-    playingTransitionRef.current = true;
-    try {
+    return runPlaybackTransition(async () => {
+      if (recommendationsRef.current.some(item => item.status === REC_STATUS.PLAYING)) return null;
       // Electron이 URL 검증과 화면 navigation을 받아들인 뒤에만 DB를
       // playing으로 바꾼다. 서버 갱신 실패 시 실제 플레이어도 즉시 복구한다.
       const result = await requestElectronPlayback(window.electronAPI, rec.video_id);
@@ -62,9 +66,7 @@ export default function useRecommendationQueue({
         window.electronAPI.endRec();
         throw error;
       }
-    } finally {
-      playingTransitionRef.current = false;
-    }
+    });
   }
 
   // 다음 곡 재생 또는 정지.
@@ -163,6 +165,9 @@ export default function useRecommendationQueue({
 
     const socket = getSocket(cafe.slug);
     let connected = false;
+    let recoveryRetryTimer = null;
+    let pendingRecoveredSnapshot = null;
+    let pendingRecoveredAutoAccept = false;
 
     socket.on('connect', () => {
       socket.emit('request_playback_role');
@@ -183,18 +188,44 @@ export default function useRecommendationQueue({
       playbackLeaderRef.current = next;
       setIsPlaybackLeader(next);
       // 리더 승격 알림은 먼저 역할만 전달한다. 별도 요청으로 recovery
-      // claim을 원자적으로 한 번만 소비한다.
+      // 필요 여부를 확인하고, 실제 복구 성공 뒤 ACK로 완료한다.
       if (next && shouldRecover === undefined) {
         socket.emit('request_playback_role');
         return;
       }
-      if (!next || !shouldRecover) return;
-
-      const recoveryMarker = `cf_playback_initialized:${cafe.slug}`;
-      if (sessionStorage.getItem(recoveryMarker) === '1') return;
-      sessionStorage.setItem(recoveryMarker, '1');
+      if (!next || recoveryInProgressRef.current) return;
+      // ACK는 서버에 도착했지만 응답 패킷만 유실될 수 있다. 다음 역할
+      // 확인에서 서버가 복구 완료를 반환하면 이미 만든 snapshot으로 이어간다.
+      if (!shouldRecover && pendingRecoveredSnapshot) {
+        const recovered = pendingRecoveredSnapshot;
+        const shouldDrain = pendingRecoveredAutoAccept;
+        pendingRecoveredSnapshot = null;
+        pendingRecoveredAutoAccept = false;
+        markPlaybackSessionRecovered(cafe.slug);
+        if (shouldDrain) await drainPendingAndPlay(recovered);
+        return;
+      }
+      if (!shouldRecover) {
+        markPlaybackSessionRecovered(cafe.slug);
+        return;
+      }
+      recoveryInProgressRef.current = true;
 
       try {
+        // 서버 프로세스만 재시작되면 registry는 새 리더로 보지만 Electron의
+        // BrowserView와 sessionStorage는 계속 살아 있다. 완료된 같은 실행
+        // 세션은 DB playing을 되돌리지 않고 새 registry에 ACK만 보낸다.
+        let playbackActive = null;
+        try {
+          if (typeof window.electronAPI?.isRecActive === 'function') {
+            playbackActive = await window.electronAPI.isRecActive();
+          }
+        } catch {}
+        if (!needsPlaybackStateReset(cafe.slug, shouldRecover, { playbackActive })) {
+          await acknowledgePlaybackRecovery(socket);
+          markPlaybackSessionRecovered(cafe.slug);
+          return;
+        }
         const [{ recommendations: latest, is_accepting }, latestCafe] = await Promise.all([
           getRecommendations(cafe.slug),
           cafeLoaded,
@@ -202,14 +233,30 @@ export default function useRecommendationQueue({
         // 새 리더 세션이 시작되었을 때만 서버에 남은 가짜 playing을
         // accepted로 복구한다. follower·브라우저·renderer reload는 건드리지 않는다.
         const reset = await Promise.all(latest.map(rec => rec.status === REC_STATUS.PLAYING
-          ? updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED).catch(() => rec)
+          ? updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED)
           : rec));
         recommendationsRef.current = reset;
         setRecommendations(reset);
         setIsAccepting(is_accepting);
+        pendingRecoveredSnapshot = reset;
+        pendingRecoveredAutoAccept = !!latestCafe?.music_filter_enabled;
+        await acknowledgePlaybackRecovery(socket);
+        markPlaybackSessionRecovered(cafe.slug);
+        pendingRecoveredSnapshot = null;
+        pendingRecoveredAutoAccept = false;
         if (latestCafe?.music_filter_enabled) await drainPendingAndPlay(reset);
       } catch (error) {
         console.error(error);
+        // 서버의 recovery flag는 ACK 전까지 남아 있다. 일시적인 API·소켓
+        // 실패는 같은 리더가 다시 역할을 요청해 복구를 재시도한다.
+        if (!recoveryRetryTimer) {
+          recoveryRetryTimer = setTimeout(() => {
+            recoveryRetryTimer = null;
+            if (socket.connected) socket.emit('request_playback_role');
+          }, 2000);
+        }
+      } finally {
+        recoveryInProgressRef.current = false;
       }
     });
 
@@ -272,17 +319,13 @@ export default function useRecommendationQueue({
 
     const removeCleanupBeforeQuit = window.electronAPI?.onCleanupBeforeQuit?.(async () => {
       try {
-        const playing = playbackLeaderRef.current
-          ? recommendationsRef.current.filter(rec => rec.status === REC_STATUS.PLAYING)
-          : [];
-        await Promise.all(
-          playing.map(rec => updateRec(cafe.slug, rec.id, REC_STATUS.PLAYED).catch(() => null))
-        );
+        await finishPlaybackForExit();
       } catch {}
       window.electronAPI?.cleanupDone?.();
     });
 
     return () => {
+      if (recoveryRetryTimer) clearTimeout(recoveryRetryTimer);
       disconnectSocket();
       if (typeof removeNowPlaying === 'function') removeNowPlaying();
       if (typeof removePlaybackState === 'function') removePlaybackState();
@@ -358,6 +401,21 @@ export default function useRecommendationQueue({
     setRecommendations(previous => previous.filter(rec => rec.id !== id));
   }
 
+  async function finishPlaybackForExit() {
+    const updated = await finishCurrentPlayback({
+      isLeader: playbackLeaderRef.current,
+      recommendations: recommendationsRef.current,
+      markPlayed: rec => updateRec(cafe.slug, rec.id, REC_STATUS.PLAYED),
+      endPlayback: () => window.electronAPI?.endRec(),
+    });
+    if (updated.length > 0) {
+      const updateMap = Object.fromEntries(updated.map(rec => [rec.id, rec]));
+      recommendationsRef.current = recommendationsRef.current.map(rec => updateMap[rec.id] || rec);
+      setRecommendations(recommendationsRef.current);
+    }
+    return updated;
+  }
+
   return {
     recommendations,
     setRecommendations,
@@ -370,6 +428,7 @@ export default function useRecommendationQueue({
     canControlPlayback: playbackAvailable && isPlaybackLeader,
     toggleAccepting,
     toggleAiAutoAccept,
+    finishPlaybackForExit,
     handleUpdate,
     handleDelete,
   };

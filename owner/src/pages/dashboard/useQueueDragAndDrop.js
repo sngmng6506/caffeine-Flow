@@ -3,6 +3,7 @@ import { createRec, deleteRec, updateRec } from '../../api';
 import { REC_STATUS } from '../../constants/recommendationStatus';
 import { recommendationToDefault } from './musicResource.mjs';
 import { requestElectronPlayback } from './playbackBridge.mjs';
+import { runPlaybackTransition } from './playbackTransition.mjs';
 
 const DEFAULT_DROP_TARGET = 'default';
 
@@ -35,6 +36,10 @@ export default function useQueueDragAndDrop({
       if (targetStatus === REC_STATUS.PLAYING && !canControlPlayback) {
         throw new Error('재생을 담당하는 Electron 앱에서만 재생 중으로 옮길 수 있습니다.');
       }
+      if (targetStatus === REC_STATUS.PLAYING
+        && recommendations.some(item => item.status === REC_STATUS.PLAYING && item.id !== data.id)) {
+        throw new Error('현재 재생 중인 곡을 먼저 종료한 뒤 새 곡을 재생해 주세요.');
+      }
 
       if (data.type === DEFAULT_DROP_TARGET) {
         const requestedStatus = targetStatus === REC_STATUS.PLAYING
@@ -51,12 +56,33 @@ export default function useQueueDragAndDrop({
         });
         let rec = created;
         if (targetStatus === REC_STATUS.PLAYING) {
+          const { type: _type, ...defaultSnapshot } = data;
+          let defaultCleared = false;
           try {
-            const result = await requestElectronPlayback(window.electronAPI, created.video_id);
-            if (!result?.ok) throw new Error(result?.error || '신청곡 재생을 시작하지 못했습니다.');
-            rec = await updateRec(cafeSlug, created.id, REC_STATUS.PLAYING);
+            // Spotify 기본 BGM을 같은 bgmView에서 takeover한 뒤 clear하면
+            // 신청곡까지 중단된다. 먼저 기본 BGM을 해제해 recView 재생으로 전환한다.
+            rec = await runPlaybackTransition(async () => {
+              await onClearDefault();
+              defaultCleared = true;
+              try {
+                const result = await requestElectronPlayback(window.electronAPI, created.video_id);
+                if (!result?.ok) throw new Error(result?.error || '신청곡 재생을 시작하지 못했습니다.');
+                return await updateRec(cafeSlug, created.id, REC_STATUS.PLAYING);
+              } catch (error) {
+                await restorePreviousPlayback(created.id);
+                throw error;
+              }
+            });
           } catch (error) {
-            await restorePreviousPlayback(created.id);
+            if (defaultCleared) await onSetDefault(defaultSnapshot).catch(console.error);
+            await deleteRec(cafeSlug, created.id).catch(() => null);
+            throw error;
+          }
+        }
+        if (targetStatus !== REC_STATUS.PLAYING) {
+          try {
+            await onClearDefault();
+          } catch (error) {
             await deleteRec(cafeSlug, created.id).catch(() => null);
             throw error;
           }
@@ -67,7 +93,6 @@ export default function useQueueDragAndDrop({
             : previous;
           return cleared.some(item => item.id === rec.id) ? cleared : [...cleared, rec];
         });
-        onClearDefault();
         return;
       }
 
@@ -80,17 +105,20 @@ export default function useQueueDragAndDrop({
         throw new Error('재생을 담당하는 Electron 앱에서만 재생 중인 곡을 옮길 수 있습니다.');
       }
 
-      if (targetStatus === REC_STATUS.PLAYING) {
-        const result = await requestElectronPlayback(window.electronAPI, rec.video_id);
-        if (!result?.ok) throw new Error(result?.error || '신청곡 재생을 시작하지 못했습니다.');
-      }
-
       let updated;
-      try {
+      if (targetStatus === REC_STATUS.PLAYING) {
+        updated = await runPlaybackTransition(async () => {
+          try {
+            const result = await requestElectronPlayback(window.electronAPI, rec.video_id);
+            if (!result?.ok) throw new Error(result?.error || '신청곡 재생을 시작하지 못했습니다.');
+            return await updateRec(cafeSlug, id, targetStatus);
+          } catch (error) {
+            await restorePreviousPlayback(id);
+            throw error;
+          }
+        });
+      } else {
         updated = await updateRec(cafeSlug, id, targetStatus);
-      } catch (error) {
-        if (targetStatus === REC_STATUS.PLAYING) await restorePreviousPlayback(id);
-        throw error;
       }
       if (targetStatus === REC_STATUS.PLAYING) {
         setRecommendations(previous => previous.map(item => (
@@ -126,7 +154,7 @@ export default function useQueueDragAndDrop({
       await updateRec(cafeSlug, rec.id, terminalStatus);
       if (rec.status === REC_STATUS.PLAYING) window.electronAPI?.endRec();
       setRecommendations(previous => previous.filter(item => item.id !== rec.id));
-      onSetDefault(recommendationToDefault(rec));
+      await onSetDefault(recommendationToDefault(rec));
     } catch (error) {
       console.error(error);
       setError(error.message || '기본 BGM을 변경하지 못했어요. 다시 시도해 주세요.');

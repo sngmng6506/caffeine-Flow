@@ -1,21 +1,14 @@
 import { io } from 'socket.io-client';
+import { getPlaybackSessionId } from './pages/dashboard/playbackSession.mjs';
 
 const SERVER = import.meta.env.VITE_SERVER_URL || '';
 
 let socket = null;
 let lastFilterAlertAt = 0;
 
-function getPlaybackSessionId() {
+function getElectronPlaybackSessionId() {
   if (typeof window.electronAPI?.playRec !== 'function') return null;
-  const key = 'cf_playback_session_id';
-  // renderer reload에는 유지되지만 Electron 앱을 완전히 다시 열면 새 ID가
-  // 되도록 sessionStorage를 사용한다.
-  let id = sessionStorage.getItem(key);
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem(key, id);
-  }
-  return id;
+  return getPlaybackSessionId();
 }
 
 function handleMusicFilterError(payload = {}) {
@@ -31,7 +24,7 @@ function handleMusicFilterError(payload = {}) {
 
 export function getSocket(slug) {
   if (!socket) {
-    const playbackSessionId = getPlaybackSessionId();
+    const playbackSessionId = getElectronPlaybackSessionId();
     socket = io(`${SERVER}/cafe`, {
       query: {
         slug,

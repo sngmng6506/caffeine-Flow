@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import { parseInitialState } from './utils/initialSession.mjs';
+import { resetPlaybackSession } from './pages/dashboard/playbackSession.mjs';
 
 const initialState = parseInitialState();
 
@@ -30,6 +31,9 @@ export default function App() {
   }
 
   function handleLogout() {
+    // 로그아웃은 BrowserView를 파괴하므로 같은 Electron lease를 재사용하지
+    // 않는다. HTTP 종료 정리가 실패해도 다음 로그인 리더가 고아 playing을 복구한다.
+    resetPlaybackSession(cafe?.slug);
     localStorage.clear();
     setCafe(null);
     window.electronAPI?.hideYoutube();

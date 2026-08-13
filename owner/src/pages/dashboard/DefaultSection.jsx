@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { defaultToRecommendationPayload, metadataToDefault } from './musicResource.mjs';
+import { requestSetBgmUrl } from './bgmBridge.mjs';
 
 const MUSIC_HOSTS = ['youtube.com', 'youtu.be', 'soundcloud.com', 'spotify.com', 'spotify.link'];
 
@@ -13,13 +14,24 @@ function isSupportedMusicUrl(value) {
   }
 }
 
-export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear, widevineStatus }) {
+export default function DefaultSection({
+  defaultVideo,
+  isPlaying,
+  onSet,
+  onClear,
+  widevineStatus,
+  recommendationPlaying = false,
+}) {
   const [inputUrl, setInputUrl] = useState('');
   const [setting, setSetting] = useState(false);
   const [error, setError] = useState('');
   const [imageError, setImageError] = useState(false);
 
   async function handleSet() {
+    if (recommendationPlaying) {
+      setError('신청곡 재생이 끝난 뒤 기본 BGM을 설정할 수 있어요.');
+      return;
+    }
     const url = inputUrl.trim();
     if (!isSupportedMusicUrl(url)) {
       setError('YouTube, Spotify, SoundCloud의 HTTPS 링크를 입력해 주세요.');
@@ -39,12 +51,32 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
       } catch {
         // 메타데이터 조회에 실패해도 입력한 링크는 기본 BGM으로 사용할 수 있다.
       }
-      onSet(info);
+      await onSet(info);
       setInputUrl('');
-    } catch {
-      setError('기본 BGM을 설정하지 못했어요. 링크를 확인하고 다시 시도해 주세요.');
+    } catch (error) {
+      setError(error.message || '기본 BGM을 설정하지 못했어요. 링크를 확인하고 다시 시도해 주세요.');
     } finally {
       setSetting(false);
+    }
+  }
+
+  async function handleClear() {
+    setError('');
+    try {
+      await onClear();
+    } catch (clearError) {
+      setError(clearError.message || '기본 BGM을 해제하지 못했어요. 다시 시도해 주세요.');
+    }
+  }
+
+  async function handleOpen(url) {
+    setError('');
+    try {
+      if (!await requestSetBgmUrl(window.electronAPI, url)) {
+        setError('신청곡 재생이 끝난 뒤 기본 BGM 화면을 열 수 있어요.');
+      }
+    } catch (openError) {
+      setError(openError.message || '기본 BGM 화면을 열지 못했어요.');
     }
   }
 
@@ -57,8 +89,12 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
     return (
       <div
         className="owner-default-card"
-        draggable
+        draggable={!recommendationPlaying}
         onDragStart={event => {
+          if (recommendationPlaying) {
+            event.preventDefault();
+            return;
+          }
           if (event.target.closest('button')) {
             event.preventDefault();
             return;
@@ -85,6 +121,11 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
             {isPlaying && <span className="owner-inline-status">재생 중</span>}
             <div className="owner-default-card__title">{defaultVideo.title}</div>
             <div className="owner-default-card__hint">끌어서 재생 중이나 대기 곡으로 옮길 수 있어요.</div>
+            {recommendationPlaying && (
+              <div className="owner-default-card__warning">
+                신청곡 재생 중에는 기본 BGM을 변경할 수 없어요.
+              </div>
+            )}
             {isSpotify && (
               <div className="owner-default-card__hint">Spotify 로그인 필요 · Premium 계정 필요</div>
             )}
@@ -98,7 +139,8 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
         <div className="owner-default-card__actions">
           <button
             type="button"
-            onClick={() => window.electronAPI?.setBgmUrl(url)}
+            onClick={() => handleOpen(url)}
+            disabled={recommendationPlaying}
             draggable={false}
             onDragStart={event => event.stopPropagation()}
             className="owner-btn owner-btn--secondary"
@@ -114,12 +156,14 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
           )}
           <button
             type="button"
-            onClick={onClear}
+            onClick={handleClear}
+            disabled={recommendationPlaying}
             draggable={false}
             onDragStart={event => event.stopPropagation()}
             className="owner-btn owner-btn--danger"
           >기본 BGM 해제</button>
         </div>
+        {error && <div role="alert" className="owner-form-error">{error}</div>}
       </div>
     );
   }
@@ -140,11 +184,16 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
       <button
         type="button"
         onClick={handleSet}
-        disabled={setting || !inputUrl.trim()}
+        disabled={setting || !inputUrl.trim() || recommendationPlaying}
         className="owner-btn owner-btn--primary"
       >
         {setting ? '설정 중…' : '기본 BGM 설정'}
       </button>
+      {recommendationPlaying && (
+        <div role="status" className="owner-form-error">
+          신청곡 재생이 끝난 뒤 기본 BGM을 설정할 수 있어요.
+        </div>
+      )}
       {error && <div role="alert" className="owner-form-error">{error}</div>}
     </div>
   );

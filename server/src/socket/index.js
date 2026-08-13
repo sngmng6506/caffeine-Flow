@@ -114,8 +114,15 @@ function initSocket(io) {
         const isLeader = !!playbackSessionId && playbackLeaders.isLeader(slug, socket.id);
         socket.emit('playback_role', {
           isLeader,
-          shouldRecover: isLeader && playbackLeaders.claimRecovery(slug, socket.id),
+          // 복구 권한은 renderer가 DB 복구를 끝내고 ACK할 때까지 유지한다.
+          // 네트워크/API 오류로 복구가 중단돼도 다음 요청에서 재시도할 수 있다.
+          shouldRecover: isLeader && playbackLeaders.needsRecovery(slug, socket.id),
         });
+      });
+
+      socket.on('playback_recovery_complete', (ack) => {
+        const ok = !!playbackSessionId && playbackLeaders.completeRecovery(slug, socket.id);
+        if (typeof ack === 'function') ack({ ok });
       });
 
       socket.on('playback_state', (payload = {}) => {

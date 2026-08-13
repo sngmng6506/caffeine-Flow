@@ -52,6 +52,7 @@ export default function QueueTab({
           onSet={onSetDefault}
           onClear={onClearDefault}
           widevineStatus={widevineStatus}
+          recommendationPlaying={playing.length > 0}
         />
       </section>
 

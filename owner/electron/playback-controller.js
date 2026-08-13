@@ -51,7 +51,10 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   }
 
   function setBgmUrl(url) {
-    if (!isAllowedMusicUrl(url)) return;
+    // 신청곡 재생 중, 특히 Spotify takeover는 bgmView 자체가 신청곡
+    // 플레이어다. 이때 BGM URL을 바꾸면 종료 이벤트 없이 DB만 playing에
+    // 남으므로 신청곡이 끝난 뒤에만 변경을 허용한다.
+    if (currentRecMode || !isAllowedMusicUrl(url)) return false;
     currentBgmUrl = url;
     const bgmView = windowManager.createBgmView();
     if (!windowManager.isPanelVisible()) showPanel();
@@ -63,16 +66,19 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     } else {
       bgmView.webContents.loadURL(url);
     }
+    return true;
   }
 
   function clearBgm() {
+    if (currentRecMode) return false;
     // takeover 종료가 과거 Spotify BGM을 되살리지 않도록 메모리 상태도
     // 함께 비운다. 뷰가 아직 생성되지 않은 경우에도 해제는 유효하다.
     currentBgmUrl = null;
     savedBgmMeta = null;
     const bgmView = windowManager.getBgmView();
-    if (!bgmView || bgmView.webContents.isDestroyed()) return;
+    if (!bgmView || bgmView.webContents.isDestroyed()) return true;
     bgmView.webContents.loadURL('https://www.google.com');
+    return true;
   }
 
   async function playRecommendation(videoIdOrUrl) {
@@ -179,12 +185,17 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     windowManager.safeSend('now-playing', null);
   }
 
+  function isRecommendationActive() {
+    return currentRecMode !== null;
+  }
+
   function registerIpcHandlers() {
     const trusted = (event) => windowManager.isFromMainRenderer(event.sender);
     ipcMain.on('show-youtube', (event) => { if (trusted(event)) showPanel(); });
     ipcMain.on('hide-youtube', (event) => { if (trusted(event)) hidePanel(); });
-    ipcMain.on('set-bgm-url', (event, url) => { if (trusted(event)) setBgmUrl(url); });
-    ipcMain.on('clear-bgm', (event) => { if (trusted(event)) clearBgm(); });
+    ipcMain.handle('set-bgm-url', (event, url) => trusted(event) && setBgmUrl(url));
+    ipcMain.handle('clear-bgm', (event) => trusted(event) && clearBgm());
+    ipcMain.handle('is-rec-active', (event) => trusted(event) && isRecommendationActive());
     ipcMain.handle('play-rec', (event, videoIdOrUrl) => trusted(event)
       ? playRecommendation(videoIdOrUrl)
       : { ok: false, error: 'Forbidden' });
@@ -195,6 +206,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     cleanupForQuit: stopDetectors,
     clearBgm,
     endRecommendation,
+    isRecommendationActive,
     playRecommendation,
     registerIpcHandlers,
     setBgmUrl,

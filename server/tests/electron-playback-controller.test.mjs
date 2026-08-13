@@ -44,17 +44,22 @@ describe('Electron playback controller acknowledgment', () => {
       .resolves.toMatchObject({ ok: false });
   });
 
-  it('BGM 해제 뒤 Spotify takeover 종료가 이전 BGM을 되살리지 않는다', async () => {
+  it('Spotify takeover 중 BGM 변경을 거절하고 종료 뒤 정상 해제한다', async () => {
     vi.useFakeTimers();
     const { controller, loadedUrls } = createHarness();
     const bgm = 'https://open.spotify.com/playlist/bgm';
     const rec = 'https://open.spotify.com/track/recommendation';
 
-    controller.setBgmUrl(bgm);
+    expect(controller.setBgmUrl(bgm)).toBe(true);
+    expect(controller.isRecommendationActive()).toBe(false);
     await expect(controller.playRecommendation(rec)).resolves.toEqual({ ok: true });
-    controller.clearBgm();
+    expect(controller.isRecommendationActive()).toBe(true);
+    expect(controller.clearBgm()).toBe(false);
+    expect(controller.setBgmUrl('https://open.spotify.com/playlist/other')).toBe(false);
     controller.endRecommendation();
+    expect(controller.isRecommendationActive()).toBe(false);
+    expect(controller.clearBgm()).toBe(true);
 
-    expect(loadedUrls).toEqual([bgm, rec, 'https://www.google.com']);
+    expect(loadedUrls).toEqual([bgm, rec, bgm, 'https://www.google.com']);
   });
 });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import SettingsStatus from './SettingsStatus';
+import { requestSetBgmUrl } from './bgmBridge.mjs';
 
 const MUSIC_SERVICES = [
   {
@@ -35,9 +36,16 @@ const MUSIC_SERVICES = [
 export default function ShortcutsTab() {
   const [message, setMessage] = useState(null);
 
-  function openService(url) {
+  async function openService(url) {
     setMessage(null);
-    window.electronAPI?.setBgmUrl(url);
+    try {
+      const opened = await requestSetBgmUrl(window.electronAPI, url);
+      if (!opened) {
+        setMessage({ tone: 'error', text: '신청곡 재생이 끝난 뒤 음악 서비스 화면을 열 수 있어요.' });
+      }
+    } catch (error) {
+      setMessage({ tone: 'error', text: error.message || '음악 서비스 화면을 열지 못했어요.' });
+    }
   }
 
   function openLogin(url) {
