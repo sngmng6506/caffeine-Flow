@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { defaultToRecommendationPayload, metadataToDefault } from './musicResource.mjs';
 
 const MUSIC_HOSTS = ['youtube.com', 'youtu.be', 'soundcloud.com', 'spotify.com', 'spotify.link'];
 
@@ -27,13 +28,13 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
     setSetting(true);
     setError('');
     try {
-      let info = { url, title: url, thumbnail: null };
+      let info = metadataToDefault({}, url);
       try {
         const base = import.meta.env.VITE_SERVER_URL ? `${import.meta.env.VITE_SERVER_URL}/api/v1` : '/api/v1';
         const response = await fetch(`${base}/tracks/oembed?url=${encodeURIComponent(url)}`);
         if (response.ok) {
           const data = await response.json();
-          info = { url, title: data.title || url, thumbnail: data.thumbnail || null };
+          info = metadataToDefault(data, url);
         }
       } catch {
         // 메타데이터 조회에 실패해도 입력한 링크는 기본 BGM으로 사용할 수 있다.
@@ -64,9 +65,7 @@ export default function DefaultSection({ defaultVideo, isPlaying, onSet, onClear
           }
           event.dataTransfer.setData('text/plain', JSON.stringify({
             type: 'default',
-            videoId: defaultVideo.videoId || url,
-            title: defaultVideo.title,
-            thumbnail: defaultVideo.thumbnail,
+            ...defaultToRecommendationPayload(defaultVideo),
           }));
           event.dataTransfer.effectAllowed = 'move';
         }}

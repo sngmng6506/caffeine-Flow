@@ -5,6 +5,19 @@ const SERVER = import.meta.env.VITE_SERVER_URL || '';
 let socket = null;
 let lastFilterAlertAt = 0;
 
+function getPlaybackSessionId() {
+  if (typeof window.electronAPI?.playRec !== 'function') return null;
+  const key = 'cf_playback_session_id';
+  // renderer reload에는 유지되지만 Electron 앱을 완전히 다시 열면 새 ID가
+  // 되도록 sessionStorage를 사용한다.
+  let id = sessionStorage.getItem(key);
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem(key, id);
+  }
+  return id;
+}
+
 function handleMusicFilterError(payload = {}) {
   const now = Date.now();
   if (now - lastFilterAlertAt < 3000) return;
@@ -18,8 +31,13 @@ function handleMusicFilterError(payload = {}) {
 
 export function getSocket(slug) {
   if (!socket) {
+    const playbackSessionId = getPlaybackSessionId();
     socket = io(`${SERVER}/cafe`, {
-      query: { slug, role: 'owner' },
+      query: {
+        slug,
+        role: 'owner',
+        ...(playbackSessionId ? { playbackSessionId } : {}),
+      },
       auth:  { token: localStorage.getItem('token') },
     });
     socket.on('music_filter_error', handleMusicFilterError);

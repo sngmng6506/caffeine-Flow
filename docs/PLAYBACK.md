@@ -16,6 +16,9 @@ recView  신청곡 임시 재생
 ```
 
 렌더러는 큐 상태와 사용자 조작을 관리하고, Electron 메인 프로세스는 창 배치·플랫폼 재생·종료 감지를 담당한다.
+같은 카페에 여러 사장님 화면이 연결돼도 서버가 선출한 Electron 한 대만 실제
+재생과 재생 상태 발행을 담당한다. 일반 브라우저와 나머지 Electron은 큐를 볼 수
+있지만 재생 조작은 수행하지 않는 follower다.
 
 ## 재생 모드
 
@@ -84,7 +87,7 @@ Electron은 DRM 재생을 위해 CastLabs Electron과 Widevine을 사용한다. 
 렌더러가 사용하는 주요 Electron 이벤트:
 
 ```text
-playRec          신청곡 재생
+playRec          신청곡 URL 검증·화면 navigation 요청. Promise<{ ok, error? }> 반환
 endRec           신청곡 종료 처리 및 BGM 복귀
 setBgmUrl        기본 BGM 설정
 clearBgm         기본 BGM 해제
@@ -101,16 +104,36 @@ setPanelRatio    렌더러/BrowserView 경계 조정
 
 재생 상태는 추천곡의 DB `playing` 상태와 분리된 실시간 신호다. Electron이
 `playing`, `paused`, `buffering`, `unknown` 중 하나를 보내며, 서버는 인증된 사장님
-소켓의 신호만 카페 룸에 전달한다. 신호가 만료되거나 사장님 앱 연결이 끊기면
+소켓 중 현재 재생 리더의 신호만 카페 룸에 전달한다. 신호가 만료되거나 사장님 앱 연결이 끊기면
 `unknown`으로 초기화하고 추천곡의 DB 상태는 변경하지 않는다.
+
+## 재생 리더와 시작 확인
+
+- Electron renderer는 앱 실행 세션 동안 유지되는 UUID를 소켓 handshake에 보낸다.
+- 서버는 카페별 첫 재생 가능 세션을 리더로 선출하고 `playback_role`을 보낸다.
+- 리더 연결이 끊기면 같은 세션의 재연결을 15초 기다린 뒤 follower를 승격한다.
+- renderer reload로 같은 세션이 돌아오면 진행 중인 `playing` 상태를 초기화하지 않는다.
+- 완전히 새 리더가 선출된 경우에만 서버에 남은 `playing`을 `accepted`로 복구한다.
+- 브라우저나 follower가 보낸 `playback_state`는 서버가 무시한다.
+
+재생 시작 순서는 `playRec` 확인 응답이 먼저다. `{ ok: true }`는 실제 음원이 이미
+소리 나고 있다는 뜻이 아니라 URL 검증과 BrowserView navigation을 Electron이
+수락했다는 뜻이다. 이 응답 뒤에만 renderer가 추천곡을 DB `playing`으로 바꾸며,
+DB 갱신이 실패하면 `endRec`으로 플레이어를 되돌린다.
+원격 owner SPA가 설치본보다 먼저 배포될 수 있으므로 preload는
+`supportsPlayRecAck` capability를 함께 노출한다. 이 값이 없는 기존 설치본은
+기존 send 방식으로 동작하고, 새 설치본부터 확인 응답을 강제한다.
 
 ## 실패와 복구
 
-- 앱 시작 시 서버에 남은 `playing` 상태는 `accepted`로 복구한다.
+- 새 재생 리더가 시작될 때 서버에 남은 `playing` 상태는 `accepted`로 복구한다.
+- follower·브라우저·renderer reload는 기존 `playing` 상태를 변경하지 않는다.
+- Electron이 navigation을 거절하거나 실패하면 DB를 `playing`으로 바꾸지 않는다.
 - 신청곡 재생 실패 시 두 곡을 동시에 `playing`으로 만들지 않는다.
 - 종료 이벤트가 중복되어도 종료 상태를 다시 활성 상태로 되돌리지 않는다.
 - 앱 종료 전 현재 재생곡을 종료 상태로 정리한다.
 - BGM 복구 실패는 신청곡 큐 상태와 분리해 다룬다.
+- 기본 BGM 해제는 뷰뿐 아니라 takeover 복구용 URL·메타데이터도 함께 비운다.
 
 상태 전이 규칙은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md)의 Recommendation Status Contract를 따른다.
 

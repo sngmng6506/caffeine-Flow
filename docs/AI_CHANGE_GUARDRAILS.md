@@ -251,6 +251,12 @@ server/tests/auth-boundary.test.mjs
 - `server/app.js`와 `server/server.js` 분리를 유지한다. 테스트는 `app.js`를 import한다.
 - DB 상태가 단일 원천이며 소켓 이벤트만으로 영구 상태를 만들지 않는다.
 - Electron 재생 상태와 서버 큐 상태가 충돌하지 않도록 한 곡만 `playing`으로 유지한다.
+- 같은 카페의 실제 재생 리더는 Electron 한 대뿐이다. 브라우저·follower는
+  `playing` 전이나 공용 `playback_state` 발행을 수행하지 않는다.
+- Electron이 신청곡 URL 검증과 navigation을 확인한 뒤에만 DB를 `playing`으로
+  바꾸고, DB 갱신 실패 시 실제 플레이어를 종료·복구한다.
+- 새 리더만 고아 `playing`을 복구한다. renderer reload나 follower 접속은 기존
+  재생 상태를 초기화하지 않는다.
 - 화면 검증이 불가능한 환경에서는 UI 스타일을 대량 변경하지 않는다.
 
 ## 변경 전 체크

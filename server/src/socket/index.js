@@ -2,10 +2,15 @@ const db = require('../db/knex');
 const jwt = require('jsonwebtoken');
 const { kstTodayString } = require('../utils/kst');
 const { isUuid } = require('../utils/validate');
-const { HEARTBEAT_REFRESH_MS, PLAYBACK_STATE_TTL_MS } = require('../constants/time-policy');
+const {
+  HEARTBEAT_REFRESH_MS,
+  PLAYBACK_STATE_TTL_MS,
+  PLAYBACK_LEADER_GRACE_MS,
+} = require('../constants/time-policy');
 const { PLAYBACK_STATE, PLAYBACK_STATES } = require('../constants/playback-state');
 const cafeService = require('../services/cafe.service');
 const { ownerRoom } = require('../routes/_recommendations.shared');
+const { createPlaybackLeaderRegistry } = require('./playback-leader-registry');
 
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 
@@ -44,6 +49,12 @@ function initSocket(io) {
   // slug별 사장님 소켓 ID 집합 — peak concurrent에서 차감
   const ownerSockets = new Map(); // slug -> Set<socketId>
   const playbackPublishers = new Map(); // slug -> { socketId, timer, payload }
+  const playbackLeaders = createPlaybackLeaderRegistry({
+    graceMs: PLAYBACK_LEADER_GRACE_MS,
+    onRoleChange: (socketId, isLeader) => {
+      cafeNsp.sockets.get(socketId)?.emit('playback_role', { isLeader });
+    },
+  });
 
   function clearPlaybackState(slug, socketId = null) {
     const current = playbackPublishers.get(slug);
@@ -92,7 +103,25 @@ function initSocket(io) {
       touchHeartbeat(ownerPayload.cafeId);
       heartbeatTimer = setInterval(() => touchHeartbeat(ownerPayload.cafeId), HEARTBEAT_REFRESH_MS);
 
+      const rawSessionId = socket.handshake.query.playbackSessionId;
+      const playbackSessionId = typeof rawSessionId === 'string' && isUuid(rawSessionId)
+        ? rawSessionId
+        : null;
+      if (playbackSessionId) playbackLeaders.add(slug, socket.id, playbackSessionId);
+      else socket.emit('playback_role', { isLeader: false });
+
+      socket.on('request_playback_role', () => {
+        const isLeader = !!playbackSessionId && playbackLeaders.isLeader(slug, socket.id);
+        socket.emit('playback_role', {
+          isLeader,
+          shouldRecover: isLeader && playbackLeaders.claimRecovery(slug, socket.id),
+        });
+      });
+
       socket.on('playback_state', (payload = {}) => {
+        // 인증된 사장님이라도 실제 재생을 맡은 Electron 한 대만 상태를
+        // 발행한다. 브라우저나 follower가 손님 화면을 덮어쓰지 못한다.
+        if (!playbackLeaders.isLeader(slug, socket.id)) return;
         if (!PLAYBACK_STATES.includes(payload.state)) return;
         const recommendationId = isUuid(payload.recommendationId)
           ? payload.recommendationId
@@ -116,6 +145,7 @@ function initSocket(io) {
     socket.on('disconnect', () => {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       clearPlaybackState(slug, socket.id);
+      playbackLeaders.remove(slug, socket.id);
       ownerSockets.get(slug)?.delete(socket.id);
       if (ownerSockets.get(slug)?.size === 0) ownerSockets.delete(slug);
     });

@@ -1,4 +1,4 @@
-const { dialog, session, shell } = require('electron');
+const { dialog, session, shell, webContents } = require('electron');
 const fs = require('fs');
 const { isAllowedMusicUrl } = require('./navigation-policy');
 
@@ -131,9 +131,13 @@ function createSessionTools({ ipcMain, windowManager }) {
 
     activeSession.webRequest.onBeforeRequest(
       { urls: ['*://secure.soundcloud.com/*', '*://accounts.google.com/gsi/iframe*'] },
-      (details, callback) => callback({
-        cancel: windowManager.isFromMusicView(details.webContents),
-      })
+      (details, callback) => {
+        // Electron WebRequest의 webContents 객체는 선택 필드다. ID만 오는
+        // 요청도 동일한 음악 뷰 정책을 적용해 우회·오작동을 막는다.
+        const requestContents = details.webContents
+          || (Number.isInteger(details.webContentsId) ? webContents.fromId(details.webContentsId) : null);
+        callback({ cancel: !!requestContents && windowManager.isFromMusicView(requestContents) });
+      }
     );
 
     activeSession.webRequest.onHeadersReceived((details, callback) => {

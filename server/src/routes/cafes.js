@@ -246,7 +246,7 @@ router.get('/me/history', requireAuth, async (req, res) => {
     // 통계 탭(KST 기준)과 이력 날짜 필터가 서로 다른 하루를 보게 됨
     const start = kstStartOfDateString(req.query.date);
     const end = kstEndOfDateString(req.query.date);
-    query = query.whereBetween('requested_at', [start, end]);
+    query = query.whereRaw(`${HISTORY_SORT_AT_SQL} BETWEEN ? AND ?`, [start, end]);
   }
 
   const items = await query.limit(limit + 1).offset(offset.value);

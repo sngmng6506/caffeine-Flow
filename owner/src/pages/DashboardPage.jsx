@@ -28,6 +28,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     loading,
     widevineStatus,
     aiAutoAccept,
+    canControlPlayback,
     toggleAccepting,
     toggleAiAutoAccept,
     handleUpdate,
@@ -91,6 +92,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     onRecommendationUpdate: handleUpdate,
     onSetDefault: handleSetDefault,
     onClearDefault: handleClearDefault,
+    canControlPlayback,
   });
 
   return (
@@ -137,6 +139,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           widevineStatus={widevineStatus}
           slug={cafe.slug}
           error={queueError}
+          canControlPlayback={canControlPlayback}
           onDragOver={handleDragOver}
           onDragLeave={clearDragOver}
           onDrop={handleDrop}
