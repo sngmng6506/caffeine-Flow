@@ -127,7 +127,9 @@ jobs:
       # Release 생성과 자산 교체를 gh CLI 한 단계로 직렬화해 동시 생성 경합을 막는다.
       - name: 빌드 · 서명
         working-directory: owner
-        run: npm run electron:build -- --publish never
+        run: |
+          npm run build
+          npx electron-builder --publish never
 
       - name: 릴리스 자산 확인
         shell: bash
