@@ -21,11 +21,29 @@ async function apiFetch(method, path, body) {
   return data;
 }
 
+async function apiFetchBlob(path) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: {
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+    },
+  });
+  if (!res.ok) {
+    let message = '요청 실패';
+    try {
+      const data = await res.json();
+      if (data.error) message = data.error;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.blob();
+}
+
 export const googleLogin = idToken => apiFetch('POST', '/auth/google', { idToken });
 export const completeRegistration = (pendingToken, cafeName, agreements, location) =>
   apiFetch('POST', '/auth/complete', { pendingToken, cafeName, agreed: true, agreements, location });
 
 export const getMe = () => apiFetch('GET', '/cafes/me');
+export const getQrImageBlob = () => apiFetchBlob('/cafes/me/qr-code');
 export const updateMe = name => apiFetch('PUT', '/cafes/me', { name });
 export const changeSlug = slug => apiFetch('PUT', '/cafes/me/slug', slug ? { slug } : {});
 export const updateNotice = notice => apiFetch('PUT', '/cafes/me/notice', { notice });

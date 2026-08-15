@@ -27,6 +27,7 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
 | GET | `/cafes/me` | 🔒 | 내 카페 정보 |
+| GET | `/cafes/me/qr-code` | 🔒 | 내 카페 손님용 QR 이미지 다운로드 |
 | PUT | `/cafes/me` | 🔒 | 카페명 등 기본 정보 변경 |
 | PUT | `/cafes/me/notice` | 🔒 | 손님 공지 변경 |
 | PUT | `/cafes/me/platforms` | 🔒 | 허용 플랫폼 변경 |

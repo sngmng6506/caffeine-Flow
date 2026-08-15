@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { changeSlug } from '../../api';
+import { getQrImageBlob } from '../../api';
 import SettingsStatus from './SettingsStatus';
 
 export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugChanged }) {
@@ -13,14 +14,15 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
     const src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=600x600&margin=20&format=jpg`;
     setMessage(null);
     try {
-      if (window.electronAPI?.supportsQrDownload) {
+      let blob;
+      try {
+        blob = await getQrImageBlob();
+      } catch (serverError) {
+        if (!window.electronAPI?.supportsQrDownload) throw serverError;
         const started = await window.electronAPI.downloadQrImage(src);
-        if (!started) throw new Error('download rejected');
+        if (!started) throw serverError;
         return;
       }
-      const res = await fetch(src);
-      if (!res.ok) throw new Error('download failed');
-      const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objectUrl;

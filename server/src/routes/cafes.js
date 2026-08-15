@@ -17,6 +17,7 @@ const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
 const { ownerRecommendation } = require('../utils/public-response');
+const { getQrImage } = require('../services/qr-image.service');
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -28,6 +29,24 @@ router.get('/me', requireAuth, async (req, res) => {
     initial_slug: initialSlug,
     customer_url: `${baseUrl}/${cafe.slug}`,
   });
+});
+
+// GET /api/v1/cafes/me/qr-code
+// renderer가 외부 QR 서버를 직접 fetch하면 CSP/CORS에 막힐 수 있어,
+// 인증된 내 카페 주소만 고정된 QR 이미지 서비스로 전달한다.
+router.get('/me/qr-code', requireAuth, async (req, res) => {
+  const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
+  try {
+    const { image, contentType } = await getQrImage(`${baseUrl}/${req.cafe.slug}`);
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': contentType,
+      'Content-Disposition': 'attachment; filename="caffeine-flow-qr.jpg"',
+    });
+    res.send(image);
+  } catch {
+    res.status(502).json({ error: 'QR 이미지를 만들지 못했어요. 다시 시도해 주세요.' });
+  }
 });
 
 // PUT /api/v1/cafes/me
