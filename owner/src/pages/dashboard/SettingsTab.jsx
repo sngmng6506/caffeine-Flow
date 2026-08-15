@@ -116,14 +116,19 @@ export default function SettingsTab({
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={handlePlatformSave}
+              disabled={!changed || saving}
+              style={settingsStyles.platformApplyBtn}
+            >
+              {saving ? '적용 중…' : '적용'}
+            </button>
           </div>
           {selected.length === 1 && (
             <div style={settingsStyles.hint}>손님 신청 플랫폼을 1개 이상 선택해 주세요.</div>
           )}
           <SettingsStatus tone={platformMessage?.tone}>{platformMessage?.text}</SettingsStatus>
-          <button type="button" onClick={handlePlatformSave} disabled={!changed || saving} style={settingsStyles.saveBtn}>
-            {saving ? '적용 중…' : '적용'}
-          </button>
         </div>
         <MusicFilterSettings />
       </CollapsibleSetting>
@@ -178,13 +183,14 @@ const settingsStyles = {
   innerSection:{ paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid #eee' },
   title:       { fontSize: 15, fontWeight: 700, color: 'var(--owner-text-strong)', marginBottom: 4 },
   desc:        { fontSize: 12, color: 'var(--owner-text-muted)', marginBottom: 14 },
-  platforms:   { display: 'flex', gap: 8, flexWrap: 'wrap' },
+  platforms:   { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   platformBtn: { display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   platformBtnActive: { fontWeight: 700 },
   platformBtnInactive: { background: '#fff', color: 'var(--owner-text-muted)', borderColor: 'var(--owner-stroke)' },
   platformDot: { width: 8, height: 8, flex: '0 0 8px', borderRadius: 999 },
   hint:        { fontSize: 12, color: '#9c6500', marginTop: 8 },
   saveBtn:     { minHeight: 40, marginTop: 16, padding: '9px 20px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 650, fontSize: 13 },
+  platformApplyBtn: { minHeight: 40, marginLeft: 'auto', padding: '9px 20px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 650, fontSize: 13 },
   logoutBtn:   { minHeight: 40, padding: '9px 16px', borderRadius: 8, border: '1px solid var(--owner-stroke)', background: '#fff', color: 'var(--owner-text)', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
   details:     { background: '#fff', borderRadius: 12, border: '1px solid var(--owner-stroke)', overflow: 'hidden' },
   summary:     { display: 'flex', flexDirection: 'column', gap: 4, padding: 16, cursor: 'pointer', listStylePosition: 'inside' },

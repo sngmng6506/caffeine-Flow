@@ -56,9 +56,8 @@ export default function ShortcutsTab() {
   async function resetSpotifyLogin() {
     setMessage(null);
     try {
-      const count = await window.electronAPI?.clearSpotifySession();
-      setMessage({ tone: 'success', text: `Spotify 로그인 정보 ${count || 0}개를 정리했어요.` });
-      window.electronAPI?.openLoginWindow('https://accounts.spotify.com/ko/login');
+      await window.electronAPI?.clearSpotifySession();
+      setMessage({ tone: 'success', text: 'Spotify 로그인 정보를 초기화했어요.' });
     } catch (error) {
       setMessage({ tone: 'error', text: error.message || 'Spotify 로그인 정보를 정리하지 못했어요. 다시 시도해 주세요.' });
     }
