@@ -11,16 +11,30 @@ export default function App() {
   const [pending]                   = useState(initialState.pending);
   const [oauthError]                = useState(initialState.oauthError);
   const [youtubeVisible, setYoutubeVisible] = useState(false);
-  const [updateVersion, setUpdateVersion]   = useState(null);
+  const [updateStatus, setUpdateStatus]     = useState(null);
 
   useEffect(() => {
     const removeYoutubeState = window.electronAPI?.onYoutubeState(visible => setYoutubeVisible(visible));
-    const removeUpdateDownloaded = window.electronAPI?.onUpdateDownloaded(version => setUpdateVersion(version));
+    const api = window.electronAPI;
+    const applyUpdateStatus = (next) => {
+      if (!next || typeof next !== 'object') return;
+      setUpdateStatus(previous => {
+        const previousRevision = Number(previous?.revision) || 0;
+        const nextRevision = Number(next.revision) || 0;
+        return nextRevision >= previousRevision ? next : previous;
+      });
+    };
+    const removeUpdateStatus = api?.onUpdateStatus?.(applyUpdateStatus);
+    const removeUpdateDownloaded = typeof api?.onUpdateStatus === 'function'
+      ? undefined
+      : api?.onUpdateDownloaded?.(version => setUpdateStatus({ state: 'downloaded', version }));
+    api?.getUpdateStatus?.().then(applyUpdateStatus).catch(() => {});
     // 앱 시작 시 이미 로그인 상태면 YouTube 패널 바로 열기
     if (initialState.cafe) window.electronAPI?.showYoutube();
 
     return () => {
       if (typeof removeYoutubeState === 'function') removeYoutubeState();
+      if (typeof removeUpdateStatus === 'function') removeUpdateStatus();
       if (typeof removeUpdateDownloaded === 'function') removeUpdateDownloaded();
     };
   }, []);
@@ -43,9 +57,13 @@ export default function App() {
     ? { height: '100vh', overflow: 'hidden' }
     : {};
 
-  const updateBanner = updateVersion && (
+  const updateBanner = updateStatus?.state === 'available' ? (
     <div className="owner-update-banner">
-      v{updateVersion} 업데이트를 설치할 수 있어요.
+      v{updateStatus.version} 업데이트를 다운로드하고 있어요.
+    </div>
+  ) : updateStatus?.state === 'downloaded' ? (
+    <div className="owner-update-banner">
+      v{updateStatus.version} 업데이트를 설치할 수 있어요.
       <button
         type="button"
         onClick={() => window.electronAPI?.restartApp()}
@@ -54,7 +72,18 @@ export default function App() {
         앱 다시 시작
       </button>
     </div>
-  );
+  ) : updateStatus?.state === 'error' ? (
+    <div className="owner-update-banner">
+      업데이트를 확인하지 못했어요.
+      <button
+        type="button"
+        onClick={() => window.electronAPI?.checkForUpdates?.()}
+        className="owner-btn owner-btn--secondary"
+      >
+        다시 확인
+      </button>
+    </div>
+  ) : null;
 
   if (!cafe) return (
     <div style={containerStyle}>

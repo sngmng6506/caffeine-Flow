@@ -47,6 +47,9 @@ const electronAPI = {
   importCookiesFromFile:  ()    => ipcRenderer.invoke('import-cookies-from-file'),
 
   onUpdateDownloaded: (cb) => subscribe('update-downloaded', cb),
+  onUpdateStatus:     (cb) => subscribe('update-status', cb),
+  getUpdateStatus:    ()   => ipcRenderer.invoke('get-update-status'),
+  checkForUpdates:    ()   => ipcRenderer.invoke('check-for-updates'),
   restartApp:         ()   => ipcRenderer.send('restart-app'),
 
   // 종료 전 cleanup: main에서 'cleanup-before-quit' 보내면 renderer가 playing → played

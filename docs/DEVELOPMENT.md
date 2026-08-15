@@ -218,6 +218,9 @@ latest.yml
 ```
 
 실행 중인 앱은 `latest.yml`과 blockmap을 이용해 업데이트를 확인한다.
+main 프로세스는 확인·발견·다운로드·오류 상태를 보관하고 renderer가 시작될 때
+`get-update-status`로 다시 조회한다. 따라서 renderer 구독 전에 다운로드가 끝나도
+설치 알림이 유실되지 않는다. 확인 실패 시 사장님 화면에서 다시 시도할 수 있다.
 DRM·서명·플랫폼 제약은 [PLAYBACK.md](PLAYBACK.md)를 참고한다.
 
 릴리스 전 확인:

@@ -7,6 +7,7 @@ export default defineConfig({
       'tests/ai-guardrails-docs.test.mjs',
       'tests/api-docs.test.mjs',
       'tests/electron-navigation-policy.test.mjs',
+      'tests/electron-auto-update.test.mjs',
       'tests/electron-panel-layout.test.mjs',
       'tests/electron-playback-controller.test.mjs',
       'tests/kst.test.mjs',
