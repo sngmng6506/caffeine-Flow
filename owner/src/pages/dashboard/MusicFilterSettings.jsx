@@ -3,7 +3,7 @@ import { getMe, testMusicFilter, updateMusicFilter } from '../../api';
 import { DEFAULT_MUSIC_FILTER_PROMPT } from '../../constants/musicFilterPolicy';
 import SettingsStatus from './SettingsStatus';
 
-// ON/OFF는 대시보드의 'AI 자동수락' 버튼이 담당 — 이 화면은 프롬프트만 편집한다.
+// 켜기/끄기는 대시보드의 'AI 필터' 버튼이 담당 — 이 화면은 프롬프트만 편집한다.
 function normalize(latest = {}) {
   return {
     prompt: latest.music_filter_prompt || '',
@@ -41,7 +41,7 @@ function TestResultCard({ result }) {
 export default function MusicFilterSettings() {
   const [initial, setInitial] = useState(normalize());
   const [form, setForm] = useState(normalize());
-  const [enabled, setEnabled] = useState(false); // 서버의 현재 AI 자동수락 상태 (읽기 전용 표시)
+  const [enabled, setEnabled] = useState(false); // 서버의 현재 AI 필터 상태 (읽기 전용 표시)
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -58,12 +58,12 @@ export default function MusicFilterSettings() {
         setForm(next);
         setEnabled(!!latest.music_filter_enabled);
       })
-      .catch(() => setMessage({ tone: 'error', text: 'AI 자동수락 설정을 불러오지 못했어요. 다시 시도해 주세요.' }))
+      .catch(() => setMessage({ tone: 'error', text: 'AI 필터 설정을 불러오지 못했어요. 다시 시도해 주세요.' }))
       .finally(() => setLoading(false));
   }, []);
 
   const changed = useMemo(() => JSON.stringify(initial) !== JSON.stringify(form), [initial, form]);
-  // AI 자동수락이 켜져 있으면 프롬프트를 비운 채로 저장할 수 없다 (서버가 400 반환)
+  // AI 필터가 켜져 있으면 프롬프트를 비운 채로 저장할 수 없다 (서버가 400 반환)
   const canSave = changed && !saving && (!enabled || form.prompt.trim().length > 0);
   const canTest = !testLoading && testUrl.trim().length > 0 && form.prompt.trim().length > 0;
 
@@ -78,7 +78,7 @@ export default function MusicFilterSettings() {
       const latestEnabled = !!latest.music_filter_enabled;
       if (latestEnabled && !form.prompt.trim()) {
         setEnabled(latestEnabled);
-        setMessage({ tone: 'error', text: 'AI 자동수락이 켜져 있어 매장 분위기 설명을 비울 수 없어요.' });
+        setMessage({ tone: 'error', text: 'AI 필터가 켜져 있어 매장 분위기 설명을 비울 수 없어요.' });
         return;
       }
       const updated = await updateMusicFilter({
@@ -119,8 +119,8 @@ export default function MusicFilterSettings() {
   if (loading) {
     return (
       <div style={styles.section}>
-        <div style={styles.title}>AI 자동수락</div>
-        <div style={styles.desc}>AI 자동수락 설정을 불러오고 있어요.</div>
+        <div style={styles.title}>AI 필터</div>
+        <div style={styles.desc}>AI 필터 설정을 불러오고 있어요.</div>
       </div>
     );
   }
@@ -130,13 +130,13 @@ export default function MusicFilterSettings() {
       <div style={styles.section}>
         <div style={styles.headerRow}>
           <div>
-            <div style={styles.title}>AI 자동수락</div>
+            <div style={styles.title}>AI 필터</div>
             <div style={styles.desc}>
-              매장 분위기 설명을 기준으로 새 신청을 확인하고, 기준에 맞는 곡을 대기 곡으로 옮겨요.
+              매장 분위기 설명으로 새 신청을 확인해요. 통과한 곡은 자동으로 수락돼요.
             </div>
           </div>
           <span style={{ ...styles.stateBadge, ...(enabled ? styles.stateOn : styles.stateOff) }}>
-            {enabled ? 'AI 자동수락 켜짐' : 'AI 자동수락 꺼짐'}
+            {enabled ? 'AI 필터 켜짐' : 'AI 필터 꺼짐'}
           </span>
         </div>
 
@@ -151,7 +151,7 @@ export default function MusicFilterSettings() {
         />
         <div style={styles.count}>{form.prompt.length}/1000</div>
         {enabled && !form.prompt.trim() && (
-          <div style={styles.warn}>AI 자동수락이 켜져 있어 매장 분위기 설명을 비울 수 없어요.</div>
+          <div style={styles.warn}>AI 필터가 켜져 있어 매장 분위기 설명을 비울 수 없어요.</div>
         )}
 
         <div style={styles.info}>

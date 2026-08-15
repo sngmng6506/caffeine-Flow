@@ -75,7 +75,7 @@ filter_status = accepted
 
 필터가 꺼져 있을 때 들어온 `filter_status=skipped` 곡은 자동 승격하지 않는다.
 
-사장님 화면에서는 대시보드의 `AI 자동수락` 버튼이 `music_filter_enabled`를 켜고 끈다. 설정 화면은 매장 분위기 설명을 편집하며, 활성 상태에서는 설명을 비워 저장할 수 없다.
+사장님 화면에서는 대시보드의 `AI 필터` 버튼이 `music_filter_enabled`를 켜고 끈다. 필터가 켜지면 위 자동수락 동작도 함께 활성화된다. 설정 화면은 매장 분위기 설명을 편집하며, 활성 상태에서는 설명을 비워 저장할 수 없다.
 
 ## Fail-closed
 

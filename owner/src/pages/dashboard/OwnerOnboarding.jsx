@@ -75,8 +75,8 @@ export default function OwnerOnboarding({
       action: '플랫폼 확인',
     },
     {
-      title: 'AI 자동수락',
-      description: '선택 사항이에요. 매장 분위기 설명을 기준으로 새 신청을 확인해요.',
+      title: 'AI 필터',
+      description: '매장 분위기 설명으로 새 신청을 확인해요. 통과한 곡은 자동으로 수락돼요.',
       status: aiAutoAccept ? '사용 중' : '선택 사항',
       complete: aiAutoAccept,
       onClick: () => openSettingsSection('owner-operation-settings'),

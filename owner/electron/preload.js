@@ -33,6 +33,8 @@ const electronAPI = {
   onWidevineStatus:    (cb)  => subscribe('widevine-status', cb),
 
   setPanelRatio:      (ratio) => ipcRenderer.send('set-panel-ratio', ratio),
+  supportsPanelCollapse: true,
+  setPanelCollapsed:  (collapsed) => ipcRenderer.send('set-panel-collapsed', collapsed),
   dividerDragStart:   ()      => ipcRenderer.send('divider-drag-start'),
   dividerDragEnd:     ()      => ipcRenderer.send('divider-drag-end'),
 

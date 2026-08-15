@@ -13,6 +13,43 @@ import { readSavedBgm, savedToBgmUrl } from './dashboard/bgmStorage';
 import { REC_STATUS } from '../constants/recommendationStatus';
 import { requestClearBgm, requestSetBgmUrl } from './dashboard/bgmBridge.mjs';
 
+const COLLAPSED_PANEL_WIDTH = 48;
+
+function CollapsedPanelRail({ isAccepting, isAcceptingReady, aiFilterEnabled, aiFilterReady, hasUpdate, onExpand }) {
+  const acceptingLabel = isAcceptingReady
+    ? (isAccepting ? '신청 받는 중' : '신청 닫힘')
+    : '신청 상태 확인 중';
+  const aiFilterLabel = aiFilterReady
+    ? (aiFilterEnabled ? 'AI 필터 켜짐' : 'AI 필터 꺼짐')
+    : 'AI 필터 상태 확인 중';
+
+  return (
+    <aside className="owner-panel-rail" aria-label="운영 상태 요약">
+      <button
+        type="button"
+        autoFocus
+        onClick={onExpand}
+        className="owner-panel-rail__expand"
+        aria-label={`사장님 화면 펼치기${hasUpdate ? ', 업데이트 있음' : ''}`}
+        title="사장님 화면 펼치기"
+      >
+        <span aria-hidden="true">›</span>
+        {hasUpdate && <span className="owner-panel-rail__update" aria-hidden="true" />}
+      </button>
+      <div className="owner-panel-rail__statuses">
+        <span className="owner-panel-rail__status" aria-label={acceptingLabel} title={acceptingLabel} aria-busy={!isAcceptingReady}>
+          <span className={`owner-panel-rail__dot ${isAcceptingReady && isAccepting ? 'owner-panel-rail__dot--success' : ''}`} aria-hidden="true" />
+          <span>신청</span>
+        </span>
+        <span className="owner-panel-rail__status" aria-label={aiFilterLabel} title={aiFilterLabel} aria-busy={!aiFilterReady}>
+          <span className={`owner-panel-rail__dot ${aiFilterReady && aiFilterEnabled ? 'owner-panel-rail__dot--primary' : ''}`} aria-hidden="true" />
+          <span>AI</span>
+        </span>
+      </div>
+    </aside>
+  );
+}
+
 export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanner }) {
   const [cafe, setCafe] = useState(initialCafe);
   const [defaultVideo, setDefaultVideo] = useState(readSavedBgm);
@@ -20,7 +57,14 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
   const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [platformSaving, setPlatformSaving] = useState(false);
   const [customerUrl, setCustomerUrl] = useState('');
-  const { panelRatio, handleDividerMouseDown } = usePanelDivider();
+  const {
+    panelRatio,
+    isPanelCollapsed,
+    supportsPanelCollapse,
+    collapsePanel,
+    expandPanel,
+    handleDividerMouseDown,
+  } = usePanelDivider();
 
   const {
     recommendations,
@@ -30,6 +74,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     loading,
     widevineStatus,
     aiAutoAccept,
+    isAcceptingReady,
+    aiFilterReady,
     canControlPlayback,
     toggleAccepting,
     toggleAiAutoAccept,
@@ -119,28 +165,55 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
   });
 
   return (
-    <div className="owner-dashboard" style={{ width: `${(panelRatio * 100).toFixed(2)}vw` }}>
-      {updateBanner}
-      {/* BrowserView 경계보다 8px 왼쪽에 renderer 드래그 영역을 둔다. */}
-      <div
-        onMouseDown={handleDividerMouseDown}
-        title="드래그하여 좌우 비율 조정"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: `calc(${(panelRatio * 100).toFixed(2)}% - 8px)`,
-          width: 8,
-          height: '100vh',
-          cursor: 'col-resize',
-          zIndex: 9999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          background: 'transparent',
-        }}
-      >
-        <div className="owner-panel-divider-line" />
-      </div>
+    <div
+      className={`owner-dashboard ${isPanelCollapsed ? 'owner-dashboard--collapsed' : ''}`}
+      style={{ width: isPanelCollapsed ? COLLAPSED_PANEL_WIDTH : `${(panelRatio * 100).toFixed(2)}vw` }}
+    >
+      {isPanelCollapsed && (
+        <CollapsedPanelRail
+          isAccepting={isAccepting}
+          isAcceptingReady={isAcceptingReady}
+          aiFilterEnabled={aiAutoAccept}
+          aiFilterReady={aiFilterReady}
+          hasUpdate={Boolean(updateBanner)}
+          onExpand={expandPanel}
+        />
+      )}
+
+      <div className="owner-dashboard__content" hidden={isPanelCollapsed}>
+        {updateBanner}
+        {/* BrowserView 경계보다 8px 왼쪽에 renderer 드래그 영역을 둔다. */}
+        <div
+          onMouseDown={handleDividerMouseDown}
+          title="드래그하여 좌우 비율 조정"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: `calc(${(panelRatio * 100).toFixed(2)}% - 8px)`,
+            width: 8,
+            height: '100vh',
+            cursor: 'col-resize',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            background: 'transparent',
+          }}
+        >
+          <div className="owner-panel-divider-line" />
+          {supportsPanelCollapse && (
+            <button
+              type="button"
+              onMouseDown={event => event.stopPropagation()}
+              onClick={collapsePanel}
+              className="owner-panel-divider-toggle"
+              aria-label="사장님 화면 접기"
+              title="사장님 화면 접기"
+            >
+              <span aria-hidden="true">‹</span>
+            </button>
+          )}
+        </div>
 
       <DashboardHeader
         cafe={cafe}
@@ -208,6 +281,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           }}
         />
       )}
+      </div>
     </div>
   );
 }

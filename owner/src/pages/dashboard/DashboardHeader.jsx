@@ -16,7 +16,7 @@ export default function DashboardHeader({
           </span>
           <span className={`owner-status ${aiAutoAccept ? 'owner-status--primary' : ''}`}>
             <span className="owner-status__dot" aria-hidden="true" />
-            AI 자동수락 {aiAutoAccept ? '켜짐' : '꺼짐'}
+            AI 필터 {aiAutoAccept ? '켜짐' : '꺼짐'}
           </span>
         </div>
       </div>
@@ -35,7 +35,7 @@ export default function DashboardHeader({
           aria-pressed={aiAutoAccept}
           className="owner-btn owner-btn--secondary"
         >
-          AI 자동수락 {aiAutoAccept ? '끄기' : '켜기'}
+          AI 필터 {aiAutoAccept ? '끄기' : '켜기'}
         </button>
       </div>
     </header>

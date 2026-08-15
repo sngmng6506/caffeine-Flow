@@ -1,5 +1,6 @@
 const { BrowserWindow, BrowserView, screen } = require('electron');
 const path = require('path');
+const { calculatePanelLayout, clampPanelRatio } = require('./panel-layout');
 const { isAllowedLoginUrl, isAllowedOwnerRendererUrl } = require('./navigation-policy');
 const {
   ISOLATED_EXTERNAL_WEB_PREFERENCES,
@@ -13,6 +14,7 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
   let recView = null;
   let recViewAttached = false;
   let panelVisible = false;
+  let panelCollapsed = false;
   let loginWin = null;
   let viewsDetachedForDrag = false;
 
@@ -113,8 +115,7 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
   function resizeViews() {
     if (!mainWindow || mainWindow.isDestroyed()) return;
     const [width, height] = mainWindow.getContentSize();
-    const leftWidth = Math.floor(width * leftRatio);
-    const bounds = { x: leftWidth, y: 0, width: width - leftWidth, height };
+    const { browserViewBounds: bounds } = calculatePanelLayout(width, height, leftRatio, panelCollapsed);
 
     if (bgmView && !bgmView.webContents.isDestroyed()) {
       bgmView.setBounds(bounds);
@@ -245,7 +246,12 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
   }
 
   function setPanelRatio(ratio) {
-    leftRatio = Math.min(0.85, Math.max(0.15, ratio));
+    leftRatio = clampPanelRatio(ratio);
+    resizeViews();
+  }
+
+  function setPanelCollapsed(collapsed) {
+    panelCollapsed = collapsed;
     resizeViews();
   }
 
@@ -270,6 +276,9 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
     });
     ipcMain.on('set-panel-ratio', (event, ratio) => {
       if (isFromMainRenderer(event.sender) && Number.isFinite(ratio)) setPanelRatio(ratio);
+    });
+    ipcMain.on('set-panel-collapsed', (event, collapsed) => {
+      if (isFromMainRenderer(event.sender) && typeof collapsed === 'boolean') setPanelCollapsed(collapsed);
     });
     ipcMain.on('divider-drag-start', (event) => {
       if (isFromMainRenderer(event.sender)) dividerDragStart();

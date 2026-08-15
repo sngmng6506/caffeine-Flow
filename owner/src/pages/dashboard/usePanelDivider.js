@@ -9,10 +9,12 @@ function clampRatio(value) {
 }
 
 export default function usePanelDivider() {
+  const supportsPanelCollapse = window.electronAPI?.supportsPanelCollapse === true;
   const [panelRatio, setPanelRatio] = useState(() => {
     const saved = Number.parseFloat(localStorage.getItem('cf_panel_ratio'));
     return Number.isFinite(saved) ? clampRatio(saved) : DEFAULT_RATIO;
   });
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const draggingRef = useRef(false);
   const listenersRef = useRef(null);
 
@@ -31,8 +33,23 @@ export default function usePanelDivider() {
 
   useEffect(() => {
     window.electronAPI?.setPanelRatio(panelRatio);
+    if (supportsPanelCollapse) window.electronAPI?.setPanelCollapsed(false);
     return stopDragging;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function collapsePanel() {
+    if (!supportsPanelCollapse) return;
+    stopDragging();
+    setIsPanelCollapsed(true);
+    window.electronAPI?.setPanelCollapsed(true);
+  }
+
+  function expandPanel() {
+    if (!supportsPanelCollapse) return;
+    setIsPanelCollapsed(false);
+    window.electronAPI?.setPanelRatio(panelRatio);
+    window.electronAPI?.setPanelCollapsed(false);
+  }
 
   function handleDividerMouseDown(event) {
     event.preventDefault();
@@ -54,5 +71,12 @@ export default function usePanelDivider() {
     window.addEventListener('mouseup', onUp);
   }
 
-  return { panelRatio, handleDividerMouseDown };
+  return {
+    panelRatio,
+    isPanelCollapsed,
+    supportsPanelCollapse,
+    collapsePanel,
+    expandPanel,
+    handleDividerMouseDown,
+  };
 }

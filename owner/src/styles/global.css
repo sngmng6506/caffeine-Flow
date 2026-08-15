@@ -40,7 +40,75 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
   background: var(--owner-canvas);
   color: var(--owner-text);
 }
+.owner-dashboard--collapsed { overflow: hidden; padding: 0; }
+.owner-dashboard__content[hidden] { display: none; }
 .owner-panel-divider-line { width: 2px; height: 100%; border-radius: 2px; background: var(--owner-stroke); }
+.owner-panel-divider-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border: 1px solid var(--owner-stroke);
+  border-radius: 9px 0 0 9px;
+  background: var(--owner-surface);
+  color: var(--owner-text-muted);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+}
+.owner-panel-divider-toggle:hover { background: var(--owner-surface-subtle); color: var(--owner-text-strong); }
+
+.owner-panel-rail {
+  position: fixed;
+  z-index: 10000;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: 48px;
+  align-items: center;
+  flex-direction: column;
+  padding: 8px 5px;
+  border-right: 1px solid var(--owner-stroke);
+  background: var(--owner-surface);
+}
+.owner-panel-rail__expand {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--owner-stroke);
+  border-radius: 9px;
+  background: var(--owner-surface);
+  color: var(--owner-text);
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+.owner-panel-rail__expand:hover { background: var(--owner-surface-subtle); }
+.owner-panel-rail__update {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--owner-surface);
+  border-radius: 50%;
+  background: var(--owner-primary);
+}
+.owner-panel-rail__statuses { display: flex; align-items: center; flex-direction: column; gap: 18px; margin-top: 28px; }
+.owner-panel-rail__status { display: flex; align-items: center; flex-direction: column; gap: 5px; color: var(--owner-text-muted); font-size: 10px; font-weight: 700; line-height: 1; }
+.owner-panel-rail__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--owner-text-disabled); }
+.owner-panel-rail__dot--success { background: var(--owner-success); }
+.owner-panel-rail__dot--primary { background: var(--owner-primary); }
 
 .owner-header {
   display: flex;

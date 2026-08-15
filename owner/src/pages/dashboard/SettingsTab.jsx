@@ -77,7 +77,7 @@ export default function SettingsTab({
       <CollapsibleSetting
         id="owner-operation-settings"
         title="운영 설정"
-        description="손님 신청 플랫폼과 AI 자동수락 기준을 관리해요."
+        description="손님 신청 플랫폼과 AI 필터 기준을 관리해요."
       >
         <div style={settingsStyles.innerSection}>
           <div style={settingsStyles.title}>손님 신청 플랫폼</div>

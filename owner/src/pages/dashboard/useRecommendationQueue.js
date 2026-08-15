@@ -29,6 +29,8 @@ export default function useRecommendationQueue({
   const [loading, setLoading] = useState(true);
   const [widevineStatus, setWidevineStatus] = useState(null);
   const [aiAutoAccept, setAiAutoAccept] = useState(false);
+  const [isAcceptingReady, setIsAcceptingReady] = useState(false);
+  const [aiFilterReady, setAiFilterReady] = useState(false);
   const [isPlaybackLeader, setIsPlaybackLeader] = useState(false);
   const aiAutoAcceptRef = useRef(aiAutoAccept);
   const playbackLeaderRef = useRef(false);
@@ -71,7 +73,7 @@ export default function useRecommendationQueue({
 
   // 다음 곡 재생 또는 정지.
   // 1) accepted 1순위 재생
-  // 2) AI 자동수락 ON이면 필터 통과 pending 1순위를 승격해 재생
+  // 2) AI 필터가 켜지면 필터 통과 pending 1순위를 승격해 재생
   // 3) 모두 없으면 BGM으로 복귀
   async function playNextOrStop(snapshot) {
     const nextAccepted = snapshot.filter(rec => rec.status === REC_STATUS.ACCEPTED).sort(byPriority)[0];
@@ -132,12 +134,15 @@ export default function useRecommendationQueue({
   useEffect(() => {
     setIsPlaybackLeader(false);
     setLoading(true);
+    setIsAcceptingReady(false);
+    setAiFilterReady(false);
 
     const recommendationsLoaded = getRecommendations(cafe.slug)
       .then(({ recommendations: loaded, is_accepting }) => {
         // playing 복구는 socket 리더가 된 Electron 한 대만 수행한다.
         setRecommendations(loaded);
         setIsAccepting(is_accepting);
+        setIsAcceptingReady(true);
         return loaded;
       })
       .catch(error => {
@@ -160,6 +165,7 @@ export default function useRecommendationQueue({
       if (latest.allowed_platforms) setAllowedPlatforms(parseAllowedPlatforms(latest.allowed_platforms));
       if (latest.customer_url) setCustomerUrl(latest.customer_url);
       setAiAutoAccept(!!latest.music_filter_enabled);
+      setAiFilterReady(true);
       return latest;
     }).catch(() => null);
 
@@ -179,6 +185,7 @@ export default function useRecommendationQueue({
         .then(({ recommendations: latest, is_accepting }) => {
           setRecommendations(latest);
           setIsAccepting(is_accepting);
+          setIsAcceptingReady(true);
         })
         .catch(() => {});
     });
@@ -340,6 +347,7 @@ export default function useRecommendationQueue({
     setIsAccepting(next);
     try {
       await setStatus(next);
+      setIsAcceptingReady(true);
     } catch {
       setIsAccepting(!next);
       alert('신청 상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -359,7 +367,7 @@ export default function useRecommendationQueue({
 
     const prompt = (latest.music_filter_prompt || '').trim();
     if (next && !prompt) {
-      alert('AI 자동수락을 켜려면 설정에서 매장 분위기 설명을 먼저 입력해 주세요.');
+      alert('AI 필터를 켜려면 설정에서 매장 분위기 설명을 먼저 입력해 주세요.');
       onPromptRequired();
       return;
     }
@@ -370,11 +378,12 @@ export default function useRecommendationQueue({
         prompt: prompt || null,
       });
     } catch (error) {
-      alert(error.message || 'AI 자동수락 설정을 저장하지 못했어요. 다시 시도해 주세요.');
+      alert(error.message || 'AI 필터 설정을 저장하지 못했어요. 다시 시도해 주세요.');
       return;
     }
 
     setAiAutoAccept(next);
+    setAiFilterReady(true);
     if (next && playbackLeaderRef.current) await drainPendingAndPlay();
   }
 
@@ -425,6 +434,8 @@ export default function useRecommendationQueue({
     loading,
     widevineStatus,
     aiAutoAccept,
+    isAcceptingReady,
+    aiFilterReady,
     canControlPlayback: playbackAvailable && isPlaybackLeader,
     toggleAccepting,
     toggleAiAutoAccept,

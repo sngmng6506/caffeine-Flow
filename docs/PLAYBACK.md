@@ -97,9 +97,11 @@ onNowPlaying     현재 재생 정보
 onPlaybackState  재생·일시정지·버퍼링 상태
 onWidevineStatus Widevine 상태
 setPanelRatio    렌더러/BrowserView 경계 조정
+setPanelCollapsed 왼쪽 사장님 화면을 48px 상태 레일로 접거나 복원
 ```
 
 렌더러 공개 API는 `owner/electron/preload.js`, 메인 프로세스 IPC 처리는 각 책임 모듈이 기준이다.
+패널을 접을 때는 `bgmView`와 `recView`를 제거하지 않고 bounds만 변경한다. 접힘 상태는 재시작·renderer reload 시 초기화하며, 마지막으로 사용한 펼친 비율만 로컬에 보존한다.
 `on*` 이벤트 구독 함수는 해당 리스너만 제거하는 해제 함수를 반환하며,
 컴포넌트 정리 시 다른 화면의 구독을 일괄 삭제하지 않는다.
 
