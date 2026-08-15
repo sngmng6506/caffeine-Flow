@@ -1,6 +1,9 @@
 function createAutoUpdateManager({ ipcMain, isDev, safeSend, isTrustedSender, updater }) {
   const activeUpdater = updater || require('electron-updater').autoUpdater;
+  const checkIntervalMs = 10 * 60 * 1000;
   let revision = 0;
+  let checkPromise = null;
+  let interval = null;
   let updateStatus = {
     state: isDev ? 'disabled' : 'idle',
     version: null,
@@ -19,13 +22,19 @@ function createAutoUpdateManager({ ipcMain, isDev, safeSend, isTrustedSender, up
 
   async function checkForUpdates() {
     if (isDev) return snapshot();
-    try {
-      await activeUpdater.checkForUpdates();
-    } catch (error) {
-      console.error('[autoUpdater] check failed:', error);
-      publish('error');
-    }
-    return snapshot();
+    if (checkPromise) return checkPromise;
+    checkPromise = (async () => {
+      try {
+        await activeUpdater.checkForUpdates();
+      } catch (error) {
+        console.error('[autoUpdater] check failed:', error);
+        publish('error');
+      } finally {
+        checkPromise = null;
+      }
+      return snapshot();
+    })();
+    return checkPromise;
   }
 
   function registerIpcHandlers() {
@@ -68,9 +77,16 @@ function createAutoUpdateManager({ ipcMain, isDev, safeSend, isTrustedSender, up
       safeSend('update-downloaded', info.version);
     });
     void checkForUpdates();
+    interval = setInterval(() => void checkForUpdates(), checkIntervalMs);
+    interval.unref?.();
   }
 
-  return { registerIpcHandlers, start, getStatus: snapshot };
+  function stop() {
+    if (interval) clearInterval(interval);
+    interval = null;
+  }
+
+  return { registerIpcHandlers, start, stop, getStatus: snapshot };
 }
 
 module.exports = { createAutoUpdateManager };

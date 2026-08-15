@@ -34,6 +34,7 @@
   "build": {
     "appId": "com.caffeine-flow.owner",
     "productName": "Caffeine Flow",
+    "artifactName": "Caffeine-Flow-Setup-${version}.${ext}",
     "electronVersion": "41.5.0+wvcus",
     "electronDownload": {
       "mirror": "https://github.com/castlabs/electron-releases/releases/download/"

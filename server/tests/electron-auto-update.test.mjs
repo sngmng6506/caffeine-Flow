@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 import autoUpdateModule from '../../owner/electron/auto-update.js';
+import ownerPackage from '../../owner/package.json' with { type: 'json' };
 
 const { createAutoUpdateManager } = autoUpdateModule;
 
@@ -27,6 +28,10 @@ function createDependencies() {
 }
 
 describe('Electron 자동 업데이트 상태 복구', () => {
+  it('릴리스 설치 파일명을 latest.yml의 안전한 경로와 동일하게 고정한다', () => {
+    expect(ownerPackage.build.artifactName).toBe('Caffeine-Flow-Setup-${version}.${ext}');
+  });
+
   it('renderer 구독 전에 다운로드가 끝나도 현재 상태를 다시 조회한다', async () => {
     const deps = createDependencies();
     deps.manager.start();
@@ -49,8 +54,21 @@ describe('Electron 자동 업데이트 상태 복구', () => {
     deps.updater.emit('error', new Error('network'));
     expect(deps.manager.getStatus()).toMatchObject({ state: 'error', version: null });
 
+    await vi.waitFor(() => expect(deps.updater.checkForUpdates).toHaveBeenCalledTimes(1));
+    await Promise.resolve();
     await deps.handlers.get('check-for-updates')({ sender: deps.trustedSender });
     expect(deps.updater.checkForUpdates).toHaveBeenCalledTimes(2);
+  });
+
+  it('앱을 켜 둔 상태에서도 10분마다 새 릴리스를 다시 확인한다', async () => {
+    vi.useFakeTimers();
+    const deps = createDependencies();
+    deps.manager.start();
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+    expect(deps.updater.checkForUpdates).toHaveBeenCalledTimes(2);
+    deps.manager.stop();
+    vi.useRealTimers();
   });
 
   it('신뢰하지 않는 renderer의 조회·재확인·설치 요청을 거절한다', async () => {

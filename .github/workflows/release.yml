@@ -151,6 +151,13 @@ jobs:
             exit 1
           fi
 
+          INSTALLER_NAME="$(basename "${INSTALLERS[0]}")"
+          UPDATE_PATH="$(sed -n 's/^path: //p' owner/dist/latest.yml | tr -d '\r')"
+          if [ "${UPDATE_PATH}" != "${INSTALLER_NAME}" ]; then
+            echo "::error::latest.yml 경로(${UPDATE_PATH})와 설치 파일명(${INSTALLER_NAME})이 다릅니다."
+            exit 1
+          fi
+
       - name: GitHub Release 발행
         shell: bash
         env:

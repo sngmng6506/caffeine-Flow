@@ -62,6 +62,7 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', (event) => {
+  autoUpdateManager.stop();
   playbackController.cleanupForQuit();
 
   if (cleanupRequested) return;
