@@ -201,18 +201,6 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           }}
         >
           <div className="owner-panel-divider-line" />
-          {supportsPanelCollapse && (
-            <button
-              type="button"
-              onMouseDown={event => event.stopPropagation()}
-              onClick={collapsePanel}
-              className="owner-panel-divider-toggle"
-              aria-label="사장님 화면 접기"
-              title="사장님 화면 접기"
-            >
-              <span aria-hidden="true">‹</span>
-            </button>
-          )}
         </div>
 
       <DashboardHeader
@@ -221,6 +209,8 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
         aiAutoAccept={aiAutoAccept}
         onToggleAccepting={toggleAccepting}
         onToggleAiAutoAccept={toggleAiAutoAccept}
+        canCollapsePanel={supportsPanelCollapse}
+        onCollapsePanel={collapsePanel}
       />
 
       <DashboardTabs activeTab={tab} recommendations={recommendations} onChange={setTab} />

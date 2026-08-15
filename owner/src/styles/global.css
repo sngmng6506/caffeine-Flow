@@ -39,29 +39,12 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
   padding: clamp(12px, 3.5%, 24px);
   background: var(--owner-canvas);
   color: var(--owner-text);
+  scrollbar-width: none;
 }
+.owner-dashboard::-webkit-scrollbar { display: none; }
 .owner-dashboard--collapsed { overflow: hidden; padding: 0; }
 .owner-dashboard__content[hidden] { display: none; }
 .owner-panel-divider-line { width: 2px; height: 100%; border-radius: 2px; background: var(--owner-stroke); }
-.owner-panel-divider-toggle {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  display: inline-flex;
-  width: 32px;
-  height: 32px;
-  align-items: center;
-  justify-content: center;
-  transform: translateY(-50%);
-  border: 1px solid var(--owner-stroke);
-  border-radius: 9px 0 0 9px;
-  background: var(--owner-surface);
-  color: var(--owner-text-muted);
-  cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
-}
-.owner-panel-divider-toggle:hover { background: var(--owner-surface-subtle); color: var(--owner-text-strong); }
 
 .owner-panel-rail {
   position: fixed;

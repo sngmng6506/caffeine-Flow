@@ -172,7 +172,6 @@ export default function MusicFilterSettings() {
         <div style={styles.advancedBody}>
           <div style={styles.headerRow}>
             <div style={styles.desc}>곡 링크를 입력해 현재 매장 분위기 설명으로 내린 판단을 미리 확인해요.</div>
-            <span style={styles.badge}>OpenRouter</span>
           </div>
 
           <label style={styles.label}>테스트 곡 URL</label>
@@ -226,7 +225,6 @@ const styles = {
   cancelBtn: { minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#667085', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
   saveBtn: { minHeight: 40, padding: '9px 20px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13 },
   disabledBtn: { opacity: 0.5, cursor: 'not-allowed' },
-  badge: { flexShrink: 0, padding: '5px 9px', borderRadius: 999, background: '#eee', color: '#777', fontSize: 11, fontWeight: 700 },
   testInputRow: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   input: { flex: '1 1 200px', width: '100%', minHeight: 40, boxSizing: 'border-box', fontSize: 13, padding: '9px 12px', borderRadius: 8, border: '1px solid #d0d5dd', outline: 'none', background: '#fff' },
   testBtn: { minHeight: 40, padding: '9px 14px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' },

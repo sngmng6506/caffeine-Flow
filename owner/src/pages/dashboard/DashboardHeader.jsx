@@ -4,6 +4,8 @@ export default function DashboardHeader({
   aiAutoAccept,
   onToggleAccepting,
   onToggleAiAutoAccept,
+  canCollapsePanel,
+  onCollapsePanel,
 }) {
   return (
     <header className="owner-header">
@@ -37,6 +39,15 @@ export default function DashboardHeader({
         >
           AI 필터 {aiAutoAccept ? '끄기' : '켜기'}
         </button>
+        {canCollapsePanel && (
+          <button
+            type="button"
+            onClick={onCollapsePanel}
+            className="owner-btn owner-btn--secondary"
+          >
+            화면 접기
+          </button>
+        )}
       </div>
     </header>
   );
