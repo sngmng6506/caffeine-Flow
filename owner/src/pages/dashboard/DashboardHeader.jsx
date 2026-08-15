@@ -39,7 +39,7 @@ export default function DashboardHeader({
           aria-pressed={aiAutoAccept}
           disabled={!aiFilterReady}
           title={aiAutoAccept ? 'AI 필터 끄기' : 'AI 필터 켜기'}
-          className={`owner-btn owner-operation-toggle ${aiFilterReady && aiAutoAccept ? 'owner-operation-toggle--primary' : ''}`}
+          className={`owner-btn owner-operation-toggle ${aiFilterReady && aiAutoAccept ? 'owner-operation-toggle--success' : ''}`}
         >
           <span className="owner-operation-toggle__dot" aria-hidden="true" />
           {aiFilterLabel}

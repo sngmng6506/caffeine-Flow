@@ -1,14 +1,14 @@
 // 아직 인라인 스타일을 쓰는 매장 정보 편집 화면의 공통 컨트롤입니다.
 // 대시보드의 레이아웃과 상태 컴포넌트는 styles/global.css에서 관리합니다.
 export const dashboardStyles = {
-  nameEditRow: {
+  nameEdit: {
     display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: 8,
+    margin: '12px 0',
   },
   nameInput: {
-    width: 180,
+    width: '100%',
     minWidth: 0,
     minHeight: 40,
     padding: '8px 11px',

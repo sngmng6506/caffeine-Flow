@@ -20,6 +20,10 @@ export default function usePanelDivider() {
     if (supportsPanelCollapse) window.electronAPI?.setPanelCollapsed(false);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    document.documentElement.style.setProperty('--owner-panel-width', `${panelRatio * 100}vw`);
+  }, [panelRatio]);
+
   function collapsePanel() {
     if (!supportsPanelCollapse) return;
     setIsPanelCollapsed(true);

@@ -42,7 +42,7 @@ function CollapsedPanelRail({ isAccepting, isAcceptingReady, aiFilterEnabled, ai
           <span>신청</span>
         </span>
         <span className="owner-panel-rail__status" aria-label={aiFilterLabel} title={aiFilterLabel} aria-busy={!aiFilterReady}>
-          <span className={`owner-panel-rail__dot ${aiFilterReady && aiFilterEnabled ? 'owner-panel-rail__dot--primary' : ''}`} aria-hidden="true" />
+          <span className={`owner-panel-rail__dot ${aiFilterReady && aiFilterEnabled ? 'owner-panel-rail__dot--success' : ''}`} aria-hidden="true" />
           <span>AI</span>
         </span>
       </div>

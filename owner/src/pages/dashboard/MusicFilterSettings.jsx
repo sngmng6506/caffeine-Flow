@@ -154,17 +154,18 @@ export default function MusicFilterSettings() {
           <div style={styles.warn}>AI 필터가 켜져 있어 매장 분위기 설명을 비울 수 없어요.</div>
         )}
 
-        <div style={styles.info}>
-          AI 판단 중 문제가 발생하면 신청곡은 자동으로 거절돼요. 결과는 이력에서 확인할 수 있어요.
+        <div style={styles.infoActionRow}>
+          <div style={styles.info}>
+            AI 판단 중 문제가 발생하면 신청곡은 자동으로 거절돼요. 결과는 이력에서 확인할 수 있어요.
+          </div>
+          <div style={styles.actions}>
+            <button type="button" onClick={() => setForm(initial)} disabled={!changed || saving} style={styles.cancelBtn}>되돌리기</button>
+            <button type="button" onClick={handleSave} disabled={!canSave} style={{ ...styles.saveBtn, ...(!canSave ? styles.disabledBtn : {}) }}>
+              {saving ? '적용 중…' : '적용'}
+            </button>
+          </div>
         </div>
-
-        <div style={styles.actions}>
-          <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
-          <button type="button" onClick={() => setForm(initial)} disabled={!changed || saving} style={styles.cancelBtn}>되돌리기</button>
-          <button type="button" onClick={handleSave} disabled={!canSave} style={{ ...styles.saveBtn, ...(!canSave ? styles.disabledBtn : {}) }}>
-            {saving ? '적용 중…' : '적용'}
-          </button>
-        </div>
+        <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
       </div>
 
       <details style={styles.advancedSection}>
@@ -214,14 +215,15 @@ const styles = {
   title: { fontSize: 15, fontWeight: 700, color: 'var(--owner-text-strong)', marginBottom: 4 },
   desc: { fontSize: 12, color: 'var(--owner-text-muted)', lineHeight: 1.45 },
   stateBadge: { flexShrink: 0, padding: '6px 10px', borderRadius: 999, border: '1px solid', fontWeight: 800, fontSize: 11 },
-  stateOn: { borderColor: '#cfe0fb', background: '#eef5ff', color: 'var(--owner-primary-hover)' },
+  stateOn: { borderColor: '#b9e8d8', background: '#eefaf6', color: '#087d5c' },
   stateOff: { borderColor: 'var(--owner-stroke)', background: 'var(--owner-surface-subtle)', color: 'var(--owner-text-muted)' },
   label: { display: 'block', fontSize: 13, fontWeight: 700, color: '#475467', marginTop: 14, marginBottom: 8 },
   textarea: { width: '100%', boxSizing: 'border-box', fontSize: 13, lineHeight: 1.5, padding: '10px 12px', borderRadius: 8, border: '1px solid #d0d5dd', outline: 'none', resize: 'vertical', fontFamily: 'sans-serif', background: '#fff' },
   count: { fontSize: 11, color: '#98a2b3', textAlign: 'right', marginTop: 4 },
   warn: { fontSize: 12, color: '#b42318', marginTop: 6 },
-  info: { marginTop: 14, padding: 12, borderRadius: 8, border: '1px solid #e4e7ec', background: '#f9fafb', color: '#667085', fontSize: 12, lineHeight: 1.45 },
-  actions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginTop: 16, flexWrap: 'wrap' },
+  infoActionRow: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' },
+  info: { flex: '1 1 320px', padding: 12, borderRadius: 8, border: '1px solid #e4e7ec', background: '#f9fafb', color: '#667085', fontSize: 12, lineHeight: 1.45 },
+  actions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' },
   cancelBtn: { minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid #d0d5dd', background: '#fff', color: '#667085', cursor: 'pointer', fontWeight: 600, fontSize: 13 },
   saveBtn: { minHeight: 40, padding: '9px 20px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13 },
   disabledBtn: { opacity: 0.5, cursor: 'not-allowed' },
