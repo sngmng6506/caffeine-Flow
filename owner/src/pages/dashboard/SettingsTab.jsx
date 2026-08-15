@@ -59,9 +59,9 @@ export default function SettingsTab({
     setPlatformMessage(null);
     try {
       await onSave(selected);
-      setPlatformMessage({ tone: 'success', text: '손님 신청 플랫폼을 저장했어요.' });
+      setPlatformMessage({ tone: 'success', text: '손님 신청 플랫폼을 적용했어요.' });
     } catch (error) {
-      setPlatformMessage({ tone: 'error', text: error.message || '손님 신청 플랫폼을 저장하지 못했어요. 다시 시도해 주세요.' });
+      setPlatformMessage({ tone: 'error', text: error.message || '손님 신청 플랫폼을 적용하지 못했어요. 다시 시도해 주세요.' });
     }
   }
 
@@ -73,6 +73,14 @@ export default function SettingsTab({
         aiAutoAccept={aiAutoAccept}
         onOpenQueue={onOpenQueue}
       />
+
+      <CollapsibleSetting
+        id="owner-music-service-settings"
+        title="음악 서비스"
+        description="음악 서비스 로그인과 재생 화면을 열어요."
+      >
+        <ShortcutsTab />
+      </CollapsibleSetting>
 
       <CollapsibleSetting
         id="owner-operation-settings"
@@ -113,11 +121,9 @@ export default function SettingsTab({
             <div style={settingsStyles.hint}>손님 신청 플랫폼을 1개 이상 선택해 주세요.</div>
           )}
           <SettingsStatus tone={platformMessage?.tone}>{platformMessage?.text}</SettingsStatus>
-          {changed && (
-            <button type="button" onClick={handlePlatformSave} disabled={saving} style={settingsStyles.saveBtn}>
-              {saving ? '저장 중…' : '저장'}
-            </button>
-          )}
+          <button type="button" onClick={handlePlatformSave} disabled={!changed || saving} style={settingsStyles.saveBtn}>
+            {saving ? '적용 중…' : '적용'}
+          </button>
         </div>
         <MusicFilterSettings />
       </CollapsibleSetting>
@@ -136,14 +142,6 @@ export default function SettingsTab({
           initialSlug={initialSlug}
           onSlugChanged={onSlugChanged}
         />
-      </CollapsibleSetting>
-
-      <CollapsibleSetting
-        id="owner-music-service-settings"
-        title="음악 서비스"
-        description="음악 서비스 로그인과 재생 화면을 열어요."
-      >
-        <ShortcutsTab />
       </CollapsibleSetting>
 
       <CollapsibleSetting

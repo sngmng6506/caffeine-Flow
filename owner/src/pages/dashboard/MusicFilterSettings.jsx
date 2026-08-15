@@ -89,9 +89,9 @@ export default function MusicFilterSettings() {
       setInitial(next);
       setForm(next);
       setEnabled(!!updated.music_filter_enabled);
-      setMessage({ tone: 'success', text: '매장 분위기 설명을 저장했어요.' });
+      setMessage({ tone: 'success', text: '매장 분위기 설명을 적용했어요.' });
     } catch (error) {
-      setMessage({ tone: 'error', text: error.message || '매장 분위기 설명을 저장하지 못했어요. 다시 시도해 주세요.' });
+      setMessage({ tone: 'error', text: error.message || '매장 분위기 설명을 적용하지 못했어요. 다시 시도해 주세요.' });
     } finally {
       setSaving(false);
     }
@@ -162,7 +162,7 @@ export default function MusicFilterSettings() {
           <SettingsStatus tone={message?.tone}>{message?.text}</SettingsStatus>
           <button type="button" onClick={() => setForm(initial)} disabled={!changed || saving} style={styles.cancelBtn}>되돌리기</button>
           <button type="button" onClick={handleSave} disabled={!canSave} style={{ ...styles.saveBtn, ...(!canSave ? styles.disabledBtn : {}) }}>
-            {saving ? '저장 중…' : '저장'}
+            {saving ? '적용 중…' : '적용'}
           </button>
         </div>
       </div>
