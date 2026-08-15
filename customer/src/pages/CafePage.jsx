@@ -387,7 +387,13 @@ export default function CafePage({ slug }) {
           channel_title: playbackState.track.artist,
           thumbnail: playbackState.track.thumbnail,
           platform: playbackState.track.platform,
+          video_id: playbackState.track.videoId,
+          comment_key: playbackState.track.commentKey,
         } : nowPlaying}
+        commentKey={playbackState.recommendationId === nowPlaying?.id
+          ? nowPlaying.video_id
+          : playbackState.track?.commentKey || nowPlaying?.video_id || null}
+        slug={slug}
         playbackState={playbackState.track
           ? playbackState.state
           : playbackState.recommendationId === nowPlaying?.id

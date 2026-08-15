@@ -23,6 +23,22 @@ describe('Electron current track metadata', () => {
     });
   });
 
+  it('플랫폼 곡 ID와 종료 진행률을 함께 정규화한다', () => {
+    expect(normalizeTrack({
+      title: '곡 제목',
+      platform: 'spotify',
+      videoId: 'https://open.spotify.com/track/example',
+      mediaDuration: 180,
+      mediaCurrentTime: 179,
+      mediaEnded: true,
+    })).toMatchObject({
+      videoId: 'https://open.spotify.com/track/example',
+      mediaDuration: 180,
+      mediaCurrentTime: 179,
+      mediaEnded: true,
+    });
+  });
+
   it('플랫폼 홈 화면 제목과 미지원 플랫폼을 곡으로 취급하지 않는다', () => {
     expect(normalizeTrack({ title: 'YouTube', platform: 'youtube' })).toBeNull();
     expect(normalizeTrack({ title: '곡 제목', platform: 'other' })).toBeNull();

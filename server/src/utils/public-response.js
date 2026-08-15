@@ -16,6 +16,8 @@ const PUBLIC_RECOMMENDATION_FIELDS = [
   'played_at',
   'playing_started_at',
   'play_duration_seconds',
+  'playback_source',
+  'link_available',
 ];
 
 const OWNER_RECOMMENDATION_FIELDS = [

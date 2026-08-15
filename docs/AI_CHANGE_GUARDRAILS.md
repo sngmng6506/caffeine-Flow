@@ -251,6 +251,10 @@ server/tests/auth-boundary.test.mjs
 - `server/app.js`와 `server/server.js` 분리를 유지한다. 테스트는 `app.js`를 import한다.
 - DB 상태가 단일 원천이며 소켓 이벤트만으로 영구 상태를 만들지 않는다.
 - Electron 재생 상태와 서버 큐 상태가 충돌하지 않도록 한 곡만 `playing`으로 유지한다.
+- 브라우저 직접 재생곡은 신청곡 `playing` 상태로 만들지 않고 UUID 재생 세션과
+  `playback_history`로 분리한다. 정상 종료 또는 60초 이상 재생만 이력에 저장한다.
+- 직접 재생곡 댓글은 곡 ID가 없더라도 세션 댓글 키로 즉시 저장하며, 실제 곡 ID가
+  확인되면 같은 카페 범위에서 키를 병합한다.
 - 같은 카페의 실제 재생 리더는 Electron 한 대뿐이다. 브라우저·follower는
   `playing` 전이나 공용 `playback_state` 발행을 수행하지 않는다.
 - Electron이 신청곡 URL 검증과 navigation을 확인한 뒤에만 DB를 `playing`으로

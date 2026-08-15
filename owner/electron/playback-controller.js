@@ -19,12 +19,12 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   let playbackStateDetector = null;
   let currentTrackDetector = null;
 
-  function stopDetectors() {
+  function stopDetectors(finalizeManualTrack = false) {
     spotifyOverlayDetector?.stop();
     soundCloudDetector?.stop();
     spotifyTakeoverDetector?.stop();
     playbackStateDetector?.stop();
-    currentTrackDetector?.stop();
+    currentTrackDetector?.stop(finalizeManualTrack);
     spotifyOverlayDetector = null;
     soundCloudDetector = null;
     spotifyTakeoverDetector = null;
@@ -39,6 +39,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
         : windowManager.getBgmView(),
       safeSend: windowManager.safeSend,
       isQuitting,
+      reportLifecycle: currentRecMode === null,
     });
     currentTrackDetector.start();
   }
@@ -60,7 +61,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   }
 
   function hidePanel() {
-    stopDetectors();
+    stopDetectors(currentRecMode === null);
     windowManager.safeSend('current-track', null);
     windowManager.detachAll();
     windowManager.safeSend('youtube-state', false);
@@ -71,7 +72,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     // 플레이어다. 이때 BGM URL을 바꾸면 종료 이벤트 없이 DB만 playing에
     // 남으므로 신청곡이 끝난 뒤에만 변경을 허용한다.
     if (currentRecMode || !isAllowedMusicUrl(url)) return false;
-    stopDetectors();
+    stopDetectors(true);
     currentBgmUrl = url;
     const bgmView = windowManager.createBgmView();
     if (!windowManager.isPanelVisible()) showPanel();
@@ -93,7 +94,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     // 함께 비운다. 뷰가 아직 생성되지 않은 경우에도 해제는 유효하다.
     currentBgmUrl = null;
     savedBgmMeta = null;
-    stopDetectors();
+    stopDetectors(true);
     windowManager.safeSend('current-track', null);
     const bgmView = windowManager.getBgmView();
     if (!bgmView || bgmView.webContents.isDestroyed()) return true;
@@ -104,7 +105,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   async function playRecommendation(videoIdOrUrl) {
     const url = toRecommendationUrl(videoIdOrUrl);
     if (!url) return { ok: false, error: '지원하지 않는 신청곡 URL입니다.' };
-    stopDetectors();
+    stopDetectors(currentRecMode === null);
     const isSpotifyRecommendation = spotify.isSpotifyUrl(url);
     const bgmIsSpotify = spotify.isSpotifyUrl(currentBgmUrl);
     const bgmView = windowManager.getBgmView();

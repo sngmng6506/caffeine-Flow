@@ -19,6 +19,24 @@ describe('public playback track payload', () => {
     });
   });
 
+  it('댓글에 필요한 곡 식별자만 공개하고 내부 세션 ID는 숨긴다', () => {
+    expect(sanitizePlaybackTrack({
+      title: '곡 제목',
+      platform: 'youtube',
+      videoId: 'video-id',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      commentKey: 'video-id',
+    })).toMatchObject({
+      videoId: 'video-id',
+      commentKey: 'video-id',
+    });
+    expect(sanitizePlaybackTrack({
+      title: '곡 제목',
+      platform: 'youtube',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+    })).not.toHaveProperty('sessionId');
+  });
+
   it('미지원 플랫폼과 외부 추적 이미지를 차단한다', () => {
     expect(sanitizePlaybackTrack({ title: '곡', platform: 'other' })).toBeNull();
     expect(sanitizePlaybackTrack({

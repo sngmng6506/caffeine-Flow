@@ -143,6 +143,7 @@ AI 필터 오류와 모델 판단 상세는 사장님 room으로만 전송한다
 | `votes` | 곡별 투표와 중복 방지. visitor ID 우선, 레거시 요청은 IP fallback |
 | `comments` | 개별 신청곡에 달린 댓글 |
 | `song_comments` | 같은 곡을 카페 간 공유하는 댓글과 답글 |
+| `playback_history` | 사장님이 브라우저에서 직접 재생한 유효 곡 이력. 신청곡 통계와 분리 |
 | `cafe_visits` | 카페·visitor ID·KST 날짜 기준 익명 브라우저 집계. visitor ID가 없을 때만 IP fallback |
 | `daily_stats` | KST 기준 운영 통계와 피크 동시접속 |
 | `cafe_slug_history` | QR slug 변경 이력과 이전 주소 이동 안내 |

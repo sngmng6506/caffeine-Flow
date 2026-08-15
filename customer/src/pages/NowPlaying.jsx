@@ -1,6 +1,8 @@
-import { LoaderCircle, Pause } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LoaderCircle, MessageCircle, Pause } from 'lucide-react';
 import SongThumbnail from '../components/SongThumbnail';
 import { PLAYBACK_STATE } from '../constants/playbackState';
+import CafeComments from './CafeComments';
 
 const WAVE_BAR_HEIGHTS = [8, 18, 12, 24, 15, 21, 10];
 
@@ -29,7 +31,13 @@ function PlaybackWaveMark() {
   );
 }
 
-export default function NowPlaying({ rec, playbackState = PLAYBACK_STATE.UNKNOWN }) {
+export default function NowPlaying({ rec, playbackState = PLAYBACK_STATE.UNKNOWN, commentKey, slug }) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+
+  useEffect(() => {
+    setCommentsOpen(false);
+  }, [commentKey]);
+
   if (!rec) return null;
 
   const isPaused = playbackState === PLAYBACK_STATE.PAUSED;
@@ -55,7 +63,23 @@ export default function NowPlaying({ rec, playbackState = PLAYBACK_STATE.UNKNOWN
           <h2 className='now-playing__title'>{rec.title}</h2>
           <p className='now-playing__channel'>{rec.channel_title}</p>
         </div>
+        {commentKey && (
+          <button
+            type='button'
+            className='now-playing__comment-button'
+            aria-expanded={commentsOpen}
+            onClick={() => setCommentsOpen(value => !value)}
+          >
+            <MessageCircle size={17} aria-hidden='true' />
+            댓글
+          </button>
+        )}
       </div>
+      {commentsOpen && commentKey && (
+        <div className='now-playing__comments'>
+          <CafeComments key={commentKey} videoId={commentKey} slug={slug} />
+        </div>
+      )}
     </section>
   );
 }

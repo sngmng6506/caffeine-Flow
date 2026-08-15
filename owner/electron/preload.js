@@ -27,6 +27,7 @@ const electronAPI = {
   onNowPlaying:     (cb) => subscribe('now-playing', cb),
   onPlaybackState:  (cb) => subscribe('playback-state', cb),
   onCurrentTrack:   (cb) => subscribe('current-track', cb),
+  onManualTrackEnded: (cb) => subscribe('manual-track-ended', cb),
 
   openBgmDevTools:     ()    => ipcRenderer.send('open-bgm-devtools'),
   openLoginWindow:     (url) => ipcRenderer.send('open-login-window', url),

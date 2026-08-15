@@ -6,6 +6,7 @@ const { canonicalizeVideoId } = require('../utils/video-id');
 const { kstStartOfDay } = require('../utils/kst');
 const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { RECENT_HISTORY_LOOKBACK_DAYS } = require('../constants/time-policy');
+const playbackHistoryService = require('./playback-history.service');
 
 async function getRecommendations(cafeId) {
   return db('recommendations')
@@ -16,16 +17,31 @@ async function getRecommendations(cafeId) {
 }
 
 async function getRecentHistory(cafeId, offset = 0, limit = 20) {
-  const rows = await db('recommendations')
+  const since = kstStartOfDay(RECENT_HISTORY_LOOKBACK_DAYS);
+  const fetchLimit = offset + limit + 1;
+  const recommendationRows = await db('recommendations')
     .where({ cafe_id: cafeId })
     .whereIn('status', [REC_STATUS.PLAYED, REC_STATUS.SKIPPED])
-    .whereRaw(`${HISTORY_SORT_AT_SQL} >= ?`, [kstStartOfDay(RECENT_HISTORY_LOOKBACK_DAYS)])
+    .whereRaw(`${HISTORY_SORT_AT_SQL} >= ?`, [since])
     .orderByRaw(`${HISTORY_SORT_AT_SQL} DESC`)
     .orderBy('requested_at', 'desc')
     .orderBy('id', 'desc')
-    .limit(limit + 1)
-    .offset(offset);
-  return { items: rows.slice(0, limit), hasMore: rows.length > limit };
+    .limit(fetchLimit);
+  const manualPage = await playbackHistoryService.getRecent(cafeId, {
+    since,
+    offset: 0,
+    limit: fetchLimit,
+  });
+  const rows = [...recommendationRows, ...manualPage.items].sort((left, right) => {
+    const leftAt = new Date(left.played_at || left.requested_at).getTime();
+    const rightAt = new Date(right.played_at || right.requested_at).getTime();
+    if (leftAt !== rightAt) return rightAt - leftAt;
+    return String(right.id).localeCompare(String(left.id));
+  });
+  return {
+    items: rows.slice(offset, offset + limit),
+    hasMore: rows.length > offset + limit,
+  };
 }
 
 async function findById(id) {

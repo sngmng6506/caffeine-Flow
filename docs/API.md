@@ -37,6 +37,7 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | PUT | `/cafes/me/slug` | 🔒 | QR slug 재발급·지정. 새 `token` 포함 |
 | PUT | `/cafes/me/status` | 🔒 | 신청 접수 ON/OFF |
 | GET | `/cafes/me/history` | 🔒 | 재생 이력. 처리 최신순, `?date=`는 처리일의 KST 기준 |
+| POST | `/cafes/me/playback-history` | 🔒 | 브라우저 직접 재생곡 종료 보고. 정상 종료 또는 60초 이상 재생만 이력 저장 |
 | GET | `/cafes/me/stats` | 🔒 | 종합 통계와 TOP10 |
 | GET | `/cafes/me/stats/music-filter` | 🔒 | 최근 AI 필터 처리 현황 |
 | GET | `/cafes/me/stats/daily` | 🔒 | 일별 통계 `?date=` |
@@ -104,6 +105,10 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 `replies`는 작성순이다. 모든 댓글 응답은 `commenter_ip`와 `visitor_id`를 제외한다.
 SoundCloud·Spotify처럼 `videoId`가 전체 URL인 경우 클라이언트는 `:videoId`를
 단일 path segment로 URL 인코딩해 전달한다.
+
+재생 중 댓글은 플랫폼 곡 ID가 확인되면 같은 곡 댓글 키를 사용한다. ID를 아직
+확인하지 못한 직접 재생곡은 재생 세션 댓글 키를 사용하며, 종료 보고에서 실제 ID가
+확인되면 해당 카페의 댓글을 실제 곡 키로 병합한다.
 
 ## 트랙 메타데이터 — `/tracks`
 

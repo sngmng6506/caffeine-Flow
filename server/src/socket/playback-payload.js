@@ -25,16 +25,27 @@ function safeThumbnail(value) {
   }
 }
 
+function optionalIdentifier(value) {
+  if (typeof value !== 'string') return null;
+  const identifier = value.trim();
+  return identifier && identifier.length <= 1000 ? identifier : null;
+}
+
 function sanitizePlaybackTrack(value) {
   if (!value || typeof value !== 'object') return null;
   const title = optionalText(value.title);
   if (!title || !VALID_PLATFORMS.includes(value.platform)) return null;
-  return {
+  const track = {
     title,
     artist: optionalText(value.artist),
     thumbnail: safeThumbnail(value.thumbnail),
     platform: value.platform,
   };
+  const videoId = optionalIdentifier(value.videoId);
+  const commentKey = optionalIdentifier(value.commentKey);
+  if (videoId) track.videoId = videoId;
+  if (commentKey) track.commentKey = commentKey;
+  return track;
 }
 
 module.exports = { sanitizePlaybackTrack };

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getRecommendations, updateRec, setStatus, getMe, updateMusicFilter } from '../../api';
+import { finalizeManualPlayback, getRecommendations, updateRec, setStatus, getMe, updateMusicFilter } from '../../api';
 import { getSocket, disconnectSocket } from '../../socket';
 import { parseAllowedPlatforms } from '../../constants/platforms';
 import { REC_STATUS } from '../../constants/recommendationStatus';
@@ -314,6 +314,9 @@ export default function useRecommendationQueue({
       currentTrackRef.current = track && typeof track === 'object' ? track : null;
       publishPlaybackState(currentTrackRef.current ? PLAYBACK_STATE.PLAYING : PLAYBACK_STATE.UNKNOWN);
     });
+    const removeManualTrackEnded = window.electronAPI?.onManualTrackEnded?.(track => {
+      finalizeManualPlayback(track).catch(error => console.error('[manual playback history]', error));
+    });
     const removeWidevineStatus = window.electronAPI?.onWidevineStatus(status => setWidevineStatus(status));
 
     const savedBgmUrl = savedToBgmUrl(readSavedBgm(cafe.id));
@@ -344,6 +347,7 @@ export default function useRecommendationQueue({
       if (typeof removeNowPlaying === 'function') removeNowPlaying();
       if (typeof removePlaybackState === 'function') removePlaybackState();
       if (typeof removeCurrentTrack === 'function') removeCurrentTrack();
+      if (typeof removeManualTrackEnded === 'function') removeManualTrackEnded();
       if (typeof removeWidevineStatus === 'function') removeWidevineStatus();
       if (typeof removeVideoEnded === 'function') removeVideoEnded();
       if (typeof removeCleanupBeforeQuit === 'function') removeCleanupBeforeQuit();

@@ -42,7 +42,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
   }
 
   return (
-    <LongPressCopy videoId={rec.video_id} onResult={onLinkCopyResult}>
+    <LongPressCopy videoId={rec.video_id} onResult={onLinkCopyResult} disabled={rec.link_available === false}>
       <article className='song-card'>
       <div className='song-card__context'>
         <div className='song-card__details'>
@@ -76,7 +76,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
       />
 
       <div className='song-card__actions'>
-        <button
+        {rec.playback_source !== 'owner' && <button
           type='button'
           onClick={handleVote}
           className={`pill-action${voted ? ' pill-action--active' : ''}`}
@@ -86,7 +86,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
           <Heart size={16} fill={voted ? 'currentColor' : 'none'} aria-hidden='true' />
           <span>좋아요</span>
           <strong>{rec.vote_count || 0}</strong>
-        </button>
+        </button>}
         <button type='button' onClick={onToggle} className='pill-action' aria-expanded={expanded}>
           <MessageCircle size={16} aria-hidden='true' />
           <span>댓글</span>

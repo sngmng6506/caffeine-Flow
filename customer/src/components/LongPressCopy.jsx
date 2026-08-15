@@ -5,7 +5,7 @@ const LONG_PRESS_MS = 550;
 const MOVE_TOLERANCE_PX = 12;
 const INTERACTIVE_SELECTOR = 'button, a, input, textarea, select, [role=button]';
 
-export default function LongPressCopy({ videoId, onResult, children }) {
+export default function LongPressCopy({ videoId, onResult, disabled = false, children }) {
   const timerRef = useRef(null);
   const resetTimerRef = useRef(null);
   const pressRef = useRef(null);
@@ -27,7 +27,7 @@ export default function LongPressCopy({ videoId, onResult, children }) {
 
   function handlePointerDown(event) {
     child.props.onPointerDown?.(event);
-    if (event.defaultPrevented || !event.isPrimary || event.button !== 0 || !isEligibleTarget(event)) return;
+    if (disabled || event.defaultPrevented || !event.isPrimary || event.button !== 0 || !isEligibleTarget(event)) return;
 
     clearPress();
     pressRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
@@ -79,7 +79,7 @@ export default function LongPressCopy({ videoId, onResult, children }) {
 
   function handleContextMenu(event) {
     child.props.onContextMenu?.(event);
-    if (isEligibleTarget(event)) event.preventDefault();
+    if (!disabled && isEligibleTarget(event)) event.preventDefault();
   }
 
   useEffect(() => () => {
@@ -88,8 +88,8 @@ export default function LongPressCopy({ videoId, onResult, children }) {
   }, []);
 
   return cloneElement(child, {
-    className: [child.props.className, 'copyable-track'].filter(Boolean).join(' '),
-    title: child.props.title || '길게 눌러 링크 복사',
+    className: [child.props.className, disabled ? null : 'copyable-track'].filter(Boolean).join(' '),
+    title: disabled ? child.props.title : child.props.title || '길게 눌러 링크 복사',
     onPointerDown: handlePointerDown,
     onPointerMove: handlePointerMove,
     onPointerUp: handlePointerEnd,

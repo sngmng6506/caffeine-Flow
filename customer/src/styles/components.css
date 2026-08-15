@@ -221,6 +221,39 @@
   min-width: 0;
 }
 
+.now-playing__info {
+  flex: 1;
+}
+
+.now-playing__comment-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 38px;
+  padding: 0 12px;
+  flex: 0 0 auto;
+  color: var(--cf-on-dark);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  background: color-mix(in srgb, var(--cf-on-dark) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cf-on-dark) 18%, transparent);
+  border-radius: 999px;
+}
+
+.now-playing__comments {
+  margin-top: 16px;
+  padding-top: 16px;
+  color: var(--cf-content);
+  border-top: 1px solid color-mix(in srgb, var(--cf-on-dark) 18%, transparent);
+}
+
+.now-playing__comments .comments {
+  margin: 0;
+  background: var(--cf-surface);
+}
+
 .now-playing__title {
   display: -webkit-box;
   overflow: hidden;
@@ -1316,6 +1349,14 @@
 @media (max-width: 380px) {
   .now-playing__thumb {
     width: 96px;
+  }
+
+  .now-playing__content {
+    flex-wrap: wrap;
+  }
+
+  .now-playing__comment-button {
+    width: 100%;
   }
 
   .request-card__actions {

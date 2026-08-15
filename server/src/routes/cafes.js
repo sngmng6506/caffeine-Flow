@@ -3,12 +3,13 @@ const rateLimit = require('express-rate-limit');
 const { requireAuth } = require('../middleware/auth');
 const cafeService = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
+const playbackHistoryService = require('../services/playback-history.service');
 const musicFilter = require('../features/music-filter');
 const { getTrackMetadata } = require('../services/track-metadata.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { issueToken } = require('../utils/jwt');
 const { APP_URL } = require('../config');
-const { validateString, validateBool, validateInEnum, validateDateString, validateCoordinate } = require('../utils/validate');
+const { validateString, validateBool, validateInEnum, validateDateString, validateCoordinate, isUuid } = require('../utils/validate');
 const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
 const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
@@ -18,6 +19,8 @@ const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
 const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
+
+const MANUAL_PLAYBACK_END_REASONS = ['ended', 'changed'];
 
 // GET /api/v1/cafes/me
 router.get('/me', requireAuth, async (req, res) => {
@@ -251,11 +254,15 @@ router.get('/me/history', requireAuth, async (req, res) => {
   const offset = parseOffset(req.query.offset);
   if (offset.error) return res.status(400).json({ error: offset.error });
   const limit = 20;
-  let query = db('recommendations')
+  let recommendationQuery = db('recommendations')
     .where({ cafe_id: req.owner.cafeId })
     .whereIn('status', TERMINAL_STATUSES)
     .orderByRaw(`${HISTORY_SORT_AT_SQL} DESC`)
     .orderBy('requested_at', 'desc')
+    .orderBy('id', 'desc');
+  let manualQuery = db('playback_history')
+    .where({ cafe_id: req.owner.cafeId })
+    .orderBy('ended_at', 'desc')
     .orderBy('id', 'desc');
 
   if (req.query.date) {
@@ -265,11 +272,65 @@ router.get('/me/history', requireAuth, async (req, res) => {
     // 통계 탭(KST 기준)과 이력 날짜 필터가 서로 다른 하루를 보게 됨
     const start = kstStartOfDateString(req.query.date);
     const end = kstEndOfDateString(req.query.date);
-    query = query.whereRaw(`${HISTORY_SORT_AT_SQL} BETWEEN ? AND ?`, [start, end]);
+    recommendationQuery = recommendationQuery.whereRaw(`${HISTORY_SORT_AT_SQL} BETWEEN ? AND ?`, [start, end]);
+    manualQuery = manualQuery.whereBetween('ended_at', [start, end]);
   }
 
-  const items = await query.limit(limit + 1).offset(offset.value);
-  res.json({ items: items.slice(0, limit).map(ownerRecommendation), hasMore: items.length > limit });
+  const fetchLimit = offset.value + limit + 1;
+  const [recommendations, manualRows] = await Promise.all([
+    recommendationQuery.limit(fetchLimit),
+    manualQuery.limit(fetchLimit),
+  ]);
+  const items = [
+    ...recommendations.map(ownerRecommendation),
+    ...manualRows.map(row => ownerRecommendation(playbackHistoryService.toHistoryItem(row))),
+  ].sort((left, right) => {
+    const leftAt = new Date(left.played_at || left.requested_at).getTime();
+    const rightAt = new Date(right.played_at || right.requested_at).getTime();
+    if (leftAt !== rightAt) return rightAt - leftAt;
+    return String(right.id).localeCompare(String(left.id));
+  });
+  res.json({
+    items: items.slice(offset.value, offset.value + limit),
+    hasMore: items.length > offset.value + limit,
+  });
+});
+
+// POST /api/v1/cafes/me/playback-history
+// 브라우저에서 직접 선택한 곡은 신청곡과 분리한다. 정상 종료 또는 1분 이상
+// 재생된 경우에만 이력으로 남기며, 짧은 탐색 재생은 댓글 키 병합만 수행한다.
+router.post('/me/playback-history', requireAuth, async (req, res) => {
+  const body = req.body || {};
+  if (!isUuid(body.sessionId)) return res.status(400).json({ error: 'sessionId 형식 오류' });
+
+  const checks = {
+    commentKey: validateString(body.commentKey, { max: 1000, name: 'commentKey' }),
+    videoId: validateString(body.videoId, { max: 1000, allowNull: true, name: 'videoId' }),
+    title: validateString(body.title, { max: 200, name: 'title' }),
+    artist: validateString(body.artist, { max: 200, allowNull: true, name: 'artist' }),
+    thumbnail: validateString(body.thumbnail, { max: 2048, allowNull: true, name: 'thumbnail' }),
+    platform: validateInEnum(body.platform, VALID_PLATFORMS, { name: 'platform' }),
+    endReason: validateInEnum(body.endReason, MANUAL_PLAYBACK_END_REASONS, { name: 'endReason' }),
+  };
+  for (const result of Object.values(checks)) {
+    if (result.error) return res.status(400).json({ error: result.error });
+  }
+  if (!Number.isInteger(body.durationSeconds) || body.durationSeconds < 0 || body.durationSeconds > 86400) {
+    return res.status(400).json({ error: 'durationSeconds는 0~86400 사이의 정수여야 합니다.' });
+  }
+
+  const result = await playbackHistoryService.finalize(req.owner.cafeId, {
+    sessionId: body.sessionId,
+    commentKey: checks.commentKey.value,
+    videoId: checks.videoId.value,
+    title: checks.title.value,
+    artist: checks.artist.value,
+    thumbnail: checks.thumbnail.value,
+    platform: checks.platform.value,
+    endReason: checks.endReason.value,
+    durationSeconds: body.durationSeconds,
+  });
+  res.json(result);
 });
 
 // GET /api/v1/cafes/me/stats
