@@ -82,6 +82,35 @@ async function update(id, data) {
   return cafe;
 }
 
+// 설정 변경과 감사 이력 기록을 한 트랜잭션으로 묶는다. 같은 값을 다시
+// 적용한 경우에는 실제 변경이 아니므로 중복 이력을 만들지 않는다.
+async function updateMusicFilterSettings(id, { enabled, prompt }) {
+  return db.transaction(async (trx) => {
+    const current = await trx('cafes')
+      .where({ id })
+      .select('id', 'music_filter_enabled', 'music_filter_prompt')
+      .forUpdate()
+      .first();
+    if (!current) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+
+    const changed = current.music_filter_enabled !== enabled || current.music_filter_prompt !== prompt;
+    const [cafe] = await trx('cafes')
+      .where({ id })
+      .update({ music_filter_enabled: enabled, music_filter_prompt: prompt })
+      .returning('*');
+
+    if (changed) {
+      await trx('music_filter_prompt_history').insert({
+        cafe_id: id,
+        enabled,
+        prompt,
+        record_type: 'changed',
+      });
+    }
+    return cafe;
+  });
+}
+
 // slug 변경 — 자동 재발급(무작위) 또는 수동 지정(아크릴 QR 재등록) 모두 처리.
 // 트랜잭션으로 이력 기록과 갱신을 묶어 부분 실패를 막는다.
 async function changeSlug(cafeId, newSlug) {
@@ -148,6 +177,7 @@ module.exports = {
   findByNaverId,
   create,
   update,
+  updateMusicFilterSettings,
   uniqueSlug,
   isValidSlugFormat,
   changeSlug,

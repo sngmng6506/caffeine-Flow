@@ -313,6 +313,88 @@ describe('방문자 집계 식별자', () => {
   });
 });
 
+describe('운영자 AI 프롬프트 감사', () => {
+  it('현재 설정·변경 이력·판단 당시 프롬프트를 카페 범위로 조회한다', async () => {
+    const prompt = '잔잔한 재즈와 로파이만 승인합니다.';
+    const firstUpdate = await request(app)
+      .put('/api/v1/cafes/me/music-filter')
+      .set({ Authorization: `Bearer ${ownerToken}` })
+      .send({ enabled: true, prompt });
+    expect(firstUpdate.status).toBe(200);
+
+    // 같은 값을 다시 적용해도 변경 이력을 중복 생성하지 않는다.
+    await request(app)
+      .put('/api/v1/cafes/me/music-filter')
+      .set({ Authorization: `Bearer ${ownerToken}` })
+      .send({ enabled: true, prompt });
+
+    const [decision] = await db('recommendations').insert({
+      cafe_id: cafe.id,
+      video_id: 'audit_rejected',
+      title: '감사 대상 곡',
+      channel_title: '테스트 채널',
+      platform: 'youtube',
+      status: 'rejected',
+      filter_status: 'rejected',
+      filter_reason: '매장 분위기와 맞지 않습니다.',
+      filter_model: 'test-model',
+      filter_prompt_snapshot: prompt,
+      filter_checked_at: new Date(),
+    }).returning('*');
+
+    const adminToken = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
+    const response = await request(app)
+      .get(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit`)
+      .set({ Authorization: `Bearer ${adminToken}` });
+
+    expect(response.status).toBe(200);
+    expect(response.body.current).toEqual({ enabled: true, prompt });
+    expect(response.body.prompt_history.filter(item => item.prompt === prompt)).toHaveLength(1);
+    expect(response.body.decisions).toContainEqual(expect.objectContaining({
+      id: decision.id,
+      filter_status: 'rejected',
+      filter_reason: '매장 분위기와 맞지 않습니다.',
+      filter_prompt_snapshot: prompt,
+    }));
+  });
+
+  it('사장님 토큰으로 전체 카페 프롬프트 감사 API에 접근할 수 없다', async () => {
+    const response = await request(app)
+      .get(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit`)
+      .set({ Authorization: `Bearer ${ownerToken}` });
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('운영자 카페 삭제', () => {
+  it('삭제 확인 후 같은 Google·Naver 식별자로 다시 가입할 수 있는 DB 상태가 된다', async () => {
+    const providerIds = { google_id: 'deleted-google-id', naver_id: 'deleted-naver-id' };
+    const [target] = await db('cafes').insert({
+      name: '삭제 대상 카페',
+      slug: 'deleteaudit1',
+      owner_email: 'deleted@t.com',
+      ...providerIds,
+    }).returning('*');
+    const adminToken = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
+
+    const response = await request(app)
+      .delete(`/api/v1/admin/cafes/${target.id}`)
+      .set({ Authorization: `Bearer ${adminToken}` });
+    expect(response.status).toBe(200);
+
+    const [rejoined] = await db('cafes').insert({
+      name: '재가입 카페',
+      slug: 'rejoinaudit1',
+      owner_email: 'deleted@t.com',
+      ...providerIds,
+    }).returning('*');
+    expect(rejoined.google_id).toBe(providerIds.google_id);
+    expect(rejoined.naver_id).toBe(providerIds.naver_id);
+
+    await db('cafes').where({ id: rejoined.id }).del();
+  });
+});
+
 describe('곡 댓글 경로 검증', () => {
   it('존재하지 않는 카페 slug를 전역 댓글로 저장하지 않는다', async () => {
     const res = await request(app)

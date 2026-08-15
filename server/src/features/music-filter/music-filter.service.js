@@ -1,4 +1,4 @@
-const { buildMusicFilterMessages } = require('./prompt.builder');
+const { buildMusicFilterMessages, resolveCafePrompt } = require('./prompt.builder');
 const { callMusicFilterLlm } = require('./llm.client');
 const { normalizeLlmDecision, rejectionFromError } = require('./decision.policy');
 const { FILTER_ACTION, FILTER_STATUS } = require('../../constants/music-filter-status');
@@ -30,10 +30,12 @@ async function evaluateRecommendation({ cafe, track }) {
     };
   }
 
-  return evaluateTrack({
-    cafePrompt: cafe.music_filter_prompt,
+  const promptSnapshot = resolveCafePrompt(cafe.music_filter_prompt);
+  const result = await evaluateTrack({
+    cafePrompt: promptSnapshot,
     track,
   });
+  return { ...result, promptSnapshot };
 }
 
 module.exports = {

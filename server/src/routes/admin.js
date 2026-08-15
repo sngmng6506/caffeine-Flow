@@ -18,6 +18,10 @@ const { ADMIN_LOGIN_LIMIT } = require('../constants/limits');
 const { HEARTBEAT_ACTIVE_WINDOW_MS } = require('../constants/time-policy');
 const { ADMIN_PASSWORD } = require('../config');
 const { isUuid } = require('../utils/validate');
+const { parseOffset } = require('../utils/pagination');
+const { FILTER_PROCESSED_STATUSES } = require('../constants/music-filter-status');
+
+const FILTER_AUDIT_PAGE_SIZE = 50;
 
 // 매장 상태 — 하트비트(last_heartbeat_at) 기준.
 // never: 가입 후 한 번도 앱을 켠 적 없음 → 장난/방치 계정 후보
@@ -147,6 +151,56 @@ router.get('/cafes/:id/stats', requireAdmin, async (req, res) => {
     hourly,
     weekday,
     musicFilter,
+  });
+});
+
+// GET /api/v1/admin/cafes/:id/music-filter-audit
+// 현재 설정, 설정 변경 이력, 판단 당시 프롬프트 스냅샷을 함께 제공한다.
+// 배포 전 판단은 정확한 프롬프트를 알 수 없으므로 snapshot=null로 둔다.
+router.get('/cafes/:id/music-filter-audit', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+
+  const cafe = await db('cafes')
+    .where({ id: req.params.id })
+    .select('id', 'name', 'music_filter_enabled', 'music_filter_prompt')
+    .first();
+  if (!cafe) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
+
+  const [promptHistory, decisionRows] = await Promise.all([
+    db('music_filter_prompt_history')
+      .where({ cafe_id: cafe.id })
+      .select('id', 'enabled', 'prompt', 'record_type', 'recorded_at')
+      .orderBy('recorded_at', 'desc')
+      .orderBy('id', 'desc')
+      .limit(50),
+    db('recommendations')
+      .where({ cafe_id: cafe.id })
+      .whereIn('filter_status', FILTER_PROCESSED_STATUSES)
+      .select(
+        'id', 'title', 'channel_title', 'platform', 'filter_status',
+        'filter_reason', 'filter_model', 'filter_error_code',
+        'filter_prompt_snapshot', 'filter_checked_at',
+      )
+      .orderBy('filter_checked_at', 'desc')
+      .orderBy('id', 'desc')
+      .offset(offset.value)
+      .limit(FILTER_AUDIT_PAGE_SIZE + 1),
+  ]);
+
+  res.json({
+    cafe: { id: cafe.id, name: cafe.name },
+    current: {
+      enabled: cafe.music_filter_enabled,
+      prompt: cafe.music_filter_prompt,
+    },
+    prompt_history: promptHistory,
+    decisions: decisionRows.slice(0, FILTER_AUDIT_PAGE_SIZE),
+    has_more: decisionRows.length > FILTER_AUDIT_PAGE_SIZE,
+    next_offset: decisionRows.length > FILTER_AUDIT_PAGE_SIZE
+      ? offset.value + FILTER_AUDIT_PAGE_SIZE
+      : null,
   });
 });
 

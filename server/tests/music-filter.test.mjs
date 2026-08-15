@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeLlmDecision, rejectionFromError } from '../src/features/music-filter/decision.policy.js';
-import { buildMusicFilterMessages } from '../src/features/music-filter/prompt.builder.js';
+import { buildMusicFilterMessages, resolveCafePrompt } from '../src/features/music-filter/prompt.builder.js';
 import { FILTER_ACTION, FILTER_STATUS } from '../src/constants/music-filter-status.js';
 
 describe('AI 음악 필터 상태 계약', () => {
@@ -32,6 +32,11 @@ describe('AI 음악 필터 상태 계약', () => {
 });
 
 describe('AI 음악 필터 프롬프트 계약', () => {
+  it('판단 메시지와 감사 스냅샷에 동일한 정규화 프롬프트를 사용한다', () => {
+    expect(resolveCafePrompt('  재즈만 허용합니다.  ')).toBe('재즈만 허용합니다.');
+    expect(resolveCafePrompt(null)).toBe('이 매장의 분위기를 해치지 않는 곡만 허용합니다.');
+  });
+
   it('사장님 정책을 유일한 매장 판단 기준으로 전달하고 필터 강도를 추가하지 않는다', () => {
     const messages = buildMusicFilterMessages({
       cafePrompt: '재즈와 로파이만 허용합니다.',

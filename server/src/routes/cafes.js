@@ -152,9 +152,9 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'AI 필터를 켜려면 매장 분위기 설명을 입력해주세요' });
   }
 
-  const cafe = await cafeService.update(req.owner.cafeId, {
-    music_filter_enabled: enabledCheck.value,
-    music_filter_prompt: promptCheck.value,
+  const cafe = await cafeService.updateMusicFilterSettings(req.owner.cafeId, {
+    enabled: enabledCheck.value,
+    prompt: promptCheck.value,
   });
 
   res.json({

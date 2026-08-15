@@ -28,6 +28,7 @@ function filterPayload(filterResult) {
     filterConfidence: filterResult.confidence,
     filterModel: filterResult.model,
     filterErrorCode: filterResult.errorCode,
+    filterPromptSnapshot: filterResult.promptSnapshot,
   };
 }
 

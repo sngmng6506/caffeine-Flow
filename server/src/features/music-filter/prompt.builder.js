@@ -2,8 +2,14 @@ function compact(value, fallback = '') {
   return String(value || fallback).trim();
 }
 
+const DEFAULT_CAFE_PROMPT = '이 매장의 분위기를 해치지 않는 곡만 허용합니다.';
+
+function resolveCafePrompt(cafePrompt) {
+  return compact(cafePrompt, DEFAULT_CAFE_PROMPT);
+}
+
 function buildMusicFilterMessages({ cafePrompt, track }) {
-  const storePrompt = compact(cafePrompt, '이 매장의 분위기를 해치지 않는 곡만 허용합니다.');
+  const storePrompt = resolveCafePrompt(cafePrompt);
 
   return [
     {
@@ -41,4 +47,4 @@ function buildMusicFilterMessages({ cafePrompt, track }) {
   ];
 }
 
-module.exports = { buildMusicFilterMessages };
+module.exports = { buildMusicFilterMessages, resolveCafePrompt };

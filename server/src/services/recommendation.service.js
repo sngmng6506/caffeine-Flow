@@ -92,6 +92,7 @@ async function insertRecommendation(dbOrTrx, cafeId, {
   filterConfidence = null,
   filterModel = null,
   filterErrorCode = null,
+  filterPromptSnapshot = null,
 }) {
   const hasFilterResult = filterStatus && filterStatus !== FILTER_STATUS.SKIPPED;
   const [rec] = await dbOrTrx('recommendations')
@@ -112,6 +113,7 @@ async function insertRecommendation(dbOrTrx, cafeId, {
       filter_confidence: filterConfidence,
       filter_model:   filterModel,
       filter_error_code: filterErrorCode,
+      filter_prompt_snapshot: filterPromptSnapshot,
       filter_checked_at: hasFilterResult ? db.fn.now() : null,
     })
     .returning('*');

@@ -16,6 +16,57 @@ let statsCafeId = null;
 const $ = (s) => document.querySelector(s);
 const token = () => sessionStorage.getItem(TOKEN_KEY);
 
+const deleteDialog = document.createElement('dialog');
+deleteDialog.className = 'delete-modal';
+deleteDialog.innerHTML = `
+  <form method=dialog class=delete-modal__panel>
+    <h2>정말 카페를 삭제할까요?</h2>
+    <p>방문·신청·프롬프트 이력을 포함한 모든 데이터가 삭제되며 되돌릴 수 없습니다.</p>
+    <label for=deleteCafeName>계속하려면 <b class=delete-modal__name></b>을 입력하세요.</label>
+    <input id=deleteCafeName autocomplete=off />
+    <div class=delete-modal__actions>
+      <button class=act value=cancel>취소</button>
+      <button class='act danger delete-modal__confirm' value=confirm disabled>삭제</button>
+    </div>
+  </form>`;
+document.body.appendChild(deleteDialog);
+
+let deleteTarget = null;
+const deleteNameInput = deleteDialog.querySelector('input');
+const deleteConfirm = deleteDialog.querySelector('.delete-modal__confirm');
+
+function openDeleteDialog(cafe) {
+  deleteTarget = cafe;
+  deleteDialog.querySelector('.delete-modal__name').textContent = cafe.name;
+  deleteNameInput.value = '';
+  deleteConfirm.disabled = true;
+  deleteDialog.showModal();
+  deleteNameInput.focus();
+}
+
+deleteNameInput.addEventListener('input', () => {
+  deleteConfirm.disabled = deleteNameInput.value !== deleteTarget?.name;
+});
+
+deleteDialog.addEventListener('close', () => {
+  deleteTarget = null;
+});
+
+deleteDialog.querySelector('form').addEventListener('submit', async (event) => {
+  if (event.submitter?.value !== 'confirm') return;
+  event.preventDefault();
+  if (!deleteTarget || deleteNameInput.value !== deleteTarget.name) return;
+  deleteConfirm.disabled = true;
+  try {
+    await api('DELETE', `/cafes/${deleteTarget.id}`);
+    deleteDialog.close();
+    await load();
+  } catch (error) {
+    deleteConfirm.disabled = false;
+    alert(error.message);
+  }
+});
+
 async function api(method, path, body) {
   const res = await fetch(`/api/v1/admin${path}`, {
     method,
@@ -25,8 +76,11 @@ async function api(method, path, body) {
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  if (res.status === 401 || res.status === 403) { logout(); throw new Error('인증 만료'); }
   const data = await res.json().catch(() => ({}));
+  if ((res.status === 401 || res.status === 403) && path !== '/login') {
+    logout();
+    throw new Error('인증이 만료되었습니다');
+  }
   if (!res.ok) {
     const error = new Error(data.error || `오류 (${res.status})`);
     error.retryAfterSeconds = Number(data.retry_after_seconds) || 0;
@@ -116,7 +170,7 @@ function renderSummary() {
   $('#summary').innerHTML = `
     <span>카페 <b>${cafes.length}</b></span>
     <span>사용 중 <b>${live}</b></span>
-    <span>오늘 익명 브라우저 <b>${reach}</b></span>
+    <span>오늘 QR 접속 <b>${reach}</b></span>
     <span>미사용 <b>${never}</b></span>`;
 }
 
@@ -197,7 +251,60 @@ function renderPattern(items, labelKey, formatLabel) {
     </div>`).join('')}</div>`;
 }
 
-function renderCafeStats(data) {
+function fmtDateTime(value) {
+  if (!value) return '기록 없음';
+  return new Date(value).toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function renderMusicFilterAudit(audit) {
+  const statusLabel = {
+    accepted: '승인',
+    rejected: '거절',
+    error_rejected: '오류 거절',
+  };
+  const currentPrompt = audit.current.prompt || '설정된 매장 분위기 설명이 없습니다.';
+  const history = audit.prompt_history.length
+    ? audit.prompt_history.map((item) => `
+        <li>
+          <div><b>${item.enabled ? '필터 켬' : '필터 끔'}</b><span>${item.record_type === 'baseline' ? '감사 기록 도입 시점' : fmtDateTime(item.recorded_at)}</span></div>
+          <p>${esc(item.prompt || '매장 분위기 설명 없음')}</p>
+        </li>`).join('')
+    : '<li class=stats-empty>저장된 변경 이력이 없습니다</li>';
+  const decisions = audit.decisions.length
+    ? audit.decisions.map((item) => `
+        <article class=audit-decision>
+          <div class=audit-decision-head>
+            <div><b>${esc(item.title)}</b><span>${esc(item.channel_title || item.platform)}</span></div>
+            <span class='decision-status d-${item.filter_status}'>${statusLabel[item.filter_status] || esc(item.filter_status)}</span>
+          </div>
+          <dl>
+            <div><dt>판단 시각</dt><dd>${fmtDateTime(item.filter_checked_at)}</dd></div>
+            <div><dt>판단 사유</dt><dd>${esc(item.filter_reason || '사유 기록 없음')}</dd></div>
+            <div><dt>사용 모델</dt><dd>${esc(item.filter_model || '기록 없음')}</dd></div>
+          </dl>
+          <details>
+            <summary>판단 당시 프롬프트</summary>
+            <pre>${esc(item.filter_prompt_snapshot || '기록 없음 — 감사 기능 도입 전 판단입니다.')}</pre>
+          </details>
+        </article>`).join('')
+    : '<div class=stats-empty>AI 판단 이력이 없습니다</div>';
+
+  return `
+    <section class=stats-section>
+      <h3>AI 프롬프트 모니터링</h3>
+      <div class=current-prompt-head><b>현재 설정</b><span>${audit.current.enabled ? '필터 켬' : '필터 끔'}</span></div>
+      <pre class=current-prompt>${esc(currentPrompt)}</pre>
+      <div class=audit-columns>
+        <div><h4>설정 변경 이력 <small>최근 50건</small></h4><ol class=prompt-history>${history}</ol></div>
+        <div><h4>AI 승인·거절 이력 <small>최근 50건</small></h4><div class=decision-list>${decisions}</div></div>
+      </div>
+    </section>`;
+}
+
+function renderCafeStats(data, audit) {
   const { today, totals, hourly, weekday, musicFilter } = data;
   const pct = (value) => `${Math.round((value || 0) * 1000) / 10}%`;
   const topSongs = totals.topSongs.length
@@ -211,6 +318,7 @@ function renderCafeStats(data) {
 
   $('#statsTitle').textContent = `${data.cafe.name} 통계`;
   $('#statsContent').innerHTML = `
+    ${renderMusicFilterAudit(audit)}
     <section class="stats-section">
       <h3>오늘</h3>
       <div class="metric-grid">
@@ -246,8 +354,11 @@ async function openCafeStats(cafeId) {
   document.querySelectorAll('.chip[data-view]').forEach((button) => button.classList.remove('on'));
   render();
   try {
-    const data = await api('GET', `/cafes/${cafeId}/stats`);
-    if (statsCafeId === cafeId) renderCafeStats(data);
+    const [data, audit] = await Promise.all([
+      api('GET', `/cafes/${cafeId}/stats`),
+      api('GET', `/cafes/${cafeId}/music-filter-audit`),
+    ]);
+    if (statsCafeId === cafeId) renderCafeStats(data, audit);
   } catch (error) {
     if (statsCafeId === cafeId) $('#statsContent').innerHTML = `<div class="stats-empty error-text">${esc(error.message)}</div>`;
   }
@@ -293,10 +404,7 @@ $('#rows').addEventListener('click', async (e) => {
       await load();
     } else if (d) {
       const cafe = cafes.find((c) => c.id === d.dataset.del);
-      const typed = prompt(`삭제하면 방문·신청 기록까지 모두 사라지며 되돌릴 수 없습니다.\n확인하려면 카페명을 입력하세요:\n\n${cafe.name}`);
-      if (typed !== cafe.name) return;
-      await api('DELETE', `/cafes/${d.dataset.del}`);
-      await load();
+      if (cafe) openDeleteDialog(cafe);
     }
   } catch (err) { alert(err.message); }
 });

@@ -180,6 +180,51 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .stats-empty { padding: 24px; color: var(--muted); text-align: center; }
 .error-text { color: var(--dormant); }
 
+/* AI 프롬프트 감사 */
+.current-prompt-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
+.current-prompt-head span { padding: 3px 7px; background: var(--accent-soft); color: var(--accent); border-radius: 5px; font-weight: 600; }
+.current-prompt { margin: 0; padding: 14px; white-space: pre-wrap; overflow-wrap: anywhere; background: #f9fafb; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.audit-columns { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(360px, 1.2fr); gap: 18px; margin-top: 18px; }
+.audit-columns h4 { display: flex; justify-content: space-between; margin-top: 0; }
+.audit-columns h4 small { color: var(--muted); font-weight: 400; }
+.prompt-history { max-height: 520px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.prompt-history li { padding: 11px 0; border-bottom: 1px solid var(--line); }
+.prompt-history li:first-child { padding-top: 0; }
+.prompt-history li:last-child { border-bottom: 0; }
+.prompt-history li > div { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+.prompt-history li span { color: var(--muted); }
+.prompt-history p { margin: 5px 0 0; color: var(--muted); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.decision-list { display: flex; max-height: 720px; overflow-y: auto; flex-direction: column; gap: 8px; }
+.audit-decision { padding: 12px; background: #f9fafb; border: 1px solid var(--line); border-radius: 8px; }
+.audit-decision-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.audit-decision-head > div { min-width: 0; }
+.audit-decision-head b, .audit-decision-head span { display: block; }
+.audit-decision-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.audit-decision-head div span { color: var(--muted); font-size: 11px; }
+.decision-status { flex: none; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.d-accepted { background: #ecfdf3; color: #15803d; }
+.d-rejected, .d-error_rejected { background: #fef2f2; color: var(--dormant); }
+.audit-decision dl { margin: 10px 0 0; }
+.audit-decision dl > div { display: grid; grid-template-columns: 64px 1fr; gap: 8px; margin-top: 4px; font-size: 11px; }
+.audit-decision dt { color: var(--muted); }
+.audit-decision dd { margin: 0; overflow-wrap: anywhere; }
+.audit-decision details { margin-top: 10px; font-size: 11px; }
+.audit-decision summary { color: var(--accent); cursor: pointer; }
+.audit-decision pre { margin: 8px 0 0; padding: 9px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+
+/* 삭제 확인 */
+.delete-modal { width: min(440px, calc(100% - 32px)); padding: 0; border: 0; border-radius: 12px; box-shadow: 0 24px 70px rgba(17, 24, 39, .22); }
+.delete-modal::backdrop { background: rgba(17, 24, 39, .42); }
+.delete-modal__panel { padding: 24px; }
+.delete-modal h2 { margin: 0; font-size: 18px; }
+.delete-modal p { margin: 9px 0 18px; color: var(--muted); font-size: 13px; }
+.delete-modal label { display: block; margin-bottom: 7px; font-size: 12px; }
+.delete-modal input { width: 100%; padding: 10px 11px; border: 1px solid #d1d5db; border-radius: 7px; font: inherit; outline: none; }
+.delete-modal input:focus { border-color: var(--dormant); box-shadow: 0 0 0 3px #fef2f2; }
+.delete-modal__actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 18px; }
+.delete-modal__confirm:not(:disabled) { background: var(--dormant); color: #fff; border-color: var(--dormant); }
+.delete-modal__confirm:disabled { cursor: not-allowed; opacity: .45; }
+
 @media (max-width: 760px) {
   header { align-items: flex-start; padding: 14px 16px; flex-direction: column; gap: 8px; }
   .summary { margin-left: 0; gap: 12px; flex-wrap: wrap; }
@@ -189,4 +234,5 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .stats-columns { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rejection-list { grid-template-columns: 1fr; }
+  .audit-columns { grid-template-columns: 1fr; }
 }
