@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest';
 import policy from '../../owner/electron/navigation-policy.js';
 import webPreferences from '../../owner/electron/web-preferences.js';
 
-const { isAllowedMusicUrl, isAllowedLoginUrl, isAllowedOwnerRendererUrl, toRecommendationUrl } = policy;
+const {
+  isAllowedMusicUrl,
+  isAllowedLoginUrl,
+  isAllowedQrImageUrl,
+  isAllowedOwnerRendererUrl,
+  toRecommendationUrl,
+} = policy;
 const { ISOLATED_EXTERNAL_WEB_PREFERENCES, STEALTH_EXTERNAL_WEB_PREFERENCES } = webPreferences;
 
 describe('Electron 외부 URL 경계', () => {
@@ -18,6 +24,13 @@ describe('Electron 외부 URL 경계', () => {
     expect(isAllowedLoginUrl('https://accounts.google.com/ServiceLogin')).toBe(true);
     expect(isAllowedLoginUrl('https://accounts.spotify.com/ko/login')).toBe(true);
     expect(isAllowedLoginUrl('https://spotify.com.example.com/login')).toBe(false);
+  });
+
+  it('QR 다운로드는 고정된 이미지 생성 경로만 허용한다', () => {
+    expect(isAllowedQrImageUrl('https://api.qrserver.com/v1/create-qr-code/?data=test&size=600x600&margin=20&format=jpg')).toBe(true);
+    expect(isAllowedQrImageUrl('https://api.qrserver.com/v1/create-qr-code/?data=test&size=4000x4000&margin=20&format=jpg')).toBe(false);
+    expect(isAllowedQrImageUrl('https://api.qrserver.com/other')).toBe(false);
+    expect(isAllowedQrImageUrl('https://api.qrserver.com.evil.test/v1/create-qr-code/')).toBe(false);
   });
 
   it('IPC renderer는 설정된 owner origin과 정확히 일치해야 한다', () => {

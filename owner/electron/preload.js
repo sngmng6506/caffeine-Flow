@@ -36,6 +36,8 @@ const electronAPI = {
   setPanelRatio:      (ratio) => ipcRenderer.send('set-panel-ratio', ratio),
   supportsPanelCollapse: true,
   setPanelCollapsed:  (collapsed) => ipcRenderer.send('set-panel-collapsed', collapsed),
+  supportsQrDownload: true,
+  downloadQrImage:    (url) => ipcRenderer.invoke('download-qr-image', url),
   dividerDragStart:   ()      => ipcRenderer.send('divider-drag-start'),
   dividerDragEnd:     ()      => ipcRenderer.send('divider-drag-end'),
 

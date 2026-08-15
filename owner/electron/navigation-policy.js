@@ -11,6 +11,8 @@ const LOGIN_HOSTS = Object.freeze([
   'accounts.spotify.com',
 ]);
 
+const QR_IMAGE_HOST = 'api.qrserver.com';
+
 const DEFAULT_OWNER_ORIGINS = Object.freeze([
   'http://localhost:5174',
   'https://caffeine-flow-production.up.railway.app',
@@ -38,6 +40,22 @@ function isAllowedLoginUrl(value) {
   return isAllowedHttpsUrl(value, LOGIN_HOSTS);
 }
 
+function isAllowedQrImageUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:'
+      && url.hostname === QR_IMAGE_HOST
+      && url.pathname === '/v1/create-qr-code/'
+      && url.searchParams.has('data')
+      && url.searchParams.get('data').length <= 2048
+      && url.searchParams.get('size') === '600x600'
+      && url.searchParams.get('margin') === '20'
+      && url.searchParams.get('format') === 'jpg';
+  } catch {
+    return false;
+  }
+}
+
 function isAllowedOwnerRendererUrl(value, configuredOwnerUrl) {
   try {
     const origin = new URL(String(value || '')).origin;
@@ -56,4 +74,10 @@ function toRecommendationUrl(value) {
   return isAllowedMusicUrl(input) ? input : null;
 }
 
-module.exports = { isAllowedMusicUrl, isAllowedLoginUrl, isAllowedOwnerRendererUrl, toRecommendationUrl };
+module.exports = {
+  isAllowedMusicUrl,
+  isAllowedLoginUrl,
+  isAllowedQrImageUrl,
+  isAllowedOwnerRendererUrl,
+  toRecommendationUrl,
+};

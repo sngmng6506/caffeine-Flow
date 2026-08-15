@@ -7,9 +7,9 @@ export const PLATFORM = Object.freeze({
 export const VALID_PLATFORMS = Object.freeze(Object.values(PLATFORM));
 
 export const PLATFORM_OPTIONS = Object.freeze([
-  { id: PLATFORM.YOUTUBE, label: 'YouTube', color: '#ff0000' },
-  { id: PLATFORM.SOUNDCLOUD, label: 'SoundCloud', color: '#ff5500' },
-  { id: PLATFORM.SPOTIFY, label: 'Spotify', color: '#1db954' },
+  { id: PLATFORM.YOUTUBE, label: 'YouTube', color: '#ff0000', softColor: '#fff1f1', activeText: '#b42318' },
+  { id: PLATFORM.SOUNDCLOUD, label: 'SoundCloud', color: '#ff5500', softColor: '#fff4ed', activeText: '#b93800' },
+  { id: PLATFORM.SPOTIFY, label: 'Spotify', color: '#1db954', softColor: '#edf9f1', activeText: '#147d3f' },
 ]);
 
 export const PLATFORM_BADGE = Object.freeze({

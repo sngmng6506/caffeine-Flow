@@ -94,10 +94,16 @@ export default function SettingsTab({
                   style={{
                     ...settingsStyles.platformBtn,
                     ...(active
-                      ? settingsStyles.platformBtnActive
+                      ? {
+                        ...settingsStyles.platformBtnActive,
+                        borderColor: p.color,
+                        background: p.softColor,
+                        color: p.activeText,
+                      }
                       : settingsStyles.platformBtnInactive),
                   }}
                 >
+                  <span style={{ ...settingsStyles.platformDot, background: p.color }} aria-hidden="true" />
                   {p.label}
                 </button>
               );
@@ -175,9 +181,10 @@ const settingsStyles = {
   title:       { fontSize: 15, fontWeight: 700, color: 'var(--owner-text-strong)', marginBottom: 4 },
   desc:        { fontSize: 12, color: 'var(--owner-text-muted)', marginBottom: 14 },
   platforms:   { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  platformBtn: { minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  platformBtnActive: { background: 'var(--owner-primary)', color: '#fff', borderColor: 'var(--owner-primary)' },
+  platformBtn: { display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 40, padding: '9px 14px', borderRadius: 8, border: '1px solid', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  platformBtnActive: { fontWeight: 700 },
   platformBtnInactive: { background: '#fff', color: 'var(--owner-text-muted)', borderColor: 'var(--owner-stroke)' },
+  platformDot: { width: 8, height: 8, flex: '0 0 8px', borderRadius: 999 },
   hint:        { fontSize: 12, color: '#9c6500', marginTop: 8 },
   saveBtn:     { minHeight: 40, marginTop: 16, padding: '9px 20px', borderRadius: 8, background: 'var(--owner-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 650, fontSize: 13 },
   logoutBtn:   { minHeight: 40, padding: '9px 16px', borderRadius: 8, border: '1px solid var(--owner-stroke)', background: '#fff', color: 'var(--owner-text)', cursor: 'pointer', fontWeight: 600, fontSize: 13 },

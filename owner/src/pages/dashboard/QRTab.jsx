@@ -11,20 +11,26 @@ export default function QRTab({ url, cafeName, currentSlug, initialSlug, onSlugC
 
   async function handleDownload() {
     const src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=600x600&margin=20&format=jpg`;
+    setMessage(null);
     try {
+      if (window.electronAPI?.supportsQrDownload) {
+        const started = await window.electronAPI.downloadQrImage(src);
+        if (!started) throw new Error('download rejected');
+        return;
+      }
       const res = await fetch(src);
+      if (!res.ok) throw new Error('download failed');
       const blob = await res.blob();
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = objectUrl;
       a.download = `caffeine-flow-${cafeName}-qr.jpg`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(objectUrl);
-      setMessage({ tone: 'success', text: 'QR 이미지를 저장했어요.' });
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
     } catch {
-      // CORS/네트워크 실패 시 새 탭 fallback
-      window.open(src, '_blank');
-      setMessage({ tone: 'info', text: 'QR 이미지를 새 창에서 열었어요.' });
+      setMessage({ tone: 'error', text: 'QR 이미지를 저장하지 못했어요. 다시 시도해 주세요.' });
     }
   }
 

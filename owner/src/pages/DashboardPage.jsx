@@ -206,7 +206,9 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
       <DashboardHeader
         cafe={cafe}
         isAccepting={isAccepting}
+        isAcceptingReady={isAcceptingReady}
         aiAutoAccept={aiAutoAccept}
+        aiFilterReady={aiFilterReady}
         onToggleAccepting={toggleAccepting}
         onToggleAiAutoAccept={toggleAiAutoAccept}
         canCollapsePanel={supportsPanelCollapse}

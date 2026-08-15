@@ -1,7 +1,11 @@
 const { BrowserWindow, BrowserView, screen } = require('electron');
 const path = require('path');
 const { calculatePanelLayout, clampPanelRatio } = require('./panel-layout');
-const { isAllowedLoginUrl, isAllowedOwnerRendererUrl } = require('./navigation-policy');
+const {
+  isAllowedLoginUrl,
+  isAllowedQrImageUrl,
+  isAllowedOwnerRendererUrl,
+} = require('./navigation-policy');
 const {
   ISOLATED_EXTERNAL_WEB_PREFERENCES,
   STEALTH_EXTERNAL_WEB_PREFERENCES,
@@ -290,6 +294,16 @@ function createWindowManager({ ownerUrl, isDev, widevineStatus, isQuitting }) {
       if (!isFromMainRenderer(event.sender)) return;
       if (bgmView && !bgmView.webContents.isDestroyed()) {
         bgmView.webContents.openDevTools({ mode: 'detach' });
+      }
+    });
+    ipcMain.handle('download-qr-image', (event, url) => {
+      if (!isFromMainRenderer(event.sender) || !isAllowedQrImageUrl(url)) return false;
+      if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return false;
+      try {
+        mainWindow.webContents.downloadURL(url);
+        return true;
+      } catch {
+        return false;
       }
     });
   }
