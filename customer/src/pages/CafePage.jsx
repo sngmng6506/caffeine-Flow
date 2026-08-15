@@ -63,6 +63,7 @@ export default function CafePage({ slug }) {
   const [playbackState, setPlaybackState] = useState({
     state: PLAYBACK_STATE.UNKNOWN,
     recommendationId: null,
+    track: null,
   });
   const swipeStart = useRef(null);
   const swipeClickTimer = useRef(null);
@@ -150,6 +151,7 @@ export default function CafePage({ slug }) {
       setPlaybackState({
         state: payload.state,
         recommendationId: payload.recommendationId || null,
+        track: payload.track || null,
       });
     });
     socket.on('cafe_moved', ({ movedTo }) => {
@@ -380,10 +382,17 @@ export default function CafePage({ slug }) {
       )}
 
       <NowPlaying
-        rec={nowPlaying}
-        playbackState={playbackState.recommendationId === nowPlaying?.id
+        rec={playbackState.track ? {
+          title: playbackState.track.title,
+          channel_title: playbackState.track.artist,
+          thumbnail: playbackState.track.thumbnail,
+          platform: playbackState.track.platform,
+        } : nowPlaying}
+        playbackState={playbackState.track
           ? playbackState.state
-          : PLAYBACK_STATE.UNKNOWN}
+          : playbackState.recommendationId === nowPlaying?.id
+            ? playbackState.state
+            : PLAYBACK_STATE.UNKNOWN}
       />
 
       <nav className={tab === 'cafeTop' ? 'tabs tabs--cafe-active' : 'tabs'} role='tablist' aria-label='음악 목록'>

@@ -95,6 +95,7 @@ isRecActive      Electron 메인의 실제 신청곡 재생 모드 조회
 onVideoEnded     신청곡 종료 알림
 onNowPlaying     현재 재생 정보
 onPlaybackState  재생·일시정지·버퍼링 상태
+onCurrentTrack   현재 BrowserView에서 감지한 공개 곡 메타데이터
 onWidevineStatus Widevine 상태
 setPanelRatio    렌더러/BrowserView 경계 조정
 setPanelCollapsed 왼쪽 사장님 화면을 48px 상태 레일로 접거나 복원
@@ -109,6 +110,14 @@ setPanelCollapsed 왼쪽 사장님 화면을 48px 상태 레일로 접거나 복
 `playing`, `paused`, `buffering`, `unknown` 중 하나를 보내며, 서버는 인증된 사장님
 소켓 중 현재 재생 리더의 신호만 카페 룸에 전달한다. 신호가 만료되거나 사장님 앱 연결이 끊기면
 `unknown`으로 초기화하고 추천곡의 DB 상태는 변경하지 않는다.
+
+현재 곡 메타데이터는 실제 음향 유무와 분리해 관리한다. Electron은 현재 들리는
+BrowserView에서 Media Session의 제목·아티스트·아트워크를 우선 읽고, 플랫폼별 최소
+DOM fallback을 사용한다. 사장님이 오른쪽 화면에서 곡을 직접 바꿔도 변경된 메타데이터를
+재생 리더 소켓이 `playback_state.track`으로 전달한다. 손님 화면은 이 값을 기존 DB
+신청곡보다 우선 표시하며, 감지 실패 시 기존 `playing` 신청곡 정보로 되돌아간다.
+서버는 제목 길이·플랫폼·썸네일 host를 allowlist로 제한하고 계정·세션·원본 페이지 URL은
+손님에게 전달하지 않는다.
 
 ## 재생 리더와 시작 확인
 
@@ -163,6 +172,7 @@ owner/electron/end-detection.js                 Spotify·SoundCloud 시그니처
 owner/electron/playback-state.js                플랫폼 공통 실시간 재생 상태 감지
 owner/electron/platform-adapters/spotify.js     Spotify 재생·takeover 복구
 owner/electron/platform-adapters/soundcloud.js  SoundCloud 모달 제거·실제 클릭
+owner/electron/platform-adapters/current-track.js 현재 곡 메타데이터 감지
 owner/electron/session-tools.js                 세션 초기화·쿠키 import·요청 정책
 owner/electron/auto-update.js                   electron-updater 이벤트와 재시작
 owner/electron/preload.js                       안전한 renderer API

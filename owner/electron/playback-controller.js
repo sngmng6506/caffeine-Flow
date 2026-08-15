@@ -6,6 +6,7 @@ const {
   createSpotifyTakeoverDetector,
 } = require('./end-detection');
 const { PLAYBACK_STATE, createPlaybackStateDetector } = require('./playback-state');
+const { createCurrentTrackDetector } = require('./platform-adapters/current-track');
 const { isAllowedMusicUrl, toRecommendationUrl } = require('./navigation-policy');
 
 function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
@@ -16,16 +17,30 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   let soundCloudDetector = null;
   let spotifyTakeoverDetector = null;
   let playbackStateDetector = null;
+  let currentTrackDetector = null;
 
   function stopDetectors() {
     spotifyOverlayDetector?.stop();
     soundCloudDetector?.stop();
     spotifyTakeoverDetector?.stop();
     playbackStateDetector?.stop();
+    currentTrackDetector?.stop();
     spotifyOverlayDetector = null;
     soundCloudDetector = null;
     spotifyTakeoverDetector = null;
     playbackStateDetector = null;
+    currentTrackDetector = null;
+  }
+
+  function startCurrentTrackDetector() {
+    currentTrackDetector = createCurrentTrackDetector({
+      getView: () => currentRecMode === 'overlay'
+        ? windowManager.getRecView()
+        : windowManager.getBgmView(),
+      safeSend: windowManager.safeSend,
+      isQuitting,
+    });
+    currentTrackDetector.start();
   }
 
   function startPlaybackStateDetector() {
@@ -46,6 +61,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
 
   function hidePanel() {
     stopDetectors();
+    windowManager.safeSend('current-track', null);
     windowManager.detachAll();
     windowManager.safeSend('youtube-state', false);
   }
@@ -55,6 +71,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     // 플레이어다. 이때 BGM URL을 바꾸면 종료 이벤트 없이 DB만 playing에
     // 남으므로 신청곡이 끝난 뒤에만 변경을 허용한다.
     if (currentRecMode || !isAllowedMusicUrl(url)) return false;
+    stopDetectors();
     currentBgmUrl = url;
     const bgmView = windowManager.createBgmView();
     if (!windowManager.isPanelVisible()) showPanel();
@@ -66,6 +83,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     } else {
       bgmView.webContents.loadURL(url);
     }
+    startCurrentTrackDetector();
     return true;
   }
 
@@ -75,6 +93,8 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     // 함께 비운다. 뷰가 아직 생성되지 않은 경우에도 해제는 유효하다.
     currentBgmUrl = null;
     savedBgmMeta = null;
+    stopDetectors();
+    windowManager.safeSend('current-track', null);
     const bgmView = windowManager.getBgmView();
     if (!bgmView || bgmView.webContents.isDestroyed()) return true;
     bgmView.webContents.loadURL('https://www.google.com');
@@ -103,6 +123,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
           isQuitting,
         });
         spotifyTakeoverDetector.start();
+        startCurrentTrackDetector();
         startPlaybackStateDetector();
         return { ok: true };
       } catch (error) {
@@ -125,6 +146,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     windowManager.attachRecView();
     try {
       await recView.webContents.loadURL(url);
+      startCurrentTrackDetector();
       startPlaybackStateDetector();
 
       if (soundcloud.isSoundCloudUrl(url)) {
@@ -170,6 +192,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
       console.log('[end-rec takeover] restore to BGM URL:', currentBgmUrl, 'resume:', resumeMeta);
       if (bgmView && currentBgmUrl) {
         void spotify.navigateAndPlay(bgmView, currentBgmUrl, resumeMeta)
+          .then(startCurrentTrackDetector)
           .catch(error => console.error('[end-rec takeover restore]', error));
       }
       windowManager.safeSend('now-playing', null);
@@ -181,6 +204,7 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
     if (bgmView && !bgmView.webContents.isDestroyed()) {
       bgmView.webContents.setAudioMuted(false);
       spotify.clickPlayIfPaused(bgmView);
+      if (currentBgmUrl) startCurrentTrackDetector();
     }
     windowManager.safeSend('now-playing', null);
   }

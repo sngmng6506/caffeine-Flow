@@ -11,6 +11,7 @@ const { PLAYBACK_STATE, PLAYBACK_STATES } = require('../constants/playback-state
 const cafeService = require('../services/cafe.service');
 const { ownerRoom } = require('../routes/_recommendations.shared');
 const { createPlaybackLeaderRegistry } = require('./playback-leader-registry');
+const { sanitizePlaybackTrack } = require('./playback-payload');
 
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 
@@ -64,6 +65,7 @@ function initSocket(io) {
     cafeNsp.to(slug).emit('playback_state', {
       state: PLAYBACK_STATE.UNKNOWN,
       recommendationId: null,
+      track: null,
     });
   }
 
@@ -140,6 +142,7 @@ function initSocket(io) {
         const nextPlayback = {
           state: payload.state,
           recommendationId,
+          track: sanitizePlaybackTrack(payload.track),
         };
         playbackPublishers.set(slug, { socketId: socket.id, timer, payload: nextPlayback });
         cafeNsp.to(slug).emit('playback_state', nextPlayback);

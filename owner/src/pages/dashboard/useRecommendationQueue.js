@@ -34,6 +34,7 @@ export default function useRecommendationQueue({
   const [isPlaybackLeader, setIsPlaybackLeader] = useState(false);
   const aiAutoAcceptRef = useRef(aiAutoAccept);
   const playbackLeaderRef = useRef(false);
+  const currentTrackRef = useRef(null);
   const recoveryInProgressRef = useRef(false);
   const playbackAvailable = typeof window.electronAPI?.playRec === 'function';
 
@@ -299,13 +300,19 @@ export default function useRecommendationQueue({
     const removeNowPlaying = window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
     // owner UI는 Railway에서 최신 버전을 불러오므로 설치본 preload보다 앞설 수 있다.
     // 구버전 Electron에는 이 채널이 없어도 Dashboard 렌더링을 계속한다.
-    const removePlaybackState = window.electronAPI?.onPlaybackState?.(state => {
+    const publishPlaybackState = state => {
       if (!playbackLeaderRef.current) return;
       const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
       socket.emit('playback_state', {
         state: Object.values(PLAYBACK_STATE).includes(state) ? state : PLAYBACK_STATE.UNKNOWN,
         recommendationId: playing?.id || null,
+        track: currentTrackRef.current,
       });
+    };
+    const removePlaybackState = window.electronAPI?.onPlaybackState?.(publishPlaybackState);
+    const removeCurrentTrack = window.electronAPI?.onCurrentTrack?.(track => {
+      currentTrackRef.current = track && typeof track === 'object' ? track : null;
+      publishPlaybackState(currentTrackRef.current ? PLAYBACK_STATE.PLAYING : PLAYBACK_STATE.UNKNOWN);
     });
     const removeWidevineStatus = window.electronAPI?.onWidevineStatus(status => setWidevineStatus(status));
 
@@ -336,6 +343,7 @@ export default function useRecommendationQueue({
       disconnectSocket();
       if (typeof removeNowPlaying === 'function') removeNowPlaying();
       if (typeof removePlaybackState === 'function') removePlaybackState();
+      if (typeof removeCurrentTrack === 'function') removeCurrentTrack();
       if (typeof removeWidevineStatus === 'function') removeWidevineStatus();
       if (typeof removeVideoEnded === 'function') removeVideoEnded();
       if (typeof removeCleanupBeforeQuit === 'function') removeCleanupBeforeQuit();

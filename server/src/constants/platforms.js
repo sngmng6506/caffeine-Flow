@@ -6,6 +6,18 @@ const PLATFORM = Object.freeze({
 
 const VALID_PLATFORMS = Object.freeze(Object.values(PLATFORM));
 
+const PLAYBACK_THUMBNAIL_HOSTS = Object.freeze([
+  'i.ytimg.com',
+  'img.youtube.com',
+  'yt3.ggpht.com',
+  'lh3.googleusercontent.com',
+  'i.scdn.co',
+  'mosaic.scdn.co',
+  'image-cdn-ak.spotifycdn.com',
+  'i1.sndcdn.com',
+  'a1.sndcdn.com',
+]);
+
 const PLATFORM_LABELS = Object.freeze({
   [PLATFORM.YOUTUBE]: 'YouTube',
   [PLATFORM.SOUNDCLOUD]: 'SoundCloud',
@@ -31,6 +43,7 @@ function platformLabel(platform) {
 module.exports = {
   PLATFORM,
   VALID_PLATFORMS,
+  PLAYBACK_THUMBNAIL_HOSTS,
   PLATFORM_LABELS,
   parseAllowedPlatforms,
   formatAllowedPlatforms,
