@@ -9,7 +9,7 @@ import HistoryTab from './dashboard/HistoryTab';
 import useRecommendationQueue from './dashboard/useRecommendationQueue';
 import usePanelDivider from './dashboard/usePanelDivider';
 import useQueueDragAndDrop from './dashboard/useQueueDragAndDrop';
-import { readSavedBgm, savedToBgmUrl } from './dashboard/bgmStorage';
+import { clearSavedBgm, readSavedBgm, saveSavedBgm, savedToBgmUrl } from './dashboard/bgmStorage';
 import { REC_STATUS } from '../constants/recommendationStatus';
 import { requestClearBgm, requestSetBgmUrl } from './dashboard/bgmBridge.mjs';
 
@@ -52,7 +52,7 @@ function CollapsedPanelRail({ isAccepting, isAcceptingReady, aiFilterEnabled, ai
 
 export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanner }) {
   const [cafe, setCafe] = useState(initialCafe);
-  const [defaultVideo, setDefaultVideo] = useState(readSavedBgm);
+  const [defaultVideo, setDefaultVideo] = useState(() => readSavedBgm(initialCafe.id));
   const [tab, setTab] = useState('queue');
   const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [platformSaving, setPlatformSaving] = useState(false);
@@ -123,7 +123,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
       throw new Error('신청곡 재생이 시작되어 기본 BGM을 변경하지 않았어요.');
     }
     setDefaultVideo(info);
-    localStorage.setItem('cf_default_video', JSON.stringify(info));
+    saveSavedBgm(cafe.id, info);
   }
 
   async function handleClearDefault() {
@@ -134,7 +134,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
       throw new Error('신청곡 재생이 시작되어 기본 BGM을 해제하지 않았어요.');
     }
     setDefaultVideo(null);
-    localStorage.removeItem('cf_default_video');
+    clearSavedBgm(cafe.id);
   }
 
   async function handleLogout() {

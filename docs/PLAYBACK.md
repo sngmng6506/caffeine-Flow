@@ -159,6 +159,8 @@ DB 갱신이 실패하면 `endRec`으로 플레이어를 되돌린다.
   조건을 검사해 Spotify takeover의 `bgmView`가 중간에 교체되지 않게 한다.
 - 기본 BGM 설정·해제는 Electron ACK가 성공한 뒤에만 React 상태와 localStorage에
   반영한다. 비동기 메타데이터 조회 중 신청곡이 시작되면 변경을 거절하고 기존 값을 유지한다.
+- 기본 BGM은 변경 가능한 slug가 아니라 카페 ID별 localStorage에 보관한다. 로그아웃은 인증
+  정보만 제거하며, 같은 카페로 다시 로그인하면 해당 카페의 기본 BGM을 복구한다.
 
 상태 전이 규칙은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md)의 Recommendation Status Contract를 따른다.
 

@@ -1,3 +1,8 @@
+export function clearOwnerSession(storage = localStorage) {
+  storage.removeItem('token');
+  storage.removeItem('cafe');
+}
+
 export function parseInitialState({
   location = window.location,
   history = window.history,
@@ -11,11 +16,6 @@ export function parseInitialState({
 
   function clearCallbackUrl() {
     history.replaceState({}, '', location.pathname);
-  }
-
-  function clearStoredSession() {
-    storage.removeItem('token');
-    storage.removeItem('cafe');
   }
 
   const callbackToken = params.get('token');
@@ -32,7 +32,7 @@ export function parseInitialState({
       clearCallbackUrl();
       return { cafe: cafeData, pending: null, oauthError: '' };
     } catch {
-      clearStoredSession();
+      clearOwnerSession(storage);
       clearCallbackUrl();
       return { cafe: null, pending: null, oauthError: '로그인 정보를 확인하지 못했어요. 다시 로그인해 주세요.' };
     }
@@ -52,7 +52,7 @@ export function parseInitialState({
   const token = storage.getItem('token');
   const cafeRaw = storage.getItem('cafe');
   if (!token || !cafeRaw) {
-    if (token || cafeRaw) clearStoredSession();
+    if (token || cafeRaw) clearOwnerSession(storage);
     return { cafe: null, pending: null, oauthError: '' };
   }
 
@@ -61,7 +61,7 @@ export function parseInitialState({
     if (!cafe || typeof cafe !== 'object' || !cafe.id || !cafe.slug) throw new Error('invalid cafe');
     return { cafe, pending: null, oauthError: '' };
   } catch {
-    clearStoredSession();
+    clearOwnerSession(storage);
     return { cafe: null, pending: null, oauthError: '저장된 로그인 정보가 손상되어 로그아웃했어요. 다시 로그인해 주세요.' };
   }
 }

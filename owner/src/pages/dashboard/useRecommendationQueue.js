@@ -316,7 +316,7 @@ export default function useRecommendationQueue({
     });
     const removeWidevineStatus = window.electronAPI?.onWidevineStatus(status => setWidevineStatus(status));
 
-    const savedBgmUrl = savedToBgmUrl(readSavedBgm());
+    const savedBgmUrl = savedToBgmUrl(readSavedBgm(cafe.id));
     if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
     const removeVideoEnded = window.electronAPI?.onVideoEnded(() => {
@@ -348,7 +348,7 @@ export default function useRecommendationQueue({
       if (typeof removeVideoEnded === 'function') removeVideoEnded();
       if (typeof removeCleanupBeforeQuit === 'function') removeCleanupBeforeQuit();
     };
-  }, [cafe.slug]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cafe.id, cafe.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function toggleAccepting() {
     const next = !isAccepting;

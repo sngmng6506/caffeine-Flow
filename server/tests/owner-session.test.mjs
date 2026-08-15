@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseInitialState } from '../../owner/src/utils/initialSession.mjs';
+import { clearOwnerSession, parseInitialState } from '../../owner/src/utils/initialSession.mjs';
 
 function dependencies({ hash = '', search = '', stored = {} } = {}) {
   const values = new Map(Object.entries(stored));
@@ -20,6 +20,24 @@ function dependencies({ hash = '', search = '', stored = {} } = {}) {
 }
 
 describe('owner 초기 세션 복구', () => {
+  it('로그아웃할 때 인증 정보만 지우고 기기 설정은 유지한다', () => {
+    const deps = dependencies({
+      stored: {
+        token: 'saved-token',
+        cafe: JSON.stringify({ id: 'cafe-id', slug: 'cafe-slug' }),
+        'cf_default_video:cafe-id': JSON.stringify({ videoId: 'video-id' }),
+        cf_panel_ratio: '0.42',
+      },
+    });
+
+    clearOwnerSession(deps.input.storage);
+
+    expect(deps.values.has('token')).toBe(false);
+    expect(deps.values.has('cafe')).toBe(false);
+    expect(deps.values.has('cf_default_video:cafe-id')).toBe(true);
+    expect(deps.values.get('cf_panel_ratio')).toBe('0.42');
+  });
+
   it('percent 문자가 있는 정상 OAuth cafe JSON을 한 번만 decode한다', () => {
     const cafe = { id: 'cafe-id', slug: 'percentcafe', name: '100% 카페' };
     const deps = dependencies({
