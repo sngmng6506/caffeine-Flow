@@ -44,7 +44,6 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 .owner-dashboard::-webkit-scrollbar { display: none; }
 .owner-dashboard--collapsed { overflow: hidden; padding: 0; }
 .owner-dashboard__content[hidden] { display: none; }
-.owner-panel-divider-line { width: 2px; height: 100%; border-radius: 2px; background: var(--owner-stroke); }
 
 .owner-panel-rail {
   position: fixed;
@@ -113,7 +112,7 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
   white-space: nowrap;
 }
 .owner-header__actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.owner-header__collapse { width: 40px; flex: 0 0 40px; padding: 0; font-size: 22px; line-height: 1; }
+.owner-header__collapse { flex: 0 0 auto; gap: 5px; padding-inline: 12px; }
 
 .owner-btn {
   display: inline-flex;
@@ -315,7 +314,7 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 
 @container owner-panel (max-width: 560px) {
   .owner-header { flex-direction: column; }
-  .owner-header__actions { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)) 40px; }
+  .owner-header__actions { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; }
   .owner-track-card { align-items: flex-start; flex-wrap: wrap; }
   .owner-track-card__body { min-width: 140px; }
   .owner-track-card__footer { width: 100%; align-items: stretch; padding-left: 36px; }

@@ -53,6 +53,7 @@ export default function DashboardHeader({
             title="운영 패널 접기"
           >
             <span aria-hidden="true">‹</span>
+            <span>최소화</span>
           </button>
         )}
       </div>
