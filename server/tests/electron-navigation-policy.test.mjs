@@ -7,6 +7,7 @@ const {
   isAllowedLoginUrl,
   isAllowedQrImageUrl,
   isAllowedOwnerRendererUrl,
+  isRecPlaybackUrl,
   toRecommendationUrl,
 } = policy;
 const { ISOLATED_EXTERNAL_WEB_PREFERENCES, STEALTH_EXTERNAL_WEB_PREFERENCES } = webPreferences;
@@ -43,6 +44,24 @@ describe('Electron 외부 URL 경계', () => {
   it('신청곡은 YouTube ID 또는 허용 플랫폼 URL만 재생 URL로 바꾼다', () => {
     expect(toRecommendationUrl('abc_DEF-123')).toBe('https://www.youtube.com/watch?v=abc_DEF-123');
     expect(toRecommendationUrl('https://evil.example/track')).toBeNull();
+  });
+
+  it('신청곡 재생 URL과 플레이어를 벗어난 URL을 구분한다', () => {
+    // 실제 재생 화면
+    expect(isRecPlaybackUrl('https://www.youtube.com/watch?v=abc')).toBe(true);
+    expect(isRecPlaybackUrl('https://music.youtube.com/watch?v=abc')).toBe(true);
+    expect(isRecPlaybackUrl('https://www.youtube.com/shorts/abc')).toBe(true);
+    expect(isRecPlaybackUrl('https://youtu.be/abc')).toBe(true);
+    expect(isRecPlaybackUrl('https://open.spotify.com/track/abc')).toBe(true);
+    expect(isRecPlaybackUrl('https://soundcloud.com/artist/track')).toBe(true);
+    // 플레이어를 벗어난 곳(홈·검색 등) → 재생 URL 아님
+    expect(isRecPlaybackUrl('https://www.youtube.com/')).toBe(false);
+    expect(isRecPlaybackUrl('https://www.youtube.com/results?search_query=x')).toBe(false);
+    expect(isRecPlaybackUrl('https://www.youtube.com/feed/library')).toBe(false);
+    expect(isRecPlaybackUrl('https://youtu.be/')).toBe(false);
+    expect(isRecPlaybackUrl('https://soundcloud.com/')).toBe(false);
+    expect(isRecPlaybackUrl('http://www.youtube.com/watch?v=abc')).toBe(false);
+    expect(isRecPlaybackUrl('https://evil.example/watch')).toBe(false);
   });
 
   it('외부 WebContents는 Node를 끄고 sandbox를 사용한다', () => {

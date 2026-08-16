@@ -7,7 +7,7 @@ const {
 } = require('./end-detection');
 const { PLAYBACK_STATE, createPlaybackStateDetector } = require('./playback-state');
 const { createCurrentTrackDetector } = require('./platform-adapters/current-track');
-const { isAllowedMusicUrl, toRecommendationUrl } = require('./navigation-policy');
+const { isAllowedMusicUrl, isRecPlaybackUrl, toRecommendationUrl } = require('./navigation-policy');
 
 function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
   let currentBgmUrl = null;
@@ -149,6 +149,24 @@ function createPlaybackController({ ipcMain, windowManager, isQuitting }) {
       await recView.webContents.loadURL(url);
       startCurrentTrackDetector();
       startPlaybackStateDetector();
+
+      // 신청곡 재생 중 사장님이 플레이어를 신청곡 밖(유튜브 홈·검색 등)으로
+      // 이동하면 그 곡을 종료 처리하도록 렌더러에 알린다. 렌더러는 곡을
+      // played로 종료만 하고 자동 다음곡 재생은 하지 않는다(사장님이 직접
+      // recView에서 브라우징/재생 중이므로). 최초 신청곡 로드는 이미 끝났고,
+      // 이후 플레이어를 벗어나는 네비게이션에서만 한 번 발화한다.
+      let recLeftFired = false;
+      const handleRecNavigation = (targetUrl) => {
+        if (recLeftFired || currentRecMode !== 'overlay') return;
+        if (windowManager.getRecView() !== recView) return;
+        if (isRecPlaybackUrl(targetUrl)) return;
+        recLeftFired = true;
+        windowManager.safeSend('rec-left');
+      };
+      recView.webContents.on('did-navigate', (_event, targetUrl) => handleRecNavigation(targetUrl));
+      recView.webContents.on('did-navigate-in-page', (_event, targetUrl, isMainFrame) => {
+        if (isMainFrame) handleRecNavigation(targetUrl);
+      });
 
       if (soundcloud.isSoundCloudUrl(url)) {
         soundcloud.preparePlayback(recView, {

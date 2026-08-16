@@ -24,6 +24,7 @@ const electronAPI = {
 
   onYoutubeState:   (cb) => subscribe('youtube-state', cb),
   onVideoEnded:     (cb) => subscribe('video-ended', cb, () => undefined),
+  onRecLeft:        (cb) => subscribe('rec-left', cb, () => undefined),
   onNowPlaying:     (cb) => subscribe('now-playing', cb),
   onPlaybackState:  (cb) => subscribe('playback-state', cb),
   onCurrentTrack:   (cb) => subscribe('current-track', cb),

@@ -334,6 +334,18 @@ export default function useRecommendationQueue({
         .catch(console.error);
     });
 
+    // 사장님이 신청곡 재생 중 플레이어를 다른 곳으로 옮기면 원곡만 played로
+    // 종료한다. 정상 종료와 달리 다음 곡을 자동 재생하지 않는다(사장님이 직접
+    // 플레이어를 조작 중이므로 방해하지 않는다).
+    const removeRecLeft = window.electronAPI?.onRecLeft?.(() => {
+      if (!playbackLeaderRef.current) return;
+      const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
+      if (!playing) return;
+      updateRec(cafe.slug, playing.id, REC_STATUS.PLAYED)
+        .then(storeRecommendation)
+        .catch(console.error);
+    });
+
     const removeCleanupBeforeQuit = window.electronAPI?.onCleanupBeforeQuit?.(async () => {
       try {
         await finishPlaybackForExit();
@@ -350,6 +362,7 @@ export default function useRecommendationQueue({
       if (typeof removeManualTrackEnded === 'function') removeManualTrackEnded();
       if (typeof removeWidevineStatus === 'function') removeWidevineStatus();
       if (typeof removeVideoEnded === 'function') removeVideoEnded();
+      if (typeof removeRecLeft === 'function') removeRecLeft();
       if (typeof removeCleanupBeforeQuit === 'function') removeCleanupBeforeQuit();
     };
   }, [cafe.id, cafe.slug]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -21,6 +21,11 @@ const READ_CURRENT_TRACK = `
     const artwork = media?.artwork?.length ? media.artwork[media.artwork.length - 1]?.src : null;
     const mediaElement = Array.from(document.querySelectorAll('video, audio'))
       .find(element => Number.isFinite(element.duration) && element.duration > 0);
+    // 실제로 소리내며 재생 중인 미디어. 유튜브 홈의 음소거 hover 미리보기를
+    // '재생 중'으로 오인하지 않도록 muted/paused/미시작 미디어는 제외한다.
+    const audibleMedia = Array.from(document.querySelectorAll('video, audio'))
+      .find(element => Number.isFinite(element.duration) && element.duration > 0
+        && !element.paused && !element.muted && element.currentTime > 0);
 
     let title = media?.title?.trim() || null;
     let artist = media?.artist?.trim() || null;
@@ -28,10 +33,12 @@ const READ_CURRENT_TRACK = `
     let videoId = null;
 
     if (platform === 'youtube') {
-      const hasTrackContext = Boolean(media?.title)
-        || location.pathname === '/watch'
+      // 홈(/)·검색 등에서는 음소거 미리보기가 mediaSession 제목을 세팅해도
+      // 곡으로 잡지 않는다. watch·shorts 페이지이거나 실제 소리내는 재생일 때만.
+      const hasTrackContext = location.pathname === '/watch'
         || location.pathname.startsWith('/shorts/')
-        || host === 'youtu.be';
+        || host === 'youtu.be'
+        || Boolean(audibleMedia);
       if (!hasTrackContext) return null;
       title = title
         || text('ytd-watch-metadata h1 yt-formatted-string')

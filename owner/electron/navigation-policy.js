@@ -66,6 +66,31 @@ function isAllowedOwnerRendererUrl(value, configuredOwnerUrl) {
   }
 }
 
+// 신청곡이 실제로 '재생'되는 플레이어 URL인지 판별한다. 같은 음악 호스트라도
+// 홈·검색·라이브러리처럼 재생 화면이 아닌 곳으로 이동하면 false다. 신청곡
+// 재생 중 사장님이 플레이어를 벗어났는지 감지하는 데 쓴다.
+function isRecPlaybackUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    if (url.protocol !== 'https:') return false;
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname;
+    if (host === 'youtu.be') return path.length > 1;
+    if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+      return path === '/watch' || path.startsWith('/shorts/');
+    }
+    if (host === 'soundcloud.com' || host.endsWith('.soundcloud.com')) {
+      return path.split('/').filter(Boolean).length >= 2;
+    }
+    if (host === 'spotify.com' || host.endsWith('.spotify.com') || host === 'open.spotify.com') {
+      return /\/(track|playlist|album)\//.test(path);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function toRecommendationUrl(value) {
   const input = String(value || '').trim();
   if (/^[A-Za-z0-9_-]{6,64}$/.test(input)) {
@@ -79,5 +104,6 @@ module.exports = {
   isAllowedLoginUrl,
   isAllowedQrImageUrl,
   isAllowedOwnerRendererUrl,
+  isRecPlaybackUrl,
   toRecommendationUrl,
 };
