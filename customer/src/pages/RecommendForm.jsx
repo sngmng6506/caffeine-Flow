@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Link2, LoaderCircle, Search, Send, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Link2, LoaderCircle, Search, Send, X } from 'lucide-react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
@@ -169,8 +169,8 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     <form onSubmit={handlePreview} className='request-card request-card--input' aria-label='신청곡 추가'>
       <div className='request-card__topline'>
         <label className='field-label' htmlFor='music-url'>음악 링크</label>
-        <button type='button' className='icon-button request-card__close' onClick={closeComposer} aria-label='신청곡 추가 닫기' disabled={loading}>
-          <X size={18} aria-hidden='true' />
+        <button type='button' className='icon-button request-card__close' onClick={closeComposer} aria-label='신청곡 추가 접기' disabled={loading}>
+          <ChevronUp size={18} aria-hidden='true' />
         </button>
       </div>
       <div className='input-shell'>
