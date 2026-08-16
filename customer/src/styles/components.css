@@ -401,9 +401,7 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-accent-blue) 24%, transparent);
 }
 
-.input-shell input,
-.comment-form input,
-.reply-form input {
+.input-shell input {
   min-width: 0;
   width: 100%;
   border: 0;
@@ -413,9 +411,7 @@
   font-size: 16px;
 }
 
-.input-shell input::placeholder,
-.comment-form input::placeholder,
-.reply-form input::placeholder {
+.input-shell input::placeholder {
   color: var(--cf-content-disabled);
 }
 
@@ -1119,10 +1115,10 @@
 
 .comments {
   margin: 0 16px 16px;
-  padding: 14px 0 0 14px;
+  padding: 14px;
   background: color-mix(in srgb, var(--cf-surface-subtle) 62%, var(--cf-surface));
-  border-top: 1px solid var(--cf-stroke);
-  border-left: 2px solid var(--cf-stroke);
+  border: 1px solid var(--cf-stroke);
+  border-left: 2px solid var(--cf-brand);
 }
 
 .comments__heading {
@@ -1152,11 +1148,21 @@
 
 .comment-form input,
 .reply-form input {
+  width: 100%;
+  min-width: 0;
   min-height: 44px;
   padding: 0 12px;
+  color: var(--cf-content-strong);
   background: var(--cf-surface);
   border: 1px solid var(--cf-stroke-strong);
   border-radius: var(--cf-radius-control);
+  font-size: 16px;
+  outline: 0;
+}
+
+.comment-form input::placeholder,
+.reply-form input::placeholder {
+  color: var(--cf-content-disabled);
 }
 
 .comment-form input:focus,
