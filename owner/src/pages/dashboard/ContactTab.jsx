@@ -14,10 +14,10 @@ export default function ContactTab({ provider }) {
         <p className="contact-desc">
           운영 중 불편한 점이나 필요한 기능이 있다면 메일로 알려주세요.
         </p>
-        <a href={mailUrl} target="_blank" rel="noreferrer" className="contact-btn">
-          메일 보내기
-        </a>
       </div>
+      <a href={mailUrl} target="_blank" rel="noreferrer" className="contact-btn">
+        메일 보내기
+      </a>
     </div>
   );
 }

@@ -1,12 +1,11 @@
 .contact-wrap  { padding-top: 4px; }
 .contact-title { margin: 0 0 8px; color: var(--owner-text-strong); font-size: 15px; font-weight: 700; }
-.contact-box   { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--owner-stroke); border-radius: 10px; background: var(--owner-surface-subtle); flex-wrap: wrap; }
-.contact-desc  { flex: 1 1 280px; margin: 0; color: var(--owner-text-muted); font-size: 12px; line-height: 1.6; }
+.contact-box   { padding: 14px; border: 1px solid var(--owner-stroke); border-radius: 10px; background: var(--owner-surface-subtle); }
+.contact-desc  { margin: 0; color: var(--owner-text-muted); font-size: 12px; line-height: 1.6; }
 .contact-btn   {
   display: inline-flex;
-  flex: 0 0 auto;
   min-height: 40px;
-  margin-left: auto;
+  margin-top: 12px;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
