@@ -18,6 +18,16 @@ const concepts = [
   { id: 'chromestack', label: 'Q', name: 'Chrome Stack', summary: '차가운 회색 바탕에 시안 프레임을 겹친 정밀한 레이어 안' },
   { id: 'cyberqueue', label: 'R', name: 'Cyber Queue', summary: '블랙·애시드 옐로 핵심 패널과 K식 평면 신청곡 목록의 최종 후보' },
   { id: 'dailysignal', label: 'S', name: 'Daily Signal', summary: '따뜻한 화이트 바탕에 형광 레이어만 남긴 일상형 조합 후보' },
+  { id: 'lounge', label: 'T', name: 'Moody Lounge', summary: '에스프레소 다크에 앰버 골드 하나 · 프리미엄 야간 카페 무드의 편안한 다크' },
+  { id: 'retrowarm', label: 'U', name: 'Retro Warm', summary: '크림 바탕에 빈티지 오렌지 + 틸 투톤 · 정겹고 음악적인 저자극 개성' },
+  { id: 'editorial', label: 'V', name: 'Editorial Pop', summary: '따뜻한 오프화이트에 확신에 찬 코발트 히어로 · 잡지 같은 강한 위계' },
+  { id: 'botanical', label: 'W', name: 'Botanical Dusk', summary: '뮤트 플럼 다크에 세이지 + 소프트 로즈 · 낯설지만 부드러운 색 이야기' },
+  { id: 'cfcurrent', label: 'X', name: '현재 손님 앱', summary: '실제 tokens.css 그대로 · 네온 라임 × 순검정 × 핫핑크 하드 그림자 (색만 비교용 기준)' },
+  { id: 'cfrecolor', label: 'Y', name: '리컬러 제안', summary: 'X와 레이아웃·구조 동일, 색만 교체 · 앰버 골드 × 웜 차콜 × 웜 클레이 그림자' },
+  { id: 'brutalneon', label: 'E1', name: 'Neon Brutalist', summary: '순검정에 라임 + 일렉트릭 마젠타 듀얼 · 두꺼운 테두리와 스택 오프셋의 브루탈 포스터' },
+  { id: 'liquidacid', label: 'E2', name: 'Liquid Acid', summary: '라임→시안 그라디언트와 네온 글로우 · 부드러운 라운드의 액체질감 실험' },
+  { id: 'vaporwave', label: 'E3', name: 'Vaporwave Sunset', summary: '마젠타→퍼플→시안 선셋 그라디언트 · 딥 인디고 위 레트로 퓨처' },
+  { id: 'liquidsignal', label: 'E4', name: 'Liquid Signal', summary: 'E2 × 현재 앱 블렌드 · 라임/시안 그라디언트와 글로우를 현재 앱의 네온 라임·순검정·핫핑크 정체성에 입힘' },
 ];
 
 const songs = [

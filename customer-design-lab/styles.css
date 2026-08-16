@@ -88,7 +88,17 @@ button { font: inherit; }
 .concept-stage[data-filter="redoffset"] .concept:not([data-concept="redoffset"]),
 .concept-stage[data-filter="chromestack"] .concept:not([data-concept="chromestack"]),
 .concept-stage[data-filter="cyberqueue"] .concept:not([data-concept="cyberqueue"]),
-.concept-stage[data-filter="dailysignal"] .concept:not([data-concept="dailysignal"]) {
+.concept-stage[data-filter="dailysignal"] .concept:not([data-concept="dailysignal"]),
+.concept-stage[data-filter="lounge"] .concept:not([data-concept="lounge"]),
+.concept-stage[data-filter="retrowarm"] .concept:not([data-concept="retrowarm"]),
+.concept-stage[data-filter="editorial"] .concept:not([data-concept="editorial"]),
+.concept-stage[data-filter="botanical"] .concept:not([data-concept="botanical"]),
+.concept-stage[data-filter="cfcurrent"] .concept:not([data-concept="cfcurrent"]),
+.concept-stage[data-filter="cfrecolor"] .concept:not([data-concept="cfrecolor"]),
+.concept-stage[data-filter="brutalneon"] .concept:not([data-concept="brutalneon"]),
+.concept-stage[data-filter="liquidacid"] .concept:not([data-concept="liquidacid"]),
+.concept-stage[data-filter="vaporwave"] .concept:not([data-concept="vaporwave"]),
+.concept-stage[data-filter="liquidsignal"] .concept:not([data-concept="liquidsignal"]) {
   display: none;
 }
 
@@ -1422,3 +1432,352 @@ button { font: inherit; }
     flex-basis: min(480px, calc(100vw - 32px));
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   개성 재검토 후보 T~W — 눈은 편하게(순수 흑백·형광 배제) 유지하되
+   각 안이 뚜렷한 색 성격을 갖도록 한 방향. 무드 다크, 레트로 투톤,
+   에디토리얼 히어로 컬러, 보타니컬 무드 다크.
+   ───────────────────────────────────────────────────────────── */
+
+/* T · Moody Lounge — 에스프레소 다크에 앰버 골드 하나로 프리미엄 야간 무드 */
+.theme--lounge {
+  --accent: #e0a763;
+  --accent-soft: #3a2f22;
+  --canvas: #211d1b;
+  --surface: #2a2422;
+  --surface-subtle: #302a27;
+  --ink: #efe7dd;
+  --muted: #a99e92;
+  --stroke: #3a332e;
+  --now: #17130f;
+  --now-accent: #e0a763;
+  --sort-active-color: #241c12;
+}
+.theme--lounge .cafe-header { background: var(--canvas); }
+.theme--lounge .now-playing,
+.theme--lounge .composer,
+.theme--lounge .cover { border-radius: 14px; }
+.theme--lounge .composer { border-color: var(--stroke); }
+.theme--lounge .composer-icon { color: #241c12; }
+.theme--lounge .now-playing { box-shadow: 0 12px 28px rgb(0 0 0 / 40%); }
+
+/* U · Retro Warm — 크림 바탕에 빈티지 오렌지 + 틸 투톤의 음악적 개성 */
+.theme--retrowarm {
+  --accent: #d9743f;
+  --accent-soft: #f7e2d1;
+  --canvas: #f5ead2;
+  --surface: #fdf7e9;
+  --surface-subtle: #ecdcbf;
+  --ink: #3d3228;
+  --muted: #8c7a63;
+  --stroke: #e2d2b4;
+  --now: #2f7d78;
+  --now-accent: #f2c14e;
+}
+.theme--retrowarm .cafe-header { background: var(--canvas); }
+.theme--retrowarm .now-playing,
+.theme--retrowarm .composer,
+.theme--retrowarm .cover { border-radius: 12px; }
+.theme--retrowarm .now-playing { box-shadow: 0 9px 22px rgb(47 125 120 / 22%); }
+.theme--retrowarm .composer { border-width: 2px; }
+
+/* V · Editorial Pop — 따뜻한 오프화이트에 확신에 찬 코발트 히어로 + 강한 타이포 */
+.theme--editorial {
+  --accent: #2f5fd0;
+  --accent-soft: #e6ecfb;
+  --canvas: #faf7f2;
+  --surface: #fffdf9;
+  --surface-subtle: #efe9df;
+  --ink: #22242b;
+  --muted: #767b86;
+  --stroke: #e4ded3;
+  --now: #1b2540;
+  --now-accent: #6f9cff;
+}
+.theme--editorial .cafe-header { background: var(--canvas); }
+.theme--editorial .cafe-header h2 { font-weight: 800; letter-spacing: -0.05em; }
+.theme--editorial .now-playing { box-shadow: 0 10px 26px rgb(27 37 64 / 24%); }
+.theme--editorial .composer { border-width: 0; box-shadow: 0 2px 10px rgb(47 95 208 / 10%); }
+
+/* W · Botanical Dusk — 뮤트 플럼 다크에 세이지 + 소프트 로즈의 낯선 색 이야기 */
+.theme--botanical {
+  --accent: #d98c9c;
+  --accent-soft: #43384a;
+  --canvas: #322a3a;
+  --surface: #3b3244;
+  --surface-subtle: #41374c;
+  --ink: #ece6ef;
+  --muted: #a99fb0;
+  --stroke: #483e52;
+  --now: #2a2333;
+  --now-accent: #9db99a;
+  --sort-active-color: #2a2333;
+}
+.theme--botanical .cafe-header { background: var(--canvas); }
+.theme--botanical .now-playing,
+.theme--botanical .composer,
+.theme--botanical .cover { border-radius: 16px; }
+.theme--botanical .composer { border-color: var(--stroke); }
+.theme--botanical .composer-icon { color: #2a2333; }
+.theme--botanical .now-playing { box-shadow: 0 12px 28px rgb(0 0 0 / 34%); }
+
+/* ─────────────────────────────────────────────────────────────
+   현재 손님 앱 색 vs 리컬러 A/B — 레이아웃/구조는 동일하게 두고
+   (각진 모서리·하드 오프셋 그림자·액센트 채움 패널) 색만 비교한다.
+   X는 실제 customer/src/styles/tokens.css 값 그대로.
+   ───────────────────────────────────────────────────────────── */
+
+/* 공통 구조 — 현재 실제 앱 성격(각진 모서리 + 시그널 하드 그림자) */
+.theme--cfcurrent .now-playing,
+.theme--cfcurrent .composer,
+.theme--cfcurrent .cover,
+.theme--cfcurrent .status-badge,
+.theme--cfcurrent .open-badge,
+.theme--cfcurrent .sort-tabs button,
+.theme--cfrecolor .now-playing,
+.theme--cfrecolor .composer,
+.theme--cfrecolor .cover,
+.theme--cfrecolor .status-badge,
+.theme--cfrecolor .open-badge,
+.theme--cfrecolor .sort-tabs button { border-radius: 0; }
+
+/* X · 현재 손님 앱 (네온 라임 · 순검정 · 핫핑크 하드 그림자) */
+.theme--cfcurrent {
+  --accent: #efff24;
+  --accent-soft: #303409;
+  --canvas: #080908;
+  --surface: #080908;
+  --surface-subtle: #151714;
+  --ink: #f6f7ef;
+  --muted: #92958a;
+  --stroke: #35382f;
+  --now: #efff24;
+  --now-accent: #080908;
+  --sort-active-color: #080908;
+}
+.theme--cfcurrent .cafe-header { background: var(--canvas); }
+.theme--cfcurrent .now-playing {
+  color: #080908;
+  box-shadow: 7px 7px 0 #ff3da1;
+}
+.theme--cfcurrent .now-label { color: rgb(8 9 8 / 72%); }
+.theme--cfcurrent .now-body div > span { color: rgb(8 9 8 / 64%); }
+.theme--cfcurrent .play-icon { color: #efff24; background: #080908; }
+.theme--cfcurrent .composer {
+  color: #080908;
+  background: #efff24;
+  border: 0;
+}
+.theme--cfcurrent .composer small { color: rgb(8 9 8 / 66%); }
+.theme--cfcurrent .composer-icon { color: #efff24; background: #080908; }
+.theme--cfcurrent .composer-action { color: #080908; }
+
+/* Y · 리컬러 제안 (앰버 골드 · 웜 차콜 · 웜 클레이 하드 그림자) — 구조 동일, 색만 교체 */
+.theme--cfrecolor {
+  --accent: #e8b45a;
+  --accent-soft: #3a2f1a;
+  --canvas: #16130f;
+  --surface: #16130f;
+  --surface-subtle: #1e1a15;
+  --ink: #f2ece1;
+  --muted: #9a9184;
+  --stroke: #34302a;
+  --now: #e8b45a;
+  --now-accent: #16130f;
+  --sort-active-color: #16130f;
+}
+.theme--cfrecolor .cafe-header { background: var(--canvas); }
+.theme--cfrecolor .now-playing {
+  color: #16130f;
+  box-shadow: 7px 7px 0 #c97a5a;
+}
+.theme--cfrecolor .now-label { color: rgb(22 19 15 / 72%); }
+.theme--cfrecolor .now-body div > span { color: rgb(22 19 15 / 64%); }
+.theme--cfrecolor .play-icon { color: #e8b45a; background: #16130f; }
+.theme--cfrecolor .composer {
+  color: #16130f;
+  background: #e8b45a;
+  border: 0;
+}
+.theme--cfrecolor .composer small { color: rgb(22 19 15 / 66%); }
+.theme--cfrecolor .composer-icon { color: #e8b45a; background: #16130f; }
+.theme--cfrecolor .composer-action { color: #16130f; }
+
+/* ─────────────────────────────────────────────────────────────
+   실험 배치 E1~E3 — X(네온)·N(Layered Lime) 취향 기반의 볼드/네온
+   에너지를 더 밀어붙인 방향. 듀얼 네온 브루탈리즘, 그라디언트 글로우,
+   베이퍼웨이브 선셋.
+   ───────────────────────────────────────────────────────────── */
+
+/* E1 · Neon Brutalist — 순검정에 라임 + 일렉트릭 마젠타 듀얼, 두꺼운 테두리와 스택 오프셋 */
+.theme--brutalneon {
+  --accent: #eaff2b;
+  --accent-soft: #1a1f05;
+  --canvas: #060606;
+  --surface: #060606;
+  --surface-subtle: #141414;
+  --ink: #f5f7ec;
+  --muted: #8f948a;
+  --stroke: #eaff2b;
+  --now: #eaff2b;
+  --now-accent: #060606;
+  --sort-active-color: #060606;
+}
+.theme--brutalneon .cafe-header h2,
+.theme--brutalneon .feed-heading strong {
+  font-size: 26px; font-weight: 950; letter-spacing: -0.06em; text-transform: uppercase;
+}
+.theme--brutalneon .now-playing,
+.theme--brutalneon .composer,
+.theme--brutalneon .cover,
+.theme--brutalneon .sort-tabs button,
+.theme--brutalneon .status-badge,
+.theme--brutalneon .open-badge { border-radius: 0; }
+.theme--brutalneon .now-playing {
+  color: #060606;
+  border: 3px solid #060606;
+  box-shadow: 8px 8px 0 #ff2bd0;
+}
+.theme--brutalneon .now-label,
+.theme--brutalneon .now-body div > span { color: rgb(6 6 6 / 66%); }
+.theme--brutalneon .play-icon { color: #eaff2b; background: #060606; }
+.theme--brutalneon .composer {
+  color: #060606; background: #eaff2b;
+  border: 3px solid #060606; box-shadow: 5px 5px 0 #ff2bd0;
+}
+.theme--brutalneon .composer small { color: rgb(6 6 6 / 68%); }
+.theme--brutalneon .composer-icon { color: #eaff2b; background: #060606; }
+.theme--brutalneon .composer-action { color: #060606; }
+.theme--brutalneon .open-badge { border: 2px solid #eaff2b; }
+/* 곡 커버도 파스텔 톤 대신 검정+네온 테두리로 통일 — 쌓여도 검정 고정, 형광 구분선만 */
+.theme--brutalneon .cover {
+  color: #eaff2b;
+  background: #060606;
+  border: 2px solid #eaff2b;
+}
+.theme--brutalneon .song-list { background: #060606; }
+
+/* E2 · Liquid Acid — 다크 베이스에 라임→시안 그라디언트와 네온 글로우, 부드러운 라운드 */
+.theme--liquidacid {
+  --accent: #33e6c0;
+  --accent-soft: #082a26;
+  --canvas: #07100e;
+  --surface: #07100e;
+  --surface-subtle: #0f1a18;
+  --ink: #eafff8;
+  --muted: #7fa89f;
+  --stroke: #16302b;
+  --now: #16f0b0;
+  --now-accent: #062018;
+}
+.theme--liquidacid .cafe-header { background: var(--canvas); }
+.theme--liquidacid .now-playing,
+.theme--liquidacid .composer,
+.theme--liquidacid .cover { border-radius: 20px; }
+.theme--liquidacid .now-playing {
+  color: #062018;
+  background: linear-gradient(135deg, #c8ff2b, #00e0ff);
+  box-shadow: 0 0 36px rgb(0 224 255 / 34%);
+}
+.theme--liquidacid .now-label,
+.theme--liquidacid .now-body div > span { color: rgb(6 32 24 / 66%); }
+.theme--liquidacid .play-icon { color: #062018; background: rgb(255 255 255 / 85%); }
+.theme--liquidacid .composer {
+  color: var(--ink);
+  background: linear-gradient(120deg, rgb(200 255 43 / 14%), rgb(0 224 255 / 16%));
+  border: 1px solid #1c3a34;
+}
+.theme--liquidacid .composer-icon {
+  color: #062018;
+  background: linear-gradient(135deg, #c8ff2b, #00e0ff);
+}
+.theme--liquidacid .cover { box-shadow: 0 0 20px rgb(51 230 192 / 20%); }
+
+/* E3 · Vaporwave Sunset — 딥 인디고에 마젠타→퍼플→시안 선셋 그라디언트, 레트로 퓨처 */
+.theme--vaporwave {
+  --accent: #ff5db4;
+  --accent-soft: #2a1030;
+  --canvas: #140a24;
+  --surface: #140a24;
+  --surface-subtle: #1e1235;
+  --ink: #f3e9ff;
+  --muted: #a892c4;
+  --stroke: #33244a;
+  --now: #ff5db4;
+  --now-accent: #2de2e6;
+}
+.theme--vaporwave .cafe-header { background: var(--canvas); }
+.theme--vaporwave .cafe-header h2,
+.theme--vaporwave .feed-heading strong {
+  font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase;
+}
+.theme--vaporwave .now-playing,
+.theme--vaporwave .composer,
+.theme--vaporwave .cover { border-radius: 12px; }
+.theme--vaporwave .now-playing {
+  color: #160a2a;
+  background: linear-gradient(160deg, #ff5db4, #7b3ff2 58%, #2de2e6);
+  box-shadow: 0 12px 32px rgb(123 63 242 / 42%);
+}
+.theme--vaporwave .now-label,
+.theme--vaporwave .now-body div > span { color: rgb(22 10 42 / 66%); }
+.theme--vaporwave .play-icon { color: #2de2e6; background: #160a2a; }
+.theme--vaporwave .tabs button.is-active { border-bottom-color: #2de2e6; }
+.theme--vaporwave .composer {
+  color: var(--ink);
+  background: var(--surface-subtle);
+  border: 1px solid #ff5db4;
+}
+.theme--vaporwave .composer-icon { color: #160a2a; background: linear-gradient(135deg, #ff5db4, #2de2e6); }
+.theme--vaporwave .composer-action { color: #2de2e6; }
+
+/* E4 · Liquid Signal — E2(Liquid Acid) × X(현재 앱)의 블렌드.
+   현재 앱 정체성(네온 라임·순검정·핫핑크 시그널)은 유지하고,
+   E2의 라임→시안 그라디언트·네온 글로우·액체 라운드를 입힌다.
+   그라디언트는 앱이 이미 가진 라임(#efff24)·시안(#00d9ff)으로 구성. */
+.theme--liquidsignal {
+  --accent: #efff24;
+  --accent-soft: #23300a;
+  --canvas: #080908;
+  --surface: #080908;
+  --surface-subtle: #14160f;
+  --ink: #f6f7ef;
+  --muted: #92958a;
+  --stroke: #2c3320;
+  --now: #efff24;
+  --now-accent: #00d9ff;
+  --sort-active-color: #080908;
+}
+.theme--liquidsignal .cafe-header { background: var(--canvas); }
+.theme--liquidsignal .cafe-header h2,
+.theme--liquidsignal .feed-heading strong {
+  font-weight: 900; letter-spacing: -0.045em;
+}
+.theme--liquidsignal .now-playing,
+.theme--liquidsignal .composer,
+.theme--liquidsignal .cover { border-radius: 16px; }
+.theme--liquidsignal .status-badge,
+.theme--liquidsignal .open-badge,
+.theme--liquidsignal .sort-tabs button { border-radius: 6px; }
+.theme--liquidsignal .now-playing {
+  color: #080908;
+  background: linear-gradient(135deg, #efff24 0%, #7bf05a 46%, #00d9ff 100%);
+  box-shadow: 0 0 30px rgb(0 217 255 / 30%), 0 0 46px rgb(239 255 36 / 14%);
+}
+.theme--liquidsignal .now-label,
+.theme--liquidsignal .now-body div > span { color: rgb(8 9 8 / 66%); }
+.theme--liquidsignal .play-icon { color: #efff24; background: #080908; }
+.theme--liquidsignal .composer {
+  color: var(--ink);
+  background: linear-gradient(120deg, rgb(239 255 36 / 12%), rgb(0 217 255 / 14%));
+  border: 1px solid #2c3320;
+  box-shadow: 0 0 22px rgb(0 217 255 / 12%);
+}
+.theme--liquidsignal .composer small { color: var(--muted); }
+.theme--liquidsignal .composer-icon {
+  color: #080908;
+  background: linear-gradient(135deg, #efff24, #00d9ff);
+}
+.theme--liquidsignal .composer-action { color: #00d9ff; }
+/* 현재 앱의 핫핑크 시그널을 커버 글로우로 은근히 남겨 정체성 유지 */
+.theme--liquidsignal .cover { box-shadow: 0 0 16px rgb(255 61 161 / 22%); }
