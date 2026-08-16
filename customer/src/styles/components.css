@@ -225,21 +225,23 @@
   flex: 1;
 }
 
-.now-playing__comment-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-height: 38px;
-  padding: 0 12px;
+.now-playing__content[role='button'] {
+  cursor: pointer;
+}
+
+.now-playing__content[role='button']:focus-visible {
+  outline: 2px solid var(--cf-on-dark);
+  outline-offset: 3px;
+}
+
+.now-playing__comment-caret {
   flex: 0 0 auto;
-  color: var(--cf-on-dark);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 750;
-  background: color-mix(in srgb, var(--cf-on-dark) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cf-on-dark) 18%, transparent);
-  border-radius: 999px;
+  color: color-mix(in srgb, var(--cf-on-dark) 55%, transparent);
+  transition: transform var(--cf-motion-fast);
+}
+
+.now-playing__comment-caret.is-open {
+  transform: rotate(180deg);
 }
 
 .now-playing__comments {
@@ -776,42 +778,26 @@
   border-top: 1px solid var(--cf-brand);
 }
 
-.song-list__item:nth-child(even),
+/* 신청곡 목록은 검정 배경 위에 형광 구분선만 사용한다. 짝수 행 형광 채움은
+   쓰지 않는다. 랭킹(rank-list)은 순위 가독성을 위해 교차 채움을 유지한다. */
 .rank-list__item:nth-child(even) {
   color: var(--cf-on-dark);
   background: var(--cf-brand);
 }
 
-.song-list__item:nth-child(even) .song-card__title,
-.song-list__item:nth-child(even) .song-card__position,
-.song-list__item:nth-child(even) .song-card__mine,
 .rank-list__item:nth-child(even) .rank-row__number,
 .rank-list__item:nth-child(even) .rank-row__info strong {
   color: var(--cf-on-dark);
 }
 
-.song-list__item:nth-child(even) .song-card__meta,
-.song-list__item:nth-child(even) .song-card__details,
-.song-list__item:nth-child(even) .pill-action,
 .rank-list__item:nth-child(even) .rank-row__info small,
 .rank-list__item:nth-child(even) .rank-row__votes,
 .rank-list__item:nth-child(even) .rank-row > svg {
   color: var(--cf-on-dark-muted);
 }
 
-.song-list__item:nth-child(even) .song-card__thumb,
 .rank-list__item:nth-child(even) .rank-row__thumbnail {
   border-color: var(--cf-on-dark);
-}
-
-.song-list__item:nth-child(even) .pill-action:hover {
-  color: var(--cf-on-dark);
-  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
-}
-
-.song-list__item:nth-child(even) .pill-action--active {
-  color: var(--cf-brand);
-  background: var(--cf-on-dark);
 }
 
 .song-card {
@@ -1353,10 +1339,6 @@
 
   .now-playing__content {
     flex-wrap: wrap;
-  }
-
-  .now-playing__comment-button {
-    width: 100%;
   }
 
   .request-card__actions {

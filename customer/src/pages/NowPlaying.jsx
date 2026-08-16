@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LoaderCircle, MessageCircle, Pause } from 'lucide-react';
+import { ChevronDown, LoaderCircle, Pause } from 'lucide-react';
 import SongThumbnail from '../components/SongThumbnail';
 import { PLAYBACK_STATE } from '../constants/playbackState';
 import CafeComments from './CafeComments';
@@ -46,13 +46,31 @@ export default function NowPlaying({ rec, playbackState = PLAYBACK_STATE.UNKNOWN
   const showsWave = !isPaused && !isBuffering;
   const StatusIcon = isPaused ? Pause : LoaderCircle;
 
+  const toggleComments = () => setCommentsOpen(value => !value);
+  // 카드 전체를 눌러 댓글을 펼친다. 명시적 '댓글' 버튼 대신 은근한 화살표만 힌트로 둔다.
+  const toggleProps = commentKey
+    ? {
+        role: 'button',
+        tabIndex: 0,
+        'aria-expanded': commentsOpen,
+        'aria-label': commentsOpen ? '댓글 접기' : '댓글 펼치기',
+        onClick: toggleComments,
+        onKeyDown: (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleComments();
+          }
+        },
+      }
+    : {};
+
   return (
     <section className='now-playing' aria-label={`현재 ${label}인 곡`}>
       <div className={`now-playing__status now-playing__status--${playbackState}`}>
         {showsWave ? <PlaybackWaveMark /> : <StatusIcon size={16} aria-hidden='true' />}
         <span>{label}</span>
       </div>
-      <div className='now-playing__content'>
+      <div className='now-playing__content' {...toggleProps}>
         <SongThumbnail
           src={rec.thumbnail}
           className='now-playing__thumb'
@@ -64,15 +82,11 @@ export default function NowPlaying({ rec, playbackState = PLAYBACK_STATE.UNKNOWN
           <p className='now-playing__channel'>{rec.channel_title}</p>
         </div>
         {commentKey && (
-          <button
-            type='button'
-            className='now-playing__comment-button'
-            aria-expanded={commentsOpen}
-            onClick={() => setCommentsOpen(value => !value)}
-          >
-            <MessageCircle size={17} aria-hidden='true' />
-            댓글
-          </button>
+          <ChevronDown
+            size={18}
+            className={`now-playing__comment-caret${commentsOpen ? ' is-open' : ''}`}
+            aria-hidden='true'
+          />
         )}
       </div>
       {commentsOpen && commentKey && (
