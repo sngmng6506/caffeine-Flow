@@ -98,7 +98,13 @@ button { font: inherit; }
 .concept-stage[data-filter="brutalneon"] .concept:not([data-concept="brutalneon"]),
 .concept-stage[data-filter="liquidacid"] .concept:not([data-concept="liquidacid"]),
 .concept-stage[data-filter="vaporwave"] .concept:not([data-concept="vaporwave"]),
-.concept-stage[data-filter="liquidsignal"] .concept:not([data-concept="liquidsignal"]) {
+.concept-stage[data-filter="liquidsignal"] .concept:not([data-concept="liquidsignal"]),
+.concept-stage[data-filter="yamipulse"] .concept:not([data-concept="yamipulse"]),
+.concept-stage[data-filter="sicksweet"] .concept:not([data-concept="sicksweet"]),
+.concept-stage[data-filter="glitchheart"] .concept:not([data-concept="glitchheart"]),
+.concept-stage[data-filter="signalheart"] .concept:not([data-concept="signalheart"]),
+.concept-stage[data-filter="signalheartpink"] .concept:not([data-concept="signalheartpink"]),
+.concept-stage[data-filter="ward"] .concept:not([data-concept="ward"]) {
   display: none;
 }
 
@@ -1781,3 +1787,293 @@ button { font: inherit; }
 .theme--liquidsignal .composer-action { color: #00d9ff; }
 /* 현재 앱의 핫핑크 시그널을 커버 글로우로 은근히 남겨 정체성 유지 */
 .theme--liquidsignal .cover { box-shadow: 0 0 16px rgb(255 61 161 / 22%); }
+
+/* ─────────────────────────────────────────────────────────────
+   사이버펑크 × 멘헤라(야미카와이) 배치 M1~M3.
+   자료조사 요약: 멘헤라=파스텔 핑크 지배 + 화이트/베이비블루/라벤더,
+   레드 크로스·알약·붕대·꿰맨 하트 모티프(병약귀여움). 사이버펑크=near-black
+   베이스 + 네온 마젠타/시안 글로우, 글리치·클립 코너·HUD. 둘의 접점이 '핑크'라
+   다크 베이스 위 핑크 지배 + 네온 글로우 + 의료/바이탈 HUD로 융합한다.
+   ───────────────────────────────────────────────────────────── */
+
+/* M1 · Yami Pulse — 핵심 사이버멘헤라. 다크 위 핫핑크 지배 + 시안 헤일로 글로우 */
+.theme--yamipulse {
+  --accent: #ff5db4;
+  --accent-soft: #2a1024;
+  --canvas: #0b0812;
+  --surface: #0b0812;
+  --surface-subtle: #170f1d;
+  --ink: #ffe9f6;
+  --muted: #b98fb0;
+  --stroke: #3a2038;
+  --now: #ff2daa;
+  --now-accent: #00e5ff;
+  --sort-active-color: #160a1e;
+}
+.theme--yamipulse .cafe-header { background: var(--canvas); }
+.theme--yamipulse .cafe-header h2 { text-shadow: 0 0 12px rgb(255 93 180 / 45%); }
+.theme--yamipulse .now-playing,
+.theme--yamipulse .composer,
+.theme--yamipulse .cover { border-radius: 14px; }
+.theme--yamipulse .now-playing {
+  color: #160a1e;
+  background: linear-gradient(135deg, #ff5db4, #ff2daa 55%, #c94fe0);
+  box-shadow: 0 0 30px rgb(255 45 170 / 40%), 0 0 52px rgb(0 229 255 / 18%);
+}
+.theme--yamipulse .now-label::after { content: ' ♡'; }
+.theme--yamipulse .now-label,
+.theme--yamipulse .now-body div > span { color: rgb(22 10 30 / 68%); }
+.theme--yamipulse .play-icon { color: #ff2daa; background: #160a1e; }
+.theme--yamipulse .composer {
+  color: var(--ink);
+  background: var(--surface-subtle);
+  border: 1px solid #ff5db4;
+  box-shadow: 0 0 18px rgb(255 93 180 / 18%);
+}
+.theme--yamipulse .composer-icon { color: #160a1e; background: linear-gradient(135deg, #ff5db4, #00e5ff); }
+.theme--yamipulse .composer-action { color: #00e5ff; }
+.theme--yamipulse .cover { box-shadow: 0 0 16px rgb(255 93 180 / 25%); }
+
+/* M2 · Sick Sweet — 파스텔 멘헤라 우위. 다크 위 핑크/라벤더/베이비블루의 병약 스위트 */
+.theme--sicksweet {
+  --accent: #ffaad4;
+  --accent-soft: #2e2036;
+  --canvas: #14101c;
+  --surface: #14101c;
+  --surface-subtle: #1e1728;
+  --ink: #f4ecff;
+  --muted: #a99cc4;
+  --stroke: #362a44;
+  --now: #ffaad4;
+  --now-accent: #8fe3ff;
+  --sort-active-color: #1a1430;
+}
+.theme--sicksweet .cafe-header { background: var(--canvas); }
+.theme--sicksweet .now-playing,
+.theme--sicksweet .composer,
+.theme--sicksweet .cover { border-radius: 18px; }
+.theme--sicksweet .now-playing {
+  color: #1a1430;
+  background: linear-gradient(135deg, #ffaad4, #b8a9ff 60%, #8fe3ff);
+  box-shadow: 0 10px 30px rgb(184 169 255 / 30%);
+}
+.theme--sicksweet .now-label::after { content: ' ♡'; }
+.theme--sicksweet .now-label,
+.theme--sicksweet .now-body div > span { color: rgb(26 20 48 / 66%); }
+.theme--sicksweet .play-icon { color: #b06fb0; background: #1a1430; }
+.theme--sicksweet .composer {
+  color: var(--ink);
+  background: var(--surface-subtle);
+  border: 1px solid #ffaad4;
+}
+.theme--sicksweet .composer-icon { color: #1a1430; background: linear-gradient(135deg, #ffaad4, #8fe3ff); }
+.theme--sicksweet .composer-action { color: #8fe3ff; }
+.theme--sicksweet .cover { box-shadow: 0 0 16px rgb(255 170 212 / 22%); }
+
+/* M3 · Glitch Heart — 사이버펑크 우위. 네온 마젠타×시안, 클립 코너·글리치 크로매틱 */
+.theme--glitchheart {
+  --accent: #ff2bd0;
+  --accent-soft: #2a0a26;
+  --canvas: #08080f;
+  --surface: #08080f;
+  --surface-subtle: #12121e;
+  --ink: #f4f4f8;
+  --muted: #8a8fb0;
+  --stroke: #ff2bd0;
+  --now: #ff2bd0;
+  --now-accent: #00e5ff;
+  --sort-active-color: #08080f;
+}
+.theme--glitchheart .cafe-header { background: var(--canvas); }
+.theme--glitchheart .cafe-header h2,
+.theme--glitchheart .feed-heading strong {
+  font-weight: 950; letter-spacing: -0.04em; text-transform: uppercase;
+  text-shadow: 2px 0 #00e5ff, -2px 0 #ff2bd0;
+}
+.theme--glitchheart .now-playing,
+.theme--glitchheart .composer,
+.theme--glitchheart .cover,
+.theme--glitchheart .status-badge,
+.theme--glitchheart .open-badge,
+.theme--glitchheart .sort-tabs button { border-radius: 0; }
+.theme--glitchheart .now-playing {
+  color: #08080f;
+  background: linear-gradient(120deg, #ff2bd0, #00e5ff);
+  border: 2px solid #00e5ff;
+  box-shadow: 0 0 26px rgb(255 43 208 / 45%);
+}
+.theme--glitchheart .now-label,
+.theme--glitchheart .now-body div > span { color: rgb(8 8 15 / 70%); }
+.theme--glitchheart .play-icon { color: #ff2bd0; background: #08080f; }
+.theme--glitchheart .composer {
+  color: var(--ink);
+  background: #12121e;
+  border: 1px solid #ff2bd0;
+  box-shadow: 0 0 16px rgb(255 43 208 / 25%);
+}
+.theme--glitchheart .composer-icon { color: #08080f; background: linear-gradient(135deg, #ff2bd0, #00e5ff); }
+.theme--glitchheart .composer-action { color: #00e5ff; }
+.theme--glitchheart .cover { border: 1px solid #ff2bd0; box-shadow: 0 0 14px rgb(0 229 255 / 22%); }
+
+/* ─────────────────────────────────────────────────────────────
+   현재 앱 베이스 기반 사이버멘헤라 B1~B2.
+   지금 쓰는 정체성(네온 라임·순검정·핫핑크·각진 구조)은 유지하고,
+   이미 있는 핫핑크·시안을 살려 글로우 + ♡ + 글리치를 얹는다.
+   차이는 '주역'뿐 — B1은 라임 유지, B2는 핑크를 전면에.
+   ───────────────────────────────────────────────────────────── */
+
+/* B1 · Signal Heart — 라임 주역 유지. 현재 앱에 핑크 글로우·♡·글리치만 가미 */
+.theme--signalheart {
+  --accent: #efff24;
+  --accent-soft: #23300a;
+  --canvas: #080908;
+  --surface: #080908;
+  --surface-subtle: #151714;
+  --ink: #f6f7ef;
+  --muted: #92958a;
+  --stroke: #35382f;
+  --now: #efff24;
+  --now-accent: #ff3da1;
+  --sort-active-color: #080908;
+}
+.theme--signalheart .cafe-header { background: var(--canvas); }
+.theme--signalheart .cafe-header h2,
+.theme--signalheart .feed-heading strong {
+  font-weight: 900; letter-spacing: -0.045em;
+  text-shadow: 2px 0 #00d9ff, -2px 0 #ff3da1;
+}
+.theme--signalheart .now-playing,
+.theme--signalheart .composer,
+.theme--signalheart .cover,
+.theme--signalheart .status-badge,
+.theme--signalheart .open-badge,
+.theme--signalheart .sort-tabs button { border-radius: 0; }
+.theme--signalheart .now-playing {
+  color: #080908;
+  box-shadow: 7px 7px 0 #ff3da1, 0 0 26px rgb(255 61 161 / 28%);
+}
+.theme--signalheart .now-label::after { content: ' ♡'; }
+.theme--signalheart .now-label,
+.theme--signalheart .now-body div > span { color: rgb(8 9 8 / 66%); }
+.theme--signalheart .play-icon { color: #efff24; background: #080908; }
+.theme--signalheart .composer {
+  color: #080908; background: #efff24; border: 0;
+}
+.theme--signalheart .composer small { color: rgb(8 9 8 / 66%); }
+.theme--signalheart .composer-icon { color: #efff24; background: #080908; }
+.theme--signalheart .composer-action { color: #ff3da1; }
+.theme--signalheart .cover {
+  color: #ff3da1; background: #080908;
+  border: 2px solid #ff3da1; box-shadow: 0 0 14px rgb(255 61 161 / 25%);
+}
+
+/* B2 · Signal Heart Pink — 핑크를 전면 주역으로. 라임/시안은 액센트로 강등 */
+.theme--signalheartpink {
+  --accent: #ff3da1;
+  --accent-soft: #33121f;
+  --canvas: #080908;
+  --surface: #080908;
+  --surface-subtle: #151714;
+  --ink: #f8eef3;
+  --muted: #a98f9c;
+  --stroke: #3a2833;
+  --now: #ff3da1;
+  --now-accent: #efff24;
+  --sort-active-color: #080908;
+}
+.theme--signalheartpink .cafe-header { background: var(--canvas); }
+.theme--signalheartpink .cafe-header h2,
+.theme--signalheartpink .feed-heading strong {
+  font-weight: 900; letter-spacing: -0.045em;
+  text-shadow: 2px 0 #00d9ff, -2px 0 #efff24;
+}
+.theme--signalheartpink .now-playing,
+.theme--signalheartpink .composer,
+.theme--signalheartpink .cover,
+.theme--signalheartpink .status-badge,
+.theme--signalheartpink .open-badge,
+.theme--signalheartpink .sort-tabs button { border-radius: 0; }
+.theme--signalheartpink .now-playing {
+  color: #080908;
+  box-shadow: 7px 7px 0 #00d9ff, 0 0 28px rgb(255 61 161 / 36%);
+}
+.theme--signalheartpink .now-label::after { content: ' ♡'; }
+.theme--signalheartpink .now-label,
+.theme--signalheartpink .now-body div > span { color: rgb(8 9 8 / 66%); }
+.theme--signalheartpink .play-icon { color: #ff3da1; background: #080908; }
+.theme--signalheartpink .composer {
+  color: #080908; background: #ff3da1; border: 0;
+}
+.theme--signalheartpink .composer small { color: rgb(8 9 8 / 66%); }
+.theme--signalheartpink .composer-icon { color: #ff3da1; background: #080908; }
+.theme--signalheartpink .composer-action { color: #efff24; }
+.theme--signalheartpink .cover {
+  color: #efff24; background: #080908;
+  border: 2px solid #ff3da1; box-shadow: 0 0 14px rgb(255 61 161 / 25%);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   V1 · Ward(병동) — 멘헤라를 이모지가 아니라 '의료 디자인 언어'로.
+   ♡·글리치 없이 봉합선(대시 보더=꿰맨 자국)·의료 크로스(선으로 그린 ＋)·
+   캡슐(알약) 배지로 병동 느낌을 낸다. 현재 앱 베이스(라임·검정·핑크)는 유지.
+   ───────────────────────────────────────────────────────────── */
+.theme--ward {
+  --accent: #efff24;
+  --accent-soft: #23300a;
+  --canvas: #080908;
+  --surface: #080908;
+  --surface-subtle: #151714;
+  --ink: #f6f7ef;
+  --muted: #92958a;
+  --stroke: #ff3da1;
+  --now: #efff24;
+  --now-accent: #ff3da1;
+  --sort-active-color: #080908;
+}
+.theme--ward .cafe-header { background: var(--canvas); }
+/* 봉합선: 카드 테두리를 핑크 대시로 — 붕대/꿰맨 자국 모티프 */
+.theme--ward .now-playing {
+  position: relative;
+  color: #080908;
+  border: 2px dashed #ff3da1;
+  border-radius: 4px;
+  box-shadow: 0 0 22px rgb(255 61 161 / 22%);
+}
+/* 의료 크로스: 카드 모서리에 얇은 선으로 그린 ＋ (의료 십자/등록 마크) */
+.theme--ward .now-playing::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 11px;
+  height: 11px;
+  opacity: .8;
+  background:
+    linear-gradient(#080908, #080908) center / 2px 100% no-repeat,
+    linear-gradient(#080908, #080908) center / 100% 2px no-repeat;
+}
+.theme--ward .now-label { letter-spacing: .14em; }
+.theme--ward .now-label,
+.theme--ward .now-body div > span { color: rgb(8 9 8 / 66%); }
+.theme--ward .play-icon { color: #efff24; background: #080908; }
+/* 캡슐 배지: 알약(캡슐) 모티프 */
+.theme--ward .status-badge,
+.theme--ward .open-badge { padding: 3px 10px; border-radius: 999px; }
+.theme--ward .composer {
+  color: #080908;
+  background: #efff24;
+  border: 2px dashed #ff3da1;
+  border-radius: 4px;
+}
+.theme--ward .composer small { color: rgb(8 9 8 / 66%); }
+.theme--ward .composer-icon { color: #efff24; background: #080908; border-radius: 999px; }
+.theme--ward .composer-action { color: #ff3da1; }
+/* 곡 커버·구분선도 봉합선으로 통일 */
+.theme--ward .cover {
+  color: #ff3da1;
+  background: #080908;
+  border: 1.5px dashed #ff3da1;
+  border-radius: 4px;
+}
+.theme--ward .song { border-top: 1px dashed rgb(255 61 161 / 55%); }
+.theme--ward .sort-tabs button { border-radius: 999px; }

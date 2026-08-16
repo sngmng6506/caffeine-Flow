@@ -28,6 +28,12 @@ const concepts = [
   { id: 'liquidacid', label: 'E2', name: 'Liquid Acid', summary: '라임→시안 그라디언트와 네온 글로우 · 부드러운 라운드의 액체질감 실험' },
   { id: 'vaporwave', label: 'E3', name: 'Vaporwave Sunset', summary: '마젠타→퍼플→시안 선셋 그라디언트 · 딥 인디고 위 레트로 퓨처' },
   { id: 'liquidsignal', label: 'E4', name: 'Liquid Signal', summary: 'E2 × 현재 앱 블렌드 · 라임/시안 그라디언트와 글로우를 현재 앱의 네온 라임·순검정·핫핑크 정체성에 입힘' },
+  { id: 'yamipulse', label: 'M1', name: 'Yami Pulse', summary: '사이버멘헤라 핵심 · 다크 위 핫핑크 지배 + 시안 헤일로 글로우, 하트 모티프' },
+  { id: 'sicksweet', label: 'M2', name: 'Sick Sweet', summary: '파스텔 멘헤라 우위 · 핑크/라벤더/베이비블루의 병약 스위트, 부드러운 라운드' },
+  { id: 'glitchheart', label: 'M3', name: 'Glitch Heart', summary: '사이버펑크 우위 · 네온 마젠타×시안, 클립 코너와 글리치 크로매틱 타이포' },
+  { id: 'signalheart', label: 'B1', name: 'Signal Heart', summary: '현재 앱 베이스 유지(라임 주역) · 핑크 글로우·♡·글리치만 가미한 사이버멘헤라 진화' },
+  { id: 'signalheartpink', label: 'B2', name: 'Signal Heart Pink', summary: '현재 앱 베이스에서 핑크를 전면 주역으로 · 라임/시안은 액센트로 강등' },
+  { id: 'ward', label: 'V1', name: 'Ward', summary: '멘헤라를 이모지 아닌 의료 디자인 언어로 · 봉합선(대시)·의료 크로스·캡슐 배지, 현재 베이스 유지' },
 ];
 
 const songs = [
