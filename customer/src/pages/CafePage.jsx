@@ -458,6 +458,7 @@ export default function CafePage({ slug }) {
                     isMyRequest={rec.is_mine}
                     hideStatus
                     expanded={queueExpanded === rec.id}
+                    compact
                   />
                   {queueExpanded === rec.id && <CafeComments videoId={rec.video_id} slug={slug} />}
                 </div>
@@ -480,6 +481,7 @@ export default function CafePage({ slug }) {
                     isMyRequest={rec.is_mine}
                     hideStatus
                     expanded={queueExpanded === rec.id}
+                    compact
                   />
                   {queueExpanded === rec.id && <CafeComments videoId={rec.video_id} slug={slug} />}
                 </div>
@@ -522,6 +524,7 @@ export default function CafePage({ slug }) {
                       onLinkCopyResult={handleCopyResult}
                       showDate
                       expanded={historyExpanded === rec.id}
+                      compact
                     />
                     {historyExpanded === rec.id && <CafeComments videoId={rec.video_id} slug={slug} />}
                   </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Heart, MessageCircle, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Heart, MessageCircle, X } from 'lucide-react';
 import { vote, unvote, cancelRecommendation } from '../api';
 import { hasVoted, markVoted, removeVote } from '../votedSongs';
 import { CANCELLABLE_STATUSES, REC_STATUS_LABELS } from '../constants/recommendationStatus';
@@ -7,7 +7,7 @@ import { COMPACT_PLATFORM_BADGE, PLATFORM } from '../constants/platforms';
 import SongThumbnail from '../components/SongThumbnail';
 import LongPressCopy from '../components/LongPressCopy';
 
-export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLinkCopyResult, showDate, position, isMyRequest, hideStatus, expanded }) {
+export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLinkCopyResult, showDate, position, isMyRequest, hideStatus, expanded, compact }) {
   const [error, setError] = useState('');
   const voted = hasVoted(slug, rec.id);
   const cancellable = isMyRequest && CANCELLABLE_STATUSES.includes(rec.status);
@@ -43,7 +43,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
 
   return (
     <LongPressCopy videoId={rec.video_id} onResult={onLinkCopyResult} disabled={rec.link_available === false}>
-      <article className='song-card'>
+      <article className={`song-card${compact ? ' song-card--compact' : ''}`}>
       <div className='song-card__context'>
         <div className='song-card__details'>
           {position && <span className='song-card__position'>{position}번째</span>}
@@ -84,12 +84,21 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
           aria-label={`좋아요 ${rec.vote_count || 0}개${voted ? ', 선택됨' : ''}`}
         >
           <Heart size={16} fill={voted ? 'currentColor' : 'none'} aria-hidden='true' />
-          <span>좋아요</span>
+          {!compact && <span>좋아요</span>}
           <strong>{rec.vote_count || 0}</strong>
         </button>}
-        <button type='button' onClick={onToggle} className='pill-action' aria-expanded={expanded}>
-          <MessageCircle size={16} aria-hidden='true' />
-          <span>댓글</span>
+        <button
+          type='button'
+          onClick={onToggle}
+          className={compact ? 'icon-button' : 'pill-action'}
+          aria-expanded={expanded}
+          aria-label={compact ? (expanded ? '댓글 접기' : '댓글 펼치기') : undefined}
+        >
+          {compact ? (
+            expanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />
+          ) : (
+            <><MessageCircle size={16} aria-hidden='true' /><span>댓글</span></>
+          )}
         </button>
         {cancellable && (
           <button type='button' onClick={handleCancel} className='pill-action pill-action--danger'>
