@@ -56,6 +56,10 @@ BGM과 신청곡이 모두 Spotify이면 같은 계정의 재생 세션이 충�
 
 Spotify와 SoundCloud는 자체 자동재생으로 다음 곡을 이어갈 수 있어 DOM의 단순 `ended` 신호에 의존하지 않는다. 제목 시그니처가 일정 횟수 연속으로 달라졌을 때 신청곡 종료로 판단한다.
 
+현재 곡 감지는 실제로 소리내며 재생 중인 미디어(음소거·정지 상태 제외)만 곡으로 인정한다. 유튜브 홈처럼 음소거 hover 미리보기가 mediaSession을 세팅해도 곡으로 잡지 않으며, watch·shorts 페이지이거나 실제 가청 재생일 때만 인정한다.
+
+신청곡 재생 중 사장님이 플레이어를 신청곡 재생 URL(watch/shorts/track 등) 밖으로 이동하면 이탈로 보고 `onRecLeft`로 알린다. 이때 원곡은 `played`로 종료만 하고, 정상 종료(`onVideoEnded`)와 달리 다음 곡 자동 재생이나 BGM 복귀는 하지 않는다. 사장님이 직접 플레이어를 조작 중이므로 방해하지 않기 위함이다.
+
 ## SoundCloud 제약
 
 SoundCloud는 스크립트로 생성한 클릭을 무시하는 경우가 있어 운영체제 수준 입력을 사용한다. 로그인 모달이나 자동재생 방해 요소는 최소 범위에서 차단한다.
@@ -92,7 +96,8 @@ endRec           신청곡 종료 처리 및 BGM 복귀
 setBgmUrl        기본 BGM 설정. Promise<boolean>으로 적용 여부 반환
 clearBgm         기본 BGM 해제. Promise<boolean>으로 적용 여부 반환
 isRecActive      Electron 메인의 실제 신청곡 재생 모드 조회
-onVideoEnded     신청곡 종료 알림
+onVideoEnded     신청곡 정상 종료 알림. 다음 곡 자동 재생
+onRecLeft        신청곡 이탈(플레이어를 신청곡 밖으로 이동) 알림. 원곡 종료만, 자동 재생 없음
 onNowPlaying     현재 재생 정보
 onPlaybackState  재생·일시정지·버퍼링 상태
 onCurrentTrack   현재 BrowserView에서 감지한 공개 곡 메타데이터
