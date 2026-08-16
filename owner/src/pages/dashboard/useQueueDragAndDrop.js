@@ -7,6 +7,19 @@ import { runPlaybackTransition } from './playbackTransition.mjs';
 
 const DEFAULT_DROP_TARGET = 'default';
 
+// 큐 항목 내부 드래그는 JSON을 text/plain에 담는다. 외부 링크·텍스트·파일을
+// 드롭하면 URL 같은 비-JSON이 들어와 JSON.parse가 깨지므로 안전하게 무시한다.
+function readDragData(event) {
+  const raw = event.dataTransfer.getData('text/plain');
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function useQueueDragAndDrop({
   cafeSlug,
   recommendations,
@@ -31,8 +44,10 @@ export default function useQueueDragAndDrop({
     setDragOver(null);
     setError('');
 
+    const data = readDragData(event);
+    if (!data) return;
+
     try {
-      const data = JSON.parse(event.dataTransfer.getData('text/plain'));
       if (targetStatus === REC_STATUS.PLAYING && !canControlPlayback) {
         throw new Error('재생을 담당하는 Electron 앱에서만 재생 중으로 옮길 수 있습니다.');
       }
@@ -139,8 +154,10 @@ export default function useQueueDragAndDrop({
     setDragOver(null);
     setError('');
 
+    const data = readDragData(event);
+    if (!data) return;
+
     try {
-      const data = JSON.parse(event.dataTransfer.getData('text/plain'));
       if (data.type === DEFAULT_DROP_TARGET) return;
       const rec = recommendations.find(item => item.id === data.id);
       if (!rec) return;
