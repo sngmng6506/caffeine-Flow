@@ -11,6 +11,7 @@ export default function QueueTab({
   dragOver,
   defaultVideo,
   nowPlaying,
+  currentTrack,
   widevineStatus,
   slug,
   error,
@@ -79,7 +80,22 @@ export default function QueueTab({
                   playbackControlDisabled={!canControlPlayback}
                 />
               ))
-            : <div className="owner-empty">재생 중인 신청곡이 없어요.</div>
+            : currentTrack
+              // 신청곡이 아니라 사장님이 브라우저에서 직접 재생 중인 곡. 손님 화면과
+              // 동일하게 실제로 나가는 곡을 여기에도 보여 준다.
+              ? (
+                <div className="owner-track-card">
+                  {currentTrack.thumbnail && (
+                    <img className="owner-track-card__thumb" src={currentTrack.thumbnail} alt="" />
+                  )}
+                  <div className="owner-track-card__body">
+                    <span className="owner-inline-status">브라우저에서 재생 중</span>
+                    <div className="owner-track-card__title">{currentTrack.title}</div>
+                    {currentTrack.artist && <div className="owner-track-card__meta">{currentTrack.artist}</div>}
+                  </div>
+                </div>
+              )
+              : <div className="owner-empty">재생 중인 신청곡이 없어요.</div>
         }
       </section>
 

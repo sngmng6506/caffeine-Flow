@@ -26,6 +26,7 @@ export default function useRecommendationQueue({
   const recommendationsRef = useRef([]);
   const [isAccepting, setIsAccepting] = useState(true);
   const [nowPlaying, setNowPlaying] = useState(null);
+  const [currentTrack, setCurrentTrack] = useState(null);
   const [loading, setLoading] = useState(true);
   const [widevineStatus, setWidevineStatus] = useState(null);
   const [aiAutoAccept, setAiAutoAccept] = useState(false);
@@ -312,6 +313,7 @@ export default function useRecommendationQueue({
     const removePlaybackState = window.electronAPI?.onPlaybackState?.(publishPlaybackState);
     const removeCurrentTrack = window.electronAPI?.onCurrentTrack?.(track => {
       currentTrackRef.current = track && typeof track === 'object' ? track : null;
+      setCurrentTrack(currentTrackRef.current);
       publishPlaybackState(currentTrackRef.current ? PLAYBACK_STATE.PLAYING : PLAYBACK_STATE.UNKNOWN);
     });
     const removeManualTrackEnded = window.electronAPI?.onManualTrackEnded?.(track => {
@@ -456,6 +458,7 @@ export default function useRecommendationQueue({
     recommendationsRef,
     isAccepting,
     nowPlaying,
+    currentTrack,
     loading,
     widevineStatus,
     aiAutoAccept,

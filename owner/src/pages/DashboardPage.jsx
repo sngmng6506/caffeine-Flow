@@ -70,6 +70,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     setRecommendations,
     isAccepting,
     nowPlaying,
+    currentTrack,
     loading,
     widevineStatus,
     aiAutoAccept,
@@ -202,6 +203,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           dragOver={dragOver}
           defaultVideo={defaultVideo}
           nowPlaying={nowPlaying}
+          currentTrack={currentTrack}
           widevineStatus={widevineStatus}
           slug={cafe.slug}
           error={queueError}
