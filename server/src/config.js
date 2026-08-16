@@ -36,6 +36,6 @@ module.exports = {
   OPENROUTER_API_KEY,
   OPENROUTER_BASE_URL,
   OPENROUTER_APP_NAME: env('OPENROUTER_APP_NAME', 'Caffeine Flow'),
-  MUSIC_FILTER_MODEL: env('MUSIC_FILTER_MODEL', 'openai/gpt-4.1-mini'),
+  MUSIC_FILTER_MODEL: env('MUSIC_FILTER_MODEL', 'anthropic/claude-sonnet-5'),
   MUSIC_FILTER_TIMEOUT_MS: Number(env('MUSIC_FILTER_TIMEOUT_MS', '8000')) || 8000,
 };
