@@ -6,8 +6,9 @@
 exports.up = async (knex) => {
   await knex.schema.alterTable('recommendations', (table) => {
     table.text('filter_prompt_snapshot').nullable();
-    table.index(['cafe_id', 'filter_checked_at'], 'idx_recommendations_filter_audit');
   });
+  // 감사 조회용 인덱스는 쓰기가 잦은 recommendations를 잠그지 않도록
+  // 20260816090000 마이그레이션에서 CONCURRENTLY로 별도 생성한다.
 
   await knex.schema.createTable('music_filter_prompt_history', (table) => {
     table.uuid('id').primary().defaultTo(knex.raw('gen_random_uuid()'));
@@ -35,7 +36,6 @@ exports.up = async (knex) => {
 exports.down = async (knex) => {
   await knex.schema.dropTableIfExists('music_filter_prompt_history');
   await knex.schema.alterTable('recommendations', (table) => {
-    table.dropIndex(['cafe_id', 'filter_checked_at'], 'idx_recommendations_filter_audit');
     table.dropColumn('filter_prompt_snapshot');
   });
 };

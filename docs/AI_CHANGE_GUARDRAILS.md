@@ -213,6 +213,7 @@ server/src/features/music-filter/decision.policy.js
 - partial unique index 변경 시 기존 중복 데이터를 먼저 정리한다.
 - UUID를 정수 PK처럼 취급하지 않는다.
 - 마이그레이션은 빈 DB와 기존 데이터가 있는 DB 양쪽을 고려한다.
+- 쓰기가 잦은 대형 테이블(`recommendations` 등)에 인덱스를 추가할 때는 배포 중 쓰기 락을 피하기 위해 `CREATE INDEX CONCURRENTLY`를 사용하고, 해당 마이그레이션만 `exports.config = { transaction: false }`로 분리한다.
 
 ## Authentication and Slug Contract
 
