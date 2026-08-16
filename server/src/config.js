@@ -36,6 +36,9 @@ module.exports = {
   OPENROUTER_API_KEY,
   OPENROUTER_BASE_URL,
   OPENROUTER_APP_NAME: env('OPENROUTER_APP_NAME', 'Caffeine Flow'),
-  MUSIC_FILTER_MODEL: env('MUSIC_FILTER_MODEL', 'anthropic/claude-sonnet-5'),
+  // OpenRouter에서 response_format json_schema(strict) 구조화 출력을 지원하는
+  // 모델이어야 한다. Anthropic 계열은 이 방식을 지원하지 않아 404(fail-closed)로
+  // 이어지므로 OpenAI 계열을 사용한다.
+  MUSIC_FILTER_MODEL: env('MUSIC_FILTER_MODEL', 'openai/gpt-4o'),
   MUSIC_FILTER_TIMEOUT_MS: Number(env('MUSIC_FILTER_TIMEOUT_MS', '8000')) || 8000,
 };
