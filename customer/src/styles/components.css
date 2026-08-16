@@ -321,9 +321,9 @@
   font-weight: 600;
 }
 
-.request-composer__trigger > strong {
+.request-composer__caret {
+  flex: 0 0 auto;
   color: var(--cf-on-dark);
-  font-size: 14px;
 }
 
 .request-composer__icon {

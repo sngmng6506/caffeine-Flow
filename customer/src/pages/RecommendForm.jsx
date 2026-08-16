@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link2, LoaderCircle, Search, Send, X } from 'lucide-react';
+import { ChevronDown, Link2, LoaderCircle, Search, Send, X } from 'lucide-react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
@@ -159,7 +159,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         <button type='button' className='request-composer__trigger' onClick={() => setComposerOpen(true)}>
           <span className='request-composer__icon' aria-hidden='true'><Link2 size={18} /></span>
           <span>듣고 싶은 곡이 있나요?</span>
-          <strong>입력</strong>
+          <ChevronDown size={18} className='request-composer__caret' aria-hidden='true' />
         </button>
       </section>
     );
