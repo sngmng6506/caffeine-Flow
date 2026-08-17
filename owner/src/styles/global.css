@@ -44,6 +44,8 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 .owner-dashboard::-webkit-scrollbar { display: none; }
 .owner-dashboard--collapsed { overflow: hidden; padding: 0; }
 .owner-dashboard__content[hidden] { display: none; }
+.owner-panel-divider-line { width: 2px; height: 100%; border-radius: 2px; background: var(--owner-stroke); transition: width .15s ease, background .15s ease; }
+.owner-panel-divider:hover .owner-panel-divider-line { width: 4px; background: var(--owner-primary); }
 
 .owner-panel-rail {
   position: fixed;

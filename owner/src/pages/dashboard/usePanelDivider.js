@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const DEFAULT_RATIO = 0.42;
 const MIN_RATIO = 0.15;
@@ -15,9 +15,26 @@ export default function usePanelDivider() {
     return Number.isFinite(saved) ? clampRatio(saved) : DEFAULT_RATIO;
   });
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const draggingRef = useRef(false);
+  const listenersRef = useRef(null);
+
+  function stopDragging() {
+    const wasDragging = draggingRef.current;
+    draggingRef.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    if (wasDragging) window.electronAPI?.dividerDragEnd?.();
+    if (listenersRef.current) {
+      window.removeEventListener('mousemove', listenersRef.current.onMove);
+      window.removeEventListener('mouseup', listenersRef.current.onUp);
+      listenersRef.current = null;
+    }
+  }
+
   useEffect(() => {
     window.electronAPI?.setPanelRatio(panelRatio);
     if (supportsPanelCollapse) window.electronAPI?.setPanelCollapsed(false);
+    return stopDragging;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -26,6 +43,7 @@ export default function usePanelDivider() {
 
   function collapsePanel() {
     if (!supportsPanelCollapse) return;
+    stopDragging();
     setIsPanelCollapsed(true);
     window.electronAPI?.setPanelCollapsed(true);
   }
@@ -37,11 +55,33 @@ export default function usePanelDivider() {
     window.electronAPI?.setPanelCollapsed(false);
   }
 
+  // 왼쪽 사장님 화면과 오른쪽 BrowserView의 좌우 폭을 드래그로 조정한다.
+  function handleDividerMouseDown(event) {
+    event.preventDefault();
+    draggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.electronAPI?.dividerDragStart?.();
+
+    const onMove = (moveEvent) => {
+      if (!draggingRef.current) return;
+      const ratio = clampRatio(moveEvent.clientX / window.innerWidth);
+      setPanelRatio(ratio);
+      localStorage.setItem('cf_panel_ratio', String(ratio));
+      window.electronAPI?.setPanelRatio(ratio);
+    };
+    const onUp = () => stopDragging();
+    listenersRef.current = { onMove, onUp };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
   return {
     panelRatio,
     isPanelCollapsed,
     supportsPanelCollapse,
     collapsePanel,
     expandPanel,
+    handleDividerMouseDown,
   };
 }

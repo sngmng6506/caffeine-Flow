@@ -63,6 +63,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
     supportsPanelCollapse,
     collapsePanel,
     expandPanel,
+    handleDividerMouseDown,
   } = usePanelDivider();
 
   const {
@@ -182,6 +183,28 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
 
       <div className="owner-dashboard__content" hidden={isPanelCollapsed}>
         {updateBanner}
+        {/* BrowserView 경계보다 8px 왼쪽에 renderer 드래그 영역을 둔다. */}
+        <div
+          className="owner-panel-divider"
+          onMouseDown={handleDividerMouseDown}
+          title="드래그하여 좌우 폭 조정"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: `calc(${(panelRatio * 100).toFixed(2)}% - 8px)`,
+            width: 8,
+            height: '100vh',
+            cursor: 'col-resize',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            background: 'transparent',
+          }}
+        >
+          <div className="owner-panel-divider-line" />
+        </div>
+
       <DashboardHeader
         cafe={cafe}
         isAccepting={isAccepting}
