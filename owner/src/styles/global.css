@@ -144,11 +144,13 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 .owner-tabs {
   display: flex;
   overflow-x: auto;
+  scrollbar-width: none;
   margin-bottom: 16px;
   border: 1px solid var(--owner-stroke);
   border-radius: 10px;
   background: var(--owner-surface);
 }
+.owner-tabs::-webkit-scrollbar { display: none; }
 .owner-tab {
   position: relative;
   display: flex;
