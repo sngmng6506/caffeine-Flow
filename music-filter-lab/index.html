@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Caffeine Flow · Music Filter Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="lab-header">
+      <div>
+        <p class="lab-eyebrow">Caffeine Flow</p>
+        <h1>Music Filter Lab</h1>
+        <p class="lab-description">
+          실제 서버와 동일한 프롬프트·tool-calling 요청을 브라우저에서 재현해 AI 음악 필터의 판단을 미리 테스트합니다.
+          운영 API·DB와 연결되지 않으며, OpenRouter로만 직접 호출합니다.
+        </p>
+      </div>
+    </header>
+
+    <main class="lab-main">
+      <section class="lab-panel" aria-label="설정">
+        <h2>설정</h2>
+        <label class="field">
+          <span>OpenRouter API Key <small>(이 브라우저 localStorage에만 저장 · OpenRouter로만 전송)</small></span>
+          <input id="apiKey" type="password" placeholder="sk-or-..." autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>모델 <small id="modelCount">(OpenRouter 목록 불러오는 중…)</small></span>
+          <input id="model" type="text" list="modelList" value="anthropic/claude-sonnet-5" spellcheck="false" placeholder="입력해서 검색 · 예: openai/gpt-4o" />
+          <datalist id="modelList"></datalist>
+        </label>
+        <p class="field-hint">서버 기본값: <code>anthropic/claude-sonnet-5</code>. 칸을 클릭/입력하면 OpenRouter 모델 목록에서 골라 바꿔가며 테스트할 수 있어요. (구조화 출력=tool calling 방식이라 tool 지원 모델이면 대부분 동작)</p>
+      </section>
+
+      <section class="lab-panel" aria-label="판단 입력">
+        <h2>판단 입력</h2>
+        <label class="field">
+          <span>매장 분위기 (사장님 정책)</span>
+          <textarea id="cafePrompt" rows="3" placeholder="예: 조용한 재즈와 로파이만. 시끄러운 힙합·EDM 금지."></textarea>
+        </label>
+        <div class="field-grid">
+          <label class="field">
+            <span>제목</span>
+            <input id="title" type="text" placeholder="Supernova" />
+          </label>
+          <label class="field">
+            <span>아티스트 / 채널</span>
+            <input id="artist" type="text" placeholder="aespa" />
+          </label>
+          <label class="field">
+            <span>플랫폼</span>
+            <select id="platform">
+              <option value="youtube">youtube</option>
+              <option value="soundcloud">soundcloud</option>
+              <option value="spotify">spotify</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>길이 (선택)</span>
+            <input id="duration" type="text" placeholder="3:58" />
+          </label>
+          <label class="field">
+            <span>신청자명 (선택)</span>
+            <input id="requester" type="text" placeholder="손님1" />
+          </label>
+        </div>
+        <button id="run" type="button" class="run-button">필터 판단 실행</button>
+      </section>
+
+      <section class="lab-panel lab-result" aria-label="결과" id="resultPanel" hidden>
+        <h2>결과</h2>
+        <div id="verdict" class="verdict"></div>
+        <dl class="result-meta">
+          <div><dt>상태 (status)</dt><dd id="statusOut">—</dd></div>
+          <div><dt>필터 상태 (filter_status)</dt><dd id="filterStatusOut">—</dd></div>
+          <div><dt>confidence</dt><dd id="confidenceOut">—</dd></div>
+          <div><dt>모델</dt><dd id="modelOut">—</dd></div>
+        </dl>
+        <div class="result-reason">
+          <h3>사유 (reason)</h3>
+          <p id="reasonOut">—</p>
+        </div>
+        <details class="result-raw">
+          <summary>원본 요청 / 응답</summary>
+          <h4>요청 messages</h4>
+          <pre id="messagesOut"></pre>
+          <h4>응답</h4>
+          <pre id="rawOut"></pre>
+        </details>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Caffeine Flow · Labs</title>
+    <style>
+      :root { color-scheme: light; font-family: Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body { display: flex; flex-direction: column; background: #0f1420; color: #e7e9ef; }
+
+      .labs-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: #12172400;
+        border-bottom: 1px solid #232a3a;
+        flex: 0 0 auto;
+      }
+      .labs-brand { margin-right: 10px; font-size: 13px; font-weight: 800; letter-spacing: 0.02em; color: #9aa3b8; white-space: nowrap; }
+      .labs-brand b { color: #fff; }
+      .labs-tab {
+        padding: 8px 14px;
+        color: #b8bfce;
+        background: #1a2030;
+        border: 1px solid #2a3142;
+        border-radius: 8px;
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 650;
+      }
+      .labs-tab:hover { color: #fff; border-color: #3a4358; }
+      .labs-tab.is-active { color: #0f1420; background: #6c8bff; border-color: #6c8bff; }
+      .labs-spacer { flex: 1; }
+      .labs-open { color: #8a93a8; font-size: 12px; text-decoration: none; white-space: nowrap; }
+      .labs-open:hover { color: #fff; }
+
+      .labs-stage { position: relative; flex: 1; min-height: 0; background: #fff; }
+      .labs-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+      .labs-frame[hidden] { display: none; }
+      .labs-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #8a93a8; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <nav class="labs-bar" role="tablist" aria-label="Labs">
+      <span class="labs-brand">Caffeine Flow · <b>Labs</b></span>
+      <button class="labs-tab is-active" role="tab" data-src="/design-lab/index.html">Flow Mark</button>
+      <button class="labs-tab" role="tab" data-src="/customer-design-lab/index.html">손님 디자인</button>
+      <button class="labs-tab" role="tab" data-src="/music-filter-lab/index.html">음악 필터</button>
+      <span class="labs-spacer"></span>
+      <a class="labs-open" id="openNew" href="/design-lab/index.html" target="_blank" rel="noreferrer">↗ 새 탭에서 열기</a>
+    </nav>
+    <div class="labs-stage" id="stage">
+      <div class="labs-empty" id="empty">불러오는 중…</div>
+    </div>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll('.labs-tab'));
+      const stage = document.getElementById('stage');
+      const empty = document.getElementById('empty');
+      const openNew = document.getElementById('openNew');
+      const frames = new Map();
+
+      function activate(tab) {
+        const src = tab.dataset.src;
+        openNew.href = src;
+        tabs.forEach((item) => item.classList.toggle('is-active', item === tab));
+
+        // 프레임을 처음 열 때만 로드하고, 이후엔 표시만 전환해 상태를 유지한다.
+        let frame = frames.get(src);
+        if (!frame) {
+          frame = document.createElement('iframe');
+          frame.className = 'labs-frame';
+          frame.src = src;
+          frame.title = tab.textContent;
+          stage.appendChild(frame);
+          frames.set(src, frame);
+        }
+        for (const [key, existing] of frames) existing.hidden = key !== src;
+        if (empty) empty.hidden = true;
+      }
+
+      tabs.forEach((tab) => tab.addEventListener('click', () => activate(tab)));
+      activate(tabs[0]);
+    </script>
+  </body>
+</html>
