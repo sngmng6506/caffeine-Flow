@@ -90,7 +90,7 @@ VITE_NAVER_ENABLED
 | `OPENROUTER_API_KEY` | OpenRouter 인증. 필터 ON에서 누락 시 fail-closed |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` |
 | `OPENROUTER_APP_NAME` | `Caffeine Flow` |
-| `MUSIC_FILTER_MODEL` | `openai/gpt-4o` |
+| `MUSIC_FILTER_MODEL` | `anthropic/claude-sonnet-5` |
 | `MUSIC_FILTER_TIMEOUT_MS` | `8000` |
 
 모델은 JSON Schema structured output을 지원해야 한다. 동작 계약은 [LLM_FILTER.md](LLM_FILTER.md)를 따른다.

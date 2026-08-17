@@ -37,10 +37,14 @@ function withCode(error, code) {
 }
 
 function parseContent(data) {
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content) throw withCode(new Error('LLM 응답 content 누락'), 'LLM_EMPTY_RESPONSE');
+  const message = data?.choices?.[0]?.message;
+  // 구조화 출력을 tool(function) call로 강제한다. OpenAI·Anthropic 등 프로바이더
+  // 무관하게 arguments(JSON 문자열)에서 판단 결과를 읽는다. 일부 프로바이더가
+  // content로 반환하는 경우를 대비해 fallback도 둔다.
+  const raw = message?.tool_calls?.[0]?.function?.arguments ?? message?.content;
+  if (!raw) throw withCode(new Error('LLM 응답 판단 결과 누락'), 'LLM_EMPTY_RESPONSE');
   try {
-    return typeof content === 'string' ? JSON.parse(content) : content;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch (error) {
     throw withCode(error, 'LLM_JSON_PARSE_ERROR');
   }
@@ -58,16 +62,24 @@ async function callMusicFilterLlm(messages) {
         model: MUSIC_FILTER_MODEL,
         messages,
         temperature: 0,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'music_filter_decision',
-            strict: true,
-            schema: RESPONSE_SCHEMA,
+        // response_format(json_schema)는 OpenAI 계열만 지원해 Anthropic 등에서
+        // 404가 났다. tool(function) calling은 프로바이더 공통이라 강제 호출로
+        // 동일한 구조화 출력을 받는다.
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'music_filter_decision',
+              description: '신청곡을 수락 또는 거절로 판단한 결과',
+              parameters: RESPONSE_SCHEMA,
+            },
           },
-        },
-        provider: {
-          require_parameters: true,
+        ],
+        // 강제 호출로 항상 판단 도구를 쓰게 한다. require_parameters는 Anthropic
+        // 엔드포인트를 걸러 404를 유발하므로 두지 않는다(tool_choice로 충분).
+        tool_choice: {
+          type: 'function',
+          function: { name: 'music_filter_decision' },
         },
       },
       {
