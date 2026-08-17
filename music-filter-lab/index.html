@@ -13,8 +13,8 @@
         <p class="lab-eyebrow">Caffeine Flow</p>
         <h1>Music Filter Lab</h1>
         <p class="lab-description">
-          실제 서버와 동일한 프롬프트·tool-calling 요청을 브라우저에서 재현해 AI 음악 필터의 판단을 미리 테스트합니다.
-          운영 API·DB와 연결되지 않으며, OpenRouter로만 직접 호출합니다.
+          음악 링크와 매장 분위기 프롬프트를 넣으면 실제 서비스와 동일하게 AI 음악 필터가 판단합니다.
+          서버(<code>/api/v1/cafes/me/music-filter/test</code>)를 통해 Railway에 등록된 OpenRouter 키로 실행됩니다.
         </p>
       </div>
     </header>
@@ -22,73 +22,47 @@
     <main class="lab-main">
       <section class="lab-panel" aria-label="설정">
         <h2>설정</h2>
+        <p id="authState" class="auth-state">로그인 세션 확인 중…</p>
+        <details class="auth-manual">
+          <summary>토큰 수동 입력 (로그인 세션이 없을 때)</summary>
+          <label class="field">
+            <span>사장님 토큰 <small>(사장님 앱 로그인 후 자동 사용 · 다른 브라우저면 수동 입력)</small></span>
+            <input id="token" type="password" placeholder="eyJ..." autocomplete="off" />
+          </label>
+        </details>
         <label class="field">
-          <span>OpenRouter API Key <small>(이 브라우저 localStorage에만 저장 · OpenRouter로만 전송)</small></span>
-          <input id="apiKey" type="password" placeholder="sk-or-..." autocomplete="off" />
-        </label>
-        <label class="field">
-          <span>모델 <small id="modelCount">(OpenRouter 목록 불러오는 중…)</small></span>
-          <input id="model" type="text" list="modelList" value="anthropic/claude-sonnet-5" spellcheck="false" placeholder="입력해서 검색 · 예: openai/gpt-4o" />
+          <span>모델 <small id="modelCount">(목록 불러오는 중…)</small></span>
+          <input id="model" type="text" list="modelList" placeholder="비우면 서버 기본 모델 · 예: openai/gpt-4o" spellcheck="false" />
           <datalist id="modelList"></datalist>
         </label>
-        <p class="field-hint">서버 기본값: <code>anthropic/claude-sonnet-5</code>. 칸을 클릭/입력하면 OpenRouter 모델 목록에서 골라 바꿔가며 테스트할 수 있어요. (구조화 출력=tool calling 방식이라 tool 지원 모델이면 대부분 동작)</p>
+        <p class="field-hint">비워두면 서버 기본값(<code id="defaultModelHint">MUSIC_FILTER_MODEL</code>)으로 판단합니다. 목록에서 골라 바꿔가며 비교하세요.</p>
       </section>
 
       <section class="lab-panel" aria-label="판단 입력">
         <h2>판단 입력</h2>
         <label class="field">
+          <span>음악 링크 <small>(YouTube · Spotify · SoundCloud)</small></span>
+          <input id="url" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." />
+        </label>
+        <label class="field">
           <span>매장 분위기 (사장님 정책)</span>
           <textarea id="cafePrompt" rows="3" placeholder="예: 조용한 재즈와 로파이만. 시끄러운 힙합·EDM 금지."></textarea>
         </label>
-        <div class="field-grid">
-          <label class="field">
-            <span>제목</span>
-            <input id="title" type="text" placeholder="Supernova" />
-          </label>
-          <label class="field">
-            <span>아티스트 / 채널</span>
-            <input id="artist" type="text" placeholder="aespa" />
-          </label>
-          <label class="field">
-            <span>플랫폼</span>
-            <select id="platform">
-              <option value="youtube">youtube</option>
-              <option value="soundcloud">soundcloud</option>
-              <option value="spotify">spotify</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>길이 (선택)</span>
-            <input id="duration" type="text" placeholder="3:58" />
-          </label>
-          <label class="field">
-            <span>신청자명 (선택)</span>
-            <input id="requester" type="text" placeholder="손님1" />
-          </label>
-        </div>
         <button id="run" type="button" class="run-button">필터 판단 실행</button>
       </section>
 
       <section class="lab-panel lab-result" aria-label="결과" id="resultPanel" hidden>
         <h2>결과</h2>
         <div id="verdict" class="verdict"></div>
-        <dl class="result-meta">
-          <div><dt>상태 (status)</dt><dd id="statusOut">—</dd></div>
-          <div><dt>필터 상태 (filter_status)</dt><dd id="filterStatusOut">—</dd></div>
-          <div><dt>confidence</dt><dd id="confidenceOut">—</dd></div>
-          <div><dt>모델</dt><dd id="modelOut">—</dd></div>
-        </dl>
         <div class="result-reason">
-          <h3>사유 (reason)</h3>
+          <h3>사유</h3>
           <p id="reasonOut">—</p>
         </div>
-        <details class="result-raw">
-          <summary>원본 요청 / 응답</summary>
-          <h4>요청 messages</h4>
-          <pre id="messagesOut"></pre>
-          <h4>응답</h4>
-          <pre id="rawOut"></pre>
-        </details>
+        <dl class="result-meta">
+          <div><dt>곡</dt><dd id="trackOut">—</dd></div>
+          <div><dt>모델</dt><dd id="modelOut">—</dd></div>
+          <div><dt>confidence</dt><dd id="confidenceOut">—</dd></div>
+        </dl>
       </section>
     </main>
 

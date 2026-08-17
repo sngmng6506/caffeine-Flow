@@ -33,6 +33,13 @@ body { margin: 0; min-width: 320px; }
 }
 .lab-panel h2 { margin: 0 0 14px; font-size: 15px; }
 
+.auth-state { margin: 0 0 12px; padding: 8px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+.auth-state--ok { color: #0d7a52; background: #e7f8f0; border: 1px solid #b7e6d3; }
+.auth-state--warn { color: #b42318; background: #fdeceb; border: 1px solid #f5c9c4; }
+.auth-manual { margin-bottom: 12px; }
+.auth-manual summary { cursor: pointer; color: #5b6cff; font-size: 12px; font-weight: 650; }
+.auth-manual .field { margin: 10px 0 0; }
+
 .field { display: block; margin-bottom: 12px; }
 .field > span { display: block; margin-bottom: 6px; color: #47505f; font-size: 13px; font-weight: 650; }
 .field > span small { color: #98a0ae; font-weight: 500; font-size: 11px; }

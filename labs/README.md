@@ -6,7 +6,7 @@
 
 - **Flow Mark** — `design-lab/` (대표 마크·상태 목업)
 - **손님 디자인** — `customer-design-lab/` (손님 화면 색·레이아웃 시안 비교)
-- **음악 필터** — `music-filter-lab/` (AI 음악 필터 판단 테스트)
+- **음악 필터 (배포)** — 서버가 같은 오리진 `/filter-lab`에서 서빙한다. 사장님 앱 로그인 세션과 Railway OpenRouter 키를 재사용하므로 로컬 정적 서버가 아니라 **배포 도메인**에서 사용한다(허브 탭은 배포 URL을 iframe으로 연다). 소스는 `music-filter-lab/`.
 
 ## 실행
 

@@ -8,7 +8,7 @@ const musicFilter = require('../features/music-filter');
 const { getTrackMetadata } = require('../services/track-metadata.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { issueToken } = require('../utils/jwt');
-const { APP_URL } = require('../config');
+const { APP_URL, OPENROUTER_BASE_URL } = require('../config');
 const { validateString, validateBool, validateInEnum, validateDateString, validateCoordinate, isUuid } = require('../utils/validate');
 const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
@@ -174,6 +174,11 @@ router.post('/me/music-filter/test', requireAuth, async (req, res) => {
   });
   if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
 
+  // 필터 테스트 lab에서 모델을 바꿔가며 비교할 수 있도록 선택적 override를 받는다.
+  // 미지정이면 서버 기본 모델(MUSIC_FILTER_MODEL)을 쓴다.
+  const modelCheck = validateString(req.body?.model, { max: 120, allowNull: true, name: '모델' });
+  if (modelCheck.error) return res.status(400).json({ error: modelCheck.error });
+
   let track;
   try {
     track = await getTrackMetadata(urlCheck.value);
@@ -186,6 +191,7 @@ router.post('/me/music-filter/test', requireAuth, async (req, res) => {
   const result = await musicFilter.evaluateTrack({
     cafePrompt: promptCheck.value,
     track,
+    model: modelCheck.value || undefined,
   });
 
   if (result.filterStatus === FILTER_STATUS.ERROR_REJECTED) {
@@ -202,6 +208,26 @@ router.post('/me/music-filter/test', requireAuth, async (req, res) => {
     model: result.model,
     track,
   });
+});
+
+// GET /api/v1/cafes/me/music-filter/models
+// 필터 테스트 lab에서 고를 수 있도록 OpenRouter 모델 목록을 프록시한다.
+// (브라우저가 openrouter.ai로 직접 붙으면 서버 CSP connect-src에 걸리므로 서버 경유)
+let musicFilterModelsCache = { at: 0, ids: null };
+router.get('/me/music-filter/models', requireAuth, async (_req, res) => {
+  if (musicFilterModelsCache.ids && Date.now() - musicFilterModelsCache.at < 10 * 60 * 1000) {
+    return res.json({ models: musicFilterModelsCache.ids });
+  }
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/models`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const ids = (data?.data || []).map(model => model.id).filter(Boolean).sort();
+    musicFilterModelsCache = { at: Date.now(), ids };
+    res.json({ models: ids });
+  } catch {
+    res.status(502).json({ error: 'OpenRouter 모델 목록을 불러오지 못했습니다', models: [] });
+  }
 });
 
 // PUT /api/v1/cafes/me/address  (주소 변경)

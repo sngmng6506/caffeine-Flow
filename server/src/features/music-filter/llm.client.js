@@ -50,16 +50,17 @@ function parseContent(data) {
   }
 }
 
-async function callMusicFilterLlm(messages) {
+async function callMusicFilterLlm(messages, modelOverride) {
   if (!OPENROUTER_API_KEY) {
     throw withCode(new Error('OPENROUTER_API_KEY 누락'), 'LLM_API_KEY_MISSING');
   }
+  const model = modelOverride || MUSIC_FILTER_MODEL;
 
   try {
     const response = await axios.post(
       `${OPENROUTER_BASE_URL}/chat/completions`,
       {
-        model: MUSIC_FILTER_MODEL,
+        model,
         messages,
         temperature: 0,
         // response_format(json_schema)는 OpenAI 계열만 지원해 Anthropic 등에서
@@ -95,7 +96,7 @@ async function callMusicFilterLlm(messages) {
 
     return {
       result: parseContent(response.data),
-      model: response.data?.model || MUSIC_FILTER_MODEL,
+      model: response.data?.model || model,
     };
   } catch (error) {
     if (error.code === 'ECONNABORTED') throw withCode(new Error('LLM API timeout'), 'LLM_TIMEOUT');

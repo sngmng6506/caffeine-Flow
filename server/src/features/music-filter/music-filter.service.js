@@ -3,14 +3,14 @@ const { callMusicFilterLlm } = require('./llm.client');
 const { normalizeLlmDecision, rejectionFromError } = require('./decision.policy');
 const { FILTER_ACTION, FILTER_STATUS } = require('../../constants/music-filter-status');
 
-async function evaluateTrack({ cafePrompt, track }) {
+async function evaluateTrack({ cafePrompt, track, model: modelOverride }) {
   const messages = buildMusicFilterMessages({
     cafePrompt,
     track,
   });
 
   try {
-    const { result, model } = await callMusicFilterLlm(messages);
+    const { result, model } = await callMusicFilterLlm(messages, modelOverride);
     return { ...normalizeLlmDecision(result), model };
   } catch (error) {
     console.error('[music-filter] LLM 판단 실패:', error?.code || error?.message || error);
