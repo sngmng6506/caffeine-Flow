@@ -350,7 +350,9 @@
 }
 
 .request-card__body {
-  padding: 0 16px 16px;
+  margin: 0 16px;
+  padding: 16px 0;
+  border-top: 1px solid color-mix(in srgb, var(--cf-on-dark) 18%, transparent);
 }
 
 .request-card__heading {
