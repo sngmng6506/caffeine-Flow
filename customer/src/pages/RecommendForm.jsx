@@ -172,18 +172,10 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     );
   }
 
-  if (!composerOpen) {
-    return (
-      <section className='request-composer' aria-label='신청곡 추가'>
-        {composerTrigger}
-      </section>
-    );
-  }
-
   return (
     <form onSubmit={handlePreview} className='request-card request-card--input' aria-label='신청곡 추가'>
       {composerTrigger}
-      <div id='request-composer-fields' className='request-card__body'>
+      {composerOpen && <div id='request-composer-fields' className='request-card__body'>
         <label className='sr-only' htmlFor='music-url'>음악 링크</label>
         <div className='input-shell'>
           <Link2 size={18} aria-hidden='true' />
@@ -232,7 +224,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
             })}
           </div>
         </div>
-      </div>
+      </div>}
     </form>
   );
 }
