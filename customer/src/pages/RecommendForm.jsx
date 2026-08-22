@@ -198,7 +198,6 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
         </button>
 
         <div className='platform-shortcuts'>
-          <span className='platform-shortcuts__label'>음악 찾기</span>
           <div className='platform-shortcuts__links'>
             {PLATFORM_LINKS.map(({ id, href }) => {
               const allowed = allowedPlatforms.includes(id);

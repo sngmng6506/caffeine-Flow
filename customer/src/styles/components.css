@@ -600,13 +600,6 @@
   border-top: 1px solid color-mix(in srgb, var(--cf-on-dark) 38%, transparent);
 }
 
-.platform-shortcuts__label {
-  flex: 0 0 auto;
-  color: var(--cf-on-dark);
-  font-size: 14px;
-  font-weight: 700;
-}
-
 .platform-shortcuts__links {
   display: flex;
   align-items: center;
