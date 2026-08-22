@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Link2, LoaderCircle, Search, Send, X } from 'lucide-react';
+import { ChevronDown, Link2, LoaderCircle, Search, Send, X } from 'lucide-react';
 import { getOembed, postRecommendation } from '../api';
 import { getDeviceName } from '../deviceName';
 import { PLATFORM, PLATFORM_BADGE, PLATFORM_LINKS, VALID_PLATFORMS, platformLabel } from '../constants/platforms';
@@ -113,6 +113,25 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
     }
   }
 
+  const composerTrigger = (
+    <button
+      type='button'
+      className='request-composer__trigger'
+      onClick={composerOpen ? closeComposer : () => setComposerOpen(true)}
+      disabled={composerOpen && loading}
+      aria-expanded={composerOpen}
+      aria-controls='request-composer-fields'
+    >
+      <span className='request-composer__icon' aria-hidden='true'><Link2 size={18} /></span>
+      <span>듣고 싶은 곡이 있나요?</span>
+      <ChevronDown
+        size={18}
+        className={`request-composer__caret${composerOpen ? ' is-open' : ''}`}
+        aria-hidden='true'
+      />
+    </button>
+  );
+
   if (step === 'preview' && preview) {
     const badge = PLATFORM_BADGE[preview.platform] || PLATFORM_BADGE[PLATFORM.YOUTUBE];
     return (
@@ -156,68 +175,62 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   if (!composerOpen) {
     return (
       <section className='request-composer' aria-label='신청곡 추가'>
-        <button type='button' className='request-composer__trigger' onClick={() => setComposerOpen(true)}>
-          <span className='request-composer__icon' aria-hidden='true'><Link2 size={18} /></span>
-          <span>듣고 싶은 곡이 있나요?</span>
-          <ChevronDown size={18} className='request-composer__caret' aria-hidden='true' />
-        </button>
+        {composerTrigger}
       </section>
     );
   }
 
   return (
     <form onSubmit={handlePreview} className='request-card request-card--input' aria-label='신청곡 추가'>
-      <div className='request-card__topline'>
+      {composerTrigger}
+      <div id='request-composer-fields' className='request-card__body'>
         <label className='field-label' htmlFor='music-url'>음악 링크</label>
-        <button type='button' className='icon-button request-card__close' onClick={closeComposer} aria-label='신청곡 추가 접기' disabled={loading}>
-          <ChevronUp size={18} aria-hidden='true' />
+        <div className='input-shell'>
+          <Link2 size={18} aria-hidden='true' />
+          <input
+            id='music-url'
+            type='url'
+            inputMode='url'
+            placeholder='음악 링크를 붙여 넣어 주세요'
+            value={url}
+            onChange={event => setUrl(event.target.value)}
+            autoComplete='off'
+          />
+        </div>
+
+        {error && <div className='feedback feedback--error request-card__input-error' role='alert'>{error}</div>}
+
+        <button type='submit' disabled={loading || !url.trim()} className='button button--primary button--full'>
+          {loading ? <LoaderCircle className='is-spinning' size={18} aria-hidden='true' /> : <Search size={18} aria-hidden='true' />}
+          {loading ? '곡 정보를 확인하고 있어요' : '신청곡 확인하기'}
         </button>
-      </div>
-      <div className='input-shell'>
-        <Link2 size={18} aria-hidden='true' />
-        <input
-          id='music-url'
-          type='url'
-          inputMode='url'
-          placeholder='음악 링크를 붙여 넣어 주세요'
-          value={url}
-          onChange={event => setUrl(event.target.value)}
-          autoComplete='off'
-        />
-      </div>
 
-      {error && <div className='feedback feedback--error request-card__input-error' role='alert'>{error}</div>}
-
-      <button type='submit' disabled={loading || !url.trim()} className='button button--primary button--full'>
-        {loading ? <LoaderCircle className='is-spinning' size={18} aria-hidden='true' /> : <Search size={18} aria-hidden='true' />}
-        {loading ? '곡 정보를 확인하고 있어요' : '신청곡 확인하기'}
-      </button>
-
-      <div className='platform-shortcuts'>
-        <span className='platform-shortcuts__label'>음악 찾기</span>
-        <div className='platform-shortcuts__links'>
-          {PLATFORM_LINKS.map(({ id, href }) => {
-            const allowed = allowedPlatforms.includes(id);
-            const label = platformLabel(id);
-            const icon = PLATFORM_ICONS[id];
-            return allowed ? (
-              <a
-                key={id}
-                href={href}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='platform-shortcut'
-                aria-label={`${label}에서 음악 찾기, 새 창`}
-                title={`${label}에서 음악 찾기`}
-              >
-                {icon}
-              </a>
-            ) : (
-              <span key={id} className='platform-shortcut platform-shortcut--disabled' aria-label={`${label} 신청 불가`}>
-                {icon}
-              </span>
-            );
-          })}
+        <div className='platform-shortcuts'>
+          <span className='platform-shortcuts__label'>음악 찾기</span>
+          <div className='platform-shortcuts__links'>
+            {PLATFORM_LINKS.map(({ id, href }) => {
+              const allowed = allowedPlatforms.includes(id);
+              const label = platformLabel(id);
+              const icon = PLATFORM_ICONS[id];
+              return allowed ? (
+                <a
+                  key={id}
+                  href={href}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='platform-shortcut'
+                  aria-label={`${label}에서 음악 찾기, 새 창`}
+                  title={`${label}에서 음악 찾기`}
+                >
+                  {icon}
+                </a>
+              ) : (
+                <span key={id} className='platform-shortcut platform-shortcut--disabled' aria-label={`${label} 신청 불가`}>
+                  {icon}
+                </span>
+              );
+            })}
+          </div>
         </div>
       </div>
     </form>

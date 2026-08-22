@@ -324,6 +324,11 @@
 .request-composer__caret {
   flex: 0 0 auto;
   color: var(--cf-on-dark);
+  transition: transform var(--cf-motion-fast);
+}
+
+.request-composer__caret.is-open {
+  transform: rotate(180deg);
 }
 
 .request-composer__icon {
@@ -341,6 +346,11 @@
 .request-card--input {
   display: flex;
   flex-direction: column;
+  padding: 0;
+}
+
+.request-card__body {
+  padding: 0 16px 16px;
 }
 
 .request-card__heading {

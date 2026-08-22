@@ -87,7 +87,7 @@ export default function CafeComments({ videoId, slug }) {
 
       {error && <p className='form-error' role='alert'>{error}</p>}
       {comments === null && <p className='comments__state'>댓글을 불러오고 있어요.</p>}
-      {comments?.length === 0 && !error && <p className='comments__state'>아직 댓글이 없어요.<br />첫 번째 이야기를 남겨 보세요.</p>}
+      {comments?.length === 0 && !error && <p className='comments__state'>첫 댓글을 남겨 보세요.</p>}
       {comments?.map(comment => (
         <CommentItem
           key={comment.id}
