@@ -135,6 +135,27 @@ filter_prompt_snapshot
 이 데이터는 오류 추적과 정책 개선에 사용한다. 자연어 사유는 원본을 보존하며, 관리자 화면에서는 현재 프롬프트·변경 이력·곡별 승인/거절·거절 사유·판단 당시 프롬프트를 확인한다.
 `filter_confidence`는 LLM이 스스로 보고한 값이며 보정된 확률이 아니다. 현재 자동수락 조건이나 운영 임계값에는 사용하지 않고 감사 데이터로만 보존한다.
 
+## 평가 데이터셋
+
+운영자는 관리자 콘솔의 AI 판단 이력에서 다음 골드 라벨을 기록한다.
+
+```text
+recommendation_id
+human_decision        accept | reject
+human_reason_code     policy_match | policy_mismatch | unsafe_content | metadata_insufficient | other
+metadata_sufficient   boolean
+reviewed_at
+```
+
+라벨은 `music_filter_reviews`에 추천곡당 한 건으로 저장하며 재검수 시 최신 값으로
+갱신한다. 추천곡 삭제 시 함께 삭제된다. AI 출력과 사람 정답을 독립적으로 비교할 수
+있도록 `recommendations.filter_status`와 일반 큐 `status`는 변경하지 않는다.
+관리자 콘솔은 미검수 상태에서 AI 결정·사유를 숨기고 곡 링크와 판단 당시 매장 정책을
+먼저 제공한다. 사람 정답을 저장한 뒤에만 AI 결과를 공개해 검수 편향을 줄인다.
+
+현재 단계에서는 골드 라벨을 수집만 한다. 자동수락, LLM 프롬프트, Exact 재사용,
+유사 사례 검색에는 아직 사용하지 않으며 성능 지표 자동 계산도 하지 않는다.
+
 ## 구현 위치
 
 ```text

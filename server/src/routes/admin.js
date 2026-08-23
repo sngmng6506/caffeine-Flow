@@ -20,6 +20,7 @@ const { ADMIN_PASSWORD } = require('../config');
 const { isUuid } = require('../utils/validate');
 const { parseOffset } = require('../utils/pagination');
 const { FILTER_PROCESSED_STATUSES } = require('../constants/music-filter-status');
+const { HUMAN_DECISIONS, HUMAN_REASON_CODES } = require('../constants/music-filter-review');
 
 const FILTER_AUDIT_PAGE_SIZE = 50;
 
@@ -175,16 +176,26 @@ router.get('/cafes/:id/music-filter-audit', requireAdmin, async (req, res) => {
       .orderBy('recorded_at', 'desc')
       .orderBy('id', 'desc')
       .limit(50),
-    db('recommendations')
-      .where({ cafe_id: cafe.id })
-      .whereIn('filter_status', FILTER_PROCESSED_STATUSES)
-      .select(
-        'id', 'title', 'channel_title', 'platform', 'filter_status',
-        'filter_reason', 'filter_model', 'filter_error_code',
-        'filter_prompt_snapshot', 'filter_checked_at',
+    db({ recommendation: 'recommendations' })
+      .leftJoin(
+        { review: 'music_filter_reviews' },
+        'review.recommendation_id',
+        'recommendation.id',
       )
-      .orderBy('filter_checked_at', 'desc')
-      .orderBy('id', 'desc')
+      .where('recommendation.cafe_id', cafe.id)
+      .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES)
+      .select(
+        'recommendation.id', 'recommendation.video_id', 'recommendation.title',
+        'recommendation.channel_title', 'recommendation.platform',
+        'recommendation.filter_status', 'recommendation.filter_reason',
+        'recommendation.filter_confidence', 'recommendation.filter_model',
+        'recommendation.filter_error_code',
+        'recommendation.filter_prompt_snapshot', 'recommendation.filter_checked_at',
+        'review.human_decision', 'review.human_reason_code',
+        'review.metadata_sufficient', 'review.reviewed_at',
+      )
+      .orderBy('recommendation.filter_checked_at', 'desc')
+      .orderBy('recommendation.id', 'desc')
       .offset(offset.value)
       .limit(FILTER_AUDIT_PAGE_SIZE + 1),
   ]);
@@ -197,11 +208,59 @@ router.get('/cafes/:id/music-filter-audit', requireAdmin, async (req, res) => {
     },
     prompt_history: promptHistory,
     decisions: decisionRows.slice(0, FILTER_AUDIT_PAGE_SIZE),
+    offset: offset.value,
     has_more: decisionRows.length > FILTER_AUDIT_PAGE_SIZE,
     next_offset: decisionRows.length > FILTER_AUDIT_PAGE_SIZE
       ? offset.value + FILTER_AUDIT_PAGE_SIZE
       : null,
   });
+});
+
+// PUT /api/v1/admin/cafes/:id/music-filter-audit/:recommendationId/review
+// AI 결과를 덮어쓰지 않고 운영자의 독립된 골드 라벨을 추천곡별로 upsert한다.
+router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id) || !isUuid(req.params.recommendationId)) {
+    return res.status(404).json({ error: 'AI 판단 이력을 찾을 수 없습니다' });
+  }
+
+  const { human_decision: humanDecision, human_reason_code: humanReasonCode } = req.body || {};
+  const metadataSufficient = req.body?.metadata_sufficient;
+  if (!HUMAN_DECISIONS.includes(humanDecision)) {
+    return res.status(400).json({ error: 'human_decision은 accept 또는 reject여야 합니다' });
+  }
+  if (!HUMAN_REASON_CODES.includes(humanReasonCode)) {
+    return res.status(400).json({ error: '유효한 human_reason_code가 필요합니다' });
+  }
+  if (typeof metadataSufficient !== 'boolean') {
+    return res.status(400).json({ error: 'metadata_sufficient는 boolean이어야 합니다' });
+  }
+
+  const recommendation = await db('recommendations')
+    .where({ id: req.params.recommendationId, cafe_id: req.params.id })
+    .whereIn('filter_status', FILTER_PROCESSED_STATUSES)
+    .select('id')
+    .first();
+  if (!recommendation) return res.status(404).json({ error: 'AI 판단 이력을 찾을 수 없습니다' });
+
+  const review = {
+    recommendation_id: recommendation.id,
+    human_decision: humanDecision,
+    human_reason_code: humanReasonCode,
+    metadata_sufficient: metadataSufficient,
+    reviewed_at: new Date(),
+  };
+  const [saved] = await db('music_filter_reviews')
+    .insert(review)
+    .onConflict('recommendation_id')
+    .merge({
+      human_decision: review.human_decision,
+      human_reason_code: review.human_reason_code,
+      metadata_sufficient: review.metadata_sufficient,
+      reviewed_at: review.reviewed_at,
+    })
+    .returning('*');
+
+  res.json(saved);
 });
 
 // PUT /api/v1/admin/cafes/:id/suspend  { is_suspended: boolean }

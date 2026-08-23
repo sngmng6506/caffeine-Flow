@@ -140,6 +140,7 @@ AI 필터 오류와 모델 판단 상세는 사장님 room으로만 전송한다
 | --- | --- |
 | `cafes` | 카페 계정, slug, 운영 설정, AI 필터 정책, 하트비트 |
 | `recommendations` | 신청곡, 일반 상태, AI 판단, 신청·재생 시각 |
+| `music_filter_reviews` | AI 판단과 분리된 운영자 골드 라벨, 사유 코드, 메타데이터 충분 여부 |
 | `votes` | 곡별 투표와 중복 방지. visitor ID 우선, 레거시 요청은 IP fallback |
 | `comments` | 개별 신청곡에 달린 댓글 |
 | `song_comments` | 같은 곡을 카페 간 공유하는 댓글과 답글 |

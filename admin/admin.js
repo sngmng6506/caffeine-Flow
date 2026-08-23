@@ -3,6 +3,14 @@
 const TOKEN_KEY = 'cf_admin_token';
 const STATUS_LABEL = { active: '사용 중', today: '오늘 사용', dormant: '휴면', never: '미사용' };
 const STATUS_COLOR = { active: '#16a34a', today: '#d97706', dormant: '#dc2626', never: '#9ca3af' };
+const REVIEW_DECISION_LABEL = { accept: '수락', reject: '거절' };
+const REVIEW_REASON_LABEL = {
+  policy_match: '매장 정책과 일치',
+  policy_mismatch: '매장 정책과 불일치',
+  unsafe_content: '부적절한 내용',
+  metadata_insufficient: '메타데이터 부족',
+  other: '기타',
+};
 
 let cafes = [];
 let filter = 'all';
@@ -259,6 +267,22 @@ function fmtDateTime(value) {
   });
 }
 
+function selectOptions(options, current, placeholder) {
+  return [
+    `<option value=''>${placeholder}</option>`,
+    ...Object.entries(options).map(([value, label]) => (
+      `<option value='${value}'${current === value ? ' selected' : ''}>${label}</option>`
+    )),
+  ].join('');
+}
+
+function auditTrackUrl(item) {
+  if (item.platform === 'youtube') {
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(item.video_id)}`;
+  }
+  return item.video_id || '#';
+}
+
 function renderMusicFilterAudit(audit) {
   const statusLabel = {
     accepted: '승인',
@@ -274,23 +298,57 @@ function renderMusicFilterAudit(audit) {
         </li>`).join('')
     : '<li class=stats-empty>저장된 변경 이력이 없습니다</li>';
   const decisions = audit.decisions.length
-    ? audit.decisions.map((item) => `
+    ? audit.decisions.map((item) => {
+      const reviewed = !!item.human_decision;
+      return `
         <article class=audit-decision>
           <div class=audit-decision-head>
-            <div><b>${esc(item.title)}</b><span>${esc(item.channel_title || item.platform)}</span></div>
-            <span class='decision-status d-${item.filter_status}'>${statusLabel[item.filter_status] || esc(item.filter_status)}</span>
+            <div><b>${esc(item.title)}</b><span>${esc(item.channel_title || '아티스트 정보 없음')} · ${esc(item.platform)}</span></div>
+            <a class=audit-track-link href='${esc(auditTrackUrl(item))}' target=_blank rel='noopener noreferrer'>곡 열기</a>
           </div>
           <dl>
             <div><dt>판단 시각</dt><dd>${fmtDateTime(item.filter_checked_at)}</dd></div>
-            <div><dt>판단 사유</dt><dd>${esc(item.filter_reason || '사유 기록 없음')}</dd></div>
-            <div><dt>사용 모델</dt><dd>${esc(item.filter_model || '기록 없음')}</dd></div>
           </dl>
-          <details>
-            <summary>판단 당시 프롬프트</summary>
+          <details${reviewed ? '' : ' open'}>
+            <summary>판단 당시 매장 정책</summary>
             <pre>${esc(item.filter_prompt_snapshot || '기록 없음 — 감사 기능 도입 전 판단입니다.')}</pre>
           </details>
-        </article>`).join('')
+          <p class='review-blind-note${reviewed ? ' hidden' : ''}'>사람 정답을 먼저 저장하면 AI 판단을 공개합니다.</p>
+          <div class='audit-ai-result${reviewed ? '' : ' hidden'}'>
+            <span class='decision-status d-${item.filter_status}'>AI ${statusLabel[item.filter_status] || esc(item.filter_status)}</span>
+            <dl>
+              <div><dt>AI 사유</dt><dd>${esc(item.filter_reason || '사유 기록 없음')}</dd></div>
+              <div><dt>Confidence</dt><dd>${item.filter_confidence == null ? '기록 없음' : Number(item.filter_confidence).toFixed(2)}</dd></div>
+              <div><dt>사용 모델</dt><dd>${esc(item.filter_model || '기록 없음')}</dd></div>
+              ${item.filter_error_code ? `<div><dt>오류 코드</dt><dd>${esc(item.filter_error_code)}</dd></div>` : ''}
+            </dl>
+          </div>
+          <form class=filter-review data-filter-review='${item.id}'>
+            <label>사람 정답
+              <select name=human_decision required>${selectOptions(REVIEW_DECISION_LABEL, item.human_decision, '선택')}</select>
+            </label>
+            <label>판단 사유
+              <select name=human_reason_code required>${selectOptions(REVIEW_REASON_LABEL, item.human_reason_code, '선택')}</select>
+            </label>
+            <label>메타데이터
+              <select name=metadata_sufficient required>
+                <option value=''>선택</option>
+                <option value=true${item.metadata_sufficient === true ? ' selected' : ''}>충분</option>
+                <option value=false${item.metadata_sufficient === false ? ' selected' : ''}>부족</option>
+              </select>
+            </label>
+            <button class=act type=submit>검수 저장</button>
+            <small class=review-saved>${item.reviewed_at ? `${fmtDateTime(item.reviewed_at)} 저장됨` : '아직 검수하지 않음'}</small>
+          </form>
+        </article>`;
+    }).join('')
     : '<div class=stats-empty>AI 판단 이력이 없습니다</div>';
+  const decisionPagination = audit.offset > 0 || audit.has_more
+    ? `<div class=audit-pagination>
+        <button class=act data-audit-offset='${Math.max(0, audit.offset - 50)}'${audit.offset <= 0 ? ' disabled' : ''}>이전 50건</button>
+        <button class=act data-audit-offset='${audit.next_offset ?? audit.offset}'${!audit.has_more ? ' disabled' : ''}>다음 50건</button>
+      </div>`
+    : '';
 
   return `
     <section class=stats-section>
@@ -299,7 +357,7 @@ function renderMusicFilterAudit(audit) {
       <pre class=current-prompt>${esc(currentPrompt)}</pre>
       <div class=audit-columns>
         <div><h4>설정 변경 이력 <small>최근 50건</small></h4><ol class=prompt-history>${history}</ol></div>
-        <div><h4>AI 승인·거절 이력 <small>최근 50건</small></h4><div class=decision-list>${decisions}</div></div>
+        <div><h4>AI 승인·거절 이력 <small>${audit.offset + 1}번째부터</small></h4><div class=decision-list>${decisions}</div>${decisionPagination}</div>
       </div>
     </section>`;
 }
@@ -346,7 +404,7 @@ function renderCafeStats(data, audit) {
     <section class="stats-section"><h3>인기곡 TOP 10 <small>누적 재생 기준</small></h3>${topSongs}</section>`;
 }
 
-async function openCafeStats(cafeId) {
+async function openCafeStats(cafeId, auditOffset = 0) {
   statsCafeId = cafeId;
   view = 'stats';
   $('#statsTitle').textContent = '카페 통계';
@@ -356,7 +414,7 @@ async function openCafeStats(cafeId) {
   try {
     const [data, audit] = await Promise.all([
       api('GET', `/cafes/${cafeId}/stats`),
-      api('GET', `/cafes/${cafeId}/music-filter-audit`),
+      api('GET', `/cafes/${cafeId}/music-filter-audit?offset=${auditOffset}`),
     ]);
     if (statsCafeId === cafeId) renderCafeStats(data, audit);
   } catch (error) {
@@ -414,6 +472,48 @@ $('#statsBack').addEventListener('click', () => {
   view = 'list';
   document.querySelectorAll('.chip[data-view]').forEach((button) => button.classList.toggle('on', button.dataset.view === 'list'));
   render();
+});
+
+$('#statsContent').addEventListener('submit', async (event) => {
+  const form = event.target.closest('form[data-filter-review]');
+  if (!form || !statsCafeId) return;
+  event.preventDefault();
+
+  const submit = form.querySelector('button[type=submit]');
+  const saved = form.querySelector('.review-saved');
+  const data = new FormData(form);
+  submit.disabled = true;
+  submit.textContent = '저장 중...';
+  try {
+    const review = await api(
+      'PUT',
+      `/cafes/${statsCafeId}/music-filter-audit/${form.dataset.filterReview}/review`,
+      {
+        human_decision: data.get('human_decision'),
+        human_reason_code: data.get('human_reason_code'),
+        metadata_sufficient: data.get('metadata_sufficient') === 'true',
+      },
+    );
+    saved.textContent = `${fmtDateTime(review.reviewed_at)} 저장됨`;
+    const card = form.closest('.audit-decision');
+    card.querySelector('.review-blind-note')?.classList.add('hidden');
+    card.querySelector('.audit-ai-result')?.classList.remove('hidden');
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = '검수 저장';
+  }
+});
+
+$('#statsContent').addEventListener('click', async (event) => {
+  const page = event.target.closest('[data-audit-offset]');
+  if (!page || !statsCafeId || page.disabled) return;
+  try {
+    await openCafeStats(statsCafeId, Number(page.dataset.auditOffset) || 0);
+  } catch (error) {
+    alert(error.message);
+  }
 });
 
 $('#loginBtn').addEventListener('click', login);

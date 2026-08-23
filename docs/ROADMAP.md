@@ -22,27 +22,9 @@
 
 ## AI 음악 필터
 
-### 평가 데이터셋
+### 평가 지표 자동화
 
-실제 신청과 LLM 판단을 운영자가 전수 검수해 골드 라벨을 만들고 필터 품질을 측정한다. LLM 출력을 보기 전 독립적으로 판단할 수 있는 검수 흐름을 우선한다.
-
-예시 필드:
-
-```text
-recommendation_id
-platform
-video_id
-song_title
-artist
-cafe_policy_snapshot
-llm_decision
-human_decision
-human_reason_code
-metadata_sufficient
-reviewed_at
-```
-
-지표 후보:
+운영자 골드 라벨 수집은 구현되어 있으며 현재 동작은 [LLM_FILTER.md](LLM_FILTER.md#평가-데이터셋)를 기준으로 한다. 라벨이 충분히 쌓이면 다음 지표를 자동 계산한다.
 
 ```text
 accuracy
@@ -51,18 +33,23 @@ false_reject
 metadata_sufficient별 성능
 ```
 
+완료 조건:
+
+- 모델·플랫폼·매장 정책별 표본 수를 함께 표시
+- 표본이 적은 구간을 성능 개선으로 오해하지 않도록 분모 노출
+- 라이브 자동수락 정책과 분리된 운영자 분석으로 제공
+
 ### 프롬프트 버전 관리
 
-판단 당시 정책을 재현할 수 있도록 버전 또는 snapshot을 저장한다.
+판단 당시 매장 정책 snapshot은 현재 저장한다. 다음 단계에서는 시스템 프롬프트 템플릿 자체의 변경도 재현할 수 있도록 명시적 버전을 저장한다.
 
 검토 필드:
 
 ```text
 filter_prompt_version
 filter_prompt_snapshot
+filter_system_prompt_version
 ```
-
-모델과 판단 시각은 현재 저장하지만 판단 당시 정책은 저장하지 않으므로, 프롬프트 변경 뒤에도 과거 결과를 재현할 수 있게 한다.
 
 ### Exact 검수 결과 재사용
 

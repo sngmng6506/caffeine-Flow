@@ -314,7 +314,7 @@ describe('방문자 집계 식별자', () => {
 });
 
 describe('운영자 AI 프롬프트 감사', () => {
-  it('현재 설정·변경 이력·판단 당시 프롬프트를 카페 범위로 조회한다', async () => {
+  it('현재 설정·판단 프롬프트와 독립된 사람 검수 라벨을 카페 범위로 관리한다', async () => {
     const prompt = '잔잔한 재즈와 로파이만 승인합니다.';
     const firstUpdate = await request(app)
       .put('/api/v1/cafes/me/music-filter')
@@ -337,6 +337,7 @@ describe('운영자 AI 프롬프트 감사', () => {
       status: 'rejected',
       filter_status: 'rejected',
       filter_reason: '매장 분위기와 맞지 않습니다.',
+      filter_confidence: 0.77,
       filter_model: 'test-model',
       filter_prompt_snapshot: prompt,
       filter_checked_at: new Date(),
@@ -354,8 +355,75 @@ describe('운영자 AI 프롬프트 감사', () => {
       id: decision.id,
       filter_status: 'rejected',
       filter_reason: '매장 분위기와 맞지 않습니다.',
+      filter_confidence: '0.770',
       filter_prompt_snapshot: prompt,
+      human_decision: null,
     }));
+
+    const reviewPath = `/api/v1/admin/cafes/${cafe.id}/music-filter-audit/${decision.id}/review`;
+    const firstReview = await request(app)
+      .put(reviewPath)
+      .set({ Authorization: `Bearer ${adminToken}` })
+      .send({
+        human_decision: 'accept',
+        human_reason_code: 'policy_match',
+        metadata_sufficient: false,
+      });
+    expect(firstReview.status).toBe(200);
+    expect(firstReview.body).toMatchObject({
+      recommendation_id: decision.id,
+      human_decision: 'accept',
+      human_reason_code: 'policy_match',
+      metadata_sufficient: false,
+    });
+
+    const updatedReview = await request(app)
+      .put(reviewPath)
+      .set({ Authorization: `Bearer ${adminToken}` })
+      .send({
+        human_decision: 'reject',
+        human_reason_code: 'policy_mismatch',
+        metadata_sufficient: true,
+      });
+    expect(updatedReview.status).toBe(200);
+    expect(Number((await db('music_filter_reviews')
+      .where({ recommendation_id: decision.id })
+      .count('* as n')
+      .first()).n)).toBe(1);
+    expect((await db('recommendations').where({ id: decision.id }).first())).toMatchObject({
+      status: 'rejected',
+      filter_status: 'rejected',
+    });
+
+    const refreshed = await request(app)
+      .get(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit`)
+      .set({ Authorization: `Bearer ${adminToken}` });
+    expect(refreshed.body.decisions).toContainEqual(expect.objectContaining({
+      id: decision.id,
+      human_decision: 'reject',
+      human_reason_code: 'policy_mismatch',
+      metadata_sufficient: true,
+    }));
+
+    expect((await request(app)
+      .put(reviewPath)
+      .set({ Authorization: `Bearer ${adminToken}` })
+      .send({ human_decision: 'maybe', human_reason_code: 'other', metadata_sufficient: true })).status).toBe(400);
+    expect((await request(app)
+      .put(reviewPath)
+      .set({ Authorization: `Bearer ${ownerToken}` })
+      .send({ human_decision: 'accept', human_reason_code: 'policy_match', metadata_sufficient: true })).status).toBe(403);
+
+    const [otherCafe] = await db('cafes').insert({
+      name: '검수 경계 카페',
+      slug: 'reviewbound1',
+      owner_email: 'review-boundary@t.com',
+    }).returning('*');
+    expect((await request(app)
+      .put(`/api/v1/admin/cafes/${otherCafe.id}/music-filter-audit/${decision.id}/review`)
+      .set({ Authorization: `Bearer ${adminToken}` })
+      .send({ human_decision: 'accept', human_reason_code: 'policy_match', metadata_sufficient: true })).status).toBe(404);
+    await db('cafes').where({ id: otherCafe.id }).del();
   });
 
   it('사장님 토큰으로 전체 카페 프롬프트 감사 API에 접근할 수 없다', async () => {

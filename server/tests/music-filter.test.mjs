@@ -2,8 +2,25 @@ import { describe, it, expect } from 'vitest';
 import { normalizeLlmDecision, rejectionFromError } from '../src/features/music-filter/decision.policy.js';
 import { buildMusicFilterMessages, resolveCafePrompt } from '../src/features/music-filter/prompt.builder.js';
 import { FILTER_ACTION, FILTER_STATUS } from '../src/constants/music-filter-status.js';
+import {
+  HUMAN_DECISION,
+  HUMAN_DECISIONS,
+  HUMAN_REASON_CODE,
+  HUMAN_REASON_CODES,
+} from '../src/constants/music-filter-review.js';
 
 describe('AI 음악 필터 상태 계약', () => {
+  it('사람 검수 라벨은 고정된 정답과 사유 코드만 사용한다', () => {
+    expect(HUMAN_DECISIONS).toEqual([HUMAN_DECISION.ACCEPT, HUMAN_DECISION.REJECT]);
+    expect(HUMAN_REASON_CODES).toEqual([
+      HUMAN_REASON_CODE.POLICY_MATCH,
+      HUMAN_REASON_CODE.POLICY_MISMATCH,
+      HUMAN_REASON_CODE.UNSAFE_CONTENT,
+      HUMAN_REASON_CODE.METADATA_INSUFFICIENT,
+      HUMAN_REASON_CODE.OTHER,
+    ]);
+  });
+
   it('LLM accept는 action=accept, filter_status=accepted로 정규화한다', () => {
     const result = normalizeLlmDecision({ decision: 'accept', confidence: 0.8, reason: '분위기에 맞습니다.' });
     expect(result.action).toBe(FILTER_ACTION.ACCEPT);

@@ -31,6 +31,7 @@ describe('AI 수정 가드레일 문서 연결', () => {
     for (const phrase of [
       'Recommendation Status Contract',
       'Music Filter Status Contract',
+      'Music Filter Review Contract',
       'Router Mount Order Contract',
       'Platform Contract',
       'Limit Policy Contract',
@@ -48,6 +49,7 @@ describe('AI 수정 가드레일 문서 연결', () => {
     for (const file of [
       'server/src/constants/recommendation-status.js',
       'server/src/constants/music-filter-status.js',
+      'server/src/constants/music-filter-review.js',
       'server/src/constants/platforms.js',
       'server/src/constants/limits.js',
       'server/src/constants/time-policy.js',
