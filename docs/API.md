@@ -32,8 +32,6 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | PUT | `/cafes/me/notice` | 🔒 | 손님 공지 변경 |
 | PUT | `/cafes/me/platforms` | 🔒 | 허용 플랫폼 변경 |
 | PUT | `/cafes/me/music-filter` | 🔒 | AI 음악 필터 사용 여부·매장 분위기 설명 설정 |
-| POST | `/cafes/me/music-filter/test` | 🔒 | 매장 분위기 설명으로 저장 없이 곡 판단 미리보기. body에 선택적 `model`(OpenRouter 모델 override) |
-| GET | `/cafes/me/music-filter/models` | 🔒 | 필터 테스트 lab용 OpenRouter 모델 목록 프록시 |
 | PUT | `/cafes/me/address` | 🔒 | 지역·좌표 변경 |
 | PUT | `/cafes/me/slug` | 🔒 | QR slug 재발급·지정. 새 `token` 포함 |
 | PUT | `/cafes/me/status` | 🔒 | 신청 접수 ON/OFF |
@@ -127,6 +125,9 @@ SoundCloud·Spotify처럼 `videoId`가 전체 URL인 경우 클라이언트는 `
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
 | POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. 15분 10회 제한, 차단 시 `retry_after_seconds` 반환 |
+| POST | `/admin/music-filter/test` | 🛡 | 필터 실험실에서 저장 없이 곡 판단. body는 `url`, `prompt`, 선택적 `model` |
+| GET | `/admin/music-filter/models` | 🛡 | OpenRouter `/models/user`의 사용 가능 모델 ID 목록을 10분 캐시해 반환 |
+| GET | `/admin/music-filter-reviews` | 🛡 | 전체 카페 AI 판단의 라벨링 큐와 전체·완료·미검수 건수. `view`, `offset` 지원 |
 | GET | `/admin/cafes` | 🛡 | 전체 카페와 운영 상태, 오늘 QR 접속 브라우저 수(`today_unique_browsers`) 조회. 사람 수가 아닌 브라우저 익명 ID 기준 |
 | GET | `/admin/cafes/:id/stats` | 🛡 | 특정 카페의 오늘·누적·시간대·요일·AI 필터 통계 |
 | GET | `/admin/cafes/:id/music-filter-audit` | 🛡 | 특정 카페의 현재 AI 필터 설정, 최근 프롬프트 변경 이력 50건, 승인·거절 판단 이력 50건 조회. `offset`으로 판단 이력 페이지 이동 |
@@ -141,6 +142,9 @@ AI 필터 검수 body는 `{ human_decision, human_reason_code, metadata_sufficie
 `policy_match|policy_mismatch|unsafe_content|metadata_insufficient|other`,
 `metadata_sufficient`는 boolean만 허용한다. 해당 카페의 AI 처리 이력만 검수할 수 있으며
 사람 라벨은 실제 신청곡 상태나 기존 LLM 판단을 변경하지 않는다.
+통합 라벨링 큐의 `view`는 `unreviewed`(기본값), `reviewed`, `all`만 허용하며
+최근 판단순 50건을 반환한다. 미검수 큐는 저장으로 목록이 줄어들므로 다음 묶음을
+가져올 때 `offset=0`부터 다시 조회한다.
 
 ## 통합 TOP10
 

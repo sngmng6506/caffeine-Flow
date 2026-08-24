@@ -360,6 +360,18 @@ describe('운영자 AI 프롬프트 감사', () => {
       human_decision: null,
     }));
 
+    const unreviewedQueue = await request(app)
+      .get('/api/v1/admin/music-filter-reviews?view=unreviewed')
+      .set({ Authorization: `Bearer ${adminToken}` });
+    expect(unreviewedQueue.status).toBe(200);
+    expect(unreviewedQueue.body.summary.unreviewed).toBeGreaterThanOrEqual(1);
+    expect(unreviewedQueue.body.decisions).toContainEqual(expect.objectContaining({
+      id: decision.id,
+      cafe_id: cafe.id,
+      cafe_name: cafe.name,
+      human_decision: null,
+    }));
+
     const reviewPath = `/api/v1/admin/cafes/${cafe.id}/music-filter-audit/${decision.id}/review`;
     const firstReview = await request(app)
       .put(reviewPath)
@@ -405,6 +417,18 @@ describe('운영자 AI 프롬프트 감사', () => {
       metadata_sufficient: true,
     }));
 
+    const reviewedQueue = await request(app)
+      .get('/api/v1/admin/music-filter-reviews?view=reviewed')
+      .set({ Authorization: `Bearer ${adminToken}` });
+    expect(reviewedQueue.status).toBe(200);
+    expect(reviewedQueue.body.decisions).toContainEqual(expect.objectContaining({
+      id: decision.id,
+      human_decision: 'reject',
+    }));
+    expect((await request(app)
+      .get('/api/v1/admin/music-filter-reviews?view=invalid')
+      .set({ Authorization: `Bearer ${adminToken}` })).status).toBe(400);
+
     expect((await request(app)
       .put(reviewPath)
       .set({ Authorization: `Bearer ${adminToken}` })
@@ -431,6 +455,16 @@ describe('운영자 AI 프롬프트 감사', () => {
       .get(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit`)
       .set({ Authorization: `Bearer ${ownerToken}` });
     expect(response.status).toBe(403);
+    expect((await request(app)
+      .get('/api/v1/admin/music-filter-reviews')
+      .set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
+    expect((await request(app)
+      .get('/api/v1/admin/music-filter/models')
+      .set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
+    expect((await request(app)
+      .post('/api/v1/admin/music-filter/test')
+      .set({ Authorization: `Bearer ${ownerToken}` })
+      .send({ url: 'https://example.com', prompt: '테스트' })).status).toBe(403);
   });
 });
 

@@ -11,18 +11,23 @@ const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const db = require('../db/knex');
 const statsService = require('../services/stats.service');
+const musicFilter = require('../features/music-filter');
+const { getTrackMetadata } = require('../services/track-metadata.service');
 const { requireAdmin } = require('../middleware/auth');
 const { issueAdminToken } = require('../utils/jwt');
 const { kstTodayString, kstStartOfDay } = require('../utils/kst');
 const { ADMIN_LOGIN_LIMIT } = require('../constants/limits');
 const { HEARTBEAT_ACTIVE_WINDOW_MS } = require('../constants/time-policy');
-const { ADMIN_PASSWORD } = require('../config');
-const { isUuid } = require('../utils/validate');
+const { ADMIN_PASSWORD, OPENROUTER_API_KEY, OPENROUTER_BASE_URL } = require('../config');
+const { isUuid, validateString } = require('../utils/validate');
 const { parseOffset } = require('../utils/pagination');
-const { FILTER_PROCESSED_STATUSES } = require('../constants/music-filter-status');
+const { FILTER_STATUS, FILTER_PROCESSED_STATUSES } = require('../constants/music-filter-status');
 const { HUMAN_DECISIONS, HUMAN_REASON_CODES } = require('../constants/music-filter-review');
 
 const FILTER_AUDIT_PAGE_SIZE = 50;
+const FILTER_REVIEW_QUEUE_PAGE_SIZE = 50;
+const MUSIC_FILTER_MODELS_CACHE_MS = 10 * 60 * 1000;
+let musicFilterModelsCache = { at: 0, ids: null };
 
 // 매장 상태 — 하트비트(last_heartbeat_at) 기준.
 // never: 가입 후 한 번도 앱을 켠 적 없음 → 장난/방치 계정 후보
@@ -76,6 +81,132 @@ router.post('/login', loginLimiter, (req, res) => {
     return res.status(401).json({ error: '비밀번호가 올바르지 않습니다' });
   }
   res.json({ token: issueAdminToken() });
+});
+
+// POST /api/v1/admin/music-filter/test
+// 운영자 전용 lab에서 실제 저장 없이 서비스와 동일한 음악 필터를 실행한다.
+router.post('/music-filter/test', requireAdmin, async (req, res) => {
+  const urlCheck = validateString(req.body?.url, { max: 2000, name: '곡 URL' });
+  if (urlCheck.error) return res.status(400).json({ error: urlCheck.error });
+
+  const promptCheck = validateString(req.body?.prompt, {
+    max: 1000,
+    name: 'AI 필터 프롬프트',
+  });
+  if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
+
+  const modelCheck = validateString(req.body?.model, { max: 120, allowNull: true, name: '모델' });
+  if (modelCheck.error) return res.status(400).json({ error: modelCheck.error });
+
+  let track;
+  try {
+    track = await getTrackMetadata(urlCheck.value);
+  } catch (error) {
+    return res.status(error.status || 400).json({
+      error: error.message || '트랙 정보를 가져올 수 없습니다',
+    });
+  }
+
+  const result = await musicFilter.evaluateTrack({
+    cafePrompt: promptCheck.value,
+    track,
+    model: modelCheck.value || undefined,
+  });
+
+  if (result.filterStatus === FILTER_STATUS.ERROR_REJECTED) {
+    return res.status(503).json({
+      error: 'OpenRouter가 곡을 판단하지 못했습니다. 잠시 후 다시 시도해주세요.',
+      errorCode: result.errorCode,
+    });
+  }
+
+  res.json({
+    decision: result.action,
+    confidence: result.confidence,
+    reason: result.reason,
+    model: result.model,
+    track,
+  });
+});
+
+// GET /api/v1/admin/music-filter/models
+// OpenRouter 키의 제공자·개인정보 설정을 반영한 사용 가능 모델을 lab에 제공한다.
+router.get('/music-filter/models', requireAdmin, async (_req, res) => {
+  if (!OPENROUTER_API_KEY) {
+    return res.status(503).json({ error: 'OPENROUTER_API_KEY가 설정되지 않았습니다', models: [] });
+  }
+  if (musicFilterModelsCache.ids && Date.now() - musicFilterModelsCache.at < MUSIC_FILTER_MODELS_CACHE_MS) {
+    return res.json({ models: musicFilterModelsCache.ids });
+  }
+
+  try {
+    const response = await fetch(`${OPENROUTER_BASE_URL}/models/user`, {
+      headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}` },
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const ids = (data?.data || []).map((model) => model.id).filter(Boolean).sort();
+    musicFilterModelsCache = { at: Date.now(), ids };
+    res.json({ models: ids });
+  } catch {
+    res.status(502).json({ error: 'OpenRouter 모델 목록을 불러오지 못했습니다', models: [] });
+  }
+});
+
+// GET /api/v1/admin/music-filter-reviews
+// 카페 구분 없이 AI 처리 이력을 모아 운영자가 한 큐에서 골드 라벨을 기록하게 한다.
+router.get('/music-filter-reviews', requireAdmin, async (req, res) => {
+  const offset = parseOffset(req.query.offset);
+  if (offset.error) return res.status(400).json({ error: offset.error });
+
+  const view = req.query.view || 'unreviewed';
+  if (!['unreviewed', 'reviewed', 'all'].includes(view)) {
+    return res.status(400).json({ error: 'view는 unreviewed, reviewed 또는 all이어야 합니다' });
+  }
+
+  const processed = db({ recommendation: 'recommendations' })
+    .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES);
+  const decisionsQuery = processed.clone()
+    .leftJoin({ cafe: 'cafes' }, 'cafe.id', 'recommendation.cafe_id')
+    .leftJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id');
+
+  if (view === 'unreviewed') decisionsQuery.whereNull('review.recommendation_id');
+  if (view === 'reviewed') decisionsQuery.whereNotNull('review.recommendation_id');
+
+  const [totalRow, reviewedRow, decisionRows] = await Promise.all([
+    processed.clone().count('recommendation.id as count').first(),
+    processed.clone()
+      .innerJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
+      .count('recommendation.id as count')
+      .first(),
+    decisionsQuery
+      .select(
+        'recommendation.id', 'recommendation.cafe_id', 'cafe.name as cafe_name',
+        'recommendation.video_id', 'recommendation.title', 'recommendation.channel_title',
+        'recommendation.platform', 'recommendation.filter_status', 'recommendation.filter_reason',
+        'recommendation.filter_confidence', 'recommendation.filter_model',
+        'recommendation.filter_error_code', 'recommendation.filter_prompt_snapshot',
+        'recommendation.filter_checked_at', 'review.human_decision',
+        'review.human_reason_code', 'review.metadata_sufficient', 'review.reviewed_at',
+      )
+      .orderBy('recommendation.filter_checked_at', 'desc')
+      .orderBy('recommendation.id', 'desc')
+      .offset(offset.value)
+      .limit(FILTER_REVIEW_QUEUE_PAGE_SIZE + 1),
+  ]);
+
+  const total = Number(totalRow?.count || 0);
+  const reviewed = Number(reviewedRow?.count || 0);
+  res.json({
+    summary: { total, reviewed, unreviewed: Math.max(0, total - reviewed) },
+    decisions: decisionRows.slice(0, FILTER_REVIEW_QUEUE_PAGE_SIZE),
+    view,
+    offset: offset.value,
+    has_more: decisionRows.length > FILTER_REVIEW_QUEUE_PAGE_SIZE,
+    next_offset: decisionRows.length > FILTER_REVIEW_QUEUE_PAGE_SIZE
+      ? offset.value + FILTER_REVIEW_QUEUE_PAGE_SIZE
+      : null,
+  });
 });
 
 // GET /api/v1/admin/cafes → 전체 카페 + 상태 + 오늘 도달/신청

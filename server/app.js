@@ -151,6 +151,10 @@ app.get('/admin', (_req, res) => {
 const filterLabPath = path.join(__dirname, '../music-filter-lab');
 app.use('/filter-lab', express.static(filterLabPath, { index: 'index.html' }));
 
+// 운영자 전용 통합 라벨링 화면. API 인증은 관리자 JWT로 별도 검증한다.
+const labelingLabPath = path.join(__dirname, '../music-labeling-lab');
+app.use('/labeling-lab', express.static(labelingLabPath, { index: 'index.html' }));
+
 // Customer SPA fallback — API 아닌 모든 경로에서 index.html 반환
 app.get('*', (_req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));

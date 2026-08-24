@@ -1,29 +1,13 @@
 'use strict';
 
 // 서버 같은-오리진에서 서빙되므로 상대경로로 호출한다(CORS 없음).
-// 인증은 사장님 앱과 같은 오리진의 localStorage 'token'을 재사용한다.
+// 운영자 콘솔과 같은 탭의 sessionStorage 관리자 토큰만 사용한다.
 const API_BASE = '/api/v1';
+const TOKEN_KEY = 'cf_admin_token';
 const $ = (id) => document.getElementById(id);
 
 function currentToken() {
-  const manual = $('token').value.trim();
-  return manual || localStorage.getItem('token') || '';
-}
-
-function refreshAuthState() {
-  const el = $('authState');
-  const hasSession = Boolean(localStorage.getItem('token'));
-  const hasManual = Boolean($('token').value.trim());
-  if (hasManual) {
-    el.textContent = '수동 입력 토큰 사용 중';
-    el.className = 'auth-state auth-state--ok';
-  } else if (hasSession) {
-    el.textContent = '사장님 로그인 세션 사용 중 (같은 브라우저)';
-    el.className = 'auth-state auth-state--ok';
-  } else {
-    el.textContent = '로그인 세션 없음 — 사장님 앱에서 로그인하거나 아래에 토큰을 입력하세요.';
-    el.className = 'auth-state auth-state--warn';
-  }
+  return sessionStorage.getItem(TOKEN_KEY) || '';
 }
 
 async function api(method, path, body) {
@@ -43,7 +27,12 @@ async function api(method, path, body) {
 }
 
 async function loadModels() {
-  const { ok, data } = await api('GET', '/cafes/me/music-filter/models');
+  const { ok, status, data } = await api('GET', '/admin/music-filter/models');
+  if (status === 401 || status === 403) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    window.location.replace('/admin');
+    return;
+  }
   const ids = ok && Array.isArray(data.models) ? data.models : [];
   if (ids.length) {
     $('modelList').innerHTML = ids.map((id) => `<option value="${id}"></option>`).join('');
@@ -68,13 +57,13 @@ function showResult({ decision, confidence, reason, model, track }) {
 $('run').addEventListener('click', async () => {
   const url = $('url').value.trim();
   if (!url) { alert('음악 링크를 입력하세요.'); return; }
-  if (!currentToken()) { alert('사장님 앱에서 먼저 로그인하거나 토큰을 입력하세요.'); return; }
+  if (!currentToken()) { window.location.replace('/admin'); return; }
 
   const button = $('run');
   button.disabled = true;
   button.textContent = '판단 중…';
   try {
-    const { ok, status, data } = await api('POST', '/cafes/me/music-filter/test', {
+    const { ok, status, data } = await api('POST', '/admin/music-filter/test', {
       url,
       prompt: $('cafePrompt').value,
       model: $('model').value.trim() || undefined,
@@ -92,7 +81,9 @@ $('run').addEventListener('click', async () => {
         track: null,
       });
     } else if (status === 401) {
-      alert('인증 실패 — 로그인 세션이 만료되었거나 토큰이 올바르지 않습니다.');
+      sessionStorage.removeItem(TOKEN_KEY);
+      alert('관리자 로그인이 만료되었습니다. 다시 로그인해주세요.');
+      window.location.replace('/admin');
     } else {
       alert(data.error || `요청 실패 (HTTP ${status})`);
     }
@@ -104,6 +95,8 @@ $('run').addEventListener('click', async () => {
   }
 });
 
-$('token').addEventListener('input', refreshAuthState);
-refreshAuthState();
-loadModels();
+if (!currentToken()) {
+  window.location.replace('/admin');
+} else {
+  loadModels();
+}

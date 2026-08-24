@@ -1,71 +1,68 @@
 <!doctype html>
-<html lang="ko">
+<html lang='ko'>
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
+    <meta charset='UTF-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <meta name='color-scheme' content='light' />
+    <meta name='robots' content='noindex, nofollow' />
     <title>Caffeine Flow · Music Filter Lab</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel='stylesheet' href='./styles.css' />
   </head>
   <body>
-    <header class="lab-header">
+    <header class='lab-header'>
       <div>
-        <p class="lab-eyebrow">Caffeine Flow</p>
+        <p class='lab-eyebrow'>Caffeine Flow</p>
         <h1>Music Filter Lab</h1>
-        <p class="lab-description">
+        <p class='lab-description'>
           음악 링크와 매장 분위기 프롬프트를 넣으면 실제 서비스와 동일하게 AI 음악 필터가 판단합니다.
-          서버(<code>/api/v1/cafes/me/music-filter/test</code>)를 통해 Railway에 등록된 OpenRouter 키로 실행됩니다.
+          관리자 전용 서버 API를 통해 Railway에 등록된 OpenRouter 키로 실행됩니다.
         </p>
       </div>
+      <nav class='lab-nav'>
+        <a href='/admin'>운영자 콘솔</a>
+        <a href='/labeling-lab'>라벨링 랩</a>
+      </nav>
     </header>
 
-    <main class="lab-main">
-      <section class="lab-panel" aria-label="설정">
+    <main class='lab-main'>
+      <section class='lab-panel' aria-label='설정'>
         <h2>설정</h2>
-        <p id="authState" class="auth-state">로그인 세션 확인 중…</p>
-        <details class="auth-manual">
-          <summary>토큰 수동 입력 (로그인 세션이 없을 때)</summary>
-          <label class="field">
-            <span>사장님 토큰 <small>(사장님 앱 로그인 후 자동 사용 · 다른 브라우저면 수동 입력)</small></span>
-            <input id="token" type="password" placeholder="eyJ..." autocomplete="off" />
-          </label>
-        </details>
-        <label class="field">
-          <span>모델 <small id="modelCount">(목록 불러오는 중…)</small></span>
-          <input id="model" type="text" list="modelList" placeholder="비우면 서버 기본 모델 · 예: openai/gpt-4o" spellcheck="false" />
-          <datalist id="modelList"></datalist>
+        <label class='field'>
+          <span>모델 <small id='modelCount'>(목록 불러오는 중…)</small></span>
+          <input id='model' type='text' list='modelList' placeholder='비우면 서버 기본 모델 · 예: openai/gpt-4o' spellcheck='false' />
+          <datalist id='modelList'></datalist>
         </label>
-        <p class="field-hint">비워두면 서버 기본값(<code id="defaultModelHint">MUSIC_FILTER_MODEL</code>)으로 판단합니다. 목록에서 골라 바꿔가며 비교하세요.</p>
+        <p class='field-hint'>비워두면 서버 기본값(<code id='defaultModelHint'>MUSIC_FILTER_MODEL</code>)으로 판단합니다. 목록에서 골라 바꿔가며 비교하세요.</p>
       </section>
 
-      <section class="lab-panel" aria-label="판단 입력">
+      <section class='lab-panel' aria-label='판단 입력'>
         <h2>판단 입력</h2>
-        <label class="field">
+        <label class='field'>
           <span>음악 링크 <small>(YouTube · Spotify · SoundCloud)</small></span>
-          <input id="url" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." />
+          <input id='url' type='url' inputmode='url' placeholder='https://www.youtube.com/watch?v=...' />
         </label>
-        <label class="field">
+        <label class='field'>
           <span>매장 분위기 (사장님 정책)</span>
-          <textarea id="cafePrompt" rows="3" placeholder="예: 조용한 재즈와 로파이만. 시끄러운 힙합·EDM 금지."></textarea>
+          <textarea id='cafePrompt' rows='3' placeholder='예: 조용한 재즈와 로파이만. 시끄러운 힙합·EDM 금지.'></textarea>
         </label>
-        <button id="run" type="button" class="run-button">필터 판단 실행</button>
+        <button id='run' type='button' class='run-button'>필터 판단 실행</button>
       </section>
 
-      <section class="lab-panel lab-result" aria-label="결과" id="resultPanel" hidden>
+      <section class='lab-panel lab-result' aria-label='결과' id='resultPanel' hidden>
         <h2>결과</h2>
-        <div id="verdict" class="verdict"></div>
-        <div class="result-reason">
+        <div id='verdict' class='verdict'></div>
+        <div class='result-reason'>
           <h3>사유</h3>
-          <p id="reasonOut">—</p>
+          <p id='reasonOut'>—</p>
         </div>
-        <dl class="result-meta">
-          <div><dt>곡</dt><dd id="trackOut">—</dd></div>
-          <div><dt>모델</dt><dd id="modelOut">—</dd></div>
-          <div><dt>confidence</dt><dd id="confidenceOut">—</dd></div>
+        <dl class='result-meta'>
+          <div><dt>곡</dt><dd id='trackOut'>—</dd></div>
+          <div><dt>모델</dt><dd id='modelOut'>—</dd></div>
+          <div><dt>confidence</dt><dd id='confidenceOut'>—</dd></div>
         </dl>
       </section>
     </main>
 
-    <script src="./app.js"></script>
+    <script src='./app.js'></script>
   </body>
 </html>

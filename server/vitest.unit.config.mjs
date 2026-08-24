@@ -5,6 +5,7 @@ export default defineConfig({
     setupFiles: ['tests/unit-setup.mjs'],
     include: [
       'tests/ai-guardrails-docs.test.mjs',
+      'tests/admin-ai-labs.test.mjs',
       'tests/api-docs.test.mjs',
       'tests/electron-navigation-policy.test.mjs',
       'tests/electron-auto-update.test.mjs',

@@ -80,6 +80,7 @@ server/src/routes/admin.js
 - `human_decision`과 `human_reason_code`는 상수에 정의된 값만 사용한다.
 - `metadata_sufficient`는 곡의 정답과 독립된 boolean 품질 표식이다.
 - 운영자 인증과 `(cafe_id, recommendation_id)` 범위를 모두 확인한 AI 처리 이력만 검수한다.
+- 전체 카페 라벨링 큐 조회와 필터 실험실 실행도 `requireAdmin` 경계를 유지하며 사장님 JWT로 열지 않는다.
 - 미검수 운영자 UI는 AI 결정·사유를 먼저 노출하지 않는다. 사람 정답 저장 후 비교용으로 공개한다.
 - 수집된 사람 라벨을 자동수락·프롬프트·검색에 연결하려면 별도 평가와 계약 변경이 필요하다.
 
