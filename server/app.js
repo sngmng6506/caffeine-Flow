@@ -145,8 +145,8 @@ app.get('/admin', (_req, res) => {
   res.sendFile(path.join(adminUiPath, 'index.html'));
 });
 
-// 음악 필터 테스트 lab — 서버 같은-오리진에서 서빙해 사장님 로그인 세션(토큰)을
-// 재사용하고 /api/v1/cafes/me/music-filter/test를 CORS 없이 호출한다. index.html에
+// 음악 필터 테스트 lab — 서버 같은-오리진에서 서빙해 운영자 콘솔의 관리자 토큰을
+// 재사용하고 /api/v1/admin/music-filter/test를 CORS 없이 호출한다. index.html에
 // inline script/style을 두지 않아 CSP script-src를 열지 않는다. catch-all보다 먼저 둔다.
 const filterLabPath = path.join(__dirname, '../music-filter-lab');
 app.use('/filter-lab', express.static(filterLabPath, { index: 'index.html' }));
