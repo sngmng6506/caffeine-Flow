@@ -16,7 +16,7 @@ const { getTrackMetadata } = require('../services/track-metadata.service');
 const { requireAdmin } = require('../middleware/auth');
 const { issueAdminToken } = require('../utils/jwt');
 const { kstTodayString, kstStartOfDay } = require('../utils/kst');
-const { ADMIN_LOGIN_LIMIT } = require('../constants/limits');
+const { ADMIN_LOGIN_LIMIT, ADMIN_LOGIN_GLOBAL_LIMIT } = require('../constants/limits');
 const { HEARTBEAT_ACTIVE_WINDOW_MS } = require('../constants/time-policy');
 const { ADMIN_PASSWORD, OPENROUTER_API_KEY, OPENROUTER_BASE_URL } = require('../config');
 const { isUuid, validateString } = require('../utils/validate');
@@ -68,19 +68,33 @@ const CAFE_STATUS = Object.freeze({
 // 보내므로 한도에 걸려 시나리오 검증이 불가능해짐 (_recommendations.shared.js와 동일 정책)
 const skipInTest = () => process.env.NODE_ENV === 'test';
 
-const loginLimiter = rateLimit({
-  ...ADMIN_LOGIN_LIMIT,
-  skip: skipInTest,
-  skipSuccessfulRequests: true,
-  handler: (req, res, _next, options) => {
-    const resetAt = req.rateLimit?.resetTime?.getTime() || Date.now() + ADMIN_LOGIN_LIMIT.windowMs;
+function adminLoginLimitHandler(limit) {
+  return (req, res, _next, options) => {
+    const resetAt = req.rateLimit?.resetTime?.getTime() || Date.now() + limit.windowMs;
     const retryAfterSeconds = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
     res.status(options.statusCode).json({
       error: `로그인 시도가 너무 많습니다. ${retryAfterSeconds}초 후 다시 시도하세요`,
       retry_after_seconds: retryAfterSeconds,
     });
-  },
+  };
+}
+
+function createAdminLoginLimiter(limit, options = {}) {
+  return rateLimit({
+    ...limit,
+    ...options,
+    skip: skipInTest,
+    skipSuccessfulRequests: true,
+    handler: adminLoginLimitHandler(limit),
+  });
+}
+
+// IP별 제한과 서비스 전체 제한을 함께 둔다. 비밀번호가 하나라 IP만 바꾸는
+// 분산 대입도 가능하므로, 전역 제한은 정상 로그인량보다 넉넉한 별도 상한이다.
+const globalLoginLimiter = createAdminLoginLimiter(ADMIN_LOGIN_GLOBAL_LIMIT, {
+  keyGenerator: () => 'admin-login-global',
 });
+const loginLimiter = createAdminLoginLimiter(ADMIN_LOGIN_LIMIT);
 
 // 길이가 달라도 조기 반환하지 않도록 해시를 비교 — 비밀번호 길이 유출 방지
 function safeEqual(a, b) {
@@ -98,7 +112,7 @@ function cafeStatus(lastHeartbeatAt, now, todayStartMs) {
 }
 
 // POST /api/v1/admin/login  { password } → { token }
-router.post('/login', loginLimiter, (req, res) => {
+router.post('/login', globalLoginLimiter, loginLimiter, (req, res) => {
   if (!ADMIN_PASSWORD) {
     return res.status(503).json({ error: 'ADMIN_PASSWORD 미설정 — 어드민 콘솔 비활성' });
   }
@@ -490,6 +504,10 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
         source_recommendation_id: recommendation.id,
         title: recommendation.title,
         ...annotationCheck.value,
+        // pg 드라이버가 JS 배열을 PostgreSQL 배열 리터럴({"pop"})로 바꾸면
+        // jsonb 컬럼에서 22P02가 발생한다. JSON 문자열로 타입을 명확히 한다.
+        mood_tags: JSON.stringify(annotationCheck.value.mood_tags),
+        genre_tags: JSON.stringify(annotationCheck.value.genre_tags),
         updated_at: reviewedAt,
       };
       [savedAnnotation] = await trx('music_track_annotations')

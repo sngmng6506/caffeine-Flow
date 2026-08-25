@@ -11,6 +11,7 @@ import {
   COMMENT_PAGE_SIZE,
   COMMENT_PAGE_MAX_SIZE,
   ADMIN_LOGIN_LIMIT,
+  ADMIN_LOGIN_GLOBAL_LIMIT,
   QR_CUSTOMER_URL_MAX_LENGTH,
   QR_IMAGE_MAX_BYTES,
 } from '../src/constants/limits.js';
@@ -60,6 +61,7 @@ describe('운영 한도 정책 상수', () => {
 
   it('운영자 로그인은 15분 동안 10회로 제한한다', () => {
     expect(ADMIN_LOGIN_LIMIT).toEqual({ windowMs: 15 * ONE_MINUTE_MS, max: 10 });
+    expect(ADMIN_LOGIN_GLOBAL_LIMIT).toEqual({ windowMs: 15 * ONE_MINUTE_MS, max: 50 });
   });
 
   it('QR 주소와 이미지 응답 크기에 상한이 있다', () => {

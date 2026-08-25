@@ -124,7 +124,7 @@ SoundCloud·Spotify처럼 `videoId`가 전체 URL인 경우 클라이언트는 `
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
-| POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. 15분 10회 제한, 차단 시 `retry_after_seconds` 반환 |
+| POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. IP별 15분 10회·서비스 전체 15분 50회 실패 제한, 차단 시 `retry_after_seconds` 반환 |
 | POST | `/admin/music-filter/test` | 🛡 | 필터 실험실에서 저장 없이 곡 판단. body는 `url`, `prompt`, 선택적 `model` |
 | GET | `/admin/music-filter/models` | 🛡 | OpenRouter `/models/user`의 사용 가능 모델 ID 목록을 10분 캐시해 반환 |
 | GET | `/admin/music-filter-reviews` | 🛡 | 전체 카페 AI 판단의 라벨링 큐와 전체·완료·미검수 건수. `view`, `offset` 지원 |
