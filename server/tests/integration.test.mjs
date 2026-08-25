@@ -380,6 +380,18 @@ describe('운영자 AI 프롬프트 감사', () => {
         human_decision: 'accept',
         human_reason_code: 'policy_match',
         metadata_sufficient: false,
+        track_annotation: {
+          artist_name: '테스트 아티스트',
+          track_version: 'original',
+          tempo_class: 'moderate',
+          mood_tags: ['peaceful', 'nostalgic'],
+          instrumentation_type: 'hybrid',
+          rhythmic_character: 'steady',
+          vocal_type: 'singing',
+          genre_tags: ['pop'],
+          note: '차분하고 부드러운 질감',
+          usage_scope: 'operational',
+        },
       });
     expect(firstReview.status).toBe(200);
     expect(firstReview.body).toMatchObject({
@@ -387,6 +399,17 @@ describe('운영자 AI 프롬프트 감사', () => {
       human_decision: 'accept',
       human_reason_code: 'policy_match',
       metadata_sufficient: false,
+      track_annotation: expect.objectContaining({
+        artist_name: '테스트 아티스트',
+        vocal_type: 'singing',
+      }),
+    });
+    expect(await db('music_track_annotations')
+      .where({ platform: 'youtube', track_key: 'audit_rejected' })
+      .first()).toMatchObject({
+      artist_name: '테스트 아티스트',
+      artist_key: '테스트 아티스트',
+      usage_scope: 'operational',
     });
 
     const updatedReview = await request(app)
@@ -424,6 +447,7 @@ describe('운영자 AI 프롬프트 감사', () => {
     expect(reviewedQueue.body.decisions).toContainEqual(expect.objectContaining({
       id: decision.id,
       human_decision: 'reject',
+      track_annotation: expect.objectContaining({ artist_name: '테스트 아티스트' }),
     }));
     expect((await request(app)
       .get('/api/v1/admin/music-filter-reviews?view=invalid')
@@ -433,6 +457,25 @@ describe('운영자 AI 프롬프트 감사', () => {
       .put(reviewPath)
       .set({ Authorization: `Bearer ${adminToken}` })
       .send({ human_decision: 'maybe', human_reason_code: 'other', metadata_sufficient: true })).status).toBe(400);
+    expect((await request(app)
+      .put(reviewPath)
+      .set({ Authorization: `Bearer ${adminToken}` })
+      .send({
+        human_decision: 'undetermined',
+        human_reason_code: 'metadata_insufficient',
+        metadata_sufficient: false,
+        track_annotation: {
+          artist_name: '테스트 아티스트',
+          track_version: 'unknown',
+          tempo_class: 'unknown',
+          mood_tags: ['peaceful', 'nostalgic', 'tender'],
+          instrumentation_type: 'unknown',
+          rhythmic_character: 'unknown',
+          vocal_type: 'unknown',
+          genre_tags: [],
+          usage_scope: 'evaluation',
+        },
+      })).status).toBe(400);
     expect((await request(app)
       .put(reviewPath)
       .set({ Authorization: `Bearer ${ownerToken}` })
@@ -457,6 +500,9 @@ describe('운영자 AI 프롬프트 감사', () => {
     expect(response.status).toBe(403);
     expect((await request(app)
       .get('/api/v1/admin/music-filter-reviews')
+      .set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
+    expect((await request(app)
+      .get('/api/v1/admin/music-filter-artist-labels?artist=test')
       .set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
     expect((await request(app)
       .get('/api/v1/admin/music-filter/models')

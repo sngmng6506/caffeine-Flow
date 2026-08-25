@@ -72,6 +72,9 @@ owner/src/constants/musicFilterPolicy.js
 ```text
 server/src/constants/music-filter-review.js
 server/src/db/migrations/20260822090000_music_filter_reviews.js
+server/src/constants/music-labeling.js
+server/src/features/music-labeling/annotation.js
+server/src/db/migrations/20260825090000_music_track_annotations.js
 server/src/routes/admin.js
 ```
 
@@ -79,10 +82,14 @@ server/src/routes/admin.js
 - 추천곡당 최신 골드 라벨 한 건만 유지하며 재검수는 upsert한다.
 - `human_decision`과 `human_reason_code`는 상수에 정의된 값만 사용한다.
 - `metadata_sufficient`는 곡의 정답과 독립된 boolean 품질 표식이다.
+- 곡 특성 라벨은 정책 일치 여부와 분리해 `(platform, track_key)`당 한 건으로 저장한다.
+- 라벨 선택값과 최대 개수는 `music-labeling.js` 상수 및 DB 제약을 함께 유지한다. 화면 표시만 한국어이며 저장 코드는 임의로 바꾸지 않는다.
+- 확인한 아티스트명의 정규화 키는 다른 곡 참고 조회에만 쓴다. 자동 동일인 판정이나 라벨 복사 근거로 사용하지 않는다.
+- `usage_scope=evaluation` 데이터는 라이브 LLM 입력이나 자동수락에 사용하지 않는다. `operational` 데이터도 현재는 수집만 하며 연결에는 별도 평가와 계약 변경이 필요하다.
 - 운영자 인증과 `(cafe_id, recommendation_id)` 범위를 모두 확인한 AI 처리 이력만 검수한다.
 - 전체 카페 라벨링 큐 조회와 필터 실험실 실행도 `requireAdmin` 경계를 유지하며 사장님 JWT로 열지 않는다.
 - 미검수 운영자 UI는 AI 결정·사유를 먼저 노출하지 않는다. 사람 정답 저장 후 비교용으로 공개한다.
-- 수집된 사람 라벨을 자동수락·프롬프트·검색에 연결하려면 별도 평가와 계약 변경이 필요하다.
+- 수집된 사람 라벨을 Exact 재사용·프롬프트·동일 아티스트 검색에 연결하려면 별도 평가와 계약 변경이 필요하다.
 
 ## Router Mount Order Contract
 

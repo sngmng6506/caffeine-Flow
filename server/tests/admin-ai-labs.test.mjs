@@ -25,8 +25,17 @@ describe('관리자 AI 랩 정적 계약', () => {
 
   it('라벨링 랩은 통합 큐를 읽고 기존 검수 API로 저장한다', () => {
     const app = read('music-labeling-lab/app.js');
+    const html = read('music-labeling-lab/index.html');
     expect(app).toContain(`/admin/music-filter-reviews?view=`);
     expect(app).toContain('/admin/cafes/${item.cafe_id}/music-filter-audit/${item.id}/review');
+    expect(app).toContain('/admin/music-filter-artist-labels?');
+    expect(app).toContain('track_annotation');
     expect(app).toContain(`sessionStorage.getItem(TOKEN_KEY)`);
+    expect(html).toContain('보컬 유형');
+    expect(html).toContain('랩·말하기 위주');
+    expect(html).not.toContain('노래와 랩이 섞임');
+    expect(html).not.toContain('라벨 확신도');
+    expect(html).not.toContain('에너지');
+    expect(html).not.toContain('콘텐츠 주의 요소');
   });
 });

@@ -1,6 +1,7 @@
 const HUMAN_DECISION = Object.freeze({
   ACCEPT: 'accept',
   REJECT: 'reject',
+  UNDETERMINED: 'undetermined',
 });
 
 const HUMAN_REASON_CODE = Object.freeze({

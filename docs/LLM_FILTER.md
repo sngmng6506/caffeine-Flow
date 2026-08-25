@@ -141,23 +141,47 @@ filter_prompt_snapshot
 
 ```text
 recommendation_id
-human_decision        accept | reject
+human_decision        accept | reject | undetermined
 human_reason_code     policy_match | policy_mismatch | unsafe_content | metadata_insufficient | other
 metadata_sufficient   boolean
 reviewed_at
 ```
 
-라벨은 `music_filter_reviews`에 추천곡당 한 건으로 저장하며 재검수 시 최신 값으로
-갱신한다. 추천곡 삭제 시 함께 삭제된다. AI 출력과 사람 정답을 독립적으로 비교할 수
+정책 검수와 별도로 플랫폼 원본 곡에는 다음 정형 음악 라벨을 저장한다.
+
+```text
+artist_name           운영자가 확인한 아티스트명
+track_version         original | live | remix | cover | edited | unknown
+tempo_class           very_slow | slow | moderate | fast | very_fast | unknown
+mood_tags             최대 2개
+instrumentation_type  acoustic | electronic | hybrid | unknown
+rhythmic_character    minimal | steady | danceable | heavy_beat | irregular | unknown
+vocal_type            none | singing | rap_spoken | unknown
+genre_tags            선택, 최대 2개
+note                  선택 메모
+usage_scope           operational | evaluation
+schema_version
+```
+
+화면에서는 모든 값을 한국어로 표시한다. `unknown`은 같은 항목의 다른 값과 함께 저장하지
+않는다. 아티스트명은 운영자가 곡을 듣고 확인하며, 정규화 키는 동일 아티스트의 다른 곡
+라벨을 찾는 용도로만 사용한다. 자동 아티스트 추정이나 곡 간 라벨 복사는 하지 않는다.
+
+정책 검수는 `music_filter_reviews`에 추천곡당 한 건, 곡 특성은
+`music_track_annotations`에 `(platform, track_key)`당 한 건으로 저장하며 재검수 시 최신
+값으로 갱신한다. 정책 검수는 추천곡 삭제 시 함께 삭제되고 곡 특성은 출처 추천곡만
+비워져 재사용 가능한 라벨을 보존한다. AI 출력과 사람 정답을 독립적으로 비교할 수
 있도록 `recommendations.filter_status`와 일반 큐 `status`는 변경하지 않는다.
 관리자 콘솔은 미검수 상태에서 AI 결정·사유를 숨기고 곡 링크와 판단 당시 매장 정책을
 먼저 제공한다. 사람 정답을 저장한 뒤에만 AI 결과를 공개해 검수 편향을 줄인다.
 라벨링 랩은 카페 구분 없이 전체·완료·미검수 건수를 집계하고 미검수 이력을
 최근 판단순 50건씩 가져와 한 항목씩 검수한다. 저장은 기존 카페·추천곡 범위 검증을
-통과한 뒤 같은 `music_filter_reviews` 레코드에 반영한다.
+통과한 뒤 정책 검수와 곡 특성을 한 트랜잭션으로 반영한다. 두 레코드가 모두 있어야
+완료로 집계한다. 확인한 아티스트의 다른 곡 라벨은 운영자가 요청할 때 최대 3건만 보여준다.
 
-현재 단계에서는 골드 라벨을 수집만 한다. 자동수락, LLM 프롬프트, Exact 재사용,
-유사 사례 검색에는 아직 사용하지 않으며 성능 지표 자동 계산도 하지 않는다.
+현재 단계에서는 골드 라벨을 수집만 한다. `usage_scope`가 `operational`이어도 자동수락,
+LLM 프롬프트, Exact 재사용, 동일 아티스트 참고 검색에는 아직 사용하지 않으며 성능 지표
+자동 계산도 하지 않는다. 라이브 판단 연결은 별도 평가와 계약 변경 후 진행한다.
 
 ## 구현 위치
 
@@ -167,6 +191,8 @@ server/src/features/music-filter/
 ├── prompt.builder.js        정책과 곡 데이터를 메시지로 구성
 ├── llm.client.js            OpenRouter 호출·timeout·JSON 파싱
 └── decision.policy.js       판단 정규화와 오류 변환
+server/src/features/music-labeling/annotation.js  수동 곡 라벨 정규화·검증
+server/src/constants/music-labeling.js            수동 곡 라벨 코드·개수 제한
 ```
 
 관련 클라이언트:

@@ -128,22 +128,28 @@ SoundCloud·Spotify처럼 `videoId`가 전체 URL인 경우 클라이언트는 `
 | POST | `/admin/music-filter/test` | 🛡 | 필터 실험실에서 저장 없이 곡 판단. body는 `url`, `prompt`, 선택적 `model` |
 | GET | `/admin/music-filter/models` | 🛡 | OpenRouter `/models/user`의 사용 가능 모델 ID 목록을 10분 캐시해 반환 |
 | GET | `/admin/music-filter-reviews` | 🛡 | 전체 카페 AI 판단의 라벨링 큐와 전체·완료·미검수 건수. `view`, `offset` 지원 |
+| GET | `/admin/music-filter-artist-labels` | 🛡 | 확인한 아티스트의 다른 곡 라벨을 최신순 최대 3건 조회. `artist`, 선택적 `platform`·`track_key` 지원 |
 | GET | `/admin/cafes` | 🛡 | 전체 카페와 운영 상태, 오늘 QR 접속 브라우저 수(`today_unique_browsers`) 조회. 사람 수가 아닌 브라우저 익명 ID 기준 |
 | GET | `/admin/cafes/:id/stats` | 🛡 | 특정 카페의 오늘·누적·시간대·요일·AI 필터 통계 |
 | GET | `/admin/cafes/:id/music-filter-audit` | 🛡 | 특정 카페의 현재 AI 필터 설정, 최근 프롬프트 변경 이력 50건, 승인·거절 판단 이력 50건 조회. `offset`으로 판단 이력 페이지 이동 |
-| PUT | `/admin/cafes/:id/music-filter-audit/:recommendationId/review` | 🛡 | AI 판단에 독립된 사람 정답·사유 코드·메타데이터 충분 여부를 추천곡별로 저장 또는 갱신 |
+| PUT | `/admin/cafes/:id/music-filter-audit/:recommendationId/review` | 🛡 | 정책 검수와 선택적 곡 특성 라벨을 한 요청으로 저장 또는 갱신 |
 | PUT | `/admin/cafes/:id/suspend` | 🛡 | 카페 정지·해제 |
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
 
 잘못된 UUID와 미존재 카페는 404다. 정지 카페는 손님 HTTP와 Socket.IO 접근이 차단된다.
 
-AI 필터 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient }`다.
-`human_decision`은 `accept|reject`, `human_reason_code`는
+AI 필터 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, track_annotation? }`다.
+`human_decision`은 `accept|reject|undetermined`, `human_reason_code`는
 `policy_match|policy_mismatch|unsafe_content|metadata_insufficient|other`,
 `metadata_sufficient`는 boolean만 허용한다. 해당 카페의 AI 처리 이력만 검수할 수 있으며
 사람 라벨은 실제 신청곡 상태나 기존 LLM 판단을 변경하지 않는다.
+`track_annotation`은 확인한 `artist_name`, `track_version`, `tempo_class`, `mood_tags`,
+`instrumentation_type`, `rhythmic_character`, `vocal_type`, 선택적 `genre_tags`와 `note`,
+`usage_scope`를 받는다. 분위기와 장르는 각각 최대 2개이며 `unknown`은 다른 값과 함께
+쓸 수 없다. 곡 라벨은 `(platform, video_id)`에 대응하는 한 건으로 저장한다.
 통합 라벨링 큐의 `view`는 `unreviewed`(기본값), `reviewed`, `all`만 허용하며
-최근 판단순 50건을 반환한다. 미검수 큐는 저장으로 목록이 줄어들므로 다음 묶음을
+최근 판단순 50건을 반환한다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`이며,
+둘 중 하나라도 없으면 `unreviewed`다. 미검수 큐는 저장으로 목록이 줄어들므로 다음 묶음을
 가져올 때 `offset=0`부터 다시 조회한다.
 
 ## 통합 TOP10

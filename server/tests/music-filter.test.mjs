@@ -11,7 +11,11 @@ import {
 
 describe('AI 음악 필터 상태 계약', () => {
   it('사람 검수 라벨은 고정된 정답과 사유 코드만 사용한다', () => {
-    expect(HUMAN_DECISIONS).toEqual([HUMAN_DECISION.ACCEPT, HUMAN_DECISION.REJECT]);
+    expect(HUMAN_DECISIONS).toEqual([
+      HUMAN_DECISION.ACCEPT,
+      HUMAN_DECISION.REJECT,
+      HUMAN_DECISION.UNDETERMINED,
+    ]);
     expect(HUMAN_REASON_CODES).toEqual([
       HUMAN_REASON_CODE.POLICY_MATCH,
       HUMAN_REASON_CODE.POLICY_MISMATCH,
