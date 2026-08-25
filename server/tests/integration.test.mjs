@@ -4,7 +4,7 @@
 //   JWT_SECRET:   임의 값
 //   NODE_ENV:     test (rate limiter 스킵)
 // CI에서는 postgres:16 서비스 컨테이너로 자동 구성됨 (ci.yml).
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
@@ -19,6 +19,10 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 let cafe;
 let ownerToken;
+const generatePublicMusicGuideMock = vi.fn(async () => ({
+  notice: '잔잔하고 편안한 재즈와 로파이 신청곡을 골라 주세요.',
+  model: 'test-public-guide-model',
+}));
 
 function guestHeaders(visitorId = 'test-visitor-1') {
   return { 'x-visitor-id': visitorId };
@@ -45,6 +49,7 @@ function ownerPostRec(body) {
 }
 
 beforeAll(async () => {
+  app.set('publicMusicGuideGenerator', generatePublicMusicGuideMock);
   // 마이그레이션은 globalSetup(tests/global-setup.mjs)에서 1회만 적용된다.
   // 잔여 데이터 제거 (재실행 대비)
   await db('recommendations').del();
@@ -316,17 +321,36 @@ describe('방문자 집계 식별자', () => {
 describe('운영자 AI 프롬프트 감사', () => {
   it('현재 설정·판단 프롬프트와 독립된 사람 검수 라벨을 카페 범위로 관리한다', async () => {
     const prompt = '잔잔한 재즈와 로파이만 승인합니다.';
+    generatePublicMusicGuideMock.mockClear();
     const firstUpdate = await request(app)
       .put('/api/v1/cafes/me/music-filter')
       .set({ Authorization: `Bearer ${ownerToken}` })
       .send({ enabled: true, prompt });
     expect(firstUpdate.status).toBe(200);
+    expect(firstUpdate.body.music_filter_public_notice)
+      .toBe('잔잔하고 편안한 재즈와 로파이 신청곡을 골라 주세요.');
+    expect(generatePublicMusicGuideMock).toHaveBeenCalledTimes(1);
 
     // 같은 값을 다시 적용해도 변경 이력을 중복 생성하지 않는다.
     await request(app)
       .put('/api/v1/cafes/me/music-filter')
       .set({ Authorization: `Bearer ${ownerToken}` })
       .send({ enabled: true, prompt });
+    expect(generatePublicMusicGuideMock).toHaveBeenCalledTimes(1);
+
+    expect(await db('cafes').where({ id: cafe.id }).first())
+      .toMatchObject({
+        music_filter_public_notice: '잔잔하고 편안한 재즈와 로파이 신청곡을 골라 주세요.',
+        music_filter_public_notice_model: 'test-public-guide-model',
+      });
+    const publicQueue = await request(app)
+      .get(`/api/v1/cafes/${cafe.slug}/recommendations`);
+    expect(publicQueue.body.notice)
+      .toBe('잔잔하고 편안한 재즈와 로파이 신청곡을 골라 주세요.');
+    expect((await request(app)
+      .put('/api/v1/cafes/me/notice')
+      .set({ Authorization: `Bearer ${ownerToken}` })
+      .send({ notice: '수동 공지' })).status).toBe(404);
 
     const [decision] = await db('recommendations').insert({
       cafe_id: cafe.id,

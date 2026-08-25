@@ -16,6 +16,10 @@ const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
 const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
+const {
+  generatePublicMusicGuide,
+  normalizePublicGuide,
+} = require('../features/music-filter/public-guide.service');
 
 const MANUAL_PLAYBACK_END_REASONS = ['ended', 'changed'];
 
@@ -106,15 +110,6 @@ router.put('/me/slug', requireAuth, slugChangeLimiter, async (req, res) => {
   });
 });
 
-// PUT /api/v1/cafes/me/notice
-router.put('/me/notice', requireAuth, async (req, res) => {
-  const noticeCheck = validateString(req.body?.notice, { max: 500, allowNull: true, name: '공지' });
-  if (noticeCheck.error) return res.status(400).json({ error: noticeCheck.error });
-  const cafe = await cafeService.update(req.owner.cafeId, { notice: noticeCheck.value });
-  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('notice_updated', { notice: cafe.notice });
-  res.json({ notice: cafe.notice });
-});
-
 // PUT /api/v1/cafes/me/platforms  (허용 플랫폼 설정)
 router.put('/me/platforms', requireAuth, async (req, res) => {
   const { allowed_platforms } = req.body || {};
@@ -149,14 +144,53 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'AI 필터를 켜려면 매장 분위기 설명을 입력해주세요' });
   }
 
+  const current = await cafeService.findById(req.owner.cafeId);
+  if (!current) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
+
+  const shouldGeneratePublicNotice = Boolean(promptCheck.value) && (
+    current.music_filter_prompt !== promptCheck.value
+    || !current.music_filter_public_notice
+  );
+  const shouldClearPublicNotice = !promptCheck.value && Boolean(
+    current.music_filter_prompt
+    || current.music_filter_public_notice
+  );
+
+  let generated = null;
+  if (shouldGeneratePublicNotice) {
+    try {
+      const generator = req.app.get('publicMusicGuideGenerator') || generatePublicMusicGuide;
+      generated = await generator({ cafePrompt: promptCheck.value });
+      generated = {
+        notice: normalizePublicGuide(generated),
+        model: generated?.model ? String(generated.model).slice(0, 100) : null,
+      };
+    } catch (error) {
+      console.error('[music-filter-public-guide] 생성 실패:', error?.code || error?.message || error);
+      return res.status(503).json({
+        error: '손님용 신청곡 안내를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+      });
+    }
+  }
+
   const cafe = await cafeService.updateMusicFilterSettings(req.owner.cafeId, {
     enabled: enabledCheck.value,
     prompt: promptCheck.value,
+    replacePublicNotice: shouldGeneratePublicNotice || shouldClearPublicNotice,
+    publicNotice: generated?.notice || null,
+    publicNoticeModel: generated?.model || null,
   });
+
+  if (current.music_filter_public_notice !== cafe.music_filter_public_notice) {
+    req.app.get('io')?.of('/cafe').to(cafe.slug).emit('notice_updated', {
+      notice: cafe.music_filter_public_notice,
+    });
+  }
 
   res.json({
     music_filter_enabled: cafe.music_filter_enabled,
     music_filter_prompt: cafe.music_filter_prompt,
+    music_filter_public_notice: cafe.music_filter_public_notice,
   });
 });
 

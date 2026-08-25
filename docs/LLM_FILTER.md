@@ -15,11 +15,33 @@ Caffeine Flow는 사장님이 작성한 매장 분위기 정책을 기준으로 
 ```text
 music_filter_enabled     필터 사용 여부
 music_filter_prompt      매장 분위기 설명
+music_filter_public_notice  손님 화면에 보여줄 정제된 신청곡 안내
 ```
 
 별도의 필터 강도는 사용하지 않는다. 사장님이 작성한 매장 분위기 설명이 유일한 매장 판단 정책이며, 각 곡 요청에는 그 시점의 최신 설명을 그대로 전달한다.
 
 과거 배포 호환을 위해 DB의 `music_filter_strictness` 컬럼은 남아 있지만 API에 노출하거나 저장·판단에 사용하지 않는다.
+
+## 손님용 신청곡 안내
+
+사장님은 내부 판정 문법을 맞추지 않고 편한 언어로 매장 분위기 설명을 작성한다. 설명을
+처음 저장하거나 내용이 달라지면 LLM이 이를 긍정적이고 짧은 손님용 신청곡 안내로 한 번
+정리한다. 결과와 사용 모델, 생성 시각을 `cafes`에 저장하고 손님 큐 조회에서는 저장된
+결과만 반환하므로 반복 조회에 LLM 비용을 사용하지 않는다.
+
+```text
+매장 분위기 설명 저장
+→ 기존 설명·저장 안내 비교
+→ 설명 변경 또는 안내 누락일 때만 공개 문구 생성
+→ 설명·공개 문구·모델·생성 시각을 함께 저장
+→ 기존 공지 섹션에 저장 문구 표시
+```
+
+원본 매장 분위기 설명은 손님에게 공개하지 않는다. 공개 문구는 내부 거절 규칙이나 금지
+장르를 길게 나열하지 않고, 손님이 어떤 분위기의 곡을 고르면 좋은지 180자 이내의
+1~2문장으로 설명한다. 생성에 실패하면 원문을 대신 노출하거나 이전 안내와 새 설명을
+섞지 않고 설정 저장을 중단한다. 프롬프트가 같고 저장 안내가 있으면 필터 ON/OFF 변경에도
+다시 생성하지 않는다.
 
 손님 신청은 일반 검증을 통과한 뒤 LLM으로 전달된다.
 
@@ -190,6 +212,7 @@ server/src/features/music-filter/
 ├── music-filter.service.js  전체 판단 흐름
 ├── prompt.builder.js        정책과 곡 데이터를 메시지로 구성
 ├── llm.client.js            OpenRouter 호출·timeout·JSON 파싱
+├── public-guide.service.js  매장 설명을 손님용 신청곡 안내로 정제
 └── decision.policy.js       판단 정규화와 오류 변환
 server/src/features/music-labeling/annotation.js  수동 곡 라벨 정규화·검증
 server/src/constants/music-labeling.js            수동 곡 라벨 코드·개수 제한

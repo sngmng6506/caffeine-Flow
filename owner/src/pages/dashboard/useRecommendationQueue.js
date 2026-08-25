@@ -158,7 +158,6 @@ export default function useRecommendationQueue({
         const updated = {
           ...previous,
           name: latest.name || previous.name,
-          notice: latest.notice ?? previous.notice,
           initial_slug: latest.initial_slug || previous.initial_slug,
         };
         localStorage.setItem('cafe', JSON.stringify(updated));

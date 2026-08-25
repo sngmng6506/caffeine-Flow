@@ -15,6 +15,7 @@ export default defineConfig({
       'tests/kst.test.mjs',
       'tests/limits.test.mjs',
       'tests/music-filter.test.mjs',
+      'tests/public-music-guide.test.mjs',
       'tests/music-labeling.test.mjs',
       'tests/owner-session.test.mjs',
       'tests/owner-music-resource.test.mjs',

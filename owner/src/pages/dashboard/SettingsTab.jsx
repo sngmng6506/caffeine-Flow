@@ -136,7 +136,7 @@ export default function SettingsTab({
       <CollapsibleSetting
         id="owner-store-settings"
         title="매장 정보"
-        description="카페명, 공지, 손님용 QR 코드를 관리해요."
+        description="카페명과 손님용 QR 코드를 관리해요."
       >
         <CafeProfileSettings cafe={cafe} onCafePatch={onCafePatch} />
         <div style={settingsStyles.divider} />

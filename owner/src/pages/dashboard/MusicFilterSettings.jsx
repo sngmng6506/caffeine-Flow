@@ -7,6 +7,7 @@ import SettingsStatus from './SettingsStatus';
 function normalize(latest = {}) {
   return {
     prompt: latest.music_filter_prompt || '',
+    publicNotice: latest.music_filter_public_notice || '',
   };
 }
 
@@ -89,7 +90,7 @@ export default function MusicFilterSettings() {
       setInitial(next);
       setForm(next);
       setEnabled(!!updated.music_filter_enabled);
-      setMessage({ tone: 'success', text: '매장 분위기 설명을 적용했어요.' });
+      setMessage({ tone: 'success', text: '매장 분위기 설명과 손님 안내를 적용했어요.' });
     } catch (error) {
       setMessage({ tone: 'error', text: error.message || '매장 분위기 설명을 적용하지 못했어요. 다시 시도해 주세요.' });
     } finally {
@@ -154,6 +155,18 @@ export default function MusicFilterSettings() {
           <div style={styles.warn}>AI 필터가 켜져 있어 매장 분위기 설명을 비울 수 없어요.</div>
         )}
 
+        <div style={styles.publicNoticeBox}>
+          <div style={styles.publicNoticeLabel}>손님 화면 안내</div>
+          <div style={form.publicNotice ? styles.publicNoticeText : styles.publicNoticeEmpty}>
+            {form.publicNotice || '매장 분위기 설명을 적용하면 손님이 읽기 편한 신청곡 안내를 만들어요.'}
+          </div>
+          <div style={styles.publicNoticeHint}>
+            {changed
+              ? '설명을 적용하면 안내도 새로 정리돼요.'
+              : '정리된 안내는 다음 설명 변경 전까지 저장해서 사용해요.'}
+          </div>
+        </div>
+
         <div style={styles.infoActionRow}>
           <div style={styles.info}>
             AI 판단 중 문제가 발생하면 신청곡은 자동으로 거절돼요. 결과는 이력에서 확인할 수 있어요.
@@ -161,7 +174,7 @@ export default function MusicFilterSettings() {
           <div style={styles.actions}>
             <button type="button" onClick={() => setForm(initial)} disabled={!changed || saving} style={styles.cancelBtn}>되돌리기</button>
             <button type="button" onClick={handleSave} disabled={!canSave} style={{ ...styles.saveBtn, ...(!canSave ? styles.disabledBtn : {}) }}>
-              {saving ? '적용 중…' : '적용'}
+              {saving ? '안내 만드는 중…' : '적용'}
             </button>
           </div>
         </div>
@@ -221,6 +234,11 @@ const styles = {
   textarea: { width: '100%', boxSizing: 'border-box', fontSize: 13, lineHeight: 1.5, padding: '10px 12px', borderRadius: 8, border: '1px solid #d0d5dd', outline: 'none', resize: 'vertical', fontFamily: 'sans-serif', background: '#fff' },
   count: { fontSize: 11, color: '#98a2b3', textAlign: 'right', marginTop: 4 },
   warn: { fontSize: 12, color: '#b42318', marginTop: 6 },
+  publicNoticeBox: { marginTop: 14, padding: 12, borderRadius: 8, border: '1px solid var(--owner-stroke)', background: 'var(--owner-surface-subtle)' },
+  publicNoticeLabel: { marginBottom: 6, color: 'var(--owner-text-strong)', fontSize: 12, fontWeight: 700 },
+  publicNoticeText: { color: 'var(--owner-text)', fontSize: 13, lineHeight: 1.5 },
+  publicNoticeEmpty: { color: 'var(--owner-text-disabled)', fontSize: 13, lineHeight: 1.5 },
+  publicNoticeHint: { marginTop: 6, color: 'var(--owner-text-muted)', fontSize: 11, lineHeight: 1.45 },
   infoActionRow: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' },
   info: { flex: '1 1 320px', padding: 12, borderRadius: 8, border: '1px solid #e4e7ec', background: '#f9fafb', color: '#667085', fontSize: 12, lineHeight: 1.45 },
   actions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' },

@@ -84,7 +84,13 @@ async function update(id, data) {
 
 // 설정 변경과 감사 이력 기록을 한 트랜잭션으로 묶는다. 같은 값을 다시
 // 적용한 경우에는 실제 변경이 아니므로 중복 이력을 만들지 않는다.
-async function updateMusicFilterSettings(id, { enabled, prompt }) {
+async function updateMusicFilterSettings(id, {
+  enabled,
+  prompt,
+  replacePublicNotice = false,
+  publicNotice = null,
+  publicNoticeModel = null,
+}) {
   return db.transaction(async (trx) => {
     const current = await trx('cafes')
       .where({ id })
@@ -94,9 +100,18 @@ async function updateMusicFilterSettings(id, { enabled, prompt }) {
     if (!current) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
 
     const changed = current.music_filter_enabled !== enabled || current.music_filter_prompt !== prompt;
+    const updateValues = { music_filter_enabled: enabled, music_filter_prompt: prompt };
+    if (replacePublicNotice) {
+      Object.assign(updateValues, {
+        music_filter_public_notice: publicNotice,
+        music_filter_public_notice_model: publicNoticeModel,
+        music_filter_public_notice_generated_at: publicNotice ? new Date() : null,
+      });
+    }
+
     const [cafe] = await trx('cafes')
       .where({ id })
-      .update({ music_filter_enabled: enabled, music_filter_prompt: prompt })
+      .update(updateValues)
       .returning('*');
 
     if (changed) {

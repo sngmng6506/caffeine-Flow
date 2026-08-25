@@ -8,7 +8,7 @@ const {
   MUSIC_FILTER_TIMEOUT_MS,
 } = require('../../config');
 
-const RESPONSE_SCHEMA = {
+const DECISION_SCHEMA = {
   type: 'object',
   properties: {
     decision: {
@@ -50,7 +50,14 @@ function parseContent(data) {
   }
 }
 
-async function callMusicFilterLlm(messages, modelOverride) {
+async function callStructuredLlm({
+  messages,
+  modelOverride,
+  toolName,
+  toolDescription,
+  schema,
+  temperature = 0,
+}) {
   if (!OPENROUTER_API_KEY) {
     throw withCode(new Error('OPENROUTER_API_KEY 누락'), 'LLM_API_KEY_MISSING');
   }
@@ -62,7 +69,7 @@ async function callMusicFilterLlm(messages, modelOverride) {
       {
         model,
         messages,
-        temperature: 0,
+        temperature,
         // response_format(json_schema)는 OpenAI 계열만 지원해 Anthropic 등에서
         // 404가 났다. tool(function) calling은 프로바이더 공통이라 강제 호출로
         // 동일한 구조화 출력을 받는다.
@@ -70,9 +77,9 @@ async function callMusicFilterLlm(messages, modelOverride) {
           {
             type: 'function',
             function: {
-              name: 'music_filter_decision',
-              description: '신청곡을 수락 또는 거절로 판단한 결과',
-              parameters: RESPONSE_SCHEMA,
+              name: toolName,
+              description: toolDescription,
+              parameters: schema,
             },
           },
         ],
@@ -80,7 +87,7 @@ async function callMusicFilterLlm(messages, modelOverride) {
         // 엔드포인트를 걸러 404를 유발하므로 두지 않는다(tool_choice로 충분).
         tool_choice: {
           type: 'function',
-          function: { name: 'music_filter_decision' },
+          function: { name: toolName },
         },
       },
       {
@@ -111,4 +118,14 @@ async function callMusicFilterLlm(messages, modelOverride) {
   }
 }
 
-module.exports = { callMusicFilterLlm };
+function callMusicFilterLlm(messages, modelOverride) {
+  return callStructuredLlm({
+    messages,
+    modelOverride,
+    toolName: 'music_filter_decision',
+    toolDescription: '신청곡을 수락 또는 거절로 판단한 결과',
+    schema: DECISION_SCHEMA,
+  });
+}
+
+module.exports = { callMusicFilterLlm, callStructuredLlm };

@@ -40,7 +40,7 @@ export const dashboardStyles = {
     cursor: 'pointer',
     fontSize: 13,
   },
-  noticeEditBtn: {
+  editBtn: {
     minHeight: 40,
     padding: '8px 14px',
     border: '1px solid var(--owner-stroke)',
@@ -50,44 +50,11 @@ export const dashboardStyles = {
     cursor: 'pointer',
     fontSize: 13,
   },
-  noticeDeleteBtn: {
-    minHeight: 40,
-    padding: '8px 14px',
-    border: '1px solid #f4c4c8',
-    borderRadius: 9,
-    background: '#fff',
-    color: 'var(--owner-danger)',
-    cursor: 'pointer',
-    fontSize: 13,
-  },
-  noticeEdit: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-    margin: '12px 0',
-  },
-  noticeInput: {
-    minHeight: 72,
-    padding: '10px 12px',
-    border: '1px solid var(--owner-stroke)',
-    borderRadius: 9,
-    outline: 'none',
-    resize: 'vertical',
-    color: 'var(--owner-text)',
-    fontFamily: 'inherit',
-    fontSize: 13,
-    lineHeight: 1.5,
-  },
-  noticeActions: {
+  actions: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'flex-end',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  noticeCount: {
-    marginRight: 'auto',
-    color: 'var(--owner-text-disabled)',
-    fontSize: 12,
   },
 };

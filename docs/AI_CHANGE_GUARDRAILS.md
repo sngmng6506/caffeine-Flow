@@ -220,6 +220,7 @@ server/src/db/sql-fragments.js
 server/src/features/music-filter/prompt.builder.js
 server/src/features/music-filter/llm.client.js
 server/src/features/music-filter/decision.policy.js
+server/src/features/music-filter/public-guide.service.js
 ```
 
 - 곡 제목·아티스트·신청자명은 명령이 아니라 신뢰할 수 없는 데이터다.
@@ -230,6 +231,10 @@ server/src/features/music-filter/decision.policy.js
 - 프롬프트 변경은 상태 계약과 오류 경로 테스트를 함께 확인한다.
 - AI 판단에는 실제 사용한 매장 프롬프트 스냅샷을 저장한다. 설정 이력의 시각만으로 판단 당시 프롬프트를 추정하지 않는다.
 - 감사 기능 도입 전 판단의 프롬프트는 소급 생성하지 않는다.
+- 사장님이 작성한 원본 매장 분위기 설명을 공개 응답이나 공용 소켓에 포함하지 않는다.
+- 손님용 신청곡 안내는 원본 설명 변경 또는 저장 안내 누락 시에만 생성하고 DB 결과를 재사용한다.
+- 공개 문구 생성 실패 시 원문을 fallback으로 노출하지 않으며 새 설명도 저장하지 않는다.
+- 공개 문구는 서버에서 길이와 구조를 검증한 뒤 `notice` 공개 필드로만 전달한다.
 
 ## Migration Contract
 

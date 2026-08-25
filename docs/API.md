@@ -29,9 +29,8 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/cafes/me` | 🔒 | 내 카페 정보 |
 | GET | `/cafes/me/qr-code` | 🔒 | 내 카페 손님용 QR 이미지 다운로드 |
 | PUT | `/cafes/me` | 🔒 | 카페명 등 기본 정보 변경 |
-| PUT | `/cafes/me/notice` | 🔒 | 손님 공지 변경 |
 | PUT | `/cafes/me/platforms` | 🔒 | 허용 플랫폼 변경 |
-| PUT | `/cafes/me/music-filter` | 🔒 | AI 음악 필터 사용 여부·매장 분위기 설명 설정 |
+| PUT | `/cafes/me/music-filter` | 🔒 | AI 음악 필터 사용 여부·매장 분위기 설명 설정. 설명 변경 시 손님용 신청곡 안내를 한 번 생성해 저장 |
 | PUT | `/cafes/me/address` | 🔒 | 지역·좌표 변경 |
 | PUT | `/cafes/me/slug` | 🔒 | QR slug 재발급·지정. 새 `token` 포함 |
 | PUT | `/cafes/me/status` | 🔒 | 신청 접수 ON/OFF |
@@ -80,6 +79,10 @@ Base URL은 `/api/v1`이며 응답은 JSON이다. 인증 엔드포인트는 `Aut
 반환하지 않는다. 공개 큐 조회·쓰기 응답의 `is_mine`은 요청의 visitor ID와
 저장값을 서버에서 비교해 계산한 boolean이다. 손님 취소는 공개 응답으로 식별자를 전달받는 방식이 아니라
 신청 당시 브라우저가 보관한 `X-Visitor-Id`가 DB의 `visitor_id`와 일치할 때만 허용한다.
+
+공개 큐 조회의 `notice`는 사장님이 작성한 내부 매장 분위기 설명이 아니라, 설명 변경 시
+LLM으로 한 번 정리해 DB에 저장한 손님용 신청곡 안내다. 큐를 조회할 때는 LLM을 호출하지
+않는다. 기존 수동 공지 변경 API는 제공하지 않는다.
 
 손님 신청의 `metadataToken`은 `GET /tracks/oembed`가 확인한 곡 정보에 5분
 유효 서명을 붙인 값이다. POST body의 임의 `videoId`, `title`, `platform`은

@@ -73,7 +73,15 @@ router.get('/', async (req, res) => {
     // 방문 통계 실패가 큐 조회를 막아서는 안 된다.
   }
   const allowed_platforms = parseAllowedPlatforms(cafe.allowed_platforms);
-  res.json({ recommendations: recs.map(rec => publicRecommendation(rec, { visitorId })), is_accepting: cafe.is_accepting, notice: cafe.notice || null, cafe_name: cafe.name, allowed_platforms });
+  res.json({
+    recommendations: recs.map(rec => publicRecommendation(rec, { visitorId })),
+    is_accepting: cafe.is_accepting,
+    // 기존 손님 UI의 공지 섹션 계약은 유지하되 원본 매장 설명이 아닌
+    // 저장된 공개용 신청곡 안내만 전달한다.
+    notice: cafe.music_filter_public_notice || null,
+    cafe_name: cafe.name,
+    allowed_platforms,
+  });
 });
 
 router.post('/', requestLimiters, async (req, res) => {

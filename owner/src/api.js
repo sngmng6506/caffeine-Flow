@@ -46,7 +46,6 @@ export const getMe = () => apiFetch('GET', '/cafes/me');
 export const getQrImageBlob = () => apiFetchBlob('/cafes/me/qr-code');
 export const updateMe = name => apiFetch('PUT', '/cafes/me', { name });
 export const changeSlug = slug => apiFetch('PUT', '/cafes/me/slug', slug ? { slug } : {});
-export const updateNotice = notice => apiFetch('PUT', '/cafes/me/notice', { notice });
 export const setStatus = is_accepting => apiFetch('PUT', '/cafes/me/status', { is_accepting });
 export const updatePlatforms = allowed_platforms =>
   apiFetch('PUT', '/cafes/me/platforms', { allowed_platforms });
