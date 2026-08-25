@@ -130,6 +130,7 @@ stateDiagram-v2
 | --- | --- |
 | `cafes` | 카페 계정, slug, 운영 설정, AI 필터 정책, 저장된 손님용 신청곡 안내, 하트비트 |
 | `recommendations` | 신청곡, 일반 상태, AI 판단, 신청·재생 시각 |
+| `music_filter_prompt_history` | 매장 분위기 설명 변경 이력. `baseline`과 `changed`를 구분 |
 | `music_filter_reviews` | AI 판단과 분리된 운영자 골드 라벨, 사유 코드, 메타데이터 충분 여부 |
 | `music_track_annotations` | 플랫폼 원본 곡별 수동 음악 특성 라벨. 정규화 아티스트 키로 참고 조회 |
 | `votes` | 곡별 투표와 중복 방지 |

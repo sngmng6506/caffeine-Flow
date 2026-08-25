@@ -60,22 +60,23 @@ Electron은 DRM 재생을 위해 CastLabs Electron과 Widevine을 사용한다. 
 
 ## 이벤트 계약
 
-렌더러 공개 API는 `owner/electron/preload.js`, 메인 IPC 처리는 각 책임 모듈이 기준이다.
+아래는 재생 흐름의 주요 이벤트다. 전체 공개 API는 `owner/electron/preload.js`, 메인 IPC 처리는 각 책임 모듈이 기준이다.
 
 ```text
-playRec           신청곡 URL 검증·navigation 요청. Promise<{ ok, error? }>
-endRec            신청곡 종료 처리 및 BGM 복귀
-setBgmUrl         기본 BGM 설정. Promise<boolean>
-clearBgm          기본 BGM 해제. Promise<boolean>
-isRecActive       메인 프로세스의 실제 신청곡 재생 모드 조회
-onVideoEnded      신청곡 정상 종료. 다음 곡 자동 재생
-onRecLeft         신청곡 이탈. 원곡 종료만, 자동 재생 없음
-onNowPlaying      현재 재생 정보
-onPlaybackState   재생·일시정지·버퍼링 상태
-onCurrentTrack    현재 BrowserView에서 감지한 공개 곡 메타데이터
-onWidevineStatus  Widevine 상태
-setPanelRatio     렌더러/BrowserView 경계 조정
-setPanelCollapsed 사장님 화면을 48px 상태 레일로 접거나 복원
+playRec             신청곡 URL 검증·navigation 요청. Promise<{ ok, error? }>
+endRec              신청곡 종료 처리 및 BGM 복귀
+setBgmUrl           기본 BGM 설정. Promise<boolean>
+clearBgm            기본 BGM 해제. Promise<boolean>
+isRecActive         메인 프로세스의 실제 신청곡 재생 모드 조회
+onVideoEnded        신청곡 정상 종료. 다음 곡 자동 재생
+onRecLeft           신청곡 이탈. 원곡 종료만, 자동 재생 없음
+onNowPlaying        현재 재생 정보
+onPlaybackState     재생·일시정지·버퍼링 상태
+onCurrentTrack      현재 BrowserView에서 감지한 공개 곡 메타데이터
+onManualTrackEnded  직접 재생곡 종료. playback_history 기록을 트리거
+onWidevineStatus    Widevine 상태
+setPanelRatio       렌더러/BrowserView 경계 조정
+setPanelCollapsed   사장님 화면을 48px 상태 레일로 접거나 복원
 ```
 
 - `on*` 구독 함수는 해당 리스너만 제거하는 해제 함수를 반환한다. 컴포넌트 정리 시 다른 화면의 구독을 일괄 삭제하지 않는다.
@@ -110,7 +111,7 @@ setPanelCollapsed 사장님 화면을 48px 상태 레일로 접거나 복원
 - 앱 종료 전 현재 재생곡을 종료 상태로 정리한다. 로그아웃도 현재 리더의 `playing`과 실제 플레이어를 함께 정리하고, HTTP 정리가 실패하면 실행 세션 ID를 폐기해 다음 리더가 고아 상태를 복구하게 한다.
 - BGM 복구 실패는 신청곡 큐 상태와 분리해 다룬다. 기본 BGM 해제는 뷰뿐 아니라 takeover 복구용 URL·메타데이터도 함께 비운다.
 - 신청곡 재생 중에는 기본 BGM 설정·해제·드래그를 잠근다. 메인 프로세스도 같은 조건을 검사해 takeover의 `bgmView`가 교체되지 않게 한다.
-- 기본 BGM 설정·해제는 Electron ACK 성공 뒤에만 React 상태와 localStorage에 반영한다. 비동기 메타데이터 조회 중 신청곡이 시작되면 변경을 거절한다.
+- 기본 BGM 설정·해제는 Electron ACK(`supportsBgmAck`) 성공 뒤에만 React 상태와 localStorage에 반영한다. 비동기 메타데이터 조회 중 신청곡이 시작되면 변경을 거절한다.
 - 기본 BGM은 변경 가능한 slug가 아니라 카페 ID별 localStorage에 보관한다. 로그아웃은 인증 정보만 제거하며 같은 카페로 다시 로그인하면 복구한다.
 
 상태 전이 규칙은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md#recommendation-status-contract)를 따른다.
