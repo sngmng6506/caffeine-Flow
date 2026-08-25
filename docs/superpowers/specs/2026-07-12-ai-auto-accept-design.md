@@ -47,7 +47,7 @@
 
 ### 문서
 
-`docs/LLM_FEATURES.md` §2(Owner Policy Setting)의 "AI 필터 ON/OFF" 설명을 대시보드 AI 자동수락 기준으로 갱신.
+당시 `docs/LLM_FEATURES.md`의 "AI 필터 ON/OFF" 설명을 대시보드 AI 자동수락 기준으로 갱신했다. 이후 그 문서는 [LLM_FILTER.md](../../LLM_FILTER.md)로 통합됐다.
 
 ## 알려진 한계(수용)
 
