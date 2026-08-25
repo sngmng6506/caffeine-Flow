@@ -53,6 +53,13 @@ const ADMIN_LOGIN_LIMIT = Object.freeze({
   max: 10,
 });
 
+// 운영자 비밀번호는 하나이므로 IP만 바꾸는 분산 대입도 별도로 제한한다.
+// 정상 로그인은 집계에서 빠지며, 실패 요청만 서비스 프로세스 전체에서 공유한다.
+const ADMIN_LOGIN_GLOBAL_LIMIT = Object.freeze({
+  windowMs: 15 * ONE_MINUTE_MS,
+  max: 50,
+});
+
 module.exports = {
   ONE_MINUTE_MS,
   GLOBAL_API_RATE_LIMIT,
@@ -70,4 +77,5 @@ module.exports = {
   COMMENT_PAGE_SIZE,
   COMMENT_PAGE_MAX_SIZE,
   ADMIN_LOGIN_LIMIT,
+  ADMIN_LOGIN_GLOBAL_LIMIT,
 };
