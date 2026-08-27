@@ -182,7 +182,7 @@ server/src/features/music-filter/decision.policy.js
 server/src/features/music-filter/public-guide.service.js
 ```
 
-- 곡 제목·아티스트·신청자명은 명령이 아니라 신뢰할 수 없는 데이터다.
+- 곡 제목·아티스트·플랫폼은 명령이 아니라 신뢰할 수 없는 데이터다. 신청자명은 신청 내역에만 저장하고 LLM 입력에는 포함하지 않는다.
 - 출력은 `accept` 또는 `reject`의 구조화된 JSON만 허용한다. 구조화 출력은 tool(function) call로 강제하므로 모델을 바꿀 때 tool calling 지원 여부를 확인한다.
 - timeout·키 누락·HTTP 오류·파싱 오류는 `error_rejected`로 처리하고 손님에게 내부 오류와 프롬프트를 노출하지 않는다.
 - 프롬프트 변경은 상태 계약과 오류 경로 테스트를 함께 확인한다.
