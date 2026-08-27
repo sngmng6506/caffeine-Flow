@@ -2,8 +2,11 @@ const { buildMusicFilterMessages, resolveCafePrompt } = require('./prompt.builde
 const { callMusicFilterLlm } = require('./llm.client');
 const { normalizeLlmDecision, rejectionFromError } = require('./decision.policy');
 const { FILTER_ACTION, FILTER_STATUS } = require('../../constants/music-filter-status');
+const { logError, CAUSE } = require('../../observability');
 
-async function evaluateTrack({ cafePrompt, track, model: modelOverride }) {
+// context는 알림에 카페 범위를 넣기 위한 것이다. 필터 실험실처럼 카페가 없는
+// 호출도 있으므로 선택값으로 둔다.
+async function evaluateTrack({ cafePrompt, track, model: modelOverride, context = {} }) {
   const messages = buildMusicFilterMessages({
     cafePrompt,
     track,
@@ -13,7 +16,13 @@ async function evaluateTrack({ cafePrompt, track, model: modelOverride }) {
     const { result, model } = await callMusicFilterLlm(messages, modelOverride);
     return { ...normalizeLlmDecision(result), model };
   } catch (error) {
-    console.error('[music-filter] LLM 판단 실패:', error?.code || error?.message || error);
+    logError({
+      code: error?.code || 'LLM_REQUEST_FAILED',
+      cause: CAUSE.EXTERNAL,
+      cafe: context.cafe || null,
+      route: context.route || null,
+      error,
+    });
     return { ...rejectionFromError(error), model: null };
   }
 }
@@ -34,6 +43,10 @@ async function evaluateRecommendation({ cafe, track }) {
   const result = await evaluateTrack({
     cafePrompt: promptSnapshot,
     track,
+    context: {
+      cafe: { id: cafe.id, slug: cafe.slug },
+      route: 'POST /cafes/:slug/recommendations',
+    },
   });
   return { ...result, promptSnapshot };
 }

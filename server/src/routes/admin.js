@@ -148,6 +148,7 @@ router.post('/music-filter/test', requireAdmin, async (req, res) => {
   }
 
   const result = await musicFilter.evaluateTrack({
+    context: { route: 'POST /admin/music-filter/test' },
     cafePrompt: promptCheck.value,
     track,
     model: modelCheck.value || undefined,

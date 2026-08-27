@@ -16,6 +16,7 @@ const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
 const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
+const { logError, CAUSE } = require('../observability');
 const {
   generatePublicMusicGuide,
   normalizePublicGuide,
@@ -166,7 +167,13 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
         model: generated?.model ? String(generated.model).slice(0, 100) : null,
       };
     } catch (error) {
-      console.error('[music-filter-public-guide] 생성 실패:', error?.code || error?.message || error);
+      logError({
+        code: error?.code || 'PUBLIC_GUIDE_FAILED',
+        cause: CAUSE.EXTERNAL,
+        cafe: { id: req.owner.cafeId, slug: req.owner.slug },
+        route: 'PUT /cafes/me/music-filter',
+        error,
+      });
       return res.status(503).json({
         error: '손님용 신청곡 안내를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
       });

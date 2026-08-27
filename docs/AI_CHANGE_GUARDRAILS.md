@@ -126,12 +126,14 @@ server/src/utils/public-response.js
 server/src/routes/_recommendations.shared.js
 server/src/routes/recommendations.js
 server/src/routes/song_comments.js
+server/src/observability/alert-channel.js
 ```
 
 - 공개 HTTP·Socket 응답에 DB row를 그대로 반환하지 않는다. 명시적 allowlist 직렬화만 사용한다.
 - `requester_ip`, `commenter_ip`, `visitor_id`, 모델명, confidence, 내부 오류 코드를 손님에게 노출하지 않는다. 사장님 응답에도 운영에 필요 없는 IP와 visitor ID를 노출하지 않는다.
 - AI 판단 상세와 필터 오류 실시간 이벤트는 JWT 검증 후 입장하는 `owner:<slug>` room으로만 보낸다.
 - 손님 취소 권한은 공개 응답 값이 아니라 요청 헤더의 visitor ID와 저장된 visitor ID가 일치하는지로 판단한다.
+- 운영자 에러 알림(Discord webhook)도 같은 경계다. 외부로 나가는 페이로드는 allowlist로 구성하고 매장 분위기 설명 원문, visitor ID, IP, 신청자명, 스택 트레이스를 넣지 않는다. 상세는 운영자 콘솔과 서버 로그에서 확인한다.
 - 공개 필드를 추가할 때는 개인정보·내부 판단 정보 여부를 먼저 검토하고 통합 테스트로 비노출을 고정한다.
 
 ## Limit Policy Contract
