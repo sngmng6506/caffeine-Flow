@@ -6,6 +6,8 @@ export default defineConfig({
     include: [
       'tests/ai-guardrails-docs.test.mjs',
       'tests/admin-ai-labs.test.mjs',
+      'tests/alert-aggregator.test.mjs',
+      'tests/alert-channel.test.mjs',
       'tests/api-docs.test.mjs',
       'tests/docs-links.test.mjs',
       'tests/electron-navigation-policy.test.mjs',

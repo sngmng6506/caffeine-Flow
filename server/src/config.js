@@ -32,6 +32,10 @@ module.exports = {
   // 못 뜨는 편이 더 나쁘기 때문.
   ADMIN_PASSWORD: env('ADMIN_PASSWORD'),
 
+  // 운영자 에러 알림용 Discord webhook. 미설정이면 알림 없이 정규화 로그만
+  // 남긴다 — 로컬 개발과 테스트에서 웹훅이 나가지 않도록 하는 기본값이다.
+  ALERT_WEBHOOK_URL: env('ALERT_WEBHOOK_URL'),
+
   // AI 음악 필터 — 실제 신청과 사장님 테스트가 동일한 OpenRouter 설정을 공유한다.
   OPENROUTER_API_KEY,
   OPENROUTER_BASE_URL,
