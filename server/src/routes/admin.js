@@ -206,7 +206,9 @@ router.get('/music-filter-reviews', requireAdmin, async (req, res) => {
   }
 
   const processed = db({ recommendation: 'recommendations' })
-    .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES);
+    .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES)
+    .whereNot((builder) => builder.whereILike('recommendation.title', '%playlist%'))
+    .whereNot((builder) => builder.whereLike('recommendation.title', '%플리%'));
   const decisionsQuery = processed.clone()
     .leftJoin({ cafe: 'cafes' }, 'cafe.id', 'recommendation.cafe_id')
     .leftJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')

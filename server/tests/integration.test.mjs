@@ -367,6 +367,33 @@ describe('운영자 AI 프롬프트 감사', () => {
       filter_checked_at: new Date(),
     }).returning('*');
 
+    const excludedDecisions = await db('recommendations').insert([
+      {
+        cafe_id: cafe.id,
+        video_id: 'audit_playlist_en',
+        title: 'Evening Playlist for Cafe',
+        channel_title: '테스트 채널',
+        platform: 'youtube',
+        status: 'rejected',
+        filter_status: 'rejected',
+        filter_reason: '플레이리스트형 콘텐츠',
+        filter_model: 'test-model',
+        filter_checked_at: new Date(),
+      },
+      {
+        cafe_id: cafe.id,
+        video_id: 'audit_playlist_ko',
+        title: '저녁 카페 플리 모음',
+        channel_title: '테스트 채널',
+        platform: 'youtube',
+        status: 'rejected',
+        filter_status: 'rejected',
+        filter_reason: '플레이리스트형 콘텐츠',
+        filter_model: 'test-model',
+        filter_checked_at: new Date(),
+      },
+    ]).returning('*');
+
     const adminToken = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
     const response = await request(app)
       .get(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit`)
@@ -395,6 +422,11 @@ describe('운영자 AI 프롬프트 감사', () => {
       cafe_name: cafe.name,
       human_decision: null,
     }));
+    for (const excluded of excludedDecisions) {
+      expect(unreviewedQueue.body.decisions).not.toContainEqual(
+        expect.objectContaining({ id: excluded.id }),
+      );
+    }
 
     const reviewPath = `/api/v1/admin/cafes/${cafe.id}/music-filter-audit/${decision.id}/review`;
     const firstReview = await request(app)

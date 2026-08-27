@@ -111,9 +111,9 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
 | POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. IP별 15분 10회·전체 15분 50회 실패 제한, 차단 시 `retry_after_seconds` 반환 |
-| POST | `/admin/music-filter/test` | 🛡 | 저장 없이 곡 판단. body는 `url`, `prompt`, 선택적 `model` |
+| POST | `/admin/music-filter/test` | 🛡 | 필터 테스트에서 저장 없이 곡 판단. body는 `url`, `prompt`, 선택적 `model` |
 | GET | `/admin/music-filter/models` | 🛡 | OpenRouter `/models/user` 목록을 10분 캐시해 반환 |
-| GET | `/admin/music-filter-reviews` | 🛡 | 전체 카페 라벨링 큐와 전체·완료·미검수 건수. `view`, `offset` 지원 |
+| GET | `/admin/music-filter-reviews` | 🛡 | `Playlist`·`플리` 제목을 제외한 전체 카페 라벨링 큐와 전체·완료·미검수 건수. `view`, `offset` 지원 |
 | GET | `/admin/music-filter-artist-labels` | 🛡 | 확인한 아티스트의 다른 곡 라벨 최신 3건. `artist`, 선택적 `platform`·`track_key` |
 | GET | `/admin/cafes` | 🛡 | 전체 카페와 운영 상태, 오늘 QR 접속 브라우저 수(`today_unique_browsers`) |
 | GET | `/admin/cafes/:id/stats` | 🛡 | 특정 카페의 오늘·누적·시간대·요일·AI 필터 통계 |
@@ -126,7 +126,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 - 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, track_annotation? }`다. 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
 - 해당 카페의 AI 처리 이력만 검수할 수 있고, 사람 라벨은 신청곡 상태나 LLM 판단을 바꾸지 않는다.
 - 곡 라벨은 `(platform, track_key)`당 한 건으로 upsert한다.
-- 라벨링 큐 `view`는 `unreviewed`(기본), `reviewed`, `all`이며 최근 판단순 50건을 반환한다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`다. 저장하면 미검수 목록이 줄어들므로 다음 묶음은 `offset=0`부터 다시 조회한다.
+- 라벨링 큐 `view`는 `unreviewed`(기본), `reviewed`, `all`이며 최근 판단순 50건을 반환한다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`다. 저장하면 미검수 목록이 줄어들므로 다음 묶음은 `offset=0`부터 다시 조회한다. 제목에 대소문자 구분 없이 `Playlist` 또는 `플리`가 포함된 항목은 모든 view와 집계에서 제외한다.
 
 ## 통합 TOP10과 헬스체크
 
