@@ -2,6 +2,7 @@ const axios = require('axios');
 const dns = require('dns');
 const net = require('net');
 const { PLATFORM } = require('../constants/platforms');
+const { logError, CAUSE } = require('../observability');
 
 const PRIVATE_IPV4_RE = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|0\.|255\.)/;
 const SOUNDCLOUD_ALLOWED_HOSTS = ['soundcloud.com', 'on.soundcloud.com', 'soundcloud.app.goo.gl', 'goo.gl'];
@@ -137,7 +138,12 @@ async function resolveSoundCloudUrl(rawUrl) {
       if (resolved) trackUrl = normalizeSoundCloudUrl(resolved) || trackUrl;
     }
   } catch (error) {
-    console.error('[track-metadata] SoundCloud 단축 URL 해석 실패:', error.message);
+    logError({
+      code: 'SOUNDCLOUD_SHORT_URL_FAILED',
+      cause: (!error.response?.status || error.response.status >= 500) ? CAUSE.EXTERNAL : CAUSE.USER,
+      route: 'GET /tracks/oembed',
+      error,
+    });
   }
 
   try {
@@ -172,7 +178,12 @@ async function getSoundCloudMetadata(rawUrl) {
       thumbnail: data.thumbnail_url || null,
     };
   } catch (error) {
-    console.error('[track-metadata] SoundCloud oEmbed 실패:', error.response?.status, error.message);
+    logError({
+      code: 'SOUNDCLOUD_OEMBED_FAILED',
+      cause: (!error.response?.status || error.response.status >= 500) ? CAUSE.EXTERNAL : CAUSE.USER,
+      route: 'GET /tracks/oembed',
+      error,
+    });
   }
 
   try {

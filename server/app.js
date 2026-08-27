@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 const { APP_URL } = require('./src/config');
 const statsService = require('./src/services/stats.service');
 const { GLOBAL_API_RATE_LIMIT } = require('./src/constants/limits');
+const { logError, isDbConnectionError, CAUSE } = require('./src/observability');
 const { parseOffset, parseTopSort } = require('./src/utils/pagination');
 
 // app 생성을 server.js(리슨·소켓)와 분리 — supertest가 포트 없이
@@ -160,9 +161,16 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// 전역 에러 핸들러
-app.use((err, _req, res, _next) => {
-  console.error(err);
+// 전역 에러 핸들러 — 여기까지 온 에러는 우리가 예상하지 못한 것이다.
+// DB 연결 실패는 서비스 전체가 멈춘 상태라 일반 500과 섞지 않고 승격한다.
+app.use((err, req, res, _next) => {
+  logError({
+    code: isDbConnectionError(err) ? 'DB_CONNECTION_FAILED' : 'INTERNAL_ERROR',
+    cause: CAUSE.PLATFORM,
+    cafe: req.cafe ? { id: req.cafe.id, slug: req.cafe.slug } : null,
+    route: `${req.method} ${req.route?.path || req.path}`,
+    error: err,
+  });
   res.status(500).json({ error: '서버 오류가 발생했습니다' });
 });
 

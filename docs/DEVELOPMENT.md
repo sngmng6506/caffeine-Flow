@@ -41,6 +41,7 @@ npm run electron:dev --prefix owner
 | `GOOGLE_CLIENT_ID` | Google 로그인 |
 | `NAVER_CLIENT_ID` | Naver 로그인 |
 | `NAVER_CLIENT_SECRET` | Naver 로그인 |
+| `ALERT_WEBHOOK_URL` | 운영자 에러 알림 Discord webhook. 미설정이면 알림 없이 로그만 남는다 |
 | `OPENROUTER_API_KEY` | OpenRouter 인증. 필터 ON에서 누락 시 fail-closed |
 | `OPENROUTER_BASE_URL` | 기본 `https://openrouter.ai/api/v1` |
 | `OPENROUTER_APP_NAME` | 기본 `Caffeine Flow` |
@@ -108,6 +109,28 @@ admin        → 루트 admin 디렉터리를 /admin에서 제공
 filter lab   → 루트 music-filter-lab을 /filter-lab에서 제공
 labeling lab → 루트 music-labeling-lab을 /labeling-lab에서 제공
 ```
+
+## 에러 알림
+
+서버 에러는 `server/src/observability/`를 거쳐 한 형식으로 로깅되고, 일부만 Discord로 나간다.
+
+```text
+[error] code=LLM_TIMEOUT cause=external cafe=<uuid> slug=<slug> route=POST /... msg=...
+```
+
+알림 여부는 `error-taxonomy.js`가 정하며 호출부는 관여하지 않는다. 기준은 심각도가 아니라 **원인 주체**다.
+
+| `cause` | 의미 | 처리 |
+| --- | --- | --- |
+| `user` | 손님·사장님 입력 탓 | 로그만. 정상 운영 중에도 계속 발생한다 |
+| `external` | 외부 플랫폼·LLM 탓 | 5분 창에 5건이면 알림 |
+| `platform` | 우리 코드·설정 탓 | 5분 창에 임계값(전역 500은 10건)이면 알림 |
+
+`LLM_API_KEY_MISSING`, `LLM_HTTP_401/402/403`, `DB_CONNECTION_FAILED`, `UNCAUGHT_EXCEPTION`, `UNHANDLED_REJECTION`은 1건도 즉시 알린다. 이미 서비스가 멈춰 있다는 뜻이기 때문이다.
+
+집계는 카페가 아니라 에러 코드 단위로 하고 영향받은 카페 수를 함께 센다. 한 카페에서만 반복되면 그 매장 설정 문제, 여러 카페에서 동시에 나면 플랫폼 전체 사고로 읽는다. 같은 코드는 1시간에 한 번까지만 재전송한다.
+
+임계값·창·쿨다운을 바꾸려면 `server/src/observability/error-taxonomy.js`를 수정하고 `server/tests/alert-aggregator.test.mjs`를 함께 확인한다.
 
 ## Electron 배포
 

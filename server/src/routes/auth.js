@@ -22,6 +22,7 @@ const STATE_COOKIE_OPTS = {
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const { issueToken, issuePendingToken } = require('../utils/jwt');
+const { logError, CAUSE } = require('../observability');
 
 
 // 같은 이메일의 다른 provider 계정 존재 여부 확인 — 정책상 provider별
@@ -138,7 +139,7 @@ router.get('/naver/callback', async (req, res) => {
     return res.redirect(`${ownerUrl}#pending=${pendingToken}`);
 
   } catch (err) {
-    console.error('[naver callback]', err.message);
+    logError({ code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.EXTERNAL, route: 'GET /auth/naver/callback', error: err });
     res.redirect(`${ownerUrl}?error=naver_failed`);
   }
 });
