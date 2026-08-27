@@ -26,6 +26,8 @@ function createAlertAggregator({
   windowMs = ALERT_WINDOW_MS,
   cooldownMs = ALERT_COOLDOWN_MS,
   now = Date.now,
+  // 기본값은 정책 파일이 정한다. 테스트에서만 주입한다.
+  threshold = thresholdFor,
 } = {}) {
   const buckets = new Map();
 
@@ -78,7 +80,7 @@ function createAlertAggregator({
       if (bucket.lastSentAt !== null && at - bucket.lastSentAt < cooldownMs) return null;
 
       const shouldSend = tier === ALERT_TIER.IMMEDIATE
-        || bucket.events.length >= thresholdFor(code);
+        || bucket.events.length >= threshold(code);
       if (!shouldSend) return null;
 
       const summary = summarize(code, tier, bucket);

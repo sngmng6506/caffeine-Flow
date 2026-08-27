@@ -45,14 +45,20 @@ const ALERT_WINDOW_MS = 5 * 60 * 1000;
 
 // 같은 코드로 다시 알리기까지의 최소 간격. 없으면 DB가 죽었을 때
 // 요청마다 웹훅이 나가 채널이 마비된다.
-const ALERT_COOLDOWN_MS = 60 * 60 * 1000;
+const ALERT_COOLDOWN_MS = 30 * 60 * 1000;
 
-const DEFAULT_THRESHOLD = 5;
+// 창과 임계값은 함께 "최소 발생률"을 정한다. 창이 미끄러지며 오래된 이벤트를
+// 버리므로, 이 비율을 못 넘는 에러는 아무리 오래 이어져도 알림이 나가지 않는다.
+//
+// 이 서비스는 신청량이 많지 않아 높은 임계값이 곧 "영영 안 울림"이 된다.
+// 예를 들어 5건/5분(분당 1건)은 하루 200건 규모에서 LLM이 완전히 죽어도
+// 도달하지 못한다. 그래서 임계값 대신 쿨다운으로 소음을 막는다.
+// 종류별 첫 발생은 바로 알리고, 같은 코드는 쿨다운 동안 잠잠하게 둔다.
+const DEFAULT_THRESHOLD = 1;
 
-// 코드별 임계값 예외. 전역 500은 평소에도 간헐적으로 날 수 있어 조금 높게 잡는다.
-const CODE_THRESHOLDS = Object.freeze({
-  INTERNAL_ERROR: 10,
-});
+// 코드별 임계값 예외. 특정 코드만 반복 확인이 필요할 때 여기에 둔다.
+// (예: 산발적 타임아웃이 잦아 소음이 되면 LLM_TIMEOUT: 3)
+const CODE_THRESHOLDS = Object.freeze({});
 
 function alertTierFor({ cause, code }) {
   if (cause === CAUSE.USER) return ALERT_TIER.LOG_ONLY;

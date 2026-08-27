@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { createAlertAggregator } = require('../src/observability/alert-aggregator');
-const { CAUSE, ALERT_TIER, DEFAULT_THRESHOLD, CODE_THRESHOLDS } = require('../src/observability/error-taxonomy');
+const { CAUSE, ALERT_TIER, DEFAULT_THRESHOLD, CODE_THRESHOLDS, thresholdFor } = require('../src/observability/error-taxonomy');
 
 function fixedClock(start = 1_000_000) {
   let current = start;
@@ -36,33 +36,39 @@ describe('알림 집계', () => {
     expect(summary.count).toBe(1);
   });
 
-  it('임계값 코드는 기준에 도달해야 나간다', () => {
+  it('임계값에 도달해야 나간다', () => {
     const clock = fixedClock();
-    const agg = createAlertAggregator({ now: clock.now });
-    for (let i = 0; i < DEFAULT_THRESHOLD - 1; i += 1) {
+    const agg = createAlertAggregator({ now: clock.now, threshold: () => 3 });
+    for (let i = 0; i < 2; i += 1) {
       expect(agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeA })).toBeNull();
     }
     const summary = agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeA });
     expect(summary).not.toBeNull();
-    expect(summary.count).toBe(DEFAULT_THRESHOLD);
+    expect(summary.count).toBe(3);
   });
 
-  it('코드별 임계값 예외를 따른다', () => {
+  it('현재 정책은 종류별 첫 발생을 바로 알린다', () => {
+    // 신청량이 많지 않아 높은 임계값은 곧 "영영 안 울림"이 된다.
+    // 소음은 임계값이 아니라 쿨다운으로 막는 것이 현재 선택이다.
+    expect(DEFAULT_THRESHOLD).toBe(1);
     const clock = fixedClock();
     const agg = createAlertAggregator({ now: clock.now });
-    const threshold = CODE_THRESHOLDS.INTERNAL_ERROR;
-    expect(threshold).toBeGreaterThan(DEFAULT_THRESHOLD);
-    for (let i = 0; i < threshold - 1; i += 1) {
-      expect(agg.record({ code: 'INTERNAL_ERROR', cause: CAUSE.PLATFORM })).toBeNull();
+    expect(agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeA })).not.toBeNull();
+  });
+
+  it('코드별 임계값 예외를 두면 그 값을 따른다', () => {
+    // 지금은 비어 있다. 예외를 추가하면 이 테스트가 자동으로 검증한다.
+    for (const [code, expected] of Object.entries(CODE_THRESHOLDS)) {
+      expect(thresholdFor(code)).toBe(expected);
     }
-    expect(agg.record({ code: 'INTERNAL_ERROR', cause: CAUSE.PLATFORM })).not.toBeNull();
+    expect(thresholdFor('예외에-없는-코드')).toBe(DEFAULT_THRESHOLD);
   });
 
   it('창 밖으로 나간 이벤트는 임계값 계산에서 빠진다', () => {
     const clock = fixedClock();
     const windowMs = 5 * 60 * 1000;
-    const agg = createAlertAggregator({ windowMs, now: clock.now });
-    for (let i = 0; i < DEFAULT_THRESHOLD - 1; i += 1) {
+    const agg = createAlertAggregator({ windowMs, now: clock.now, threshold: () => 3 });
+    for (let i = 0; i < 2; i += 1) {
       agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeA });
     }
     clock.advance(windowMs + 1);
@@ -94,7 +100,7 @@ describe('알림 집계', () => {
 
   it('영향받은 카페 수로 매장 문제와 플랫폼 사고를 구분한다', () => {
     const clock = fixedClock();
-    const agg = createAlertAggregator({ now: clock.now });
+    const agg = createAlertAggregator({ now: clock.now, threshold: () => 5 });
     agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeA });
     agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeA });
     agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeB });
@@ -107,10 +113,10 @@ describe('알림 집계', () => {
 
   it('카페가 많으면 목록을 자르고 남은 수를 센다', () => {
     const clock = fixedClock();
-    const agg = createAlertAggregator({ now: clock.now });
     // 임계값에 도달하는 순간 발사하고 창을 비우므로, 목록 상한(5)을 넘는
-    // 카페를 한 창에 모으려면 임계값이 더 높은 코드로 확인해야 한다.
-    const threshold = CODE_THRESHOLDS.INTERNAL_ERROR;
+    // 카페를 한 창에 모으려면 임계값을 더 높게 주입해야 한다.
+    const threshold = 10;
+    const agg = createAlertAggregator({ now: clock.now, threshold: () => threshold });
     let summary = null;
     for (let i = 0; i < threshold; i += 1) {
       summary = agg.record({ code: 'INTERNAL_ERROR', cause: CAUSE.PLATFORM, cafeId: `cafe-${i}`, slug: `s${i}` })
@@ -123,8 +129,8 @@ describe('알림 집계', () => {
 
   it('알림을 보낸 뒤에는 창을 비워 같은 건을 두 번 세지 않는다', () => {
     const clock = fixedClock();
-    const agg = createAlertAggregator({ cooldownMs: 0, now: clock.now });
-    for (let i = 0; i < DEFAULT_THRESHOLD; i += 1) {
+    const agg = createAlertAggregator({ cooldownMs: 0, now: clock.now, threshold: () => 5 });
+    for (let i = 0; i < 5; i += 1) {
       agg.record({ code: 'LLM_TIMEOUT', cause: CAUSE.EXTERNAL, ...cafeA });
     }
     expect(agg.pendingCount('LLM_TIMEOUT')).toBe(0);
