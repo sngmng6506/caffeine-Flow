@@ -76,6 +76,7 @@ form { margin-top: 22px; }
 .section-title > div > span { display: grid; width: 24px; height: 24px; color: #fff; background: #2563eb; border-radius: 50%; place-items: center; font-size: 12px; font-weight: 700; }
 .section-title h3 { margin: 0; font-size: 16px; }
 .section-title small, .text-field small { color: #7b8496; font-size: 11px; }
+.section-title small.is-loaded { color: #15803d; font-weight: 700; }
 fieldset { min-width: 0; margin: 15px 0 0; padding: 0; border: 0; }
 legend { margin-bottom: 8px; color: #4a5568; font-size: 12px; font-weight: 700; }
 

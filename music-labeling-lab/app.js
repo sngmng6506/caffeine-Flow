@@ -114,6 +114,10 @@ function resetForm(item) {
   form.reset();
   const annotation = item.track_annotation;
   $('artistName').value = annotation?.artist_name || item.channel_title || '';
+  $('existingLabelStatus').textContent = annotation
+    ? `기존 곡 라벨 불러옴 · ${formatDateTime(annotation.updated_at)}`
+    : '실제 아티스트를 확인해주세요.';
+  $('existingLabelStatus').classList.toggle('is-loaded', Boolean(annotation));
   $('artistReferences').hidden = true;
   $('artistReferences').innerHTML = '';
 
@@ -270,7 +274,7 @@ $('reviewForm').addEventListener('submit', async (event) => {
       {
         human_decision: decision,
         human_reason_code: reasonCode,
-        metadata_sufficient: item.metadata_sufficient ?? false,
+        metadata_sufficient: item.metadata_sufficient ?? null,
         track_annotation: {
           artist_name: form.get('artist_name'),
           track_version: item.track_annotation?.track_version || 'unknown',

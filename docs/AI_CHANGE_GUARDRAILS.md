@@ -57,12 +57,14 @@ server/src/constants/music-labeling.js
 server/src/features/music-labeling/annotation.js
 server/src/db/migrations/20260822090000_music_filter_reviews.js
 server/src/db/migrations/20260825090000_music_track_annotations.js
+server/src/db/migrations/20260828090000_nullable_music_filter_metadata_sufficient.js
 server/src/routes/admin.js
 ```
 
 - 사람 검수는 AI 판단과 일반 큐 상태를 덮어쓰지 않는 별도 `music_filter_reviews` 레코드다. 추천곡당 최신 골드 라벨 한 건만 유지하고 재검수는 upsert한다.
-- `human_decision`과 `human_reason_code`는 상수에 정의된 값만 사용한다. `metadata_sufficient`는 곡의 정답과 독립된 품질 표식이다.
+- `human_decision`과 `human_reason_code`는 상수에 정의된 값만 사용한다. `metadata_sufficient`는 곡의 정답과 독립된 nullable 품질 표식이며 `null`은 미확인이다. 질문하지 않은 값을 `false`로 만들지 않는다.
 - 곡 특성 라벨은 정책 일치 여부와 분리해 `(platform, track_key)`당 한 건으로 저장한다. 선택값과 최대 개수는 상수와 DB 제약을 함께 유지하며, 한국어는 화면 표시용이고 저장 코드는 바꾸지 않는다.
+- 기존 곡 특성 라벨은 라벨링 화면에 선택된 상태로 복원한다. 매장 정책 검수는 곡 라벨과 달리 추천곡별로 유지하고 다른 매장·신청에 자동 복사하지 않는다.
 - 확인한 아티스트명의 정규화 키는 다른 곡 참고 조회에만 쓴다. 자동 동일인 판정이나 라벨 복사 근거로 사용하지 않는다.
 - `usage_scope=evaluation` 데이터는 라이브 LLM 입력이나 자동수락에 사용하지 않는다. `operational`도 현재는 수집만 하며 연결에는 별도 평가와 계약 변경이 필요하다.
 - 운영자 인증과 `(cafe_id, recommendation_id)` 범위를 모두 확인한 AI 처리 이력만 검수한다.

@@ -435,7 +435,7 @@ describe('운영자 AI 프롬프트 감사', () => {
       .send({
         human_decision: 'accept',
         human_reason_code: 'policy_match',
-        metadata_sufficient: false,
+        metadata_sufficient: null,
         track_annotation: {
           artist_name: '테스트 아티스트',
           track_version: 'original',
@@ -454,7 +454,7 @@ describe('운영자 AI 프롬프트 감사', () => {
       recommendation_id: decision.id,
       human_decision: 'accept',
       human_reason_code: 'policy_match',
-      metadata_sufficient: false,
+      metadata_sufficient: null,
       track_annotation: expect.objectContaining({
         artist_name: '테스트 아티스트',
         vocal_type: 'singing',
@@ -467,6 +467,32 @@ describe('운영자 AI 프롬프트 감사', () => {
       artist_key: '테스트 아티스트',
       usage_scope: 'operational',
     });
+
+    const [repeatedDecision] = await db('recommendations').insert({
+      cafe_id: cafe.id,
+      video_id: 'audit_rejected',
+      title: '감사 대상 곡 재신청',
+      channel_title: '테스트 채널',
+      platform: 'youtube',
+      status: 'rejected',
+      filter_status: 'rejected',
+      filter_reason: '매장 분위기와 맞지 않습니다.',
+      filter_model: 'test-model',
+      filter_prompt_snapshot: prompt,
+      filter_checked_at: new Date(),
+    }).returning('*');
+    const repeatedQueue = await request(app)
+      .get('/api/v1/admin/music-filter-reviews?view=unreviewed')
+      .set({ Authorization: `Bearer ${adminToken}` });
+    expect(repeatedQueue.body.decisions).toContainEqual(expect.objectContaining({
+      id: repeatedDecision.id,
+      human_decision: null,
+      track_annotation: expect.objectContaining({
+        artist_name: '테스트 아티스트',
+        tempo_class: 'moderate',
+        mood_tags: ['peaceful', 'nostalgic'],
+      }),
+    }));
 
     const updatedReview = await request(app)
       .put(reviewPath)
