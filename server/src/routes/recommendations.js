@@ -105,7 +105,7 @@ router.post('/', requestLimiters, async (req, res) => {
   if (duplicate) return res.status(409).json({ error: '이미 대기 중인 곡입니다' });
   const queueCount = await recService.countActive(cafe.id);
   if (queueCount >= MAX_QUEUE_SIZE) return res.status(429).json({ error: `대기열이 가득 찼습니다 (최대 ${MAX_QUEUE_SIZE}곡)` });
-  const filterResult = await musicFilter.evaluateRecommendation({ cafe, track: { videoId, title, channelTitle, thumbnail, duration, platform, requesterName } });
+  const filterResult = await musicFilter.evaluateRecommendation({ cafe, track: { videoId, title, channelTitle, thumbnail, duration, platform } });
   const ip = getClientIp(req);
   const visitorId = safeVisitorId(req);
   let rec;

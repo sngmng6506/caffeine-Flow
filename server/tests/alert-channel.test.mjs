@@ -52,7 +52,20 @@ describe('알림 페이로드', () => {
       count: 1,
     }));
     expect(payload).not.toContain('해당 매장 설정 문제');
-    expect(payload).toContain('한정되지 않는다');
+    expect(payload).toContain('아직 판단할 수 없다');
+  });
+
+  it('1건짜리 임계값 알림도 범위를 단정하지 않는다', () => {
+    // DEFAULT_THRESHOLD가 1이면 첫 알림은 항상 1건 1카페다. 표본이 없는데
+    // "해당 매장 문제"라고 적으면 전 카페 장애를 한 매장 문제로 오독하게 된다.
+    const payload = JSON.stringify(buildAlertMessage({ ...summary, count: 1 }));
+    expect(payload).not.toContain('해당 매장 설정 문제');
+    expect(payload).toContain('아직 판단할 수 없다');
+  });
+
+  it('2건 이상 쌓였을 때만 매장 문제로 좁힌다', () => {
+    const payload = JSON.stringify(buildAlertMessage({ ...summary, count: 3 }));
+    expect(payload).toContain('카페 1곳에서 반복 발생');
   });
 
   it('금지된 필드는 어떤 경로로도 실리지 않는다', () => {

@@ -206,7 +206,9 @@ router.get('/music-filter-reviews', requireAdmin, async (req, res) => {
   }
 
   const processed = db({ recommendation: 'recommendations' })
-    .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES);
+    .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES)
+    .whereNot((builder) => builder.whereILike('recommendation.title', '%playlist%'))
+    .whereNot((builder) => builder.whereLike('recommendation.title', '%플리%'));
   const decisionsQuery = processed.clone()
     .leftJoin({ cafe: 'cafes' }, 'cafe.id', 'recommendation.cafe_id')
     .leftJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
@@ -462,8 +464,8 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
   if (!HUMAN_REASON_CODES.includes(humanReasonCode)) {
     return res.status(400).json({ error: '유효한 human_reason_code가 필요합니다' });
   }
-  if (typeof metadataSufficient !== 'boolean') {
-    return res.status(400).json({ error: 'metadata_sufficient는 boolean이어야 합니다' });
+  if (metadataSufficient !== null && typeof metadataSufficient !== 'boolean') {
+    return res.status(400).json({ error: 'metadata_sufficient는 boolean 또는 null이어야 합니다' });
   }
   const annotationCheck = req.body?.track_annotation === undefined
     ? { value: null }

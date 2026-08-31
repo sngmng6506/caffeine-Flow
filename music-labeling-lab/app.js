@@ -6,10 +6,6 @@ const PAGE_SIZE = 50;
 const $ = (id) => document.getElementById(id);
 
 const LABELS = Object.freeze({
-  track_version: {
-    original: '원곡', live: '라이브', remix: '리믹스', cover: '커버',
-    edited: '편집·속도 변경', unknown: '판단하기 어려움',
-  },
   tempo_class: {
     very_slow: '매우 느림', slow: '느림', moderate: '보통', fast: '빠름',
     very_fast: '매우 빠름', unknown: '판단하기 어려움',
@@ -118,11 +114,14 @@ function resetForm(item) {
   form.reset();
   const annotation = item.track_annotation;
   $('artistName').value = annotation?.artist_name || item.channel_title || '';
+  $('existingLabelStatus').textContent = annotation
+    ? `기존 곡 라벨 불러옴 · ${formatDateTime(annotation.updated_at)}`
+    : '실제 아티스트를 확인해주세요.';
+  $('existingLabelStatus').classList.toggle('is-loaded', Boolean(annotation));
   $('artistReferences').hidden = true;
   $('artistReferences').innerHTML = '';
 
   if (annotation) {
-    setRadio('track_version', annotation.track_version);
     setRadio('tempo_class', annotation.tempo_class);
     setChecks('mood_tags', annotation.mood_tags || []);
     setRadio('instrumentation_type', annotation.instrumentation_type);
@@ -133,7 +132,6 @@ function resetForm(item) {
     setRadio('usage_scope', annotation.usage_scope);
   }
 
-  setRadio('metadata_sufficient', item.metadata_sufficient == null ? null : String(item.metadata_sufficient));
   setRadio('human_decision', item.human_decision);
 }
 
@@ -150,8 +148,7 @@ function renderItem() {
     return;
   }
 
-  const policyReviewed = Boolean(item.human_decision);
-  const complete = policyReviewed && Boolean(item.track_annotation);
+  const complete = Boolean(item.human_decision && item.track_annotation);
   const url = trackUrl(item);
   $('message').hidden = true;
   $('reviewCard').hidden = false;
@@ -166,17 +163,8 @@ function renderItem() {
   $('trackLink').hidden = !url;
 
   resetForm(item);
-  $('blindNote').hidden = policyReviewed;
-  $('aiResult').hidden = !policyReviewed;
   $('aiDecision').textContent = `AI ${item.filter_status === 'accepted' ? '승인' : item.filter_status === 'rejected' ? '거절' : '오류 거절'}`;
   $('aiDecision').className = `decision decision--${item.filter_status}`;
-  $('aiReason').textContent = item.filter_reason || '사유 기록 없음';
-  $('aiConfidence').textContent = item.filter_confidence == null
-    ? '기록 없음'
-    : Number(item.filter_confidence).toFixed(2);
-  $('aiModel').textContent = item.filter_model || '기록 없음';
-  $('aiErrorRow').hidden = !item.filter_error_code;
-  $('aiError').textContent = item.filter_error_code || '';
 
   $('saveReview').textContent = complete ? '곡 라벨과 매장 판단 갱신' : '곡 라벨과 매장 판단 저장';
   $('previousItem').disabled = currentIndex === 0 && currentOffset === 0;
@@ -286,10 +274,10 @@ $('reviewForm').addEventListener('submit', async (event) => {
       {
         human_decision: decision,
         human_reason_code: reasonCode,
-        metadata_sufficient: form.get('metadata_sufficient') === 'true',
+        metadata_sufficient: item.metadata_sufficient ?? null,
         track_annotation: {
           artist_name: form.get('artist_name'),
-          track_version: form.get('track_version'),
+          track_version: item.track_annotation?.track_version || 'unknown',
           tempo_class: form.get('tempo_class'),
           mood_tags: moodTags,
           instrumentation_type: form.get('instrumentation_type'),

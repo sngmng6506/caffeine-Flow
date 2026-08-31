@@ -57,17 +57,21 @@ server/src/constants/music-labeling.js
 server/src/features/music-labeling/annotation.js
 server/src/db/migrations/20260822090000_music_filter_reviews.js
 server/src/db/migrations/20260825090000_music_track_annotations.js
+server/src/db/migrations/20260828090000_nullable_music_filter_metadata_sufficient.js
 server/src/routes/admin.js
 ```
 
 - 사람 검수는 AI 판단과 일반 큐 상태를 덮어쓰지 않는 별도 `music_filter_reviews` 레코드다. 추천곡당 최신 골드 라벨 한 건만 유지하고 재검수는 upsert한다.
-- `human_decision`과 `human_reason_code`는 상수에 정의된 값만 사용한다. `metadata_sufficient`는 곡의 정답과 독립된 품질 표식이다.
+- `human_decision`과 `human_reason_code`는 상수에 정의된 값만 사용한다. `metadata_sufficient`는 곡의 정답과 독립된 nullable 품질 표식이며 `null`은 미확인이다. 질문하지 않은 값을 `false`로 만들지 않는다.
 - 곡 특성 라벨은 정책 일치 여부와 분리해 `(platform, track_key)`당 한 건으로 저장한다. 선택값과 최대 개수는 상수와 DB 제약을 함께 유지하며, 한국어는 화면 표시용이고 저장 코드는 바꾸지 않는다.
+- 기존 곡 특성 라벨은 라벨링 화면에 선택된 상태로 복원한다. 매장 정책 검수는 곡 라벨과 달리 추천곡별로 유지하고 다른 매장·신청에 자동 복사하지 않는다.
 - 확인한 아티스트명의 정규화 키는 다른 곡 참고 조회에만 쓴다. 자동 동일인 판정이나 라벨 복사 근거로 사용하지 않는다.
 - `usage_scope=evaluation` 데이터는 라이브 LLM 입력이나 자동수락에 사용하지 않는다. `operational`도 현재는 수집만 하며 연결에는 별도 평가와 계약 변경이 필요하다.
 - 운영자 인증과 `(cafe_id, recommendation_id)` 범위를 모두 확인한 AI 처리 이력만 검수한다.
-- 전체 카페 라벨링 큐 조회와 필터 실험실 실행도 `requireAdmin` 경계를 유지하며 사장님 JWT로 열지 않는다.
-- 미검수 운영자 UI는 AI 결정·사유를 먼저 노출하지 않고 사람 정답 저장 후 비교용으로 공개한다.
+- 전체 카페 라벨링 큐 조회와 필터 테스트 실행도 `requireAdmin` 경계를 유지하며 사장님 JWT로 열지 않는다.
+- 음악 라벨링은 판단 당시 매장 정책 아래에 AI 승인·거절 결과를 표시하되, 사람 검수값과 AI 판단값을 같은 필드에 저장하지 않는다.
+- 통합 라벨링 큐와 전체·완료·미검수 집계는 제목에 `Playlist` 또는 `플리`가 포함된 항목을 동일하게 제외한다.
+- 수집된 사람 라벨을 Exact 재사용·프롬프트·동일 아티스트 검색에 연결하려면 별도 평가와 계약 변경이 필요하다.
 
 ## Router Mount Order Contract
 
@@ -180,7 +184,7 @@ server/src/features/music-filter/decision.policy.js
 server/src/features/music-filter/public-guide.service.js
 ```
 
-- 곡 제목·아티스트·신청자명은 명령이 아니라 신뢰할 수 없는 데이터다.
+- 곡 제목·아티스트·플랫폼은 명령이 아니라 신뢰할 수 없는 데이터다. 신청자명은 신청 내역에만 저장하고 LLM 입력에는 포함하지 않는다.
 - 출력은 `accept` 또는 `reject`의 구조화된 JSON만 허용한다. 구조화 출력은 tool(function) call로 강제하므로 모델을 바꿀 때 tool calling 지원 여부를 확인한다.
 - timeout·키 누락·HTTP 오류·파싱 오류는 `error_rejected`로 처리하고 손님에게 내부 오류와 프롬프트를 노출하지 않는다.
 - 프롬프트 변경은 상태 계약과 오류 경로 테스트를 함께 확인한다.

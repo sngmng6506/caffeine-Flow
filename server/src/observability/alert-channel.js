@@ -35,15 +35,17 @@ function buildAlertMessage(summary) {
   const immediate = summary.tier === ALERT_TIER.IMMEDIATE;
   const windowMinutes = Math.round(summary.windowMs / 60000);
 
-  // 카페 수로 원인을 추론하는 건 임계값 알림에서만 의미가 있다. 즉시 알림은
-  // 정의상 1건에 나가므로, 키 만료처럼 전 카페가 멈춘 상황에서도 카페 수는
-  // 1이다. 여기서 "해당 매장 문제"라고 적으면 정반대로 오해하게 된다.
-  const scope = immediate
-    ? '첫 발생 시점에 보낸 알림 — 영향 범위는 아래 카페로 한정되지 않는다'
-    : summary.affectedCafeCount > 1
-      ? `${summary.affectedCafeCount}개 카페에서 발생 — 플랫폼 전체 문제일 가능성`
+  // 카페 수로 원인을 추론하려면 표본이 2건 이상이어야 한다. 현재 정책은
+  // 임계값 1이라 첫 알림은 늘 1건이고, 그때는 전 카페가 멈춘 상황에서도
+  // 카페 수가 1이다. 여기서 "해당 매장 문제"라고 적으면 정반대로 읽힌다.
+  // 쿨다운 동안 집계는 계속되므로 두 번째 알림부터 실제 범위가 드러난다.
+  const inferable = !immediate && summary.count > 1;
+  const scope = summary.affectedCafeCount > 1
+    ? `${summary.affectedCafeCount}개 카페에서 발생 — 플랫폼 전체 문제일 가능성`
+    : !inferable
+      ? '첫 발생 시점에 보낸 알림 — 영향 범위는 아직 판단할 수 없다'
       : summary.affectedCafeCount === 1
-        ? '카페 1곳에서 발생 — 해당 매장 설정 문제일 가능성'
+        ? '카페 1곳에서 반복 발생 — 해당 매장 설정 문제일 가능성'
         : '카페 범위 없음 (서버 전역)';
 
   const cafeList = summary.cafes.length
@@ -91,4 +93,4 @@ function createAlertChannel({ webhookUrl, send = axios.post }) {
   };
 }
 
-module.exports = { createAlertChannel, buildAlertMessage, redact };
+module.exports = { createAlertChannel, buildAlertMessage, redact, SEND_TIMEOUT_MS };
