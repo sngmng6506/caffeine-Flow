@@ -5,19 +5,19 @@
     <meta name='viewport' content='width=device-width, initial-scale=1.0' />
     <meta name='color-scheme' content='light' />
     <meta name='robots' content='noindex, nofollow' />
-    <title>Caffeine Flow · 라벨링 랩</title>
+    <title>Caffeine Flow · 음악 라벨링</title>
     <link rel='stylesheet' href='./styles.css' />
   </head>
   <body>
     <header class='lab-header'>
       <div>
         <p class='eyebrow'>Caffeine Flow</p>
-        <h1>음악 라벨링 랩</h1>
+        <h1>음악 라벨링</h1>
         <p>곡을 듣고 한국어 선택지를 고른 뒤 매장 정책과 맞는지 판단합니다.</p>
       </div>
       <nav>
         <a href='/admin'>운영자 콘솔</a>
-        <a href='/filter-lab'>필터 실험실</a>
+        <a href='/filter-lab'>필터 테스트</a>
       </nav>
     </header>
 
@@ -58,23 +58,17 @@
         <details open>
           <summary>판단 당시 매장 정책</summary>
           <pre id='policy'></pre>
-        </details>
-
-        <details class='guide'>
-          <summary>선택 기준 도움말</summary>
-          <ul>
-            <li><b>분위기</b>는 곡 전체에서 가장 두드러지는 두 가지까지만 고릅니다.</li>
-            <li><b>강한 비트</b>는 킥·베이스 등 박자가 전면에 드러나는 경우입니다.</li>
-            <li><b>판단하기 어려움</b>은 다른 선택지와 함께 고르지 않습니다.</li>
-            <li>장르는 잘 모르겠으면 비워두거나 잘 모르겠음을 선택합니다.</li>
-          </ul>
+          <div class='policy-result'>
+            <span>AI 판단 결과</span>
+            <strong id='aiDecision'></strong>
+          </div>
         </details>
 
         <form id='reviewForm'>
           <section class='form-section artist-section'>
             <div class='section-title'>
               <div><span>1</span><h3>곡 확인</h3></div>
-              <small>실제 아티스트와 버전을 확인해주세요.</small>
+              <small id='existingLabelStatus'>실제 아티스트를 확인해주세요.</small>
             </div>
             <label class='text-field'>확인한 아티스트명
               <div class='artist-input-row'>
@@ -83,17 +77,6 @@
               </div>
             </label>
             <div id='artistReferences' class='artist-references' hidden></div>
-            <fieldset>
-              <legend>곡 버전</legend>
-              <div class='choice-grid compact'>
-                <label><input type='radio' name='track_version' value='original' required /><span>원곡</span></label>
-                <label><input type='radio' name='track_version' value='live' /><span>라이브</span></label>
-                <label><input type='radio' name='track_version' value='remix' /><span>리믹스</span></label>
-                <label><input type='radio' name='track_version' value='cover' /><span>커버</span></label>
-                <label><input type='radio' name='track_version' value='edited' /><span>편집·속도 변경</span></label>
-                <label><input type='radio' name='track_version' value='unknown' /><span>판단하기 어려움</span></label>
-              </div>
-            </fieldset>
           </section>
 
           <section class='form-section'>
@@ -194,13 +177,6 @@
           <section class='form-section decision-section'>
             <div class='section-title'><div><span>5</span><h3>매장 정책 판단</h3></div></div>
             <fieldset>
-              <legend>기본 메타데이터만으로 판단 가능했나요?</legend>
-              <div class='choice-grid compact'>
-                <label><input type='radio' name='metadata_sufficient' value='true' required /><span>가능했음</span></label>
-                <label><input type='radio' name='metadata_sufficient' value='false' /><span>곡을 들어야 했음</span></label>
-              </div>
-            </fieldset>
-            <fieldset>
               <legend>이 매장 정책과 맞나요?</legend>
               <div class='choice-grid compact decision-grid'>
                 <label><input type='radio' name='human_decision' value='accept' required /><span>매장과 잘 맞음</span></label>
@@ -219,17 +195,6 @@
 
           <button type='submit' id='saveReview' class='save-button'>곡 라벨과 매장 판단 저장</button>
         </form>
-
-        <p id='blindNote' class='blind-note'>저장하면 이 항목의 AI 판단을 공개합니다.</p>
-        <section id='aiResult' class='ai-result' hidden>
-          <h3 id='aiDecision'></h3>
-          <dl>
-            <div><dt>AI 사유</dt><dd id='aiReason'></dd></div>
-            <div><dt>Confidence</dt><dd id='aiConfidence'></dd></div>
-            <div><dt>모델</dt><dd id='aiModel'></dd></div>
-            <div id='aiErrorRow'><dt>오류 코드</dt><dd id='aiError'></dd></div>
-          </dl>
-        </section>
 
         <div class='navigation'>
           <button type='button' id='previousItem'>이전</button>
