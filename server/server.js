@@ -5,20 +5,27 @@ const { networkInterfaces } = require('os');
 const { app, corsOriginCheck } = require('./app');
 const { PORT } = require('./src/config');
 const initSocket = require('./src/socket');
-const { logError, CAUSE } = require('./src/observability');
+const { logError, CAUSE, CRASH_EXIT_DELAY_MS } = require('./src/observability');
 
 // 지금까지 이 두 이벤트에 핸들러가 없어, 잡히지 않은 에러는 아무 기록도
-// 남기지 못하고 프로세스만 사라졌다. 알림 이전에 최소한의 흔적을 남긴다.
+// 남기지 못하고 프로세스만 사라졌다. 기록을 남기되 Node의 기본 동작인
+// "죽는다"는 그대로 유지한다. 핸들러를 등록하는 것만으로 기본 크래시가
+// 꺼지므로, 로그만 남기고 살려두면 상태가 깨진 프로세스가 계속 도는 대신
+// 자동 재시작을 잃는다.
+function crashAfterLogging(code, error) {
+  logError({ code, cause: CAUSE.PLATFORM, error });
+  // 웹훅 전송 타임아웃보다 길게 기다린다. 가장 심각한 알림이 전송 도중
+  // 잘리면 안 된다. unref하지 않는 이유도 같다 — listen 이전 크래시에서
+  // 이벤트 루프가 비어 exit code 0으로 조용히 끝나는 것을 막는다.
+  setTimeout(() => process.exit(1), CRASH_EXIT_DELAY_MS);
+}
+
 process.on('uncaughtException', (error) => {
-  logError({ code: 'UNCAUGHT_EXCEPTION', cause: CAUSE.PLATFORM, error });
-  // 상태가 깨진 채로 계속 돌면 더 위험하다. 알림이 나갈 짧은 여유만 두고
-  // 종료해 Railway가 새 인스턴스를 띄우게 한다.
-  setTimeout(() => process.exit(1), 1000).unref();
+  crashAfterLogging('UNCAUGHT_EXCEPTION', error);
 });
 
 process.on('unhandledRejection', (reason) => {
-  const error = reason instanceof Error ? reason : new Error(String(reason));
-  logError({ code: 'UNHANDLED_REJECTION', cause: CAUSE.PLATFORM, error });
+  crashAfterLogging('UNHANDLED_REJECTION', reason instanceof Error ? reason : new Error(String(reason)));
 });
 
 const server = http.createServer(app);

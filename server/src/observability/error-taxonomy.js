@@ -86,6 +86,26 @@ function isDbConnectionError(error) {
   return DB_CONNECTION_ERROR_CODES.includes(error?.code);
 }
 
+/**
+ * 트랙 메타데이터 조회 실패의 원인 주체를 가른다.
+ *
+ * 이 엔드포인트는 공개·무인증이라 손님이 오타를 내거나 비공개 곡을 붙여넣는
+ * 것만으로도 하루에 수십 번 실패한다. 그걸 전부 알리면 채널이 죽고, 반대로
+ * 전부 묻으면 SoundCloud가 HTML 구조를 바꾼 것 같은 진짜 신호를 놓친다.
+ *
+ * 판단 근거는 HTTP status가 아니라 에러에 실린 upstream 표식이다.
+ * `getTrackMetadata`가 던지는 건 status=400인 자체 에러라, axios의
+ * `error.response`를 보면 항상 undefined가 나와 전부 외부 장애로 분류된다.
+ */
+function trackErrorCause(error) {
+  // 외부 호출 전에 입력 검증에서 걸린 경우 — 잘못된 URL, 미지원 플랫폼 등
+  if (!error?.upstream) return CAUSE.USER;
+  // 곡이 비공개이거나 삭제됨 — 손님이 고를 수 있는 정상 범위
+  if (error.upstreamStatus === 404 || error.upstreamStatus === 410) return CAUSE.USER;
+  // 403 차단, 429 한도 초과, 5xx, 네트워크 오류, 페이지 구조 변경
+  return CAUSE.EXTERNAL;
+}
+
 module.exports = {
   CAUSE,
   CAUSES,
@@ -98,4 +118,5 @@ module.exports = {
   alertTierFor,
   thresholdFor,
   isDbConnectionError,
+  trackErrorCause,
 };

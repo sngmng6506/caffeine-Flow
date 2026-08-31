@@ -38,6 +38,7 @@ export default defineConfig({
       'tests/qr-image.test.mjs',
       'tests/security-headers.test.mjs',
       'tests/time-policy.test.mjs',
+      'tests/track-error-cause.test.mjs',
       'tests/transition.test.mjs',
       'tests/validate.test.mjs',
     ],

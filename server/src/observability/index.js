@@ -1,7 +1,11 @@
 const { ALERT_WEBHOOK_URL } = require('../config');
-const { CAUSE, CAUSES, isDbConnectionError } = require('./error-taxonomy');
+const { CAUSE, CAUSES, isDbConnectionError, trackErrorCause } = require('./error-taxonomy');
 const { createAlertAggregator } = require('./alert-aggregator');
-const { createAlertChannel } = require('./alert-channel');
+const { createAlertChannel, SEND_TIMEOUT_MS } = require('./alert-channel');
+
+// 크래시 뒤 종료를 미루는 시간. 웹훅 전송 타임아웃보다 길어야 마지막 알림이
+// 잘리지 않는다. 두 값이 따로 놀지 않도록 여기서 파생시킨다.
+const CRASH_EXIT_DELAY_MS = SEND_TIMEOUT_MS + 500;
 
 const aggregator = createAlertAggregator();
 const channel = createAlertChannel({ webhookUrl: ALERT_WEBHOOK_URL });
@@ -65,7 +69,9 @@ function logError({ code, cause, cafe = null, route = null, error = null, messag
 
 module.exports = {
   logError,
+  CRASH_EXIT_DELAY_MS,
   isDbConnectionError,
+  trackErrorCause,
   alertsEnabled,
   CAUSE,
 };

@@ -22,7 +22,7 @@ const STATE_COOKIE_OPTS = {
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const { issueToken, issuePendingToken } = require('../utils/jwt');
-const { logError, CAUSE } = require('../observability');
+const { logError, CAUSE, isDbConnectionError } = require('../observability');
 
 
 // 같은 이메일의 다른 provider 계정 존재 여부 확인 — 정책상 provider별
@@ -139,7 +139,17 @@ router.get('/naver/callback', async (req, res) => {
     return res.redirect(`${ownerUrl}#pending=${pendingToken}`);
 
   } catch (err) {
-    logError({ code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.EXTERNAL, route: 'GET /auth/naver/callback', error: err });
+    // 이 catch는 네이버 HTTP 호출과 DB 조회를 함께 감싼다. 셋을 구분하지
+    // 않으면 DB 장애가 네이버 문제로 보고되고, 만료된 auth code 재사용처럼
+    // 손님 탓인 실패까지 알림을 만든다.
+    const upstreamStatus = err.response?.status;
+    const isUserError = upstreamStatus >= 400 && upstreamStatus < 500;
+    logError({
+      code: isDbConnectionError(err) ? 'DB_CONNECTION_FAILED' : 'NAVER_CALLBACK_FAILED',
+      cause: isDbConnectionError(err) ? CAUSE.PLATFORM : isUserError ? CAUSE.USER : CAUSE.EXTERNAL,
+      route: 'GET /auth/naver/callback',
+      error: err,
+    });
     res.redirect(`${ownerUrl}?error=naver_failed`);
   }
 });
