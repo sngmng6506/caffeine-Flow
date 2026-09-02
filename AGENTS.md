@@ -64,6 +64,8 @@
 npm run lint --prefix server
 npm run test:unit --prefix server
 npm test --prefix server
+npm test --prefix customer
+npm test --prefix owner
 npm run build --prefix customer
 npm run build --prefix owner
 ```
@@ -93,7 +95,7 @@ DB가 필요한 통합 테스트와 환경변수는 [docs/DEVELOPMENT.md](docs/D
 ## 커밋 전 체크리스트
 
 - [ ] 작업에 해당하는 문서와 실제 코드·상수를 읽었다.
-- [ ] 변경 범위에 맞는 테스트가 통과했고, customer/owner 변경은 Vite 빌드가 통과했다.
+- [ ] 변경 범위에 맞는 테스트가 통과했고, customer/owner 변경은 각 테스트와 Vite 빌드가 통과했다.
 - [ ] 마이그레이션은 실제 PostgreSQL 스키마와 기존 데이터를 고려했다.
 - [ ] 라우트 변경을 [docs/API.md](docs/API.md)에 반영했다.
 - [ ] 외부 동작·계약 변경만 문서에 반영했고, 현재 동작과 미래 계획을 섞지 않았다.

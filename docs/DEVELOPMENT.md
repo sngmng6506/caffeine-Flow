@@ -74,6 +74,7 @@ npm run lint --prefix server         # ESLint
 npm run test:unit --prefix server    # DB 비의존 테스트만
 npm test --prefix server             # 마이그레이션 포함 통합 테스트
 npm test --prefix owner              # 사장님 화면 훅 테스트 (jsdom)
+npm test --prefix customer           # 손님 화면 테스트 (jsdom)
 npm run build --prefix customer
 npm run build --prefix owner
 ```
@@ -86,6 +87,16 @@ npm run build --prefix owner
 리더 게이트는 `startPlaying` 내부와 각 호출부에 이중으로 걸려 있다. 그래서 한
 쪽만 지워도 테스트는 통과한다 — 테스트가 고정하는 것은 개별 가드가 아니라
 "리더가 아닌 화면은 `playRec`을 호출하지 않는다"는 관찰 가능한 속성이다.
+
+`customer` 테스트는 손님 신원과 상호작용 판정을 덮는다. visitor ID는 신청 취소
+권한의 근거이므로 모든 요청에 실려야 하고, 길게 눌러 링크 복사는 탭과 같은
+요소를 공유해 판정이 조금만 어긋나도 정반대로 망가진다. 둘 다 화면을 봐야만
+드러나는 종류라 시간과 좌표를 직접 넣어 고정한다. 색상·레이아웃은 대상이
+아니다 — 화면 확인이 불가능한 환경에서 스타일을 검증하면 의미 없는 스냅샷만
+쌓인다.
+
+`vi.fn()`은 vitest config의 `restoreMocks` 대상이 아니다. 호출 기록에 의존하는
+테스트는 `beforeEach`에서 직접 `mockClear()`한다.
 
 린트는 서버에만 적용된다. 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만 다룬다
 (`no-unused-vars`, `no-undef`, `eqeqeq` 등). 포맷터는 두지 않는다 — 기존 스타일이
@@ -101,7 +112,7 @@ JWT_SECRET=ci-only-secret \
 npm test --prefix server
 ```
 
-CI는 `server-test`(PostgreSQL + 린트 + 단위·통합 테스트)와 `frontend-build`(customer·owner Vite 빌드, Electron 메인 문법 검사)를 실행한다.
+CI는 `server-test`(PostgreSQL + 린트 + 단위·통합 테스트)와 `frontend-build`(customer·owner 테스트와 Vite 빌드, Electron 메인 문법 검사)를 실행한다.
 
 ## 서버 배포
 
