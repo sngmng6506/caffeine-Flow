@@ -1,6 +1,19 @@
 import { useEffect, useId, useState } from 'react';
 import { Music2 } from 'lucide-react';
 
+const YOUTUBE_THUMBNAIL_HOSTS = new Set(['img.youtube.com', 'i.ytimg.com']);
+
+function isUnavailableYouTubeThumbnail(image) {
+  try {
+    const hostname = new URL(image.currentSrc || image.src).hostname;
+    return YOUTUBE_THUMBNAIL_HOSTS.has(hostname)
+      && image.naturalWidth <= 120
+      && image.naturalHeight <= 90;
+  } catch {
+    return false;
+  }
+}
+
 export default function SongThumbnail({ src, className, fallbackClassName, iconSize = 20 }) {
   const [failed, setFailed] = useState(false);
   const patternId = useId();
@@ -25,5 +38,15 @@ export default function SongThumbnail({ src, className, fallbackClassName, iconS
     );
   }
 
-  return <img src={src} alt='' className={className} onError={() => setFailed(true)} />;
+  return (
+    <img
+      src={src}
+      alt=''
+      className={className}
+      onLoad={event => {
+        if (isUnavailableYouTubeThumbnail(event.currentTarget)) setFailed(true);
+      }}
+      onError={() => setFailed(true)}
+    />
+  );
 }
