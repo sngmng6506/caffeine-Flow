@@ -220,6 +220,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
       <DashboardTabs activeTab={tab} recommendations={recommendations} onChange={setTab} />
 
       {tab === 'queue' && (
+        <div id="owner-panel-queue" role="tabpanel" aria-labelledby="owner-tab-queue">
         <QueueTab
           recommendations={recommendations}
           loading={loading}
@@ -240,6 +241,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
           onUpdate={handleUpdate}
           onDelete={handleDelete}
         />
+        </div>
       )}
 
       <HistoryTab
@@ -250,6 +252,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
       />
 
       {tab === 'settings' && (
+        <div id="owner-panel-settings" role="tabpanel" aria-labelledby="owner-tab-settings">
         <SettingsTab
           allowedPlatforms={allowedPlatforms}
           saving={platformSaving}
@@ -275,6 +278,7 @@ export default function DashboardPage({ cafe: initialCafe, onLogout, updateBanne
             }
           }}
         />
+        </div>
       )}
       </div>
     </div>

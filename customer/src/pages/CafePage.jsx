@@ -291,6 +291,20 @@ export default function CafePage({ slug }) {
     setTab(nextTab);
   }
 
+  function handleTabKeyDown(event, currentTab) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const currentIndex = tabs.findIndex(item => item.id === currentTab);
+    const nextIndex = event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? tabs.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    const nextTab = tabs[nextIndex].id;
+    changeTab(nextTab);
+    requestAnimationFrame(() => document.getElementById(`music-tab-${nextTab}`)?.focus());
+  }
+
   function handleSwipeStart(event) {
     if (event.touches.length !== 1 || event.target.closest?.('input, textarea, select, a')) {
       swipeStart.current = null;
@@ -406,10 +420,14 @@ export default function CafePage({ slug }) {
           <button
             key={item.id}
             type='button'
+            id={`music-tab-${item.id}`}
             role='tab'
             aria-selected={tab === item.id}
+            aria-controls={`music-panel-${item.id}`}
+            tabIndex={tab === item.id ? 0 : -1}
             className={tab === item.id ? 'tabs__button is-active' : 'tabs__button'}
             onClick={() => changeTab(item.id)}
+            onKeyDown={event => handleTabKeyDown(event, item.id)}
           >
             {item.label}
           </button>
@@ -425,7 +443,7 @@ export default function CafePage({ slug }) {
         onClickCapture={handleSwipeClickCapture}
       >
       {tab === 'queue' && (
-        <div key='queue' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
+        <div id='music-panel-queue' aria-labelledby='music-tab-queue' key='queue' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
           {isAccepting && (
             <RecommendForm
               slug={slug}
@@ -496,7 +514,7 @@ export default function CafePage({ slug }) {
       )}
 
       {tab === 'history' && (
-        <div key='history' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
+        <div id='music-panel-history' aria-labelledby='music-tab-history' key='history' className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
           {historyLoading && history.length === 0 ? (
             <StatePanel icon={LoaderCircle} title='최근 재생을 불러오고 있어요.' loading />
           ) : historyError && history.length === 0 ? (
@@ -541,7 +559,7 @@ export default function CafePage({ slug }) {
       )}
 
       {(tab === 'cafeTop' || tab === 'globalTop') && (
-        <div key={tab} className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
+        <div id={`music-panel-${tab}`} aria-labelledby={`music-tab-${tab}`} key={tab} className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
           <Top10List
             items={tab === 'cafeTop' ? cafeTop : globalTop}
             hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}

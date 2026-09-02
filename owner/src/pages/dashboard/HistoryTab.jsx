@@ -54,7 +54,7 @@ export default function HistoryTab({ active, slug, onUpdate, onDelete }) {
   const today = todayKstString();
 
   return (
-    <div className="owner-history">
+    <div id="owner-panel-history" role="tabpanel" aria-labelledby="owner-tab-history" className="owner-history">
       <div className="owner-history__toolbar">
         <div className="owner-segmented" aria-label="이력 기간">
           <button

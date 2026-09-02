@@ -343,6 +343,10 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
   .owner-history__date { width: 100%; }
 }
 @container owner-panel (max-width: 420px) {
+  .owner-header__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-header__collapse { grid-column: 1 / -1; width: 100%; }
+  .owner-track-card__actions { width: 100%; }
+  .owner-track-card__actions .owner-btn { min-width: 0; flex: 1 1 0; }
   .owner-bgm-form { grid-template-columns: 1fr; }
   .owner-bgm-form__label, .owner-form-error { grid-column: 1; }
   .owner-track-card__thumb, .owner-default-card__thumb { width: 72px; height: 42px; flex-basis: 72px; }

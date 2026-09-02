@@ -135,7 +135,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   if (step === 'preview' && preview) {
     const badge = PLATFORM_BADGE[preview.platform] || PLATFORM_BADGE[PLATFORM.YOUTUBE];
     return (
-      <section className='request-card' aria-labelledby='request-preview-title'>
+      <section className='request-card' aria-labelledby='request-preview-title' aria-busy={loading}>
         <div className='request-card__heading'>
           <div>
             <h2 id='request-preview-title'>이 곡이 맞나요?</h2>
@@ -173,7 +173,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
   }
 
   return (
-    <form onSubmit={handlePreview} className='request-card request-card--input' aria-label='신청곡 추가'>
+    <form onSubmit={handlePreview} className='request-card request-card--input' aria-label='신청곡 추가' aria-busy={loading}>
       {composerTrigger}
       {composerOpen && <div id='request-composer-fields' className='request-card__body'>
         <label className='sr-only' htmlFor='music-url'>음악 링크</label>
@@ -187,6 +187,7 @@ export default function RecommendForm({ slug, onAdded, activeVideoIds = [], play
             value={url}
             onChange={event => setUrl(event.target.value)}
             autoComplete='off'
+            autoFocus
           />
         </div>
 

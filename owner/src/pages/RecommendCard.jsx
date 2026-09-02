@@ -43,6 +43,7 @@ export default function RecommendCard({
   playbackControlDisabled = false,
 }) {
   const [loading, setLoading] = useState(false);
+  const [activeAction, setActiveAction] = useState('');
   const [actionError, setActionError] = useState('');
   const [imageError, setImageError] = useState(false);
   const filter = filterLabel(rec);
@@ -52,6 +53,7 @@ export default function RecommendCard({
 
   async function handle(action) {
     setLoading(true);
+    setActiveAction(action);
     setActionError('');
     try {
       if (action === 'delete') {
@@ -66,6 +68,7 @@ export default function RecommendCard({
       setActionError('곡 상태를 변경하지 못했어요. 다시 시도해 주세요.');
     } finally {
       setLoading(false);
+      setActiveAction('');
     }
   }
 
@@ -138,7 +141,8 @@ export default function RecommendCard({
               onClick={() => handle(OWNER_ACTION_STATUS.SKIPPED)}
               disabled={loading || playbackControlDisabled}
               className="owner-btn owner-btn--secondary"
-            >건너뛰기</button>
+              aria-busy={activeAction === OWNER_ACTION_STATUS.SKIPPED}
+            >{activeAction === OWNER_ACTION_STATUS.SKIPPED ? '처리 중…' : '건너뛰기'}</button>
           </div>
         )}
 
@@ -149,7 +153,8 @@ export default function RecommendCard({
               onClick={() => handle(OWNER_ACTION_STATUS.SKIPPED)}
               disabled={loading}
               className="owner-btn owner-btn--secondary"
-            >건너뛰기</button>
+              aria-busy={activeAction === OWNER_ACTION_STATUS.SKIPPED}
+            >{activeAction === OWNER_ACTION_STATUS.SKIPPED ? '처리 중…' : '건너뛰기'}</button>
           </div>
         )}
 
@@ -160,13 +165,15 @@ export default function RecommendCard({
               onClick={() => handle(OWNER_ACTION_STATUS.ACCEPTED)}
               disabled={loading}
               className="owner-btn owner-btn--primary"
-            >수락</button>
+              aria-busy={activeAction === OWNER_ACTION_STATUS.ACCEPTED}
+            >{activeAction === OWNER_ACTION_STATUS.ACCEPTED ? '처리 중…' : '수락'}</button>
             <button
               type="button"
               onClick={() => handle(OWNER_ACTION_STATUS.SKIPPED)}
               disabled={loading}
               className="owner-btn owner-btn--secondary"
-            >건너뛰기</button>
+              aria-busy={activeAction === OWNER_ACTION_STATUS.SKIPPED}
+            >{activeAction === OWNER_ACTION_STATUS.SKIPPED ? '처리 중…' : '건너뛰기'}</button>
           </div>
         )}
 

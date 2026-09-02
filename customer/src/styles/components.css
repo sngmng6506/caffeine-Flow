@@ -1391,6 +1391,19 @@
     width: 84px;
   }
 
+  .song-card--compact {
+    grid-template-columns: 72px minmax(0, 1fr) auto;
+    column-gap: 8px;
+  }
+
+  .song-card--compact .song-card__thumb {
+    width: 72px;
+  }
+
+  .song-card--compact .song-card__actions {
+    min-width: 84px;
+  }
+
   .song-card__actions {
     padding-left: 0;
   }
