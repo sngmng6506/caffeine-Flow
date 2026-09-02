@@ -52,6 +52,8 @@ export default function CafePage({ slug }) {
   const [topLoading, setTopLoading] = useState(false);
   const [topLoaded, setTopLoaded] = useState({ cafeTop: false, globalTop: false });
   const [topSort, setTopSort] = useState({ cafeTop: 'count', globalTop: 'count' });
+  const [topError, setTopError] = useState('');
+  const [topRetry, setTopRetry] = useState(0);
   const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [successMsg, setSuccessMsg] = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
@@ -87,6 +89,7 @@ export default function CafePage({ slug }) {
     setCafeTop([]);
     setGlobalTop([]);
     setTopLoaded({ cafeTop: false, globalTop: false });
+    setTopError('');
   }, [slug]);
 
   const nowPlaying = recs.find(rec => rec.status === REC_STATUS.PLAYING) || null;
@@ -181,35 +184,45 @@ export default function CafePage({ slug }) {
         setHistoryHasMore(hasMore);
         setHistoryLoaded(true);
       })
-      .catch(() => setHistoryError('최근 재생을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'))
+      .catch(() => setHistoryError('잠시 후 다시 시도해 주세요.'))
       .finally(() => setHistoryLoading(false));
   }, [tab, slug, historyLoaded, historyRetry]);
 
+  // 실패를 삼키면 목록이 비어 "아직 순위를 만들 데이터가 없어요"가 뜬다.
+  // 데이터는 있는데 못 불러온 것뿐이므로 최근 재생과 같이 오류로 구분한다.
   useEffect(() => {
-    if (tab === 'cafeTop' && !topLoaded.cafeTop) {
+    const load = (fetchTop, apply, key) => {
       setTopLoading(true);
-      getCafeTop10(slug, 0, topSort.cafeTop)
+      setTopError('');
+      fetchTop()
         .then(({ items, hasMore }) => {
-          setCafeTop(items);
-          setCafeTopHasMore(hasMore);
-          setTopLoaded(previous => ({ ...previous, cafeTop: true }));
+          apply(items, hasMore);
+          setTopLoaded(previous => ({ ...previous, [key]: true }));
         })
-        .catch(() => {})
+        .catch(() => setTopError('잠시 후 다시 시도해 주세요.'))
         .finally(() => setTopLoading(false));
+    };
+
+    if (tab === 'cafeTop' && !topLoaded.cafeTop) {
+      load(
+        () => getCafeTop10(slug, 0, topSort.cafeTop),
+        (items, hasMore) => { setCafeTop(items); setCafeTopHasMore(hasMore); },
+        'cafeTop',
+      );
     }
 
     if (tab === 'globalTop' && !topLoaded.globalTop) {
-      setTopLoading(true);
-      getGlobalTop10(0, topSort.globalTop)
-        .then(({ items, hasMore }) => {
-          setGlobalTop(items);
-          setGlobalTopHasMore(hasMore);
-          setTopLoaded(previous => ({ ...previous, globalTop: true }));
-        })
-        .catch(() => {})
-        .finally(() => setTopLoading(false));
+      load(
+        () => getGlobalTop10(0, topSort.globalTop),
+        (items, hasMore) => { setGlobalTop(items); setGlobalTopHasMore(hasMore); },
+        'globalTop',
+      );
     }
-  }, [tab, slug, topLoaded.cafeTop, topLoaded.globalTop, topSort.cafeTop, topSort.globalTop]);
+
+    // 두 TOP 탭이 오류 상태를 공유한다. 이미 불러온 탭으로 옮겼을 때
+    // 다른 탭의 실패 문구가 남지 않게 지운다.
+    if (topLoaded[tab]) setTopError('');
+  }, [tab, slug, topLoaded.cafeTop, topLoaded.globalTop, topSort.cafeTop, topSort.globalTop, topRetry]);
 
   async function loadMoreTop() {
     setTopLoading(true);
@@ -605,6 +618,8 @@ export default function CafePage({ slug }) {
             slug={tab === 'cafeTop' ? slug : null}
             voteSlug={slug}
             sortBy={topSort[tab]}
+            error={topError}
+            onRetry={() => setTopRetry(value => value + 1)}
             onSortChange={changeTopSort}
             onLoadMore={loadMoreTop}
             onCopyResult={handleCopyResult}
