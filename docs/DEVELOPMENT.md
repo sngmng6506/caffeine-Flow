@@ -73,9 +73,19 @@ npm run migrate:rollback --prefix server
 npm run lint --prefix server         # ESLint
 npm run test:unit --prefix server    # DB 비의존 테스트만
 npm test --prefix server             # 마이그레이션 포함 통합 테스트
+npm test --prefix owner              # 사장님 화면 훅 테스트 (jsdom)
 npm run build --prefix customer
 npm run build --prefix owner
 ```
+
+`owner` 테스트는 재생 리더와 자동수락의 **배선**을 검증한다. 순수 판단 로직은
+`src/pages/dashboard/*.mjs` 헬퍼로 빠져 server 테스트가 덮으므로, 여기서는
+"그 헬퍼를 어느 자리에서 호출하는가"만 본다. 리더가 아닌 화면이 재생을
+시작하는 실수는 순수 함수 테스트로 잡히지 않기 때문이다.
+
+리더 게이트는 `startPlaying` 내부와 각 호출부에 이중으로 걸려 있다. 그래서 한
+쪽만 지워도 테스트는 통과한다 — 테스트가 고정하는 것은 개별 가드가 아니라
+"리더가 아닌 화면은 `playRec`을 호출하지 않는다"는 관찰 가능한 속성이다.
 
 린트는 서버에만 적용된다. 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만 다룬다
 (`no-unused-vars`, `no-undef`, `eqeqeq` 등). 포맷터는 두지 않는다 — 기존 스타일이

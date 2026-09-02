@@ -64,6 +64,9 @@ jobs:
       - name: Syntax check Electron main process
         run: find electron -name '*.js' -print0 | xargs -0 -n1 node --check
         working-directory: owner
+      - name: Owner tests
+        run: npm test
+        working-directory: owner
       - name: Build owner
         run: npm run build
         working-directory: owner
