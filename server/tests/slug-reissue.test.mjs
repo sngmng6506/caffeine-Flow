@@ -82,7 +82,7 @@ describe('QR slug 재발급/재등록', () => {
   });
 
   it('이미 사용 중인 slug로 지정 → 409', async () => {
-    const a = await freshCafe('reused01');
+    await freshCafe('reused01'); // 이 카페가 reused01을 점유한다
     const b = await freshCafe('reusednew');
     const res = await request(app)
       .put('/api/v1/cafes/me/slug')

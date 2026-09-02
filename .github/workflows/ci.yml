@@ -30,10 +30,8 @@ jobs:
       - name: Install server deps
         run: npm ci
         working-directory: server
-      - name: Syntax check (routes/services/utils)
-        run: |
-          node --check server.js && node --check app.js
-          find src -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Lint
+        run: npm run lint
         working-directory: server
       - name: Unit + integration tests
         run: npm test

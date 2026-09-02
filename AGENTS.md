@@ -61,6 +61,7 @@
 ## 검증 명령
 
 ```bash
+npm run lint --prefix server
 npm run test:unit --prefix server
 npm test --prefix server
 npm run build --prefix customer

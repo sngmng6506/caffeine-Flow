@@ -74,7 +74,9 @@ function detectPlatform(url) {
     if (hostname === 'youtu.be' || hostname === 'youtube.com' || hostname.endsWith('.youtube.com')) return PLATFORM.YOUTUBE;
     if (hostname === 'soundcloud.com' || hostname.endsWith('.soundcloud.com') || hostname === 'soundcloud.app.goo.gl') return PLATFORM.SOUNDCLOUD;
     if (hostname === 'spotify.com' || hostname.endsWith('.spotify.com') || hostname === 'spotify.link') return PLATFORM.SPOTIFY;
-  } catch {}
+  } catch {
+    // URL 형식이 아니면 지원 플랫폼이 아닌 것으로 본다
+  }
   return null;
 }
 
@@ -86,7 +88,9 @@ function extractYoutubeId(url) {
       if (parsed.pathname.startsWith('/shorts/')) return parsed.pathname.split('/')[2] || null;
       return parsed.searchParams.get('v');
     }
-  } catch {}
+  } catch {
+    // 파싱 실패는 videoId 없음으로 처리한다
+  }
   return null;
 }
 
@@ -94,7 +98,9 @@ function normalizeSoundCloudUrl(url) {
   try {
     const parsed = new URL(url);
     return `https://soundcloud.com${parsed.pathname.replace(/\/$/, '')}`;
-  } catch {}
+  } catch {
+    // 정규화할 수 없는 입력은 호출부가 null로 판단한다
+  }
   return null;
 }
 
@@ -102,7 +108,9 @@ function normalizeSpotifyUrl(url) {
   try {
     const parsed = new URL(url);
     return `${parsed.origin}${parsed.pathname.replace(/\/$/, '')}`;
-  } catch {}
+  } catch {
+    // 정규화할 수 없는 입력은 호출부가 null로 판단한다
+  }
   return null;
 }
 
@@ -269,7 +277,9 @@ async function getSpotifyMetadata(rawUrl) {
       const titleMatch = page.data.match(/<title>(.+?)<\/title>/);
       const byMatch = titleMatch?.[1]?.match(/by\s+(.+?)\s*\|\s*Spotify/);
       if (byMatch) artist = byMatch[1].trim();
-    } catch {}
+    } catch {
+      // 아티스트 추출은 부가 정보라 실패해도 트랙 정보는 그대로 반환한다
+    }
 
     return {
       platform: PLATFORM.SPOTIFY,
