@@ -1104,18 +1104,31 @@
   box-shadow: var(--cf-shadow-subtle);
 }
 
+/* 좋아요는 행 펼치기와 별개의 행동이므로 버튼을 겹치지 않게 나란히 둔다.
+   행 전체를 하나의 버튼으로 두면 그 안에 버튼을 넣을 수 없다. */
+.rank-row-line {
+  display: flex;
+  align-items: center;
+}
+
 .rank-row {
-  width: 100%;
+  min-width: 0;
   min-height: 72px;
   display: grid;
-  grid-template-columns: 24px 76px minmax(0, 1fr) 48px 18px;
+  flex: 1;
+  grid-template-columns: 24px 76px minmax(0, 1fr) 18px;
   align-items: center;
   gap: 8px;
-  padding: 16px;
+  padding: 16px 8px 16px 16px;
   border: 0;
   cursor: pointer;
   text-align: left;
   background: transparent;
+}
+
+.rank-row__vote {
+  flex: 0 0 auto;
+  margin-right: 8px;
 }
 
 .rank-row__number {
@@ -1163,22 +1176,12 @@
   font-size: 12px;
 }
 
-.rank-row__votes {
-  width: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 3px;
-  flex: 0 0 auto;
-  grid-column: 4;
-  grid-row: 1;
-  color: var(--cf-content-muted);
-  font-size: 11px;
+.rank-row__vote strong {
   font-variant-numeric: tabular-nums;
 }
 
 .rank-row > svg {
-  grid-column: 5;
+  grid-column: 4;
   grid-row: 1;
 }
 
@@ -1469,9 +1472,6 @@
     width: 64px;
   }
 
-  .rank-row__votes {
-    width: 44px;
-  }
 }
 
 @media (min-width: 641px) {

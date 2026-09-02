@@ -32,6 +32,13 @@ export const vote   = (slug, id) =>
 export const unvote = (slug, id) =>
   apiFetch('DELETE', `/cafes/${slug}/recommendations/${id}/vote`);
 
+// TOP 목록에는 신청곡 ID가 없고 곡 키만 있다. 서버에서는 위 두 경로와 같은 표다.
+export const voteSong = (slug, trackKey) =>
+  apiFetch('POST', `/cafes/${slug}/recommendations/songs/${encodeURIComponent(trackKey)}/vote`);
+
+export const unvoteSong = (slug, trackKey) =>
+  apiFetch('DELETE', `/cafes/${slug}/recommendations/songs/${encodeURIComponent(trackKey)}/vote`);
+
 export const cancelRecommendation = (slug, id) =>
   apiFetch('DELETE', `/cafes/${slug}/recommendations/${id}/cancel`);
 

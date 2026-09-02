@@ -222,6 +222,23 @@ server/tests/auth-boundary.test.mjs
 - IP rate limit은 visitor ID 위조를 막는 별도 방어선이므로 유지한다.
 - visitor ID 입력 길이는 DB 컬럼 길이와 일치시킨다.
 
+## Song Vote Contract
+
+```text
+server/src/services/recommendation.service.js   voteSong / unvoteSong
+server/src/services/stats.service.js            topQuery
+server/src/db/migrations/20260902090000_song_scoped_votes.js
+customer/src/trackKey.js
+customer/src/votedSongs.js
+```
+
+- 좋아요는 신청 건이 아니라 **곡**에 붙는다. 표의 단위는 `(cafe_id, track_key, visitor_id)`이고 visitor ID가 없는 레거시 요청만 IP로 막는다. 같은 곡이 여러 번 신청돼도 한 사람은 한 표다.
+- `track_key`는 `CANONICAL_VIDEO_ID_SQL`(`?` 앞부분)로 만든다. 서버의 `canonicalizeVideoId`와 손님 화면의 `trackKeyOf`가 같은 규칙이어야 한다. 한쪽만 바꾸면 화면은 눌린 것으로 보이는데 서버는 다른 곡으로 센다.
+- TOP 집계의 좋아요는 `votes`를 직접 센다. `recommendations.vote_count`는 큐 정렬용 비정규화 값이라 같은 카페·같은 곡의 행이 모두 같은 값을 갖는다 — SUM 하면 신청 횟수만큼 곱해진다.
+- 표는 손님이 보고 있는 매장에 남는다. 전체 TOP에서 우리 매장 기록이 없는 곡에 좋아요를 눌러도 되지만, 어딘가에서 실제로 재생된 곡인지 확인한 뒤에만 받는다.
+- 신청곡이 취소·삭제돼도 곡 좋아요는 남는다(`recommendation_id`는 `ON DELETE SET NULL`).
+- 손님 화면의 눌림 표시는 신청곡 ID가 아니라 곡 키로 저장한다. 큐·최근 재생·양쪽 TOP이 같은 곡을 다른 행으로 보여줘도 눌림 상태는 하나다.
+
 ## App Boundary Contract
 
 - `server/app.js`와 `server/server.js` 분리를 유지한다. 테스트는 `app.js`를 import한다.

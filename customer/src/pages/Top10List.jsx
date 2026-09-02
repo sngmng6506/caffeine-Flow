@@ -4,9 +4,14 @@ import LongPressCopy from '../components/LongPressCopy';
 import SongThumbnail from '../components/SongThumbnail';
 import CafeComments from './CafeComments';
 import StatePanel from './StatePanel';
+import { hasVoted } from '../votedSongs';
+import { trackKeyOf } from '../trackKey';
 
-export default function Top10List({ items, hasMore, loading, slug, sortBy, onSortChange, onLoadMore, onCopyResult }) {
+// voteSlug는 항상 지금 보고 있는 매장이다. 전체 TOP은 다른 매장의 곡도 보여주지만
+// 좋아요는 손님이 있는 매장에 남는다 — slug(댓글 범위)와 구분해서 받는다.
+export default function Top10List({ items, hasMore, loading, slug, voteSlug, sortBy, onSortChange, onLoadMore, onCopyResult, onVote }) {
   const [expanded, setExpanded] = useState(null);
+  const [voting, setVoting] = useState(null);
 
   if (loading && items.length === 0) {
     return <StatePanel icon={LoaderCircle} title='인기곡을 불러오고 있어요.' loading />;
@@ -28,25 +33,39 @@ export default function Top10List({ items, hasMore, loading, slug, sortBy, onSor
         {items.map((item, index) => {
           const rowKey = `${item.video_id}__${index}`;
           const isExpanded = expanded === rowKey;
+          const trackKey = trackKeyOf(item.video_id);
+          const voted = voteSlug ? hasVoted(voteSlug, trackKey) : false;
           return (
             <li className='rank-list__item' key={rowKey}>
-              <LongPressCopy videoId={item.video_id} onResult={onCopyResult}>
-                <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
-                  <span className='rank-row__number'>{index + 1}</span>
-                  <SongThumbnail
-                    src={item.thumbnail}
-                    className='rank-row__thumbnail'
-                    fallbackClassName='rank-row__thumbnail--empty'
-                    iconSize={18}
-                  />
-                  <span className='rank-row__info'>
-                    <strong>{item.title}</strong>
-                    <small>{item.channel_title} · {item.count}회 재생</small>
-                  </span>
-                  <span className='rank-row__votes'><Heart size={14} aria-hidden='true' /> {item.total_votes || 0}</span>
-                  {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
+              <div className='rank-row-line'>
+                <LongPressCopy videoId={item.video_id} onResult={onCopyResult}>
+                  <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
+                    <span className='rank-row__number'>{index + 1}</span>
+                    <SongThumbnail
+                      src={item.thumbnail}
+                      className='rank-row__thumbnail'
+                      fallbackClassName='rank-row__thumbnail--empty'
+                      iconSize={18}
+                    />
+                    <span className='rank-row__info'>
+                      <strong>{item.title}</strong>
+                      <small>{item.channel_title} · {item.count}회 재생</small>
+                    </span>
+                    {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
+                  </button>
+                </LongPressCopy>
+                <button
+                  type='button'
+                  className={`pill-action rank-row__vote${voted ? ' pill-action--active' : ''}`}
+                  onClick={() => { setVoting(rowKey); Promise.resolve(onVote?.(trackKey, voted)).finally(() => setVoting(null)); }}
+                  disabled={!voteSlug || voting === rowKey}
+                  aria-pressed={voted}
+                  aria-label={`좋아요 ${item.total_votes || 0}개${voted ? ', 선택됨' : ''}`}
+                >
+                  <Heart size={14} fill={voted ? 'currentColor' : 'none'} aria-hidden='true' />
+                  <strong>{item.total_votes || 0}</strong>
                 </button>
-              </LongPressCopy>
+              </div>
               {isExpanded && <CafeComments videoId={item.video_id} slug={slug} />}
             </li>
           );

@@ -291,6 +291,111 @@ describe('투표', () => {
   });
 });
 
+// 좋아요는 신청 건이 아니라 곡에 붙는다. 같은 곡이 여러 번 신청되면 행은
+// 여러 개지만 표는 (카페, 곡, 방문자)당 하나다.
+// 계약: docs/AI_CHANGE_GUARDRAILS.md#anonymous-visitor-identity-contract
+describe('곡 단위 좋아요', () => {
+  async function seedSong(videoIds, status = 'played') {
+    const rows = await db('recommendations').insert(
+      videoIds.map((video_id, i) => ({
+        cafe_id: cafe.id, video_id, title: `곡 ${video_id} ${i}`, status,
+      })),
+    ).returning('*');
+    return rows;
+  }
+
+  it('같은 곡의 다른 신청에 두 번 투표할 수 없다', async () => {
+    const [first, second] = await seedSong(['dup_song', 'dup_song']);
+    const base = `/api/v1/cafes/${cafe.slug}/recommendations`;
+    expect((await request(app).post(`${base}/${first.id}/vote`).set(guestHeaders('song-voter'))).status).toBe(200);
+    const again = await request(app).post(`${base}/${second.id}/vote`).set(guestHeaders('song-voter'));
+    expect(again.status).toBe(409);
+  });
+
+  it('추적 파라미터가 붙은 같은 곡도 한 표로 본다', async () => {
+    const [plain, tracked] = await seedSong(['canon_song', 'canon_song?si=abc']);
+    const base = `/api/v1/cafes/${cafe.slug}/recommendations`;
+    expect((await request(app).post(`${base}/${plain.id}/vote`).set(guestHeaders('canon-voter'))).status).toBe(200);
+    expect((await request(app).post(`${base}/${tracked.id}/vote`).set(guestHeaders('canon-voter'))).status).toBe(409);
+  });
+
+  it('한 표가 같은 곡의 모든 행에 반영된다', async () => {
+    const rows = await seedSong(['shared_count', 'shared_count', 'shared_count']);
+    const base = `/api/v1/cafes/${cafe.slug}/recommendations`;
+    await request(app).post(`${base}/${rows[0].id}/vote`).set(guestHeaders('shared-voter'));
+    const stored = await db('recommendations').whereIn('id', rows.map(r => r.id)).select('vote_count');
+    expect(stored.map(r => r.vote_count)).toEqual([1, 1, 1]);
+  });
+
+  it('곡 키로도 투표하고 취소할 수 있다', async () => {
+    await seedSong(['track_key_song']);
+    const url = `/api/v1/cafes/${cafe.slug}/recommendations/songs/track_key_song/vote`;
+    const voted = await request(app).post(url).set(guestHeaders('track-voter'));
+    expect(voted.status).toBe(200);
+    expect(voted.body).toEqual({ track_key: 'track_key_song', vote_count: 1 });
+    const removed = await request(app).delete(url).set(guestHeaders('track-voter'));
+    expect(removed.body.vote_count).toBe(0);
+  });
+
+  it('신청곡 경로와 곡 경로가 같은 표를 공유한다', async () => {
+    const [rec] = await seedSong(['shared_path_song']);
+    const base = `/api/v1/cafes/${cafe.slug}/recommendations`;
+    await request(app).post(`${base}/${rec.id}/vote`).set(guestHeaders('both-paths'));
+    const viaSong = await request(app).post(`${base}/songs/shared_path_song/vote`).set(guestHeaders('both-paths'));
+    expect(viaSong.status).toBe(409);
+    const removed = await request(app).delete(`${base}/songs/shared_path_song/vote`).set(guestHeaders('both-paths'));
+    expect(removed.body.vote_count).toBe(0);
+  });
+
+  it('TOP 집계가 신청 횟수만큼 좋아요를 부풀리지 않는다', async () => {
+    await seedSong(['top_count_song', 'top_count_song', 'top_count_song'], 'played');
+    const base = `/api/v1/cafes/${cafe.slug}/recommendations`;
+    await request(app).post(`${base}/songs/top_count_song/vote`).set(guestHeaders('top-voter'));
+    const top = await request(app).get(`${base}/top10?sort=votes`);
+    const row = top.body.items.find(i => i.video_id === 'top_count_song');
+    expect(row.count).toBe(3);
+    expect(row.total_votes).toBe(1);
+  });
+
+  it('다른 매장에서만 재생된 곡에도 좋아요를 남길 수 있다', async () => {
+    // 전체 TOP에는 우리 매장 기록이 없는 곡도 나온다. 표는 이 매장에 남되
+    // 우리 매장 recommendations에는 그 곡 행이 없다.
+    const [otherCafe] = await db('cafes')
+      .insert({ name: '남의 매장', slug: 'othercafe-vote', owner_email: 'other-vote@t.com' })
+      .returning('*');
+    await db('recommendations').insert({
+      cafe_id: otherCafe.id, video_id: 'elsewhere_song', title: '남의 매장 곡', status: 'played',
+    });
+
+    const url = `/api/v1/cafes/${cafe.slug}/recommendations/songs/elsewhere_song/vote`;
+    const voted = await request(app).post(url).set(guestHeaders('cross-cafe-voter'));
+    expect(voted.status).toBe(200);
+    expect(voted.body.vote_count).toBe(1);
+
+    const stored = await db('votes').where({ cafe_id: cafe.id, track_key: 'elsewhere_song' }).first();
+    expect(stored.recommendation_id).toBeNull();
+
+    const global = await request(app).get('/api/v1/top10?sort=votes');
+    expect(global.body.items.find(i => i.video_id === 'elsewhere_song').total_votes).toBe(1);
+
+    await db('cafes').where({ id: otherCafe.id }).del();
+  });
+
+  it('재생된 적 없는 임의의 곡 키는 거절한다', async () => {
+    const url = `/api/v1/cafes/${cafe.slug}/recommendations/songs/totally_made_up/vote`;
+    expect((await request(app).post(url).set(guestHeaders('fake-voter'))).status).toBe(404);
+  });
+
+  it('신청곡이 삭제돼도 곡 좋아요는 남는다', async () => {
+    const [rec] = await seedSong(['outlives_rec', 'outlives_rec']);
+    const base = `/api/v1/cafes/${cafe.slug}/recommendations`;
+    await request(app).post(`${base}/songs/outlives_rec/vote`).set(guestHeaders('outlive-voter'));
+    await db('recommendations').where({ id: rec.id }).delete();
+    const votes = await db('votes').where({ cafe_id: cafe.id, track_key: 'outlives_rec' });
+    expect(votes).toHaveLength(1);
+  });
+});
+
 describe('방문자 집계 식별자', () => {
   it('같은 IP의 서로 다른 visitor는 각각 한 명으로 기록한다', async () => {
     const sharedIp = '203.0.113.30';
@@ -801,13 +906,25 @@ describe('통계 — knex raw ? 바인딩 회귀 (split_part 이스케이프)', 
       { cafe_id: topCafe.id, video_id: 'rejected_spam', title: '거절 스팸', status: 'rejected', vote_count: 1000 },
       { cafe_id: topCafe.id, video_id: 'pending_spam', title: '대기 스팸', status: 'pending', vote_count: 1000 },
     );
-    await db('recommendations').insert(rows);
+    const inserted = await db('recommendations').insert(rows).returning(['id', 'video_id']);
+
+    // TOP의 좋아요는 votes에서 직접 센다. recommendations.vote_count는 큐 정렬용
+    // 비정규화 값이라 그것만 높은 행은 순위에 영향을 주지 않는다.
+    const winner = inserted.find(r => r.video_id === 'vote_winner');
+    await db('votes').insert(Array.from({ length: 5 }, (_, i) => ({
+      cafe_id: topCafe.id,
+      track_key: 'vote_winner',
+      recommendation_id: winner.id,
+      voter_ip: `198.51.100.${i + 1}`,
+      visitor_id: `top-sort-voter-${i}`,
+    })));
 
     const countRes = await request(app).get(`/api/v1/cafes/${topCafe.slug}/recommendations/top10?sort=count`);
     const voteRes = await request(app).get(`/api/v1/cafes/${topCafe.slug}/recommendations/top10?sort=votes`);
     expect(countRes.status).toBe(200);
     expect(countRes.body.items.map(item => item.video_id)).not.toContain('vote_winner');
     expect(voteRes.body.items[0].video_id).toBe('vote_winner');
+    expect(voteRes.body.items[0].total_votes).toBe(5);
     expect(voteRes.body.items.map(item => item.video_id)).not.toContain('rejected_spam');
     expect(voteRes.body.items.map(item => item.video_id)).not.toContain('pending_spam');
 

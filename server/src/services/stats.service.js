@@ -58,21 +58,38 @@ const TOP_PAGE_SIZE = 10;
 // 정규화 video_id 기준 SQL 그룹 집계 + limit+1 페이지네이션.
 // 이전 구현은 전체 그룹 행을 메모리에 올려 JS에서 병합·정렬·slice —
 // 무인증 공개 엔드포인트(/api/v1/top10)라 데이터 누적 시 요청당 풀스캔이었음.
-function topQuery(builder, offset, sort = 'count') {
+// 좋아요는 votes에서 직접 센다. recommendations.vote_count는 큐 정렬을 위해
+// 비정규화해 둔 값이라 같은 카페·같은 곡의 행들이 모두 같은 값을 갖는다 —
+// 그대로 SUM 하면 신청 횟수만큼 곱해진다. 또 전체 TOP에는 우리 매장에서 재생된
+// 적 없는 곡도 나오는데, 그런 곡의 표는 recommendations 어디에도 없다.
+// voteScope: 표를 셀 범위 (매장 TOP은 그 카페, 전체 TOP은 전부)
+function topQuery(builder, offset, sort = 'count', voteScope = () => {}) {
   const primary = sort === 'votes' ? 'total_votes' : 'count';
   const secondary = sort === 'votes' ? 'count' : 'total_votes';
-  return builder
+  const played = builder
     .where({ status: REC_STATUS.PLAYED })
     .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
     .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
-    .sum('vote_count as total_votes')
-    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL))
+    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL));
+
+  const votes = db('votes')
+    .select('track_key')
+    .count('id as total_votes')
+    .groupBy('track_key')
+    .modify(voteScope);
+
+  return db
+    .select('p.video_id', 'p.title', 'p.channel_title', 'p.thumbnail')
+    .select(db.raw('p.count as count'))
+    .select(db.raw('COALESCE(v.total_votes, 0) as total_votes'))
+    .from(played.as('p'))
+    .leftJoin(votes.as('v'), 'v.track_key', 'p.video_id')
     .orderBy(primary, 'desc')
     .orderBy(secondary, 'desc')
-    .orderByRaw(`${CANONICAL_VIDEO_ID_SQL} ASC`)
+    .orderBy('video_id', 'asc')
     .limit(TOP_PAGE_SIZE + 1)
     .offset(offset);
 }
@@ -87,7 +104,12 @@ function pageRows(rows) {
 }
 
 async function getCafeTop10(cafeId, offset = 0, sort = 'count') {
-  const rows = await topQuery(db('recommendations').where({ cafe_id: cafeId }), offset, sort);
+  const rows = await topQuery(
+    db('recommendations').where({ cafe_id: cafeId }),
+    offset,
+    sort,
+    q => q.where({ cafe_id: cafeId }),
+  );
   return pageRows(rows);
 }
 
@@ -95,10 +117,12 @@ async function getGlobalTop10(offset = 0, sort = 'count') {
   // 정지(is_suspended) 카페의 곡은 공개 TOP10에서 제외한다 — 정지의 목적이
   // 손님 노출 차단인데 여기만 남으면 구멍. join 대신 whereIn 서브쿼리를
   // 쓰는 이유: topQuery가 count('id')를 쓰므로 join 시 id가 모호해짐.
+  const suspendedFree = () => db('cafes').select('id').where({ is_suspended: false });
   const rows = await topQuery(
-    db('recommendations').whereIn('cafe_id', db('cafes').select('id').where({ is_suspended: false })),
+    db('recommendations').whereIn('cafe_id', suspendedFree()),
     offset,
     sort,
+    q => q.whereIn('cafe_id', suspendedFree()),
   );
   return pageRows(rows);
 }
