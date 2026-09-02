@@ -6,14 +6,10 @@ import { REC_STATUS } from '../../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../../constants/playbackState';
 import { readSavedBgm, savedToBgmUrl } from './bgmStorage';
 import { isAutoAcceptEligible } from './queuePolicy';
-import { acknowledgePlaybackRecovery } from './playbackRecovery.mjs';
 import { createPlaybackCommands } from './playbackCommands.mjs';
+import { createPlaybackRoleFlow } from './playbackRoleFlow.mjs';
 import { subscribeElectron } from './electronSubscriptions.mjs';
 import { finishCurrentPlayback } from './playbackCleanup.mjs';
-import {
-  markPlaybackSessionRecovered,
-  needsPlaybackStateReset,
-} from './playbackSession.mjs';
 
 export default function useRecommendationQueue({
   cafe,
@@ -36,7 +32,6 @@ export default function useRecommendationQueue({
   const aiAutoAcceptRef = useRef(aiAutoAccept);
   const playbackLeaderRef = useRef(false);
   const currentTrackRef = useRef(null);
-  const recoveryInProgressRef = useRef(false);
   const playbackAvailable = typeof window.electronAPI?.playRec === 'function';
 
   recommendationsRef.current = recommendations;
@@ -108,9 +103,6 @@ export default function useRecommendationQueue({
 
     const socket = getSocket(cafe.slug);
     let connected = false;
-    let recoveryRetryTimer = null;
-    let pendingRecoveredSnapshot = null;
-    let pendingRecoveredAutoAccept = false;
 
     socket.on('connect', () => {
       socket.emit('request_playback_role');
@@ -127,82 +119,26 @@ export default function useRecommendationQueue({
         .catch(() => {});
     });
 
-    socket.on('playback_role', async ({ isLeader, shouldRecover }) => {
-      const next = playbackAvailable && isLeader === true;
-      playbackLeaderRef.current = next;
-      setIsPlaybackLeader(next);
-      // 리더 승격 알림은 먼저 역할만 전달한다. 별도 요청으로 recovery
-      // 필요 여부를 확인하고, 실제 복구 성공 뒤 ACK로 완료한다.
-      if (next && shouldRecover === undefined) {
-        socket.emit('request_playback_role');
-        return;
-      }
-      if (!next || recoveryInProgressRef.current) return;
-      // ACK는 서버에 도착했지만 응답 패킷만 유실될 수 있다. 다음 역할
-      // 확인에서 서버가 복구 완료를 반환하면 이미 만든 snapshot으로 이어간다.
-      if (!shouldRecover && pendingRecoveredSnapshot) {
-        const recovered = pendingRecoveredSnapshot;
-        const shouldDrain = pendingRecoveredAutoAccept;
-        pendingRecoveredSnapshot = null;
-        pendingRecoveredAutoAccept = false;
-        markPlaybackSessionRecovered(cafe.slug);
-        if (shouldDrain) await drainPendingAndPlay(recovered);
-        return;
-      }
-      if (!shouldRecover) {
-        markPlaybackSessionRecovered(cafe.slug);
-        return;
-      }
-      recoveryInProgressRef.current = true;
-
-      try {
-        // 서버 프로세스만 재시작되면 registry는 새 리더로 보지만 Electron의
-        // BrowserView와 sessionStorage는 계속 살아 있다. 완료된 같은 실행
-        // 세션은 DB playing을 되돌리지 않고 새 registry에 ACK만 보낸다.
-        let playbackActive = null;
-        try {
-          if (typeof window.electronAPI?.isRecActive === 'function') {
-            playbackActive = await window.electronAPI.isRecActive();
-          }
-        } catch {}
-        if (!needsPlaybackStateReset(cafe.slug, shouldRecover, { playbackActive })) {
-          await acknowledgePlaybackRecovery(socket);
-          markPlaybackSessionRecovered(cafe.slug);
-          return;
-        }
-        const [{ recommendations: latest, is_accepting }, latestCafe] = await Promise.all([
-          getRecommendations(cafe.slug),
-          cafeLoaded,
-        ]);
-        // 새 리더 세션이 시작되었을 때만 서버에 남은 가짜 playing을
-        // accepted로 복구한다. follower·브라우저·renderer reload는 건드리지 않는다.
-        const reset = await Promise.all(latest.map(rec => rec.status === REC_STATUS.PLAYING
-          ? updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED)
-          : rec));
+    const roleFlow = createPlaybackRoleFlow({
+      socket,
+      getSlug: () => cafe.slug,
+      getElectronApi: () => window.electronAPI,
+      getRecommendations,
+      updateRec,
+      getCafeSettings: () => cafeLoaded,
+      onLeaderChange: (isLeader) => {
+        playbackLeaderRef.current = isLeader;
+        setIsPlaybackLeader(isLeader);
+      },
+      onRecovered: (reset, accepting) => {
         recommendationsRef.current = reset;
         setRecommendations(reset);
-        setIsAccepting(is_accepting);
-        pendingRecoveredSnapshot = reset;
-        pendingRecoveredAutoAccept = !!latestCafe?.music_filter_enabled;
-        await acknowledgePlaybackRecovery(socket);
-        markPlaybackSessionRecovered(cafe.slug);
-        pendingRecoveredSnapshot = null;
-        pendingRecoveredAutoAccept = false;
-        if (latestCafe?.music_filter_enabled) await drainPendingAndPlay(reset);
-      } catch (error) {
-        console.error(error);
-        // 서버의 recovery flag는 ACK 전까지 남아 있다. 일시적인 API·소켓
-        // 실패는 같은 리더가 다시 역할을 요청해 복구를 재시도한다.
-        if (!recoveryRetryTimer) {
-          recoveryRetryTimer = setTimeout(() => {
-            recoveryRetryTimer = null;
-            if (socket.connected) socket.emit('request_playback_role');
-          }, 2000);
-        }
-      } finally {
-        recoveryInProgressRef.current = false;
-      }
+        setIsAccepting(accepting);
+      },
+      drainPendingAndPlay,
     });
+
+    socket.on('playback_role', payload => roleFlow.handleRole(payload, { playbackAvailable }));
 
     socket.on('owner_recommendations_update', ({ action, rec, id }) => {
       if (action === 'add') {
@@ -289,7 +225,7 @@ export default function useRecommendationQueue({
     });
 
     return () => {
-      if (recoveryRetryTimer) clearTimeout(recoveryRetryTimer);
+      roleFlow.dispose();
       disconnectSocket();
       unsubscribeElectron();
     };
