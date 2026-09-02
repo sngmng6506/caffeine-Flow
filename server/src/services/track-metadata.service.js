@@ -10,6 +10,12 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 // extra로 upstream 표식을 실어 보낸다. 손님 입력 탓과 플랫폼 장애를
 // 구분하는 근거이며, 판단은 observability/error-taxonomy가 한다.
+// 서버 IP 차단(403)·한도 초과(429)·서버 오류(5xx)·무응답은 우리가 알아야 할
+// 신호다. 나머지 4xx는 손님이 고른 곡의 속성이라 알리지 않는다.
+function isUpstreamTrackFailure(status) {
+  return !status || status >= 500 || status === 403 || status === 429;
+}
+
 function metadataError(message, code = 'TRACK_METADATA_ERROR', extra = {}) {
   const error = new Error(message);
   error.code = code;
@@ -117,8 +123,16 @@ async function getYoutubeMetadata(rawUrl) {
       channelTitle: data.author_name,
       thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
     };
-  } catch {
-    throw metadataError('영상 정보를 가져올 수 없습니다 (임베드 비활성화 또는 잘못된 URL)', 'TRACK_YOUTUBE_FETCH_FAILED');
+  } catch (error) {
+    // oEmbed의 401·404는 "임베드 비활성화"이거나 없는 영상이라 손님이 고른 곡의
+    // 속성이다. 403·429는 서버 IP 차단·한도 초과라 전 카페 신청이 막히므로
+    // SoundCloud와 같은 기준으로 플랫폼 신호로 본다.
+    const status = error.response?.status;
+    throw metadataError(
+      '영상 정보를 가져올 수 없습니다 (임베드 비활성화 또는 잘못된 URL)',
+      'TRACK_YOUTUBE_FETCH_FAILED',
+      { upstream: isUpstreamTrackFailure(status), upstreamStatus: status ?? null },
+    );
   }
 }
 
@@ -226,8 +240,10 @@ async function getSoundCloudMetadata(rawUrl) {
     else if (status === 429) message += ' (요청 한도 초과 — 잠시 후 재시도)';
     else if (status) message += ` (SoundCloud ${status})`;
     else message += ' (네트워크 오류)';
+    // 404·410은 비공개·삭제된 곡이라 손님이 고를 수 있는 정상 범위다.
+    // 403(서버 IP 차단)·429·5xx·네트워크 오류는 우리가 알아야 할 신호다.
     throw metadataError(message, 'TRACK_SOUNDCLOUD_FETCH_FAILED', {
-      upstream: true,
+      upstream: !(status === 404 || status === 410),
       upstreamStatus: status ?? null,
     });
   }
@@ -262,8 +278,14 @@ async function getSpotifyMetadata(rawUrl) {
       channelTitle: artist,
       thumbnail: data.thumbnail_url || null,
     };
-  } catch {
-    throw metadataError('트랙 정보를 가져올 수 없습니다 (비공개 또는 잘못된 Spotify URL)', 'TRACK_SPOTIFY_FETCH_FAILED');
+  } catch (error) {
+    // 401·404는 비공개·삭제된 트랙이고, 403·429는 서버 IP 차단·한도 초과다.
+    const status = error.response?.status;
+    throw metadataError(
+      '트랙 정보를 가져올 수 없습니다 (비공개 또는 잘못된 Spotify URL)',
+      'TRACK_SPOTIFY_FETCH_FAILED',
+      { upstream: isUpstreamTrackFailure(status), upstreamStatus: status ?? null },
+    );
   }
 }
 

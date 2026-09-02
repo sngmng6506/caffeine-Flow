@@ -331,8 +331,8 @@ function renderMusicFilterAudit(audit) {
               <select name=human_reason_code required>${selectOptions(REVIEW_REASON_LABEL, item.human_reason_code, '선택')}</select>
             </label>
             <label>메타데이터
-              <select name=metadata_sufficient required>
-                <option value=''>선택</option>
+              <select name=metadata_sufficient>
+                <option value=''${item.metadata_sufficient === null || item.metadata_sufficient === undefined ? ' selected' : ''}>미확인</option>
                 <option value=true${item.metadata_sufficient === true ? ' selected' : ''}>충분</option>
                 <option value=false${item.metadata_sufficient === false ? ' selected' : ''}>부족</option>
               </select>
@@ -491,7 +491,10 @@ $('#statsContent').addEventListener('submit', async (event) => {
       {
         human_decision: data.get('human_decision'),
         human_reason_code: data.get('human_reason_code'),
-        metadata_sufficient: data.get('metadata_sufficient') === 'true',
+        // 빈 값은 "묻지 않음"이므로 false가 아니라 null로 보낸다.
+        metadata_sufficient: data.get('metadata_sufficient') === ''
+          ? null
+          : data.get('metadata_sufficient') === 'true',
       },
     );
     saved.textContent = `${fmtDateTime(review.reviewed_at)} 저장됨`;

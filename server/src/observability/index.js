@@ -1,5 +1,5 @@
 const { ALERT_WEBHOOK_URL } = require('../config');
-const { CAUSE, CAUSES, isDbConnectionError, trackErrorCause } = require('./error-taxonomy');
+const { CAUSE, CAUSES, isDbConnectionError, trackErrorCause, naverCallbackError } = require('./error-taxonomy');
 const { createAlertAggregator } = require('./alert-aggregator');
 const { createAlertChannel, SEND_TIMEOUT_MS } = require('./alert-channel');
 
@@ -72,6 +72,7 @@ module.exports = {
   CRASH_EXIT_DELAY_MS,
   isDbConnectionError,
   trackErrorCause,
+  naverCallbackError,
   alertsEnabled,
   CAUSE,
 };

@@ -52,7 +52,17 @@ describe('알림 페이로드', () => {
       count: 1,
     }));
     expect(payload).not.toContain('해당 매장 설정 문제');
-    expect(payload).toContain('아직 판단할 수 없다');
+    expect(payload).toContain('아래 카페로 한정되지 않는다');
+  });
+
+  it('쿨다운 뒤 재발송되는 즉시 알림은 실제 건수를 보여준다', () => {
+    // 집계는 쿨다운 중에도 계속되므로 두 번째 즉시 알림은 1건이 아니다.
+    // "1건"으로 굳어 있으면 진행 중인 장애를 첫 발생으로 잘못 읽는다.
+    const payload = JSON.stringify(buildAlertMessage({
+      ...summary, tier: ALERT_TIER.IMMEDIATE, count: 25,
+    }));
+    expect(payload).toContain('25건');
+    expect(payload).not.toContain('1건 (즉시 알림 대상)');
   });
 
   it('1건짜리 임계값 알림도 범위를 단정하지 않는다', () => {
@@ -60,12 +70,21 @@ describe('알림 페이로드', () => {
     // "해당 매장 문제"라고 적으면 전 카페 장애를 한 매장 문제로 오독하게 된다.
     const payload = JSON.stringify(buildAlertMessage({ ...summary, count: 1 }));
     expect(payload).not.toContain('해당 매장 설정 문제');
-    expect(payload).toContain('아직 판단할 수 없다');
+    expect(payload).toContain('판단하기에는 부족하다');
   });
 
   it('2건 이상 쌓였을 때만 매장 문제로 좁힌다', () => {
     const payload = JSON.stringify(buildAlertMessage({ ...summary, count: 3 }));
     expect(payload).toContain('카페 1곳에서 반복 발생');
+  });
+
+  it('카페 범위가 없는 서버 전역 오류는 그렇게 표시한다', () => {
+    // INTERNAL_ERROR·UNCAUGHT_EXCEPTION은 카페가 없고 대개 1건짜리라,
+    // 표본 부족 분기에 먼저 걸리면 서버 전역이라는 사실을 잃는다.
+    const payload = JSON.stringify(buildAlertMessage({
+      ...summary, code: 'UNCAUGHT_EXCEPTION', count: 1, cafes: [], affectedCafeCount: 0,
+    }));
+    expect(payload).toContain('카페 범위 없음 (서버 전역)');
   });
 
   it('금지된 필드는 어떤 경로로도 실리지 않는다', () => {

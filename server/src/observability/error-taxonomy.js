@@ -29,6 +29,7 @@ const IMMEDIATE_CODES = Object.freeze([
   'LLM_HTTP_401', //        인증 실패 — 키 만료·폐기
   'LLM_HTTP_402', //        크레딧 소진 — 결제 필요
   'LLM_HTTP_403', //        권한 거부 — 모델 접근 차단
+  'NAVER_CREDENTIALS_REJECTED', // 네이버가 우리 자격증명을 거부 — 전 사장님 로그인 차단
   'DB_CONNECTION_FAILED', // DB 연결 불가 — 서비스 전체 정지
   'UNCAUGHT_EXCEPTION', //  프로세스 사망
   'UNHANDLED_REJECTION', // 처리되지 않은 Promise 거부
@@ -93,17 +94,46 @@ function isDbConnectionError(error) {
  * 것만으로도 하루에 수십 번 실패한다. 그걸 전부 알리면 채널이 죽고, 반대로
  * 전부 묻으면 SoundCloud가 HTML 구조를 바꾼 것 같은 진짜 신호를 놓친다.
  *
- * 판단 근거는 HTTP status가 아니라 에러에 실린 upstream 표식이다.
- * `getTrackMetadata`가 던지는 건 status=400인 자체 에러라, axios의
- * `error.response`를 보면 항상 undefined가 나와 전부 외부 장애로 분류된다.
+ * 여기서는 status를 해석하지 않는다. 같은 코드라도 플랫폼마다 뜻이 달라서다.
+ * SoundCloud의 403은 "서버 IP 차단"(플랫폼 문제)이지만 YouTube oEmbed의 401은
+ * "임베드 비활성화"(손님이 고른 곡의 속성)다. 그래서 status 의미를 아는
+ * throw 지점이 `upstream` 표식을 달고, 이 함수는 그 표식만 해석한다.
  */
 function trackErrorCause(error) {
-  // 외부 호출 전에 입력 검증에서 걸린 경우 — 잘못된 URL, 미지원 플랫폼 등
-  if (!error?.upstream) return CAUSE.USER;
-  // 곡이 비공개이거나 삭제됨 — 손님이 고를 수 있는 정상 범위
-  if (error.upstreamStatus === 404 || error.upstreamStatus === 410) return CAUSE.USER;
-  // 403 차단, 429 한도 초과, 5xx, 네트워크 오류, 페이지 구조 변경
-  return CAUSE.EXTERNAL;
+  return error?.upstream ? CAUSE.EXTERNAL : CAUSE.USER;
+}
+
+/**
+ * 네이버 콜백 실패의 코드와 원인을 정한다.
+ *
+ * 이 catch 하나가 네이버 HTTP 호출과 DB 조회를 함께 감싸므로 셋을 구분해야
+ * 한다. 구분하지 않으면 네이버 DNS 실패가 "DB 연결 불가"로 보고되고,
+ * 반대로 우리 client_secret이 만료돼 전 사장님 로그인이 막힌 상황은
+ * 손님 탓으로 묻힌다.
+ */
+// 네이버 OAuth 토큰 엔드포인트가 우리 client 설정을 거부할 때 주는 코드
+const NAVER_CREDENTIAL_ERRORS = Object.freeze(['invalid_client', 'unauthorized_client']);
+
+function naverCallbackError(error) {
+  const upstream = error?.isAxiosError === true;
+  // axios 에러가 아니면 이 블록의 DB 조회에서 온 것이다
+  if (!upstream && isDbConnectionError(error)) {
+    return { code: 'DB_CONNECTION_FAILED', cause: CAUSE.PLATFORM };
+  }
+  // 토큰 교환이 남긴 에러 코드가 가장 정확한 근거다. 네이버가 우리 client
+  // 자격증명을 거부한 경우만 전 사장님 로그인이 막힌 상황이다.
+  if (error?.naverTokenError) {
+    return NAVER_CREDENTIAL_ERRORS.includes(error.naverTokenError)
+      ? { code: 'NAVER_CREDENTIALS_REJECTED', cause: CAUSE.PLATFORM }
+      // 만료·재사용된 auth code 등. 알 수 없는 코드도 여기로 보낸다 —
+      // 오알림보다 무음이 낫고, 로그에는 원본 코드가 그대로 남는다.
+      : { code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.USER };
+  }
+  const status = error?.response?.status;
+  // 토큰 교환을 통과한 뒤의 4xx는 손님 요청 문제로 본다
+  if (status >= 400 && status < 500) return { code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.USER };
+  // 5xx, 네트워크 오류, 그 밖의 응답
+  return { code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.EXTERNAL };
 }
 
 module.exports = {
@@ -119,4 +149,5 @@ module.exports = {
   thresholdFor,
   isDbConnectionError,
   trackErrorCause,
+  naverCallbackError,
 };

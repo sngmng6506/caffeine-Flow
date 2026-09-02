@@ -22,7 +22,7 @@ const STATE_COOKIE_OPTS = {
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const { issueToken, issuePendingToken } = require('../utils/jwt');
-const { logError, CAUSE, isDbConnectionError } = require('../observability');
+const { logError, naverCallbackError } = require('../observability');
 
 
 // 같은 이메일의 다른 provider 계정 존재 여부 확인 — 정책상 provider별
@@ -116,6 +116,15 @@ router.get('/naver/callback', async (req, res) => {
       },
     });
 
+    // 네이버는 만료·재사용된 auth code에도 HTTP 200에 에러 본문을 준다. 그대로
+    // 진행하면 `Bearer undefined`로 프로필을 조회해 401이 돌아오고, 손님 한 명의
+    // 재시도가 "전 사장님 로그인 차단" 알림으로 둔갑한다. 여기서 끊는다.
+    if (!tokenData?.access_token) {
+      const tokenError = new Error(`네이버 토큰 교환 실패: ${tokenData?.error || 'unknown'}`);
+      tokenError.naverTokenError = tokenData?.error || 'unknown';
+      throw tokenError;
+    }
+
     // 사용자 정보 조회
     const { data: profileData } = await axios.get('https://openapi.naver.com/v1/nid/me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
@@ -139,17 +148,9 @@ router.get('/naver/callback', async (req, res) => {
     return res.redirect(`${ownerUrl}#pending=${pendingToken}`);
 
   } catch (err) {
-    // 이 catch는 네이버 HTTP 호출과 DB 조회를 함께 감싼다. 셋을 구분하지
-    // 않으면 DB 장애가 네이버 문제로 보고되고, 만료된 auth code 재사용처럼
-    // 손님 탓인 실패까지 알림을 만든다.
-    const upstreamStatus = err.response?.status;
-    const isUserError = upstreamStatus >= 400 && upstreamStatus < 500;
-    logError({
-      code: isDbConnectionError(err) ? 'DB_CONNECTION_FAILED' : 'NAVER_CALLBACK_FAILED',
-      cause: isDbConnectionError(err) ? CAUSE.PLATFORM : isUserError ? CAUSE.USER : CAUSE.EXTERNAL,
-      route: 'GET /auth/naver/callback',
-      error: err,
-    });
+    // 이 catch는 네이버 HTTP 호출과 DB 조회를 함께 감싼다. 코드와 원인 구분은
+    // observability의 naverCallbackError가 단일 기준으로 관리한다.
+    logError({ ...naverCallbackError(err), route: 'GET /auth/naver/callback', error: err });
     res.redirect(`${ownerUrl}?error=naver_failed`);
   }
 });

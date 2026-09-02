@@ -39,14 +39,17 @@ function buildAlertMessage(summary) {
   // 임계값 1이라 첫 알림은 늘 1건이고, 그때는 전 카페가 멈춘 상황에서도
   // 카페 수가 1이다. 여기서 "해당 매장 문제"라고 적으면 정반대로 읽힌다.
   // 쿨다운 동안 집계는 계속되므로 두 번째 알림부터 실제 범위가 드러난다.
-  const inferable = !immediate && summary.count > 1;
   const scope = summary.affectedCafeCount > 1
     ? `${summary.affectedCafeCount}개 카페에서 발생 — 플랫폼 전체 문제일 가능성`
-    : !inferable
-      ? '첫 발생 시점에 보낸 알림 — 영향 범위는 아직 판단할 수 없다'
-      : summary.affectedCafeCount === 1
-        ? '카페 1곳에서 반복 발생 — 해당 매장 설정 문제일 가능성'
-        : '카페 범위 없음 (서버 전역)';
+    : summary.affectedCafeCount === 0
+      ? '카페 범위 없음 (서버 전역)'
+      // 즉시 알림은 카페 수로 원인을 추론하지 않는다. 키 만료처럼 전 카페가
+      // 멈춘 상황도 한 카페의 요청에서 처음 발견되기 때문이다.
+      : immediate
+        ? '영향 범위는 아래 카페로 한정되지 않는다'
+        : summary.count > 1
+          ? '카페 1곳에서 반복 발생 — 해당 매장 설정 문제일 가능성'
+          : '표본 1건 — 영향 범위를 판단하기에는 부족하다';
 
   const cafeList = summary.cafes.length
     ? summary.cafes.map((cafe) => `\`${cafe.slug || cafe.id}\``).join(', ')
@@ -54,7 +57,13 @@ function buildAlertMessage(summary) {
     : '—';
 
   const fields = [
-    { name: '발생', value: immediate ? '1건 (즉시 알림 대상)' : `${windowMinutes}분간 ${summary.count}건`, inline: true },
+    {
+      name: '발생',
+      value: summary.count === 1 && immediate
+        ? '1건 (즉시 알림 대상)'
+        : `${windowMinutes}분간 ${summary.count}건`,
+      inline: true,
+    },
     { name: '범위', value: scope, inline: false },
     { name: immediate ? '발생 카페' : '카페', value: cafeList, inline: false },
   ];
