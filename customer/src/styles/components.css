@@ -324,8 +324,10 @@
   border-radius: inherit;
 }
 
-.request-composer__trigger:hover {
-  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .request-composer__trigger:hover {
+    background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+  }
 }
 
 .request-composer__trigger > span:nth-child(2) {
@@ -472,8 +474,10 @@
   box-shadow: none;
 }
 
-.button--primary:hover:not(:disabled) {
-  background: var(--cf-brand-hover);
+@media (hover: hover) and (pointer: fine) {
+  .button--primary:hover:not(:disabled) {
+    background: var(--cf-brand-hover);
+  }
 }
 
 .button--secondary {
@@ -482,8 +486,10 @@
   border-color: var(--cf-stroke-strong);
 }
 
-.button--secondary:hover:not(:disabled) {
-  background: var(--cf-surface-subtle);
+@media (hover: hover) and (pointer: fine) {
+  .button--secondary:hover:not(:disabled) {
+    background: var(--cf-surface-subtle);
+  }
 }
 
 .button--text {
@@ -526,9 +532,11 @@
   background: var(--cf-on-dark);
 }
 
-.request-card .button--primary:hover:not(:disabled) {
-  color: var(--cf-brand-hover);
-  background: var(--cf-on-dark);
+@media (hover: hover) and (pointer: fine) {
+  .request-card .button--primary:hover:not(:disabled) {
+    color: var(--cf-brand-hover);
+    background: var(--cf-on-dark);
+  }
 }
 
 .request-card .button--secondary {
@@ -552,8 +560,10 @@
   border-color: color-mix(in srgb, var(--cf-on-dark) 45%, transparent);
 }
 
-.request-card .button--secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .request-card .button--secondary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+  }
 }
 
 .request-preview {
@@ -648,13 +658,10 @@
   transition: transform var(--cf-motion-press), background var(--cf-motion-color);
 }
 
-.platform-shortcut:hover {
-  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
-}
-
 @media (hover: hover) and (pointer: fine) {
   .platform-shortcut:hover {
     transform: translateY(-1px);
+    background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
   }
 }
 
@@ -942,9 +949,11 @@
   background: transparent;
 }
 
-.icon-button:hover {
-  color: var(--cf-brand);
-  background: var(--cf-brand-soft);
+@media (hover: hover) and (pointer: fine) {
+  .icon-button:hover {
+    color: var(--cf-brand);
+    background: var(--cf-brand-soft);
+  }
 }
 
 .song-card__actions {
@@ -986,13 +995,33 @@
   font-weight: 600;
 }
 
-.pill-action:hover {
-  color: var(--cf-content-strong);
-  background: var(--cf-surface-subtle);
+/* 눌림 피드백은 장식이 아니라 응답이다 — 화면이 입력을 받았음을 즉시 알린다.
+   .button 외의 눌리는 요소에도 같은 값을 쓴다. */
+.pill-action,
+.icon-button,
+.tabs__button,
+.request-composer__trigger {
+  transition: transform var(--cf-motion-press), color var(--cf-motion-color), background var(--cf-motion-color);
+}
+
+.pill-action:active:not(:disabled),
+.icon-button:active:not(:disabled),
+.tabs__button:active,
+.request-composer__trigger:active:not(:disabled),
+.platform-shortcut:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pill-action:hover {
+    color: var(--cf-content-strong);
+    background: var(--cf-surface-subtle);
+  }
 }
 
 .pill-action strong {
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .pill-action--active {
@@ -1318,8 +1347,10 @@
   overflow-wrap: anywhere;
 }
 
-.customer-footer a:hover {
-  color: var(--cf-brand);
+@media (hover: hover) and (pointer: fine) {
+  .customer-footer a:hover {
+    color: var(--cf-brand);
+  }
 }
 
 .copy-toast {

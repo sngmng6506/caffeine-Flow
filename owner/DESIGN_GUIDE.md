@@ -172,7 +172,7 @@
 - 큐의 위치 변화는 실제 순서 변경이나 drag 중인 곡처럼 공간 관계를 설명할 때만 사용한다. 목록 전체 진입, 장식용 stagger, bounce, blur, 3D 효과는 쓰지 않는다.
 - 패널 접기·펼치기는 오른쪽 BrowserView의 크기·위치 동기화와 입력 응답을 우선하며, 시각 효과 때문에 Electron 레이아웃 갱신을 지연하지 않는다.
 - `prefers-reduced-motion: reduce`에서는 위치 이동·scale·반복을 제거하되 상태 이해에 필요한 짧은 opacity·색상 피드백과 완료 안내는 유지할 수 있다.
-- hover 기반 이동은 `(hover: hover) and (pointer: fine)` 환경에서만 허용한다.
+- 모든 hover 규칙은 이동뿐 아니라 **색·배경 변화까지** `(hover: hover) and (pointer: fine)` 안에 둔다. 터치 기기는 탭에 hover가 걸려 손을 뗀 뒤에도 상태가 남는다.
 
 ## 접근성·반응형
 

@@ -51,7 +51,9 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 .owner-dashboard--collapsed { overflow: hidden; padding: 0; }
 .owner-dashboard__content[hidden] { display: none; }
 .owner-panel-divider-line { width: 2px; height: 100%; border-radius: 2px; background: var(--owner-stroke); transform-origin: center; transition: transform var(--owner-motion-fast), background var(--owner-motion-color); }
-.owner-panel-divider:hover .owner-panel-divider-line { background: var(--owner-primary); transform: scaleX(2); }
+@media (hover: hover) and (pointer: fine) {
+  .owner-panel-divider:hover .owner-panel-divider-line { background: var(--owner-primary); transform: scaleX(2); }
+}
 
 .owner-panel-rail {
   position: fixed;
@@ -83,7 +85,9 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
   font-size: 22px;
   line-height: 1;
 }
-.owner-panel-rail__expand:hover { background: var(--owner-surface-subtle); }
+@media (hover: hover) and (pointer: fine) {
+  .owner-panel-rail__expand:hover { background: var(--owner-surface-subtle); }
+}
 .owner-panel-rail__update {
   position: absolute;
   top: -2px;
@@ -137,16 +141,27 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
   transition: transform var(--owner-motion-press), background-color var(--owner-motion-color), border-color var(--owner-motion-color), color var(--owner-motion-color);
 }
 .owner-btn:active:not(:disabled) { transform: scale(0.97); }
+/* .owner-btn 외의 눌리는 요소도 같은 피드백을 준다. */
+.owner-tab, .owner-operation-toggle, .owner-panel-rail__expand { transition: transform var(--owner-motion-press), background-color var(--owner-motion-color), border-color var(--owner-motion-color); }
+.owner-tab:active, .owner-operation-toggle:active:not(:disabled), .owner-panel-rail__expand:active { transform: scale(0.97); }
 .owner-btn--primary { border-color: var(--owner-primary); background: var(--owner-primary); color: #fff; }
-.owner-btn--primary:hover:not(:disabled) { border-color: var(--owner-primary-hover); background: var(--owner-primary-hover); }
+@media (hover: hover) and (pointer: fine) {
+  .owner-btn--primary:hover:not(:disabled) { border-color: var(--owner-primary-hover); background: var(--owner-primary-hover); }
+}
 .owner-btn--secondary { border-color: var(--owner-stroke); background: var(--owner-surface); color: var(--owner-text); }
-.owner-btn--secondary:hover:not(:disabled) { border-color: #d5d9de; background: var(--owner-surface-subtle); }
+@media (hover: hover) and (pointer: fine) {
+  .owner-btn--secondary:hover:not(:disabled) { border-color: #d5d9de; background: var(--owner-surface-subtle); }
+}
 .owner-btn--danger { border-color: #f4c4c8; background: var(--owner-surface); color: var(--owner-danger); }
 .owner-operation-toggle { gap: 7px; border-color: var(--owner-stroke); background: var(--owner-surface); color: var(--owner-text-muted); }
-.owner-operation-toggle:hover:not(:disabled) { border-color: #d5d9de; background: var(--owner-surface-subtle); }
+@media (hover: hover) and (pointer: fine) {
+  .owner-operation-toggle:hover:not(:disabled) { border-color: #d5d9de; background: var(--owner-surface-subtle); }
+}
 .owner-operation-toggle__dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--owner-text-disabled); }
 .owner-operation-toggle--success { border-color: #b9e8d8; background: #eefaf6; color: #087d5c; }
-.owner-operation-toggle--success:hover:not(:disabled) { border-color: #8bd7be; background: #e4f7f0; }
+@media (hover: hover) and (pointer: fine) {
+  .owner-operation-toggle--success:hover:not(:disabled) { border-color: #8bd7be; background: #e4f7f0; }
+}
 .owner-operation-toggle--success .owner-operation-toggle__dot { background: var(--owner-success); }
 
 .owner-tabs {
@@ -174,7 +189,9 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
   font-size: 13px;
 }
 .owner-tab:last-child { border-right: 0; }
-.owner-tab:hover:not(.owner-tab--active) { background: var(--owner-surface-subtle); }
+@media (hover: hover) and (pointer: fine) {
+  .owner-tab:hover:not(.owner-tab--active) { background: var(--owner-surface-subtle); }
+}
 .owner-tab--active { color: var(--owner-primary); font-weight: 700; }
 .owner-tab--active::after {
   position: absolute;
@@ -238,7 +255,9 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 .owner-track-card[draggable="true"] { cursor: grab; }
 .owner-track-card[draggable="true"]:active { cursor: grabbing; }
 .owner-track-card--interactive { cursor: pointer; }
-.owner-track-card--interactive:hover { background: var(--owner-surface-subtle); }
+@media (hover: hover) and (pointer: fine) {
+  .owner-track-card--interactive:hover { background: var(--owner-surface-subtle); }
+}
 .owner-track-card__position { width: 24px; flex: 0 0 24px; color: var(--owner-text-muted); font-size: 13px; font-weight: 750; text-align: center; }
 .owner-track-card__thumb, .owner-default-card__thumb {
   width: 88px;
@@ -301,7 +320,9 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 .owner-bgm-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding-top: 8px; }
 .owner-bgm-form__label { grid-column: 1 / -1; color: var(--owner-text-muted); font-size: 12px; font-weight: 650; }
 .owner-input { width: 100%; min-width: 0; min-height: 40px; padding: 8px 11px; border: 1px solid var(--owner-stroke); border-radius: 9px; outline: 0; background: var(--owner-surface); color: var(--owner-text); font-size: 13px; }
-.owner-input:hover { border-color: #cbd0d6; }
+@media (hover: hover) and (pointer: fine) {
+  .owner-input:hover { border-color: #cbd0d6; }
+}
 .owner-input:focus { border-color: var(--owner-primary); }
 .owner-form-error { grid-column: 1 / -1; color: var(--owner-danger); font-size: 12px; line-height: 1.45; }
 
@@ -359,6 +380,9 @@ button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacit
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .owner-panel-divider:hover .owner-panel-divider-line,
-  .owner-btn:active:not(:disabled) { transform: none; }
+  .owner-btn:active:not(:disabled),
+  .owner-tab:active,
+  .owner-operation-toggle:active:not(:disabled),
+  .owner-panel-rail__expand:active { transform: none; }
   .owner-settings-toast { animation: owner-toast-fade 120ms ease; }
 }
