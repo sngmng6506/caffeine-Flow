@@ -5,7 +5,7 @@ const { networkInterfaces } = require('os');
 const { app, corsOriginCheck } = require('./app');
 const { PORT } = require('./src/config');
 const initSocket = require('./src/socket');
-const { logError, CAUSE, CRASH_EXIT_DELAY_MS } = require('./src/observability');
+const { logError, CAUSE, CRASH_EXIT_DELAY_MS, alertsEnabled } = require('./src/observability');
 
 // 지금까지 이 두 이벤트에 핸들러가 없어, 잡히지 않은 에러는 아무 기록도
 // 남기지 못하고 프로세스만 사라졌다. 기록을 남기되 Node의 기본 동작인
@@ -17,6 +17,8 @@ function crashAfterLogging(code, error) {
   // 웹훅 전송 타임아웃보다 길게 기다린다. 가장 심각한 알림이 전송 도중
   // 잘리면 안 된다. unref하지 않는 이유도 같다 — listen 이전 크래시에서
   // 이벤트 루프가 비어 exit code 0으로 조용히 끝나는 것을 막는다.
+  // 알림이 꺼져 있으면 기다릴 이유가 없으므로 바로 종료한다.
+  if (!alertsEnabled) process.exit(1);
   setTimeout(() => process.exit(1), CRASH_EXIT_DELAY_MS);
 }
 

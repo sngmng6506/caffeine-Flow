@@ -42,11 +42,11 @@ function buildAlertMessage(summary) {
   const inferable = !immediate && summary.count > 1;
   const scope = summary.affectedCafeCount > 1
     ? `${summary.affectedCafeCount}개 카페에서 발생 — 플랫폼 전체 문제일 가능성`
-    : !inferable
-      ? '첫 발생 시점에 보낸 알림 — 영향 범위는 아직 판단할 수 없다'
-      : summary.affectedCafeCount === 1
+    : summary.affectedCafeCount === 0
+      ? '카페 범위 없음 (서버 전역)'
+      : inferable
         ? '카페 1곳에서 반복 발생 — 해당 매장 설정 문제일 가능성'
-        : '카페 범위 없음 (서버 전역)';
+        : '표본 1건 — 영향 범위를 판단하기에는 부족하다';
 
   const cafeList = summary.cafes.length
     ? summary.cafes.map((cafe) => `\`${cafe.slug || cafe.id}\``).join(', ')

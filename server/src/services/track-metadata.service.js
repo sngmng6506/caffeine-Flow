@@ -117,8 +117,15 @@ async function getYoutubeMetadata(rawUrl) {
       channelTitle: data.author_name,
       thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
     };
-  } catch {
-    throw metadataError('영상 정보를 가져올 수 없습니다 (임베드 비활성화 또는 잘못된 URL)', 'TRACK_YOUTUBE_FETCH_FAILED');
+  } catch (error) {
+    // oEmbed의 4xx는 "임베드 비활성화"이거나 없는 영상이라 손님이 고른 곡의
+    // 속성이다. 5xx나 무응답만 YouTube 쪽 장애로 본다.
+    const status = error.response?.status;
+    throw metadataError(
+      '영상 정보를 가져올 수 없습니다 (임베드 비활성화 또는 잘못된 URL)',
+      'TRACK_YOUTUBE_FETCH_FAILED',
+      { upstream: !status || status >= 500, upstreamStatus: status ?? null },
+    );
   }
 }
 
@@ -226,8 +233,10 @@ async function getSoundCloudMetadata(rawUrl) {
     else if (status === 429) message += ' (요청 한도 초과 — 잠시 후 재시도)';
     else if (status) message += ` (SoundCloud ${status})`;
     else message += ' (네트워크 오류)';
+    // 404·410은 비공개·삭제된 곡이라 손님이 고를 수 있는 정상 범위다.
+    // 403(서버 IP 차단)·429·5xx·네트워크 오류는 우리가 알아야 할 신호다.
     throw metadataError(message, 'TRACK_SOUNDCLOUD_FETCH_FAILED', {
-      upstream: true,
+      upstream: !(status === 404 || status === 410),
       upstreamStatus: status ?? null,
     });
   }
@@ -262,8 +271,14 @@ async function getSpotifyMetadata(rawUrl) {
       channelTitle: artist,
       thumbnail: data.thumbnail_url || null,
     };
-  } catch {
-    throw metadataError('트랙 정보를 가져올 수 없습니다 (비공개 또는 잘못된 Spotify URL)', 'TRACK_SPOTIFY_FETCH_FAILED');
+  } catch (error) {
+    // 4xx는 비공개·삭제된 트랙이고, 5xx나 무응답만 Spotify 쪽 장애다.
+    const status = error.response?.status;
+    throw metadataError(
+      '트랙 정보를 가져올 수 없습니다 (비공개 또는 잘못된 Spotify URL)',
+      'TRACK_SPOTIFY_FETCH_FAILED',
+      { upstream: !status || status >= 500, upstreamStatus: status ?? null },
+    );
   }
 }
 

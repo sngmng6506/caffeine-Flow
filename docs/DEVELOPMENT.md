@@ -126,7 +126,11 @@ labeling lab → 루트 music-labeling-lab을 /labeling-lab에서 제공
 | `external` | 외부 플랫폼·LLM 탓 | 알림 |
 | `platform` | 우리 코드·설정 탓 | 알림 |
 
-`cause`는 HTTP status로 추측하지 않는다. 트랙 조회는 자체 에러 객체를 던지므로 axios의 `error.response`가 항상 비어 있고, 그걸 근거로 삼으면 손님 오타까지 외부 장애로 분류된다. 대신 에러에 실린 `upstream` 표식을 `trackErrorCause`가 해석한다. 비공개·삭제된 곡(404·410)은 손님 탓, 차단·한도 초과·5xx·네트워크 오류·페이지 구조 변경은 플랫폼 신호다.
+`cause`는 알림 계층이 status로 추측하지 않는다. 같은 status라도 플랫폼마다 뜻이 다르기 때문이다. SoundCloud의 403은 서버 IP 차단(우리가 알아야 할 신호)이지만 YouTube oEmbed의 401은 임베드 비활성화(손님이 고른 곡의 속성)다.
+
+그래서 status 의미를 아는 throw 지점이 에러에 `upstream` 표식을 달고, `trackErrorCause`는 그 표식만 해석한다. 새 조회 경로를 추가할 때는 그 자리에서 "이 실패가 우리 문제인가"를 판단해 표식을 달아야 한다. 표식이 없으면 손님 탓으로 간주해 알리지 않는다.
+
+네이버 콜백도 같은 이유로 `naverCallbackError`가 판단한다. 이 `catch` 하나가 네이버 HTTP 호출과 DB 조회를 함께 감싸므로, 범용 소켓 코드만 보면 네이버 DNS 실패가 `DB_CONNECTION_FAILED`로 둔갑한다.
 
 성공 경로가 남아 있는 중간 실패는 보고하지 않는다. SoundCloud oEmbed가 실패해도 HTML 파싱으로 곡을 찾아내면 그 요청은 정상이므로, 최종 실패 지점 한 곳에서만 보고한다.
 
