@@ -58,8 +58,10 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/history` | 🔓 | 최근 7일의 재생·건너뜀 이력 `?offset=` |
 | GET | `/top10` | 🔓 | 실제 재생된 곡의 매장 순위 `?offset=&sort=count\|votes` |
 | DELETE | `/:id/cancel` | 🔓 | 본인 신청 취소 |
-| POST | `/:id/vote` | 🔓 ⏱ | 투표 |
-| DELETE | `/:id/vote` | 🔓 ⏱ | 투표 취소 |
+| POST | `/songs/:trackKey/vote` | 🔓 ⏱ | 곡 좋아요. TOP 목록처럼 신청곡 ID가 없는 화면에서 사용 |
+| DELETE | `/songs/:trackKey/vote` | 🔓 ⏱ | 곡 좋아요 취소 |
+| POST | `/:id/vote` | 🔓 ⏱ | 좋아요. 서버가 곡 키로 바꿔 위 경로와 같은 표를 쓴다 |
+| DELETE | `/:id/vote` | 🔓 ⏱ | 좋아요 취소 |
 | POST | `/:id/comments` | 🔓 ⏱ | 신청곡 댓글 |
 
 ### 사장님

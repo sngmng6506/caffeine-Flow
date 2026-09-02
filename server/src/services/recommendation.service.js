@@ -4,7 +4,7 @@ const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM } = require('../constants/platforms');
 const { canonicalizeVideoId } = require('../utils/video-id');
 const { kstStartOfDay } = require('../utils/kst');
-const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
+const { HISTORY_SORT_AT_SQL, CANONICAL_VIDEO_ID_SQL } = require('../db/sql-fragments');
 const { RECENT_HISTORY_LOOKBACK_DAYS } = require('../constants/time-policy');
 const playbackHistoryService = require('./playback-history.service');
 
@@ -257,34 +257,94 @@ async function remove(cafeId, id) {
   return db('recommendations').where({ id, cafe_id: cafeId }).delete();
 }
 
-async function vote(cafeId, recommendationId, voterIp, visitorId) {
+// 좋아요는 신청 건이 아니라 곡에 붙는다. 같은 곡이 여러 번 신청되면 행은
+// 여러 개지만 표는 (카페, 곡, 방문자)당 하나이고, 그 카페의 같은 곡 행들은
+// 모두 같은 vote_count를 본다.
+//
+// 계약: docs/AI_CHANGE_GUARDRAILS.md#anonymous-visitor-identity-contract
+
+/** 카페 안의 한 곡에 달린 표를 세어 그 곡의 모든 행에 반영한다. */
+async function syncSongVoteCount(trx, cafeId, trackKey) {
+  const [{ count }] = await trx('votes').where({ cafe_id: cafeId, track_key: trackKey }).count('id as count');
+  const total = Number(count);
+  await trx('recommendations')
+    .where({ cafe_id: cafeId })
+    .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+    .update({ vote_count: total });
+  return total;
+}
+
+/** 곡 좋아요 결과 — 표시에 필요한 최소 정보만 담는다. */
+async function songVoteResult(trx, cafeId, trackKey, total) {
+  const rows = await trx('recommendations')
+    .where({ cafe_id: cafeId })
+    .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+    .select('*');
+  return { trackKey, voteCount: total, recommendations: rows };
+}
+
+async function voteSong(cafeId, trackKey, voterIp, visitorId, { recommendationId = null } = {}) {
+  if (!trackKey) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
   return db.transaction(async (trx) => {
-    await requireForCafe(trx, cafeId, recommendationId);
-    await trx('votes').insert({ recommendation_id: recommendationId, voter_ip: voterIp, visitor_id: visitorId || null });
-    const [rec] = await trx('recommendations')
-      .where({ id: recommendationId, cafe_id: cafeId })
-      .increment('vote_count', 1)
-      .returning('*');
-    return rec;
+    // 카페 잠금으로 같은 곡의 동시 투표가 카운트를 어긋나게 하지 않는다.
+    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
+    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+    // 전체 TOP에는 우리 매장에서 재생된 적 없는 곡도 나온다. 그 곡에도 좋아요를
+    // 남길 수 있어야 하므로 존재 확인은 전역으로 한다 — 임의 문자열은 막되
+    // "어딘가에서 실제로 재생된 곡"이면 받는다.
+    const known = await trx('recommendations')
+      .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+      .first('id');
+    if (!known) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
+    // 표는 이 매장에 남는다. 우리 매장에 그 곡의 행이 있으면 함께 연결한다.
+    const local = await trx('recommendations')
+      .where({ cafe_id: cafeId })
+      .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+      .first('id');
+
+    await trx('votes').insert({
+      cafe_id: cafeId,
+      track_key: trackKey,
+      recommendation_id: recommendationId || local?.id || null,
+      voter_ip: voterIp,
+      visitor_id: visitorId || null,
+    });
+    const total = await syncSongVoteCount(trx, cafeId, trackKey);
+    return songVoteResult(trx, cafeId, trackKey, total);
   });
 }
 
-async function unvote(cafeId, recommendationId, voterIp, visitorId) {
+async function unvoteSong(cafeId, trackKey, voterIp, visitorId) {
+  if (!trackKey) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
   return db.transaction(async (trx) => {
-    await requireForCafe(trx, cafeId, recommendationId);
-    let query = trx('votes').where({ recommendation_id: recommendationId });
+    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
+    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+
+    let query = trx('votes').where({ cafe_id: cafeId, track_key: trackKey });
     query = visitorId
       ? query.where({ visitor_id: visitorId })
       : query.whereNull('visitor_id').where({ voter_ip: voterIp });
     const deleted = await query.delete();
     if (!deleted) throw Object.assign(new Error('투표 기록이 없습니다'), { status: 404 });
-    const [rec] = await trx('recommendations')
-      .where({ id: recommendationId, cafe_id: cafeId })
-      .where('vote_count', '>', 0)
-      .decrement('vote_count', 1)
-      .returning('*');
-    return rec;
+
+    const total = await syncSongVoteCount(trx, cafeId, trackKey);
+    return songVoteResult(trx, cafeId, trackKey, total);
   });
+}
+
+/** 신청곡 ID로 들어온 요청을 곡 단위로 넘긴다. 손님 화면의 기존 경로다. */
+async function vote(cafeId, recommendationId, voterIp, visitorId) {
+  const rec = await findByIdForCafe(cafeId, recommendationId);
+  if (!rec) throw Object.assign(new Error('추천곡을 찾을 수 없습니다'), { status: 404 });
+  const result = await voteSong(cafeId, canonicalizeVideoId(rec.video_id), voterIp, visitorId, { recommendationId });
+  return result.recommendations.find(row => row.id === recommendationId) || rec;
+}
+
+async function unvote(cafeId, recommendationId, voterIp, visitorId) {
+  const rec = await findByIdForCafe(cafeId, recommendationId);
+  if (!rec) throw Object.assign(new Error('추천곡을 찾을 수 없습니다'), { status: 404 });
+  const result = await unvoteSong(cafeId, canonicalizeVideoId(rec.video_id), voterIp, visitorId);
+  return result.recommendations.find(row => row.id === recommendationId) || rec;
 }
 
 async function addComment(cafeId, recommendationId, { commenterIp, commenterName, body }) {
@@ -312,6 +372,8 @@ module.exports = {
   remove,
   vote,
   unvote,
+  voteSong,
+  unvoteSong,
   addComment,
   isValidTransition,
   ACTIVE_STATUSES,

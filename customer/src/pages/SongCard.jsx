@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, Heart, MessageCircle, X } from 'lucide-react';
 import { vote, unvote, cancelRecommendation } from '../api';
 import { hasVoted, markVoted, removeVote } from '../votedSongs';
+import { trackKeyOf } from '../trackKey';
 import { CANCELLABLE_STATUSES, REC_STATUS_LABELS } from '../constants/recommendationStatus';
 import { COMPACT_PLATFORM_BADGE, PLATFORM } from '../constants/platforms';
 import SongThumbnail from '../components/SongThumbnail';
@@ -9,7 +10,9 @@ import LongPressCopy from '../components/LongPressCopy';
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLinkCopyResult, showDate, position, isMyRequest, hideStatus, expanded, compact }) {
   const [error, setError] = useState('');
-  const voted = hasVoted(slug, rec.id);
+  // 좋아요는 이 신청 건이 아니라 곡에 붙는다 — 같은 곡의 다른 신청도 함께 눌린 상태다.
+  const trackKey = trackKeyOf(rec.video_id);
+  const voted = hasVoted(slug, trackKey);
   const cancellable = isMyRequest && CANCELLABLE_STATUSES.includes(rec.status);
   const platformBadge = rec.platform && rec.platform !== PLATFORM.YOUTUBE ? COMPACT_PLATFORM_BADGE[rec.platform] : null;
 
@@ -29,11 +32,11 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
     try {
       if (voted) {
         const updated = await unvote(slug, rec.id);
-        removeVote(slug, rec.id);
+        removeVote(slug, trackKey);
         onUpdate(updated);
       } else {
         const updated = await vote(slug, rec.id);
-        markVoted(slug, rec.id);
+        markVoted(slug, trackKey);
         onUpdate(updated);
       }
     } catch (caught) {

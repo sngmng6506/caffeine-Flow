@@ -123,6 +123,7 @@ stateDiagram-v2
 
 - 사장님 권한은 JWT의 불변 `cafeId`로 카페를 조회한 뒤 현재 slug까지 일치할 때만 부여한다. 옛 slug가 다른 카페에 재사용되어도 옛 토큰은 새 소유자의 데이터와 owner room에 접근할 수 없다.
 - 손님 취소는 `visitor_id` 일치가 필수다. 투표·방문 중복 제거는 `visitor_id`를 우선하고 값이 없는 레거시 요청만 IP로 fallback한다.
+- 좋아요는 신청 건이 아니라 곡에 붙는다. `(cafe_id, track_key, visitor_id)`당 한 표이므로 같은 곡이 여러 번 신청돼도, 큐·최근 재생·TOP 어디에서 눌러도 한 표다. 계약은 [AI_CHANGE_GUARDRAILS.md#song-vote-contract](AI_CHANGE_GUARDRAILS.md#song-vote-contract).
 
 ## 데이터 모델
 
@@ -133,7 +134,7 @@ stateDiagram-v2
 | `music_filter_prompt_history` | 매장 분위기 설명 변경 이력. `baseline`과 `changed`를 구분 |
 | `music_filter_reviews` | AI 판단과 분리된 운영자 골드 라벨, 사유 코드, 선택적 메타데이터 충분 여부 |
 | `music_track_annotations` | 플랫폼 원본 곡별 수동 음악 특성 라벨. 정규화 아티스트 키로 참고 조회 |
-| `votes` | 곡별 투표와 중복 방지 |
+| `votes` | 매장·곡 단위 좋아요와 중복 방지. 신청 건이 사라져도 남는다 |
 | `comments` | 개별 신청곡 댓글 |
 | `song_comments` | 같은 곡을 카페 간 공유하는 댓글과 답글 |
 | `playback_history` | 사장님이 브라우저에서 직접 재생한 유효 곡 이력. 신청곡 통계와 분리 |

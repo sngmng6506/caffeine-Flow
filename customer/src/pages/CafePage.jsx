@@ -11,7 +11,11 @@ import {
   getRecentHistory,
   getCafeTop10,
   getGlobalTop10,
+  voteSong,
+  unvoteSong,
 } from '../api';
+import { markVoted, removeVote } from '../votedSongs';
+import { trackKeyOf } from '../trackKey';
 import { getSocket, disconnectSocket } from '../socket';
 import { VALID_PLATFORMS } from '../constants/platforms';
 import { ACTIVE_STATUSES, HISTORY_STATUSES, REC_STATUS } from '../constants/recommendationStatus';
@@ -142,6 +146,12 @@ export default function CafePage({ slug }) {
       if (action === 'delete') setRecs(previous => previous.filter(item => item.id !== id));
     });
 
+    // 곡 좋아요는 그 곡의 모든 행에 걸친다. 행 단위 update 이벤트로는 TOP 목록을
+    // 갱신할 수 없어(TOP은 곡 단위 집계다) 곡 키로 따로 받는다.
+    socket.on('song_vote', ({ track_key, vote_count }) => {
+      applySongVote(track_key, vote_count);
+    });
+
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
     socket.on('notice_updated', ({ notice: nextNotice }) => setNotice(nextNotice));
     socket.on('cafe_updated', ({ cafe_name }) => setCafeName(cafe_name));
@@ -260,6 +270,34 @@ export default function CafePage({ slug }) {
       setHistoryRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
     } else {
       setRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
+    }
+  }
+
+  // 같은 곡이 큐·최근 재생·양쪽 TOP에 동시에 있을 수 있다. 한 번의 좋아요를
+  // 네 목록 모두에 같은 값으로 반영한다.
+  function applySongVote(trackKey, voteCount) {
+    if (!trackKey) return;
+    const patchRec = list => list.map(rec => (trackKeyOf(rec.video_id) === trackKey
+      ? { ...rec, vote_count: voteCount }
+      : rec));
+    const patchTop = list => list.map(item => (trackKeyOf(item.video_id) === trackKey
+      ? { ...item, total_votes: voteCount }
+      : item));
+    setRecs(patchRec);
+    setHistoryRecs(patchRec);
+    setCafeTop(patchTop);
+    setGlobalTop(patchTop);
+  }
+
+  // 전체 TOP은 다른 매장의 곡도 보여주지만 좋아요는 손님이 있는 이 매장에 남는다.
+  async function handleTopVote(trackKey, voted) {
+    try {
+      const { vote_count } = voted ? await unvoteSong(slug, trackKey) : await voteSong(slug, trackKey);
+      if (voted) removeVote(slug, trackKey);
+      else markVoted(slug, trackKey);
+      applySongVote(trackKey, vote_count);
+    } catch (caught) {
+      handleCopyResult({ type: 'error', message: caught.message });
     }
   }
 
@@ -565,10 +603,12 @@ export default function CafePage({ slug }) {
             hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}
             loading={topLoading}
             slug={tab === 'cafeTop' ? slug : null}
+            voteSlug={slug}
             sortBy={topSort[tab]}
             onSortChange={changeTopSort}
             onLoadMore={loadMoreTop}
             onCopyResult={handleCopyResult}
+            onVote={handleTopVote}
           />
         </div>
       )}

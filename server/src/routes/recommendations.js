@@ -165,6 +165,44 @@ router.delete('/:id/cancel', async (req, res) => {
   res.json({ ok: true });
 });
 
+// 곡 단위 좋아요. TOP 목록에는 신청곡 ID가 없고 곡 키만 있으므로 이 경로를 쓴다.
+// 최근 재생·큐의 `/:id/vote`와 같은 표를 공유한다 — 한 사람이 한 곡에 한 표다.
+function songVotePayload(result) {
+  return { track_key: result.trackKey, vote_count: result.voteCount };
+}
+
+function broadcastSongVote(req, slug, result) {
+  broadcast(req, slug, 'song_vote', songVotePayload(result));
+  for (const rec of result.recommendations) broadcastRecommendation(req, slug, { action: 'vote', rec });
+}
+
+router.post('/songs/:trackKey/vote', voteLimiters, async (req, res) => {
+  const cafe = await findCafeForMutation(req, res);
+  if (!cafe) return;
+  try {
+    const result = await recService.voteSong(cafe.id, req.params.trackKey, getClientIp(req), safeVisitorId(req));
+    broadcastSongVote(req, req.params.slug, result);
+    res.json(songVotePayload(result));
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: '이미 투표했습니다' });
+    if (sendServiceError(res, err)) return;
+    throw err;
+  }
+});
+
+router.delete('/songs/:trackKey/vote', voteLimiters, async (req, res) => {
+  const cafe = await findCafeForMutation(req, res);
+  if (!cafe) return;
+  try {
+    const result = await recService.unvoteSong(cafe.id, req.params.trackKey, getClientIp(req), safeVisitorId(req));
+    broadcastSongVote(req, req.params.slug, result);
+    res.json(songVotePayload(result));
+  } catch (err) {
+    if (sendServiceError(res, err)) return;
+    throw err;
+  }
+});
+
 router.post('/:id/vote', voteLimiters, async (req, res) => {
   const cafe = await findCafeForMutation(req, res);
   if (!cafe) return;
