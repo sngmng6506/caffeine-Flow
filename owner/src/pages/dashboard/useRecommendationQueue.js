@@ -5,10 +5,10 @@ import { parseAllowedPlatforms } from '../../constants/platforms';
 import { REC_STATUS } from '../../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../../constants/playbackState';
 import { readSavedBgm, savedToBgmUrl } from './bgmStorage';
-import { byPriority, isAutoAcceptEligible } from './queuePolicy';
-import { requestElectronPlayback } from './playbackBridge.mjs';
+import { isAutoAcceptEligible } from './queuePolicy';
 import { acknowledgePlaybackRecovery } from './playbackRecovery.mjs';
-import { runPlaybackTransition } from './playbackTransition.mjs';
+import { createPlaybackCommands } from './playbackCommands.mjs';
+import { subscribeElectron } from './electronSubscriptions.mjs';
 import { finishCurrentPlayback } from './playbackCleanup.mjs';
 import {
   markPlaybackSessionRecovered,
@@ -52,86 +52,22 @@ export default function useRecommendationQueue({
     ));
   }
 
-  // 소켓 add 이벤트와 수동 수락이 겹쳐도 renderer에서는 한 번에 한 곡만
-  // playing 전환을 요청한다. 서버도 카페 잠금으로 최종 불변식을 보장한다.
-  async function startPlaying(rec) {
-    if (!playbackAvailable || !playbackLeaderRef.current) return null;
-    return runPlaybackTransition(async () => {
-      if (recommendationsRef.current.some(item => item.status === REC_STATUS.PLAYING)) return null;
-      // Electron이 URL 검증과 화면 navigation을 받아들인 뒤에만 DB를
-      // playing으로 바꾼다. 서버 갱신 실패 시 실제 플레이어도 즉시 복구한다.
-      const result = await requestElectronPlayback(window.electronAPI, rec.video_id);
-      if (!result?.ok) throw new Error(result?.error || '신청곡 재생을 시작하지 못했습니다.');
-      try {
-        const playing = await updateRec(cafe.slug, rec.id, REC_STATUS.PLAYING);
-        storeRecommendation(playing);
-        return playing;
-      } catch (error) {
-        window.electronAPI.endRec();
-        throw error;
-      }
-    });
-  }
-
-  // 다음 곡 재생 또는 정지.
-  // 1) accepted 1순위 재생
-  // 2) AI 필터가 켜지면 필터 통과 pending 1순위를 승격해 재생
-  // 3) 모두 없으면 BGM으로 복귀
-  async function playNextOrStop(snapshot) {
-    const nextAccepted = snapshot.filter(rec => rec.status === REC_STATUS.ACCEPTED).sort(byPriority)[0];
-    if (nextAccepted) {
-      try {
-        await startPlaying(nextAccepted);
-      } catch (error) {
-        console.error(error);
-      }
-      return;
-    }
-
-    if (aiAutoAcceptRef.current) {
-      const nextPending = snapshot.filter(isAutoAcceptEligible).sort(byPriority)[0];
-      if (nextPending) {
-        try {
-          const accepted = await updateRec(cafe.slug, nextPending.id, REC_STATUS.ACCEPTED);
-          storeRecommendation(accepted);
-          await startPlaying(accepted);
-        } catch (error) {
-          console.error(error);
-        }
-        return;
-      }
-    }
-
-    window.electronAPI?.endRec();
-  }
-
-  // AI 통과 pending을 accepted로 승격하고 재생 중인 곡이 없으면 첫 곡을 시작한다.
-  async function drainPendingAndPlay(base) {
-    if (!playbackLeaderRef.current) return;
-    let snapshot = base || recommendationsRef.current;
-    const pendingList = snapshot.filter(isAutoAcceptEligible);
-
-    if (pendingList.length > 0) {
-      const updates = (await Promise.all(
-        pendingList.map(rec => updateRec(cafe.slug, rec.id, REC_STATUS.ACCEPTED).catch(() => null))
-      )).filter(Boolean);
-      const updateMap = Object.fromEntries(updates.map(update => [update.id, update]));
-      snapshot = snapshot.map(rec => updateMap[rec.id] || rec);
+  // 재생 명령은 playbackCommands.mjs가 담당한다. 훅은 최신 상태를 읽는
+  // getter만 넘기고, 판단 순서와 Electron·서버 갱신 순서는 그쪽 계약이다.
+  const { startPlaying, playNextOrStop, drainPendingAndPlay } = createPlaybackCommands({
+    getSlug: () => cafe.slug,
+    getElectronApi: () => window.electronAPI,
+    updateRec,
+    isPlaybackAvailable: () => playbackAvailable,
+    isLeader: () => playbackLeaderRef.current,
+    isAutoAcceptOn: () => aiAutoAcceptRef.current,
+    getRecommendations: () => recommendationsRef.current,
+    storeRecommendation,
+    replaceRecommendations: (snapshot) => {
       recommendationsRef.current = snapshot;
-      setRecommendations(previous => previous.map(rec => updateMap[rec.id] || rec));
-    }
-
-    if (snapshot.some(rec => rec.status === REC_STATUS.PLAYING)) return;
-
-    const firstAccepted = snapshot.filter(rec => rec.status === REC_STATUS.ACCEPTED).sort(byPriority)[0];
-    if (!firstAccepted) return;
-
-    try {
-      await startPlaying(firstAccepted);
-    } catch (error) {
-      console.error(error);
-    }
-  }
+      setRecommendations(snapshot);
+    },
+  });
 
   useEffect(() => {
     setIsPlaybackLeader(false);
@@ -297,9 +233,6 @@ export default function useRecommendationQueue({
 
     socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
 
-    const removeNowPlaying = window.electronAPI?.onNowPlaying(info => setNowPlaying(info));
-    // owner UI는 Railway에서 최신 버전을 불러오므로 설치본 preload보다 앞설 수 있다.
-    // 구버전 Electron에는 이 채널이 없어도 Dashboard 렌더링을 계속한다.
     const publishPlaybackState = state => {
       if (!playbackLeaderRef.current) return;
       const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
@@ -309,62 +242,56 @@ export default function useRecommendationQueue({
         track: currentTrackRef.current,
       });
     };
-    const removePlaybackState = window.electronAPI?.onPlaybackState?.(publishPlaybackState);
-    const removeCurrentTrack = window.electronAPI?.onCurrentTrack?.(track => {
-      currentTrackRef.current = track && typeof track === 'object' ? track : null;
-      setCurrentTrack(currentTrackRef.current);
-      publishPlaybackState(currentTrackRef.current ? PLAYBACK_STATE.PLAYING : PLAYBACK_STATE.UNKNOWN);
-    });
-    const removeManualTrackEnded = window.electronAPI?.onManualTrackEnded?.(track => {
-      finalizeManualPlayback(track).catch(error => console.error('[manual playback history]', error));
-    });
-    const removeWidevineStatus = window.electronAPI?.onWidevineStatus(status => setWidevineStatus(status));
+
+    // 재생 리더만 곡을 종료 상태로 넘긴다. follower가 같은 이벤트를 받아도
+    // DB를 건드리면 두 화면이 같은 곡을 두 번 종료시킨다.
+    const endPlayingAs = (status, { playNext } = {}) => () => {
+      if (!playbackLeaderRef.current) return;
+      const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
+      if (!playing) return;
+      updateRec(cafe.slug, playing.id, status)
+        .then(updated => {
+          storeRecommendation(updated);
+          if (playNext) playNextOrStop(recommendationsRef.current);
+        })
+        .catch(console.error);
+    };
 
     const savedBgmUrl = savedToBgmUrl(readSavedBgm(cafe.id));
     if (savedBgmUrl) window.electronAPI?.setBgmUrl(savedBgmUrl);
 
-    const removeVideoEnded = window.electronAPI?.onVideoEnded(() => {
-      if (!playbackLeaderRef.current) return;
-      const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
-      if (!playing) return;
-      updateRec(cafe.slug, playing.id, REC_STATUS.PLAYED)
-        .then(updated => {
-          storeRecommendation(updated);
-          playNextOrStop(recommendationsRef.current);
-        })
-        .catch(console.error);
-    });
-
-    // 사장님이 신청곡 재생 중 플레이어를 다른 곳으로 옮기면 원곡만 played로
-    // 종료한다. 정상 종료와 달리 다음 곡을 자동 재생하지 않는다(사장님이 직접
-    // 플레이어를 조작 중이므로 방해하지 않는다).
-    const removeRecLeft = window.electronAPI?.onRecLeft?.(() => {
-      if (!playbackLeaderRef.current) return;
-      const playing = recommendationsRef.current.find(rec => rec.status === REC_STATUS.PLAYING);
-      if (!playing) return;
-      updateRec(cafe.slug, playing.id, REC_STATUS.PLAYED)
-        .then(storeRecommendation)
-        .catch(console.error);
-    });
-
-    const removeCleanupBeforeQuit = window.electronAPI?.onCleanupBeforeQuit?.(async () => {
-      try {
-        await finishPlaybackForExit();
-      } catch {}
-      window.electronAPI?.cleanupDone?.();
+    // 구버전 설치본에 없는 채널은 subscribeElectron이 건너뛴다.
+    const unsubscribeElectron = subscribeElectron(window.electronAPI, {
+      onNowPlaying: info => setNowPlaying(info),
+      onPlaybackState: publishPlaybackState,
+      onCurrentTrack: track => {
+        currentTrackRef.current = track && typeof track === 'object' ? track : null;
+        setCurrentTrack(currentTrackRef.current);
+        publishPlaybackState(currentTrackRef.current ? PLAYBACK_STATE.PLAYING : PLAYBACK_STATE.UNKNOWN);
+      },
+      onManualTrackEnded: track => {
+        finalizeManualPlayback(track).catch(error => console.error('[manual playback history]', error));
+      },
+      onWidevineStatus: status => setWidevineStatus(status),
+      onVideoEnded: endPlayingAs(REC_STATUS.PLAYED, { playNext: true }),
+      // 사장님이 신청곡 재생 중 플레이어를 다른 곳으로 옮기면 원곡만 played로
+      // 종료한다. 정상 종료와 달리 다음 곡을 자동 재생하지 않는다 — 사장님이
+      // 직접 플레이어를 조작 중이므로 방해하지 않는다.
+      onRecLeft: endPlayingAs(REC_STATUS.PLAYED),
+      onCleanupBeforeQuit: async () => {
+        try {
+          await finishPlaybackForExit();
+        } catch {
+          // 종료 정리는 실패해도 앱 종료를 막지 않는다
+        }
+        window.electronAPI?.cleanupDone?.();
+      },
     });
 
     return () => {
       if (recoveryRetryTimer) clearTimeout(recoveryRetryTimer);
       disconnectSocket();
-      if (typeof removeNowPlaying === 'function') removeNowPlaying();
-      if (typeof removePlaybackState === 'function') removePlaybackState();
-      if (typeof removeCurrentTrack === 'function') removeCurrentTrack();
-      if (typeof removeManualTrackEnded === 'function') removeManualTrackEnded();
-      if (typeof removeWidevineStatus === 'function') removeWidevineStatus();
-      if (typeof removeVideoEnded === 'function') removeVideoEnded();
-      if (typeof removeRecLeft === 'function') removeRecLeft();
-      if (typeof removeCleanupBeforeQuit === 'function') removeCleanupBeforeQuit();
+      unsubscribeElectron();
     };
   }, [cafe.id, cafe.slug]); // eslint-disable-line react-hooks/exhaustive-deps
 
