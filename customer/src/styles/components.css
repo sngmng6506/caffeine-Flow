@@ -209,11 +209,25 @@
 .request-preview__thumb--fallback {
   display: grid;
   place-items: center;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--cf-brand);
+  background: var(--cf-surface-subtle);
 }
 
-.now-playing__thumb--fallback {
-  color: var(--cf-on-dark);
-  background: var(--cf-on-dark-soft);
+.song-thumbnail__fallback-pattern {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--cf-brand);
+  opacity: .16;
+}
+
+.song-thumbnail__fallback-icon {
+  position: relative;
 }
 
 .now-playing__info,
@@ -281,17 +295,19 @@
   margin: 0 16px 23px;
   padding: 16px;
   background: var(--cf-composer);
-  border: 0;
+  border: 1px solid var(--cf-composer-stroke);
+  border-left-width: 4px;
   border-radius: var(--cf-radius-panel);
-  box-shadow: var(--cf-shadow-signal);
+  box-shadow: none;
 }
 
 .request-composer {
   margin: 0 16px 23px;
   background: var(--cf-composer);
-  border: 0;
+  border: 1px solid var(--cf-composer-stroke);
+  border-left-width: 4px;
   border-radius: var(--cf-radius-panel);
-  box-shadow: var(--cf-shadow-signal);
+  box-shadow: none;
 }
 
 .request-composer__trigger {
@@ -304,26 +320,26 @@
   border: 0;
   cursor: pointer;
   text-align: left;
-  color: var(--cf-on-dark-muted);
+  color: var(--cf-content-muted);
   background: transparent;
   font-size: 15px;
   border-radius: inherit;
 }
 
 .request-composer__trigger:hover {
-  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+  background: var(--cf-surface-subtle);
 }
 
 .request-composer__trigger > span:nth-child(2) {
   min-width: 0;
   flex: 1;
-  color: var(--cf-on-dark);
+  color: var(--cf-content-strong);
   font-weight: 600;
 }
 
 .request-composer__caret {
   flex: 0 0 auto;
-  color: var(--cf-on-dark);
+  color: var(--cf-content);
   transition: transform var(--cf-motion-fast);
 }
 
@@ -338,7 +354,8 @@
   place-items: center;
   flex: 0 0 auto;
   color: var(--cf-brand);
-  background: var(--cf-on-dark);
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-stroke-strong);
   border-radius: var(--cf-radius-control);
   box-shadow: none;
 }
@@ -352,7 +369,7 @@
 .request-card__body {
   margin: 0 16px;
   padding: 16px 0;
-  border-top: 1px solid color-mix(in srgb, var(--cf-on-dark) 18%, transparent);
+  border-top: 1px solid var(--cf-stroke);
 }
 
 .request-card__heading {
@@ -377,12 +394,12 @@
 .request-card__close {
   width: 36px;
   height: 36px;
-  color: var(--cf-on-dark);
+  color: var(--cf-content);
 }
 
 .request-card h2 {
   margin: 0;
-  color: var(--cf-on-dark);
+  color: var(--cf-content-strong);
   font-size: 20px;
   letter-spacing: -0.02em;
 }
@@ -390,7 +407,7 @@
 .field-label {
   display: block;
   margin-bottom: 7px;
-  color: var(--cf-on-dark);
+  color: var(--cf-content-strong);
   font-size: 14px;
   font-weight: 700;
 }
@@ -403,14 +420,14 @@
   padding: 0 13px;
   color: var(--cf-content-muted);
   background: var(--cf-on-dark);
-  border: 1px solid var(--cf-on-dark);
+  border: 1px solid var(--cf-stroke);
   border-radius: var(--cf-radius-control);
   transition: border-color var(--cf-motion-fast), box-shadow var(--cf-motion-fast);
 }
 
 .input-shell:focus-within {
-  border-color: var(--cf-accent-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-accent-blue) 24%, transparent);
+  border-color: var(--cf-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-brand) 18%, transparent);
 }
 
 .input-shell input {
@@ -508,23 +525,23 @@
 }
 
 .request-card .button--primary {
-  color: var(--cf-brand);
-  background: var(--cf-on-dark);
+  color: var(--cf-on-dark);
+  background: var(--cf-brand);
 }
 
 .request-card .button--primary:hover:not(:disabled) {
-  color: var(--cf-brand-hover);
-  background: var(--cf-on-dark);
+  color: var(--cf-on-dark);
+  background: var(--cf-brand-hover);
 }
 
 .request-card .button--secondary {
-  color: var(--cf-on-dark);
-  background: transparent;
-  border-color: var(--cf-on-dark);
+  color: var(--cf-content);
+  background: var(--cf-surface);
+  border-color: var(--cf-stroke);
 }
 
 .request-card .button--secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+  background: var(--cf-surface-subtle);
 }
 
 .request-preview {
@@ -542,7 +559,7 @@
 
 .request-preview__thumb--fallback {
   color: var(--cf-brand);
-  background: var(--cf-brand-soft);
+  background: var(--cf-surface-subtle);
 }
 
 .request-preview__info {
@@ -598,7 +615,7 @@
   gap: 12px;
   margin-top: 15px;
   padding-top: 13px;
-  border-top: 1px solid color-mix(in srgb, var(--cf-on-dark) 38%, transparent);
+  border-top: 1px solid var(--cf-stroke);
 }
 
 .platform-shortcuts__links {
@@ -612,15 +629,16 @@
   height: 44px;
   display: grid;
   place-items: center;
-  background: transparent;
-  border: 1px solid var(--cf-on-dark);
+  background: var(--cf-surface);
+  border: 1px solid var(--cf-stroke);
   border-radius: var(--cf-radius-control);
   text-decoration: none;
   transition: transform var(--cf-motion-press), background var(--cf-motion-color);
 }
 
 .platform-shortcut:hover {
-  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+  border-color: var(--cf-brand);
+  background: var(--cf-surface-subtle);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -782,29 +800,12 @@
 
 .song-list__item + .song-list__item,
 .rank-list__item + .rank-list__item {
-  border-top: 1px solid var(--cf-brand);
+  border-top: 1px solid var(--cf-stroke);
 }
 
-/* 신청곡 목록은 검정 배경 위에 형광 구분선만 사용한다. 짝수 행 형광 채움은
-   쓰지 않는다. 랭킹(rank-list)은 순위 가독성을 위해 교차 채움을 유지한다. */
+/* 긴 목록은 차콜 교차 면으로 행만 구분한다. 형광 면은 선택·재생·주요 행동에 남긴다. */
 .rank-list__item:nth-child(even) {
-  color: var(--cf-on-dark);
-  background: var(--cf-brand);
-}
-
-.rank-list__item:nth-child(even) .rank-row__number,
-.rank-list__item:nth-child(even) .rank-row__info strong {
-  color: var(--cf-on-dark);
-}
-
-.rank-list__item:nth-child(even) .rank-row__info small,
-.rank-list__item:nth-child(even) .rank-row__votes,
-.rank-list__item:nth-child(even) .rank-row > svg {
-  color: var(--cf-on-dark-muted);
-}
-
-.rank-list__item:nth-child(even) .rank-row__thumbnail {
-  border-color: var(--cf-on-dark);
+  background: var(--cf-surface-subtle);
 }
 
 .song-card {
@@ -845,8 +846,11 @@
 .rank-row__thumbnail--empty {
   display: grid;
   place-items: center;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   color: var(--cf-brand);
-  background: var(--cf-brand-soft);
+  background: var(--cf-surface-subtle);
 }
 
 .song-card__body {
