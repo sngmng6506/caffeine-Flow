@@ -295,19 +295,17 @@
   margin: 0 16px 23px;
   padding: 16px;
   background: var(--cf-composer);
-  border: 1px solid var(--cf-composer-stroke);
-  border-left-width: 4px;
+  border: 0;
   border-radius: var(--cf-radius-panel);
-  box-shadow: none;
+  box-shadow: var(--cf-shadow-signal-invert);
 }
 
 .request-composer {
   margin: 0 16px 23px;
   background: var(--cf-composer);
-  border: 1px solid var(--cf-composer-stroke);
-  border-left-width: 4px;
+  border: 0;
   border-radius: var(--cf-radius-panel);
-  box-shadow: none;
+  box-shadow: var(--cf-shadow-signal-invert);
 }
 
 .request-composer__trigger {
@@ -320,26 +318,26 @@
   border: 0;
   cursor: pointer;
   text-align: left;
-  color: var(--cf-content-muted);
+  color: var(--cf-on-pink-muted);
   background: transparent;
   font-size: 15px;
   border-radius: inherit;
 }
 
 .request-composer__trigger:hover {
-  background: var(--cf-surface-subtle);
+  background: color-mix(in srgb, var(--cf-on-pink) 10%, transparent);
 }
 
 .request-composer__trigger > span:nth-child(2) {
   min-width: 0;
   flex: 1;
-  color: var(--cf-content-strong);
+  color: var(--cf-on-pink);
   font-weight: 600;
 }
 
 .request-composer__caret {
   flex: 0 0 auto;
-  color: var(--cf-content);
+  color: var(--cf-on-pink);
   transition: transform var(--cf-motion-fast);
 }
 
@@ -354,8 +352,7 @@
   place-items: center;
   flex: 0 0 auto;
   color: var(--cf-brand);
-  background: var(--cf-surface);
-  border: 1px solid var(--cf-stroke-strong);
+  background: var(--cf-on-dark);
   border-radius: var(--cf-radius-control);
   box-shadow: none;
 }
@@ -369,7 +366,7 @@
 .request-card__body {
   margin: 0 16px;
   padding: 16px 0;
-  border-top: 1px solid var(--cf-stroke);
+  border-top: 1px solid color-mix(in srgb, var(--cf-on-pink) 22%, transparent);
 }
 
 .request-card__heading {
@@ -394,12 +391,12 @@
 .request-card__close {
   width: 36px;
   height: 36px;
-  color: var(--cf-content);
+  color: var(--cf-on-pink);
 }
 
 .request-card h2 {
   margin: 0;
-  color: var(--cf-content-strong);
+  color: var(--cf-on-pink);
   font-size: 20px;
   letter-spacing: -0.02em;
 }
@@ -407,7 +404,7 @@
 .field-label {
   display: block;
   margin-bottom: 7px;
-  color: var(--cf-content-strong);
+  color: var(--cf-on-pink);
   font-size: 14px;
   font-weight: 700;
 }
@@ -420,14 +417,14 @@
   padding: 0 13px;
   color: var(--cf-content-muted);
   background: var(--cf-on-dark);
-  border: 1px solid var(--cf-stroke);
+  border: 1px solid var(--cf-on-dark);
   border-radius: var(--cf-radius-control);
   transition: border-color var(--cf-motion-fast), box-shadow var(--cf-motion-fast);
 }
 
 .input-shell:focus-within {
-  border-color: var(--cf-brand);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-brand) 18%, transparent);
+  border-color: var(--cf-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-focus) 30%, transparent);
 }
 
 .input-shell input {
@@ -525,23 +522,38 @@
 }
 
 .request-card .button--primary {
-  color: var(--cf-on-dark);
-  background: var(--cf-brand);
+  color: var(--cf-brand);
+  background: var(--cf-on-dark);
 }
 
 .request-card .button--primary:hover:not(:disabled) {
-  color: var(--cf-on-dark);
-  background: var(--cf-brand-hover);
+  color: var(--cf-brand-hover);
+  background: var(--cf-on-dark);
 }
 
 .request-card .button--secondary {
-  color: var(--cf-content);
-  background: var(--cf-surface);
-  border-color: var(--cf-stroke);
+  color: var(--cf-on-pink);
+  background: transparent;
+  border-color: var(--cf-on-pink);
+}
+
+/* 전역 .button:disabled의 opacity .5는 검정 캔버스에서는 맞지만, 신청 패널처럼
+   채도 높은 면 위에서는 버튼이 배경과 섞여 탁한 덩어리가 된다. 면은 그대로
+   두고 글자만 낮춰 비활성임을 알리되 읽히게 한다. */
+.request-card .button--primary:disabled {
+  opacity: 1;
+  color: color-mix(in srgb, var(--cf-brand) 55%, var(--cf-on-dark));
+  background: var(--cf-on-dark);
+}
+
+.request-card .button--secondary:disabled {
+  opacity: 1;
+  color: color-mix(in srgb, var(--cf-on-pink) 55%, transparent);
+  border-color: color-mix(in srgb, var(--cf-on-pink) 45%, transparent);
 }
 
 .request-card .button--secondary:hover:not(:disabled) {
-  background: var(--cf-surface-subtle);
+  background: color-mix(in srgb, var(--cf-on-pink) 10%, transparent);
 }
 
 .request-preview {
@@ -615,7 +627,7 @@
   gap: 12px;
   margin-top: 15px;
   padding-top: 13px;
-  border-top: 1px solid var(--cf-stroke);
+  border-top: 1px solid color-mix(in srgb, var(--cf-on-pink) 38%, transparent);
 }
 
 .platform-shortcuts__links {
@@ -629,16 +641,15 @@
   height: 44px;
   display: grid;
   place-items: center;
-  background: var(--cf-surface);
-  border: 1px solid var(--cf-stroke);
+  background: transparent;
+  border: 1px solid var(--cf-on-pink);
   border-radius: var(--cf-radius-control);
   text-decoration: none;
   transition: transform var(--cf-motion-press), background var(--cf-motion-color);
 }
 
 .platform-shortcut:hover {
-  border-color: var(--cf-brand);
-  background: var(--cf-surface-subtle);
+  background: color-mix(in srgb, var(--cf-on-pink) 10%, transparent);
 }
 
 @media (hover: hover) and (pointer: fine) {
