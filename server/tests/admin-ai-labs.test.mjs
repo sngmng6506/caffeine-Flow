@@ -30,6 +30,7 @@ describe('관리자 AI 랩 정적 계약', () => {
     const app = read('music-labeling-lab/app.js');
     const html = read('music-labeling-lab/index.html');
     const adminRoute = read('server/src/routes/admin.js');
+    const reviewService = read('server/src/features/music-labeling/review.service.js');
     const nullableMigration = read('server/src/db/migrations/20260828090000_nullable_music_filter_metadata_sufficient.js');
     expect(app).toContain(`/admin/music-filter-reviews?view=`);
     expect(app).toContain('/admin/cafes/${item.cafe_id}/music-filter-audit/${item.id}/review');
@@ -52,8 +53,9 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).toContain('AI 판단 결과');
     expect(html).toContain(`id='existingLabelStatus'`);
     expect(html).toContain('<h1>음악 라벨링</h1>');
-    expect(adminRoute).toContain(`builder.whereILike('recommendation.title', '%playlist%')`);
-    expect(adminRoute).toContain(`builder.whereLike('recommendation.title', '%플리%')`);
+    // 재생목록 제외는 라우트가 아니라 라벨링 서비스가 담당한다
+    expect(reviewService).toContain(`builder.whereILike('recommendation.title', '%playlist%')`);
+    expect(reviewService).toContain(`builder.whereLike('recommendation.title', '%플리%')`);
     expect(adminRoute).toContain(`metadataSufficient !== null`);
     expect(nullableMigration).toContain('ALTER COLUMN metadata_sufficient DROP NOT NULL');
     expect(nullableMigration).toContain('ALTER COLUMN metadata_sufficient SET NOT NULL');

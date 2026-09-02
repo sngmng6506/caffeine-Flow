@@ -21,39 +21,15 @@ const { HEARTBEAT_ACTIVE_WINDOW_MS } = require('../constants/time-policy');
 const { ADMIN_PASSWORD, OPENROUTER_API_KEY, OPENROUTER_BASE_URL } = require('../config');
 const { isUuid, validateString } = require('../utils/validate');
 const { parseOffset } = require('../utils/pagination');
-const { FILTER_STATUS, FILTER_PROCESSED_STATUSES } = require('../constants/music-filter-status');
+const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { HUMAN_DECISIONS, HUMAN_REASON_CODES } = require('../constants/music-filter-review');
 const { normalizeArtistKey, validateMusicAnnotation } = require('../features/music-labeling/annotation');
+const labelingReview = require('../features/music-labeling/review.service');
+const { LABELING_VIEWS } = labelingReview;
 
-const FILTER_AUDIT_PAGE_SIZE = 50;
-const FILTER_REVIEW_QUEUE_PAGE_SIZE = 50;
 const MUSIC_FILTER_MODELS_CACHE_MS = 10 * 60 * 1000;
 let musicFilterModelsCache = { at: 0, ids: null };
 
-function attachTrackAnnotation(row) {
-  const annotationKeys = Object.keys(row).filter((key) => key.startsWith('annotation_'));
-  const decision = { ...row };
-  for (const key of annotationKeys) delete decision[key];
-  if (!row.annotation_id) return { ...decision, track_annotation: null };
-  return {
-    ...decision,
-    track_annotation: {
-      id: row.annotation_id,
-      artist_name: row.annotation_artist_name,
-      track_version: row.annotation_track_version,
-      tempo_class: row.annotation_tempo_class,
-      mood_tags: row.annotation_mood_tags,
-      instrumentation_type: row.annotation_instrumentation_type,
-      rhythmic_character: row.annotation_rhythmic_character,
-      vocal_type: row.annotation_vocal_type,
-      genre_tags: row.annotation_genre_tags,
-      note: row.annotation_note,
-      usage_scope: row.annotation_usage_scope,
-      schema_version: row.annotation_schema_version,
-      updated_at: row.annotation_updated_at,
-    },
-  };
-}
 
 // 매장 상태 — 하트비트(last_heartbeat_at) 기준.
 // never: 가입 후 한 번도 앱을 켠 적 없음 → 장난/방치 계정 후보
@@ -201,82 +177,11 @@ router.get('/music-filter-reviews', requireAdmin, async (req, res) => {
   if (offset.error) return res.status(400).json({ error: offset.error });
 
   const view = req.query.view || 'unreviewed';
-  if (!['unreviewed', 'reviewed', 'all'].includes(view)) {
+  if (!LABELING_VIEWS.includes(view)) {
     return res.status(400).json({ error: 'view는 unreviewed, reviewed 또는 all이어야 합니다' });
   }
 
-  const processed = db({ recommendation: 'recommendations' })
-    .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES)
-    .whereNot((builder) => builder.whereILike('recommendation.title', '%playlist%'))
-    .whereNot((builder) => builder.whereLike('recommendation.title', '%플리%'));
-  const decisionsQuery = processed.clone()
-    .leftJoin({ cafe: 'cafes' }, 'cafe.id', 'recommendation.cafe_id')
-    .leftJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
-    .leftJoin({ annotation: 'music_track_annotations' }, function joinTrackAnnotation() {
-      this.on('annotation.platform', '=', 'recommendation.platform')
-        .andOn('annotation.track_key', '=', 'recommendation.video_id');
-    });
-
-  if (view === 'unreviewed') {
-    decisionsQuery.where((builder) => {
-      builder.whereNull('review.recommendation_id').orWhereNull('annotation.id');
-    });
-  }
-  if (view === 'reviewed') {
-    decisionsQuery.whereNotNull('review.recommendation_id').whereNotNull('annotation.id');
-  }
-
-  const [totalRow, reviewedRow, decisionRows] = await Promise.all([
-    processed.clone().count('recommendation.id as count').first(),
-    processed.clone()
-      .innerJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
-      .innerJoin({ annotation: 'music_track_annotations' }, function joinTrackAnnotation() {
-        this.on('annotation.platform', '=', 'recommendation.platform')
-          .andOn('annotation.track_key', '=', 'recommendation.video_id');
-      })
-      .count('recommendation.id as count')
-      .first(),
-    decisionsQuery
-      .select(
-        'recommendation.id', 'recommendation.cafe_id', 'cafe.name as cafe_name',
-        'recommendation.video_id', 'recommendation.title', 'recommendation.channel_title',
-        'recommendation.platform', 'recommendation.filter_status', 'recommendation.filter_reason',
-        'recommendation.filter_confidence', 'recommendation.filter_model',
-        'recommendation.filter_error_code', 'recommendation.filter_prompt_snapshot',
-        'recommendation.filter_checked_at', 'review.human_decision',
-        'review.human_reason_code', 'review.metadata_sufficient', 'review.reviewed_at',
-        'annotation.id as annotation_id',
-        'annotation.artist_name as annotation_artist_name',
-        'annotation.track_version as annotation_track_version',
-        'annotation.tempo_class as annotation_tempo_class',
-        'annotation.mood_tags as annotation_mood_tags',
-        'annotation.instrumentation_type as annotation_instrumentation_type',
-        'annotation.rhythmic_character as annotation_rhythmic_character',
-        'annotation.vocal_type as annotation_vocal_type',
-        'annotation.genre_tags as annotation_genre_tags',
-        'annotation.note as annotation_note',
-        'annotation.usage_scope as annotation_usage_scope',
-        'annotation.schema_version as annotation_schema_version',
-        'annotation.updated_at as annotation_updated_at',
-      )
-      .orderBy('recommendation.filter_checked_at', 'desc')
-      .orderBy('recommendation.id', 'desc')
-      .offset(offset.value)
-      .limit(FILTER_REVIEW_QUEUE_PAGE_SIZE + 1),
-  ]);
-
-  const total = Number(totalRow?.count || 0);
-  const reviewed = Number(reviewedRow?.count || 0);
-  res.json({
-    summary: { total, reviewed, unreviewed: Math.max(0, total - reviewed) },
-    decisions: decisionRows.slice(0, FILTER_REVIEW_QUEUE_PAGE_SIZE).map(attachTrackAnnotation),
-    view,
-    offset: offset.value,
-    has_more: decisionRows.length > FILTER_REVIEW_QUEUE_PAGE_SIZE,
-    next_offset: decisionRows.length > FILTER_REVIEW_QUEUE_PAGE_SIZE
-      ? offset.value + FILTER_REVIEW_QUEUE_PAGE_SIZE
-      : null,
-  });
+  res.json(await labelingReview.fetchLabelingQueue({ view, offset: offset.value }));
 });
 
 // GET /api/v1/admin/music-filter-artist-labels?artist=...
@@ -291,24 +196,12 @@ router.get('/music-filter-artist-labels', requireAdmin, async (req, res) => {
   if (Boolean(platformCheck.value) !== Boolean(trackKeyCheck.value)) {
     return res.status(400).json({ error: '플랫폼과 곡 식별자는 함께 전달해야 합니다' });
   }
-  const artistKey = normalizeArtistKey(artistCheck.value);
-  const rows = await db('music_track_annotations')
-    .where({ artist_key: artistKey })
-    .modify((query) => {
-      if (platformCheck.value && trackKeyCheck.value) {
-        query.whereNot((builder) => {
-          builder.where({ platform: platformCheck.value, track_key: trackKeyCheck.value });
-        });
-      }
-    })
-    .select(
-      'id', 'title', 'artist_name', 'track_version', 'tempo_class', 'mood_tags',
-      'instrumentation_type', 'rhythmic_character', 'vocal_type', 'genre_tags',
-      'note', 'usage_scope', 'updated_at',
-    )
-    .orderBy('updated_at', 'desc')
-    .limit(3);
-  res.json({ artist_name: artistCheck.value, labels: rows });
+  const labels = await labelingReview.fetchArtistLabels({
+    artistKey: normalizeArtistKey(artistCheck.value),
+    platform: platformCheck.value,
+    trackKey: trackKeyCheck.value,
+  });
+  res.json({ artist_name: artistCheck.value, labels });
 });
 
 // GET /api/v1/admin/cafes → 전체 카페 + 상태 + 오늘 도달/신청
@@ -402,36 +295,7 @@ router.get('/cafes/:id/music-filter-audit', requireAdmin, async (req, res) => {
     .first();
   if (!cafe) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
 
-  const [promptHistory, decisionRows] = await Promise.all([
-    db('music_filter_prompt_history')
-      .where({ cafe_id: cafe.id })
-      .select('id', 'enabled', 'prompt', 'record_type', 'recorded_at')
-      .orderBy('recorded_at', 'desc')
-      .orderBy('id', 'desc')
-      .limit(50),
-    db({ recommendation: 'recommendations' })
-      .leftJoin(
-        { review: 'music_filter_reviews' },
-        'review.recommendation_id',
-        'recommendation.id',
-      )
-      .where('recommendation.cafe_id', cafe.id)
-      .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES)
-      .select(
-        'recommendation.id', 'recommendation.video_id', 'recommendation.title',
-        'recommendation.channel_title', 'recommendation.platform',
-        'recommendation.filter_status', 'recommendation.filter_reason',
-        'recommendation.filter_confidence', 'recommendation.filter_model',
-        'recommendation.filter_error_code',
-        'recommendation.filter_prompt_snapshot', 'recommendation.filter_checked_at',
-        'review.human_decision', 'review.human_reason_code',
-        'review.metadata_sufficient', 'review.reviewed_at',
-      )
-      .orderBy('recommendation.filter_checked_at', 'desc')
-      .orderBy('recommendation.id', 'desc')
-      .offset(offset.value)
-      .limit(FILTER_AUDIT_PAGE_SIZE + 1),
-  ]);
+  const audit = await labelingReview.fetchCafeAudit({ cafeId: cafe.id, offset: offset.value });
 
   res.json({
     cafe: { id: cafe.id, name: cafe.name },
@@ -439,13 +303,8 @@ router.get('/cafes/:id/music-filter-audit', requireAdmin, async (req, res) => {
       enabled: cafe.music_filter_enabled,
       prompt: cafe.music_filter_prompt,
     },
-    prompt_history: promptHistory,
-    decisions: decisionRows.slice(0, FILTER_AUDIT_PAGE_SIZE),
+    ...audit,
     offset: offset.value,
-    has_more: decisionRows.length > FILTER_AUDIT_PAGE_SIZE,
-    next_offset: decisionRows.length > FILTER_AUDIT_PAGE_SIZE
-      ? offset.value + FILTER_AUDIT_PAGE_SIZE
-      : null,
   });
 });
 
@@ -472,73 +331,19 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
     : validateMusicAnnotation(req.body.track_annotation);
   if (annotationCheck.error) return res.status(400).json({ error: annotationCheck.error });
 
-  const recommendation = await db('recommendations')
-    .where({ id: req.params.recommendationId, cafe_id: req.params.id })
-    .whereIn('filter_status', FILTER_PROCESSED_STATUSES)
-    .select('id', 'platform', 'video_id', 'title', 'channel_title')
-    .first();
+  const recommendation = await labelingReview.findReviewableRecommendation({
+    cafeId: req.params.id,
+    recommendationId: req.params.recommendationId,
+  });
   if (!recommendation) return res.status(404).json({ error: 'AI 판단 이력을 찾을 수 없습니다' });
 
-  const saved = await db.transaction(async (trx) => {
-    const reviewedAt = new Date();
-    const review = {
-      recommendation_id: recommendation.id,
-      human_decision: humanDecision,
-      human_reason_code: humanReasonCode,
-      metadata_sufficient: metadataSufficient,
-      reviewed_at: reviewedAt,
-    };
-    const [savedReview] = await trx('music_filter_reviews')
-      .insert(review)
-      .onConflict('recommendation_id')
-      .merge({
-        human_decision: review.human_decision,
-        human_reason_code: review.human_reason_code,
-        metadata_sufficient: review.metadata_sufficient,
-        reviewed_at: review.reviewed_at,
-      })
-      .returning('*');
-
-    let savedAnnotation = null;
-    if (annotationCheck.value) {
-      const annotation = {
-        platform: recommendation.platform,
-        track_key: recommendation.video_id,
-        source_recommendation_id: recommendation.id,
-        title: recommendation.title,
-        ...annotationCheck.value,
-        // pg 드라이버가 JS 배열을 PostgreSQL 배열 리터럴({"pop"})로 바꾸면
-        // jsonb 컬럼에서 22P02가 발생한다. JSON 문자열로 타입을 명확히 한다.
-        mood_tags: JSON.stringify(annotationCheck.value.mood_tags),
-        genre_tags: JSON.stringify(annotationCheck.value.genre_tags),
-        updated_at: reviewedAt,
-      };
-      [savedAnnotation] = await trx('music_track_annotations')
-        .insert(annotation)
-        .onConflict(['platform', 'track_key'])
-        .merge({
-          source_recommendation_id: annotation.source_recommendation_id,
-          title: annotation.title,
-          artist_name: annotation.artist_name,
-          artist_key: annotation.artist_key,
-          track_version: annotation.track_version,
-          tempo_class: annotation.tempo_class,
-          mood_tags: annotation.mood_tags,
-          instrumentation_type: annotation.instrumentation_type,
-          rhythmic_character: annotation.rhythmic_character,
-          vocal_type: annotation.vocal_type,
-          genre_tags: annotation.genre_tags,
-          note: annotation.note,
-          usage_scope: annotation.usage_scope,
-          schema_version: annotation.schema_version,
-          updated_at: annotation.updated_at,
-        })
-        .returning('*');
-    }
-
-    return { ...savedReview, track_annotation: savedAnnotation };
+  const saved = await labelingReview.saveReview({
+    recommendation,
+    humanDecision,
+    humanReasonCode,
+    metadataSufficient,
+    annotation: annotationCheck.value,
   });
-
   res.json(saved);
 });
 

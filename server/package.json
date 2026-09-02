@@ -8,7 +8,8 @@
     "migrate": "knex migrate:latest --knexfile src/db/knexfile.js",
     "migrate:rollback": "knex migrate:rollback --knexfile src/db/knexfile.js",
     "test": "vitest run",
-    "test:unit": "vitest run --config vitest.unit.config.mjs"
+    "test:unit": "vitest run --config vitest.unit.config.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "axios": "^1.19.0",
@@ -25,6 +26,9 @@
     "socket.io": "^4.6.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.9.1",
+    "globals": "^17.12.0",
     "nodemon": "^3.0.1",
     "supertest": "^7.2.2",
     "vitest": "^4.1.9"

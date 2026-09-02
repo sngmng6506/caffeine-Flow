@@ -70,11 +70,17 @@ npm run migrate:rollback --prefix server
 ## 테스트·빌드
 
 ```bash
+npm run lint --prefix server         # ESLint
 npm run test:unit --prefix server    # DB 비의존 테스트만
 npm test --prefix server             # 마이그레이션 포함 통합 테스트
 npm run build --prefix customer
 npm run build --prefix owner
 ```
+
+린트는 서버에만 적용된다. 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만 다룬다
+(`no-unused-vars`, `no-undef`, `eqeqeq` 등). 포맷터는 두지 않는다 — 기존 스타일이
+이미 일관되고, 한 번 돌리면 전 파일이 diff로 뒤집혀 리뷰가 불가능해진다.
+`customer`·`owner`·`admin`은 아직 린트 대상이 아니다.
 
 `test:unit`은 `vitest.unit.config.mjs`에 명시된 테스트만 실행하며 PostgreSQL에 연결하지 않는다.
 
@@ -85,7 +91,7 @@ JWT_SECRET=ci-only-secret \
 npm test --prefix server
 ```
 
-CI는 `server-test`(PostgreSQL + 문법 + 단위·통합 테스트)와 `frontend-build`(customer·owner Vite 빌드, Electron 메인 문법 검사)를 실행한다.
+CI는 `server-test`(PostgreSQL + 린트 + 단위·통합 테스트)와 `frontend-build`(customer·owner Vite 빌드, Electron 메인 문법 검사)를 실행한다.
 
 ## 서버 배포
 
