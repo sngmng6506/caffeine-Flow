@@ -69,6 +69,12 @@
   --cf-shadow-raised: none;
   --cf-shadow-signal: 7px 7px 0 var(--cf-layer-pink);
 
-  --cf-motion-fast: 150ms ease-out;
-  --cf-motion-base: 220ms ease-out;
+  --cf-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --cf-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --cf-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --cf-motion-press: 120ms var(--cf-ease-out);
+  --cf-motion-fast: 150ms var(--cf-ease-out);
+  --cf-motion-base: 220ms var(--cf-ease-out);
+  --cf-motion-move: 220ms var(--cf-ease-in-out);
+  --cf-motion-color: 150ms ease;
 }

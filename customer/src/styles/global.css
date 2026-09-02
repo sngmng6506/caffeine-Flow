@@ -72,12 +72,23 @@ img {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  .spin,
+  .is-spinning,
+  .now-playing__wave-mark rect {
+    animation: none !important;
+  }
+
+  .tab-panel--forward,
+  .tab-panel--backward {
+    animation: cf-reduced-fade 160ms ease !important;
+  }
+
+  .button:active:not(:disabled),
+  .platform-shortcut:hover {
+    transform: none;
   }
 }

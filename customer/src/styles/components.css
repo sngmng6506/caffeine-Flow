@@ -439,11 +439,12 @@
   cursor: pointer;
   font-size: 15px;
   font-weight: 700;
-  transition: transform var(--cf-motion-fast), background var(--cf-motion-fast), border-color var(--cf-motion-fast);
+  transform-origin: center;
+  transition: transform var(--cf-motion-press), background var(--cf-motion-color), border-color var(--cf-motion-color);
 }
 
 .button:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: scale(0.97);
 }
 
 .button:disabled {
@@ -615,12 +616,17 @@
   border: 1px solid var(--cf-on-dark);
   border-radius: var(--cf-radius-control);
   text-decoration: none;
-  transition: transform var(--cf-motion-fast), background var(--cf-motion-fast);
+  transition: transform var(--cf-motion-press), background var(--cf-motion-color);
 }
 
 .platform-shortcut:hover {
-  transform: translateY(-1px);
   background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .platform-shortcut:hover {
+    transform: translateY(-1px);
+  }
 }
 
 .platform-shortcut--disabled {
@@ -718,11 +724,11 @@
 }
 
 .tab-panel--forward {
-  animation: cf-tab-forward var(--cf-motion-base);
+  animation: cf-tab-forward var(--cf-motion-move);
 }
 
 .tab-panel--backward {
-  animation: cf-tab-backward var(--cf-motion-base);
+  animation: cf-tab-backward var(--cf-motion-move);
 }
 
 .content-section + .content-section {
@@ -1355,6 +1361,11 @@
 @keyframes cf-tab-backward {
   from { opacity: 0; transform: translateX(-12px); }
   to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes cf-reduced-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (max-width: 380px) {
