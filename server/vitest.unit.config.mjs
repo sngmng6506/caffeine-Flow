@@ -25,6 +25,7 @@ export default defineConfig({
       'tests/owner-bgm-bridge.test.mjs',
       'tests/owner-bgm-storage.test.mjs',
       'tests/owner-playback-cleanup.test.mjs',
+      'tests/owner-playback-commands.test.mjs',
       'tests/owner-playback-bridge.test.mjs',
       'tests/owner-playback-recovery.test.mjs',
       'tests/owner-playback-session.test.mjs',
