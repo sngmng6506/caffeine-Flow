@@ -297,7 +297,7 @@
   background: var(--cf-composer);
   border: 0;
   border-radius: var(--cf-radius-panel);
-  box-shadow: var(--cf-shadow-signal-invert);
+  box-shadow: var(--cf-shadow-signal);
 }
 
 .request-composer {
@@ -305,7 +305,7 @@
   background: var(--cf-composer);
   border: 0;
   border-radius: var(--cf-radius-panel);
-  box-shadow: var(--cf-shadow-signal-invert);
+  box-shadow: var(--cf-shadow-signal);
 }
 
 .request-composer__trigger {
@@ -318,26 +318,26 @@
   border: 0;
   cursor: pointer;
   text-align: left;
-  color: var(--cf-on-pink-muted);
+  color: var(--cf-on-dark-muted);
   background: transparent;
   font-size: 15px;
   border-radius: inherit;
 }
 
 .request-composer__trigger:hover {
-  background: color-mix(in srgb, var(--cf-on-pink) 10%, transparent);
+  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
 }
 
 .request-composer__trigger > span:nth-child(2) {
   min-width: 0;
   flex: 1;
-  color: var(--cf-on-pink);
+  color: var(--cf-on-dark);
   font-weight: 600;
 }
 
 .request-composer__caret {
   flex: 0 0 auto;
-  color: var(--cf-on-pink);
+  color: var(--cf-on-dark);
   transition: transform var(--cf-motion-fast);
 }
 
@@ -366,7 +366,7 @@
 .request-card__body {
   margin: 0 16px;
   padding: 16px 0;
-  border-top: 1px solid color-mix(in srgb, var(--cf-on-pink) 22%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--cf-on-dark) 18%, transparent);
 }
 
 .request-card__heading {
@@ -391,12 +391,12 @@
 .request-card__close {
   width: 36px;
   height: 36px;
-  color: var(--cf-on-pink);
+  color: var(--cf-on-dark);
 }
 
 .request-card h2 {
   margin: 0;
-  color: var(--cf-on-pink);
+  color: var(--cf-on-dark);
   font-size: 20px;
   letter-spacing: -0.02em;
 }
@@ -404,7 +404,7 @@
 .field-label {
   display: block;
   margin-bottom: 7px;
-  color: var(--cf-on-pink);
+  color: var(--cf-on-dark);
   font-size: 14px;
   font-weight: 700;
 }
@@ -423,8 +423,8 @@
 }
 
 .input-shell:focus-within {
-  border-color: var(--cf-focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-focus) 30%, transparent);
+  border-color: var(--cf-accent-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cf-accent-blue) 24%, transparent);
 }
 
 .input-shell input {
@@ -532,9 +532,9 @@
 }
 
 .request-card .button--secondary {
-  color: var(--cf-on-pink);
+  color: var(--cf-on-dark);
   background: transparent;
-  border-color: var(--cf-on-pink);
+  border-color: var(--cf-on-dark);
 }
 
 /* 전역 .button:disabled의 opacity .5는 검정 캔버스에서는 맞지만, 신청 패널처럼
@@ -548,12 +548,12 @@
 
 .request-card .button--secondary:disabled {
   opacity: 1;
-  color: color-mix(in srgb, var(--cf-on-pink) 55%, transparent);
-  border-color: color-mix(in srgb, var(--cf-on-pink) 45%, transparent);
+  color: color-mix(in srgb, var(--cf-on-dark) 55%, transparent);
+  border-color: color-mix(in srgb, var(--cf-on-dark) 45%, transparent);
 }
 
 .request-card .button--secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--cf-on-pink) 10%, transparent);
+  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
 }
 
 .request-preview {
@@ -627,7 +627,7 @@
   gap: 12px;
   margin-top: 15px;
   padding-top: 13px;
-  border-top: 1px solid color-mix(in srgb, var(--cf-on-pink) 38%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--cf-on-dark) 38%, transparent);
 }
 
 .platform-shortcuts__links {
@@ -642,14 +642,14 @@
   display: grid;
   place-items: center;
   background: transparent;
-  border: 1px solid var(--cf-on-pink);
+  border: 1px solid var(--cf-on-dark);
   border-radius: var(--cf-radius-control);
   text-decoration: none;
   transition: transform var(--cf-motion-press), background var(--cf-motion-color);
 }
 
 .platform-shortcut:hover {
-  background: color-mix(in srgb, var(--cf-on-pink) 10%, transparent);
+  background: color-mix(in srgb, var(--cf-on-dark) 8%, transparent);
 }
 
 @media (hover: hover) and (pointer: fine) {
