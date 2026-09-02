@@ -52,7 +52,17 @@ describe('알림 페이로드', () => {
       count: 1,
     }));
     expect(payload).not.toContain('해당 매장 설정 문제');
-    expect(payload).toContain('판단하기에는 부족하다');
+    expect(payload).toContain('아래 카페로 한정되지 않는다');
+  });
+
+  it('쿨다운 뒤 재발송되는 즉시 알림은 실제 건수를 보여준다', () => {
+    // 집계는 쿨다운 중에도 계속되므로 두 번째 즉시 알림은 1건이 아니다.
+    // "1건"으로 굳어 있으면 진행 중인 장애를 첫 발생으로 잘못 읽는다.
+    const payload = JSON.stringify(buildAlertMessage({
+      ...summary, tier: ALERT_TIER.IMMEDIATE, count: 25,
+    }));
+    expect(payload).toContain('25건');
+    expect(payload).not.toContain('1건 (즉시 알림 대상)');
   });
 
   it('1건짜리 임계값 알림도 범위를 단정하지 않는다', () => {

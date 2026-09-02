@@ -12,14 +12,20 @@ const { logError, CAUSE, CRASH_EXIT_DELAY_MS, alertsEnabled } = require('./src/o
 // "죽는다"는 그대로 유지한다. 핸들러를 등록하는 것만으로 기본 크래시가
 // 꺼지므로, 로그만 남기고 살려두면 상태가 깨진 프로세스가 계속 도는 대신
 // 자동 재시작을 잃는다.
+// stderr flush에 필요한 최소 시간
+const FLUSH_DELAY_MS = 100;
+
 function crashAfterLogging(code, error) {
   logError({ code, cause: CAUSE.PLATFORM, error });
-  // 웹훅 전송 타임아웃보다 길게 기다린다. 가장 심각한 알림이 전송 도중
-  // 잘리면 안 된다. unref하지 않는 이유도 같다 — listen 이전 크래시에서
-  // 이벤트 루프가 비어 exit code 0으로 조용히 끝나는 것을 막는다.
-  // 알림이 꺼져 있으면 기다릴 이유가 없으므로 바로 종료한다.
-  if (!alertsEnabled) process.exit(1);
-  setTimeout(() => process.exit(1), CRASH_EXIT_DELAY_MS);
+  // 같은 tick에서 process.exit()을 부르면 stderr가 파이프인 배포에서 방금 찍은
+  // 로그와 스택이 flush 전에 잘린다. 핸들러를 둔 목적이 사라지므로 최소한의
+  // 여유를 준다. 알림이 켜져 있으면 웹훅 전송 타임아웃보다 길게 기다린다.
+  //
+  // exitCode를 함께 세팅하는 이유는 listen 이전 크래시 때문이다. 그때는
+  // 이벤트 루프가 비어 타이머 전에 종료되는데, 그래도 0이 아닌 코드로 끝나야
+  // Railway가 실패로 인식한다.
+  process.exitCode = 1;
+  setTimeout(() => process.exit(1), alertsEnabled ? CRASH_EXIT_DELAY_MS : FLUSH_DELAY_MS);
 }
 
 process.on('uncaughtException', (error) => {

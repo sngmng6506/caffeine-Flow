@@ -111,19 +111,27 @@ function trackErrorCause(error) {
  * 반대로 우리 client_secret이 만료돼 전 사장님 로그인이 막힌 상황은
  * 손님 탓으로 묻힌다.
  */
+// 네이버 OAuth 토큰 엔드포인트가 우리 client 설정을 거부할 때 주는 코드
+const NAVER_CREDENTIAL_ERRORS = Object.freeze(['invalid_client', 'unauthorized_client']);
+
 function naverCallbackError(error) {
   const upstream = error?.isAxiosError === true;
   // axios 에러가 아니면 이 블록의 DB 조회에서 온 것이다
   if (!upstream && isDbConnectionError(error)) {
     return { code: 'DB_CONNECTION_FAILED', cause: CAUSE.PLATFORM };
   }
-  const status = error?.response?.status;
-  // 우리 자격증명이 거부됨 — 모든 사장님의 네이버 로그인이 막힌다
-  if (status === 401 || status === 403) {
-    return { code: 'NAVER_CREDENTIALS_REJECTED', cause: CAUSE.PLATFORM };
+  // 토큰 교환이 남긴 에러 코드가 가장 정확한 근거다. 네이버가 우리 client
+  // 자격증명을 거부한 경우만 전 사장님 로그인이 막힌 상황이다.
+  if (error?.naverTokenError) {
+    return NAVER_CREDENTIAL_ERRORS.includes(error.naverTokenError)
+      ? { code: 'NAVER_CREDENTIALS_REJECTED', cause: CAUSE.PLATFORM }
+      // 만료·재사용된 auth code 등. 알 수 없는 코드도 여기로 보낸다 —
+      // 오알림보다 무음이 낫고, 로그에는 원본 코드가 그대로 남는다.
+      : { code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.USER };
   }
-  // 만료·재사용된 auth code 등 요청 자체가 잘못된 경우
-  if (status === 400) return { code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.USER };
+  const status = error?.response?.status;
+  // 토큰 교환을 통과한 뒤의 4xx는 손님 요청 문제로 본다
+  if (status >= 400 && status < 500) return { code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.USER };
   // 5xx, 네트워크 오류, 그 밖의 응답
   return { code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.EXTERNAL };
 }

@@ -59,19 +59,36 @@ describe('네이버 콜백 실패 분류', () => {
     response: status ? { status } : undefined,
   });
 
+  const tokenError = (code) => Object.assign(new Error('token'), { naverTokenError: code });
+
   it('우리 자격증명 거부는 즉시 알림 대상이다', () => {
     // client_secret 만료 시 전 사장님의 네이버 로그인이 막힌다
-    for (const status of [401, 403]) {
-      const result = naverCallbackError(axiosError(status));
+    for (const code of ['invalid_client', 'unauthorized_client']) {
+      const result = naverCallbackError(tokenError(code));
       expect(result).toEqual({ code: 'NAVER_CREDENTIALS_REJECTED', cause: CAUSE.PLATFORM });
       expect(alertTierFor(result)).toBe(ALERT_TIER.IMMEDIATE);
     }
   });
 
   it('만료된 auth code 재사용은 손님 탓이다', () => {
-    expect(naverCallbackError(axiosError(400))).toEqual({
+    // 네이버는 이 경우 HTTP 200에 에러 본문을 주므로 status로는 못 가른다
+    expect(naverCallbackError(tokenError('invalid_request'))).toEqual({
       code: 'NAVER_CALLBACK_FAILED', cause: CAUSE.USER,
     });
+  });
+
+  it('알 수 없는 토큰 에러는 알리지 않는다', () => {
+    // 오알림보다 무음이 낫다. 원본 코드는 로그에 남는다.
+    expect(naverCallbackError(tokenError('unknown')).cause).toBe(CAUSE.USER);
+  });
+
+  it('손님 재시도가 즉시 알림으로 둔갑하지 않는다 (회귀 방지)', () => {
+    // 토큰 교환 실패를 그냥 통과시키면 `Bearer undefined`로 프로필을 조회해
+    // 401이 돌아온다. 그걸 자격증명 거부로 읽으면 손님 한 명의 재시도가
+    // "전 사장님 로그인 차단" 즉시 알림이 된다.
+    const result = naverCallbackError(axiosError(401));
+    expect(result.code).not.toBe('NAVER_CREDENTIALS_REJECTED');
+    expect(alertTierFor(result)).not.toBe(ALERT_TIER.IMMEDIATE);
   });
 
   it('네이버 서버 오류와 네트워크 실패는 외부 신호다', () => {
