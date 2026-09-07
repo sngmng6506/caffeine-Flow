@@ -64,7 +64,7 @@ YouTube 아닌 플랫폼, 같은 곡의 추적 파라미터 변형, 전체 TOP �
 | `GOOGLE_CLIENT_ID` | Google 로그인 |
 | `NAVER_CLIENT_ID` | Naver 로그인 |
 | `NAVER_CLIENT_SECRET` | Naver 로그인 |
-| `ALERT_WEBHOOK_URL` | 운영자 에러 알림 Discord webhook. 미설정이면 알림 없이 로그만 남는다 |
+| `ALERT_WEBHOOK_URL` | 운영자 에러 알림 Discord webhook. 미설정이면 알림 없이 로그만 남는다. **프로세스 시작 시 한 번만 읽으므로 배포 후 추가했다면 재시작해야 켜진다** — production에서 비어 있으면 시작 로그에 경고가 남는다 |
 | `OPENROUTER_API_KEY` | OpenRouter 인증. 필터 ON에서 누락 시 fail-closed |
 | `OPENROUTER_BASE_URL` | 기본 `https://openrouter.ai/api/v1` |
 | `OPENROUTER_APP_NAME` | 기본 `Caffeine Flow` |
