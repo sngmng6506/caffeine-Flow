@@ -14,6 +14,7 @@ const statsService = require('../services/stats.service');
 const musicFilter = require('../features/music-filter');
 const { getTrackMetadata } = require('../services/track-metadata.service');
 const { requireAdmin } = require('../middleware/auth');
+const { sendTestAlert } = require('../observability');
 const { issueAdminToken } = require('../utils/jwt');
 const { kstTodayString, kstStartOfDay } = require('../utils/kst');
 const { ADMIN_LOGIN_LIMIT, ADMIN_LOGIN_GLOBAL_LIMIT } = require('../constants/limits');
@@ -148,6 +149,21 @@ router.post('/music-filter/test', requireAdmin, async (req, res) => {
 
 // GET /api/v1/admin/music-filter/models
 // OpenRouter 키의 제공자·개인정보 설정을 반영한 사용 가능 모델을 lab에 제공한다.
+// 에러 알림 전송 확인. 실제 알림과 같은 경로를 타므로 웹훅이 서버에서
+// 실제로 나가는지까지 확인된다. 전용 코드를 써서 진짜 장애의 쿨다운은
+// 건드리지 않는다.
+router.post('/alert-test', requireAdmin, async (_req, res) => {
+  const result = await sendTestAlert();
+  if (result.sent) return res.json({ ok: true, message: '테스트 알림을 보냈습니다. Discord 채널을 확인하세요.' });
+
+  const reasons = {
+    disabled: 'ALERT_WEBHOOK_URL이 설정되지 않았거나 이 프로세스가 변수 추가 전에 시작됐습니다.',
+    cooldown: '최근 30분 안에 이미 테스트 알림을 보냈습니다. 잠시 후 다시 시도하세요.',
+    delivery_failed: '웹훅으로 전송하지 못했습니다. URL이 유효한지 서버 로그를 확인하세요.',
+  };
+  res.status(409).json({ ok: false, reason: result.reason, message: reasons[result.reason] || '전송하지 못했습니다.' });
+});
+
 router.get('/music-filter/models', requireAdmin, async (_req, res) => {
   if (!OPENROUTER_API_KEY) {
     return res.status(503).json({ error: 'OPENROUTER_API_KEY가 설정되지 않았습니다', models: [] });

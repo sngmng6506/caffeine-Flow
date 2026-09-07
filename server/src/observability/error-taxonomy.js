@@ -33,7 +33,12 @@ const IMMEDIATE_CODES = Object.freeze([
   'DB_CONNECTION_FAILED', // DB 연결 불가 — 서비스 전체 정지
   'UNCAUGHT_EXCEPTION', //  프로세스 사망
   'UNHANDLED_REJECTION', // 처리되지 않은 Promise 거부
+  'ALERT_TEST', //          운영자가 누른 전송 확인. 즉시 보내야 의미가 있다
 ]);
+
+// 운영자 테스트 전용 코드. 실제 에러 코드와 섞이면 진짜 장애의 쿨다운을
+// 태워버리므로 따로 둔다.
+const ALERT_TEST_CODE = 'ALERT_TEST';
 
 const ALERT_TIER = Object.freeze({
   IMMEDIATE: 'immediate',
@@ -144,6 +149,7 @@ module.exports = {
   ALERT_WINDOW_MS,
   ALERT_COOLDOWN_MS,
   DEFAULT_THRESHOLD,
+  ALERT_TEST_CODE,
   CODE_THRESHOLDS,
   alertTierFor,
   thresholdFor,

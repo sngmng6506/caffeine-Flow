@@ -114,6 +114,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | --- | --- | :-: | --- |
 | POST | `/admin/login` | 🔓 | 운영자 로그인, 12시간 토큰. IP별 15분 10회·전체 15분 50회 실패 제한, 차단 시 `retry_after_seconds` 반환 |
 | POST | `/admin/music-filter/test` | 🛡 | 필터 테스트에서 저장 없이 곡 판단. body는 `url`, `prompt`, 선택적 `model` |
+| POST | `/admin/alert-test` | 🛡 | 에러 알림 전송 확인. 실제 알림 경로로 보내며 전용 코드라 진짜 장애의 쿨다운을 건드리지 않는다 |
 | GET | `/admin/music-filter/models` | 🛡 | OpenRouter `/models/user` 목록을 10분 캐시해 반환 |
 | GET | `/admin/music-filter-reviews` | 🛡 | `Playlist`·`플리` 제목을 제외한 전체 카페 라벨링 큐와 전체·완료·미검수 건수. `view`, `offset` 지원 |
 | GET | `/admin/music-filter-artist-labels` | 🛡 | 확인한 아티스트의 다른 곡 라벨 최신 3건. `artist`, 선택적 `platform`·`track_key` |
