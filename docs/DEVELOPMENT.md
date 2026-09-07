@@ -119,7 +119,9 @@ python analyze.py ./authorized-track.wav \
 python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 ```
 
-Essentia와 사전학습 모델은 상업 적용 전에 각각 라이선스를 확인한다. 현재 워커는 라이선스가 별도로 필요한 감정 모델을 포함하지 않으며 Valence/Arousal을 `null`로 저장한다.
+미니PC 상주 운영은 `worker.py`가 담당한다. `~/caffeine-audio/{inbox,processing,processed,failed,models}` 디렉터리 큐를 폴링하고 결과만 outbound HTTPS로 제출하며, 들어오는 포트는 열지 않는다. 등록 절차와 `CAFFEINE_FLOW_SERVER_URL`·`AUDIO_WORKER_ROOT`·`AUDIO_MODEL_DIR`·`POLL_INTERVAL_MS`·`DISCORD_AUDIO_WEBHOOK_URL` 설명은 [audio-analysis-worker/README.md](../audio-analysis-worker/README.md)에 있다.
+
+Valence/Arousal은 `ENABLE_VALENCE_AROUSAL=true`일 때만 `deam-msd-musicnn` 모델로 채운다. 기본값은 꺼짐이며, 모델이 비상업(CC BY-NC-SA 4.0) 라이선스라 라벨링 Lab 평가에만 쓰고 신청곡 자동 승인에 연결하지 않는다. 상업화에는 별도 라이선스가 필요하다. 모델 파일은 저장소에 커밋하지 않고 `AUDIO_MODEL_DIR`에 두며 워커가 SHA-256을 확인한다.
 
 ## 마이그레이션
 
