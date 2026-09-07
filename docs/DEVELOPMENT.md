@@ -73,7 +73,9 @@ npm run migrate:rollback --prefix server
 npm run lint --prefix server         # ESLint
 npm run test:unit --prefix server    # DB 비의존 테스트만
 npm test --prefix server             # 마이그레이션 포함 통합 테스트
+npm run lint --prefix owner          # 사장님 React·Electron ESLint
 npm test --prefix owner              # 사장님 화면 훅 테스트 (jsdom)
+npm run lint --prefix customer       # 손님 React ESLint
 npm test --prefix customer           # 손님 화면 테스트 (jsdom)
 npm run build --prefix customer
 npm run build --prefix owner
@@ -98,10 +100,13 @@ npm run build --prefix owner
 `vi.fn()`은 vitest config의 `restoreMocks` 대상이 아니다. 호출 기록에 의존하는
 테스트는 `beforeEach`에서 직접 `mockClear()`한다.
 
-린트는 서버에만 적용된다. 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만 다룬다
-(`no-unused-vars`, `no-undef`, `eqeqeq` 등). 포맷터는 두지 않는다 — 기존 스타일이
-이미 일관되고, 한 번 돌리면 전 파일이 diff로 뒤집혀 리뷰가 불가능해진다.
-`customer`·`owner`·`admin`은 아직 린트 대상이 아니다.
+린트는 서버·customer·owner에 적용된다. owner는 React 화면뿐 아니라 Electron
+메인·preload 프로세스도 검사한다. 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만
+다룬다(`no-unused-vars`, `no-undef`, `eqeqeq`, React Hooks 등). 포맷터는 두지
+않는다 — 기존 스타일이 이미 일관되고, 한 번 돌리면 전 파일이 diff로 뒤집혀
+리뷰가 불가능해진다. 기존 effect 의도를 검토하며 도입할 수 있도록
+`react-hooks/exhaustive-deps`만 경고이고 나머지 버그성 규칙은 오류다.
+정적 `admin`·lab 화면은 아직 린트 대상이 아니다.
 
 `test:unit`은 `vitest.unit.config.mjs`에 명시된 테스트만 실행하며 PostgreSQL에 연결하지 않는다.
 
@@ -112,7 +117,7 @@ JWT_SECRET=ci-only-secret \
 npm test --prefix server
 ```
 
-CI는 `server-test`(PostgreSQL + 린트 + 단위·통합 테스트)와 `frontend-build`(customer·owner 테스트와 Vite 빌드, Electron 메인 문법 검사)를 실행한다.
+CI는 `server-test`(PostgreSQL + 린트 + 단위·통합 테스트)와 `frontend-build`(customer·owner 린트·테스트와 Vite 빌드)를 실행한다. owner 린트가 Electron 메인·preload 프로세스의 구문과 전역 사용도 함께 검사한다.
 
 ## 서버 배포
 

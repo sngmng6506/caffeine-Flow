@@ -22,7 +22,7 @@ function copyWithTextarea(text) {
   textarea.style.left = '-9999px';
   textarea.style.fontSize = '16px';
   document.body.appendChild(textarea);
-  let copied = false;
+  let copied;
   try {
     try {
       textarea.focus({ preventScroll: true });
