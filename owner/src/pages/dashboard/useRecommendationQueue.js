@@ -70,7 +70,7 @@ export default function useRecommendationQueue({
     setIsAcceptingReady(false);
     setAiFilterReady(false);
 
-    const recommendationsLoaded = getRecommendations(cafe.slug)
+    getRecommendations(cafe.slug)
       .then(({ recommendations: loaded, is_accepting }) => {
         // playing 복구는 socket 리더가 된 Electron 한 대만 수행한다.
         setRecommendations(loaded);

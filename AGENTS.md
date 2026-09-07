@@ -64,7 +64,9 @@
 npm run lint --prefix server
 npm run test:unit --prefix server
 npm test --prefix server
+npm run lint --prefix customer
 npm test --prefix customer
+npm run lint --prefix owner
 npm test --prefix owner
 npm run build --prefix customer
 npm run build --prefix owner
