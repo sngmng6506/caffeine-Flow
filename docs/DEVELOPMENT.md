@@ -8,7 +8,14 @@
 
 ## 설치와 실행
 
-요구사항은 Node.js 20.19+ 또는 22.12+, PostgreSQL 16 권장, npm이다.
+요구사항은 PostgreSQL 16 권장과 npm이며, Node는 앱마다 하한이 다르다.
+
+| 대상 | 최소 Node | 이유 |
+| --- | --- | --- |
+| `server` | 20.19+ | 운영(Railway) 기준 |
+| `customer`, `owner` | 22.13+ | 테스트가 쓰는 jsdom 30의 의존 undici가 `worker_threads.markAsUncloneable`(Node 22.10 추가)을 요구한다. Node 20에서는 테스트 파일을 읽기 전에 worker가 죽는다 |
+
+CI도 같은 이유로 `server-test`는 Node 20, `frontend-build`는 22.13.0으로 나눠 실행한다.
 
 ```bash
 npm ci --prefix server
@@ -24,6 +31,10 @@ npm run electron:dev --prefix owner
 ```
 
 각 dev 명령은 별도 터미널에서 실행한다.
+
+Claude Code 웹 세션은 매번 새로 클론돼 `node_modules`가 없다. `.claude/hooks/session-start.sh`가
+세션 시작 시 세 앱의 의존성을 설치하므로 lint·test를 바로 실행할 수 있다. 로컬에서는
+건너뛰며(`CLAUDE_CODE_REMOTE`로 판단), lockfile이 바뀐 브랜치를 받았을 때는 위 `npm ci`를 다시 실행한다.
 
 ## 환경변수
 
