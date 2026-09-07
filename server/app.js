@@ -174,4 +174,4 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ error: '서버 오류가 발생했습니다' });
 });
 
-module.exports = { app, buildAllowedOrigins, corsOriginCheck, CSP_DIRECTIVES };
+module.exports = { app, buildAllowedOrigins, corsOriginCheck, CSP_DIRECTIVES, ALLOWED_ORIGINS };
