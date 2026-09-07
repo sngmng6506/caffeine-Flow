@@ -129,6 +129,7 @@ owner/electron/preload.js
 server/src/utils/public-response.js
 server/src/routes/_recommendations.shared.js
 server/src/routes/recommendations.js
+server/src/routes/recommendations/*.routes.js
 server/src/routes/song_comments.js
 server/src/observability/alert-channel.js
 ```
@@ -206,6 +207,7 @@ server/src/features/music-filter/public-guide.service.js
 ```text
 server/src/services/recommendation.service.js
 server/src/routes/recommendations.js
+server/src/routes/recommendations/*.routes.js
 server/src/routes/recommendations.owner.js
 server/tests/auth-boundary.test.mjs
 ```

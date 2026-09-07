@@ -39,6 +39,25 @@ flowchart LR
 
 서버는 판단과 데이터 일관성을, Electron은 실제 외부 플랫폼 재생을 책임진다. 여러 사장님이 접속해도 서버가 카페별 재생 리더 Electron 한 대를 정한다. 리더 선출·재연결 lease·재생 시작 확인 순서는 [PLAYBACK.md](PLAYBACK.md)가 기준이다.
 
+## 추천곡 구현 탐색 지도
+
+손님 추천곡 흐름을 수정할 때는 조립점에서 시작하고, 아래 책임 파일만 좁혀 읽는다. 외부 API 경로와 응답 계약은 [API.md](API.md)가 기준이다.
+
+| 조립점·모듈 | 책임 |
+| --- | --- |
+| `customer/src/pages/CafePage.jsx` | 탭·스와이프·알림과 화면 컴포넌트 조립 |
+| `customer/src/pages/cafe/useCafeQueue.js` | 활성 큐 스냅샷, Socket.IO 동기화, 재생 상태 |
+| `customer/src/pages/cafe/useCafeHistory.js` | 최근 재생 조회·페이지네이션·곡 투표값 반영 |
+| `customer/src/pages/cafe/useTopSongs.js` | 매장·전체 TOP 조회, 정렬·페이지네이션·곡 좋아요 |
+| `server/src/routes/recommendations.js` | 손님 추천곡 하위 라우터 조립. 엔드포인트 로직을 두지 않음 |
+| `server/src/routes/recommendations/queue.routes.js` | 활성 큐 조회, 신청, 본인 취소 |
+| `server/src/routes/recommendations/history.routes.js` | 최근 재생과 매장 TOP 조회 |
+| `server/src/routes/recommendations/vote.routes.js` | 신청 건·곡 단위 좋아요와 실시간 전파 |
+| `server/src/routes/recommendations/comment.routes.js` | 신청곡 댓글 작성 |
+| `server/src/routes/recommendations/shared.js` | 손님 mutation의 카페·오류·UUID 공통 처리 |
+
+사장님 추천곡 API는 계속 `server/src/routes/recommendations.owner.js`가 담당한다. 공개 응답 직렬화, 실시간 전파, 제한 정책처럼 손님·사장님 경계를 함께 쓰는 기능은 `server/src/routes/_recommendations.shared.js`와 가드레일을 먼저 확인한다.
+
 ## 신청곡 흐름
 
 ```mermaid

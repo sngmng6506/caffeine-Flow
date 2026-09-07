@@ -1,4 +1,4 @@
-// recommendations.public.js와 recommendations.owner.js가 공유하는 유틸.
+// 손님 recommendations 하위 라우터와 recommendations.owner.js가 공유하는 유틸.
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
 const { ONE_MINUTE_MS, QUEUE_MAX_SIZE, VISITOR_ID_MAX_LENGTH } = require('../constants/limits');
 const {

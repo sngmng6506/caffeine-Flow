@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -6,19 +6,7 @@ import {
   LoaderCircle,
   PauseCircle,
 } from 'lucide-react';
-import {
-  getRecommendations,
-  getRecentHistory,
-  getCafeTop10,
-  getGlobalTop10,
-  voteSong,
-  unvoteSong,
-} from '../api';
-import { markVoted, removeVote } from '../votedSongs';
-import { trackKeyOf } from '../trackKey';
-import { getSocket, disconnectSocket } from '../socket';
-import { VALID_PLATFORMS } from '../constants/platforms';
-import { ACTIVE_STATUSES, HISTORY_STATUSES, REC_STATUS } from '../constants/recommendationStatus';
+import { REC_STATUS } from '../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../constants/playbackState';
 import NowPlaying from './NowPlaying';
 import RecommendForm from './RecommendForm';
@@ -26,6 +14,9 @@ import SongCard from './SongCard';
 import CafeComments from './CafeComments';
 import StatePanel from './StatePanel';
 import Top10List from './Top10List';
+import useCafeHistory from './cafe/useCafeHistory';
+import useCafeQueue from './cafe/useCafeQueue';
+import useTopSongs from './cafe/useTopSongs';
 
 function getTabs(cafeName) {
   return [
@@ -37,43 +28,72 @@ function getTabs(cafeName) {
 }
 
 export default function CafePage({ slug }) {
-  const [recs, setRecs] = useState([]);
-  const [isAccepting, setIsAccepting] = useState(true);
-  const [notice, setNotice] = useState(null);
-  const [cafeName, setCafeName] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [tab, setTab] = useState('queue');
   const [tabDirection, setTabDirection] = useState('forward');
-  const [cafeTop, setCafeTop] = useState([]);
-  const [cafeTopHasMore, setCafeTopHasMore] = useState(false);
-  const [globalTop, setGlobalTop] = useState([]);
-  const [globalTopHasMore, setGlobalTopHasMore] = useState(false);
-  const [topLoading, setTopLoading] = useState(false);
-  const [topLoaded, setTopLoaded] = useState({ cafeTop: false, globalTop: false });
-  const [topSort, setTopSort] = useState({ cafeTop: 'count', globalTop: 'count' });
-  const [topError, setTopError] = useState('');
-  const [topRetry, setTopRetry] = useState(0);
-  const [allowedPlatforms, setAllowedPlatforms] = useState(VALID_PLATFORMS);
   const [successMsg, setSuccessMsg] = useState('');
   const [successTimer, setSuccessTimer] = useState(null);
   const [copyNotice, setCopyNotice] = useState(null);
-  const [historyRecs, setHistoryRecs] = useState([]);
-  const [historyHasMore, setHistoryHasMore] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
-  const [historyError, setHistoryError] = useState('');
-  const [historyRetry, setHistoryRetry] = useState(0);
   const [historyExpanded, setHistoryExpanded] = useState(null);
   const [queueExpanded, setQueueExpanded] = useState(null);
-  const [playbackState, setPlaybackState] = useState({
-    state: PLAYBACK_STATE.UNKNOWN,
-    recommendationId: null,
-    track: null,
-  });
   const swipeStart = useRef(null);
   const swipeClickTimer = useRef(null);
   const copyNoticeTimer = useRef(null);
+
+  const historyData = useCafeHistory({ slug, active: tab === 'history' });
+  const topData = useTopSongs({ slug, tab });
+  const {
+    items: history,
+    hasMore: historyHasMore,
+    loading: historyLoading,
+    error: historyError,
+    loadMore: loadMoreHistory,
+    retry: retryHistory,
+    upsertRecommendation: upsertHistoryRecommendation,
+    updateRecommendation: updateHistoryRecommendation,
+    patchSongVote: patchHistorySongVote,
+  } = historyData;
+  const {
+    items: topItems,
+    hasMore: topHasMore,
+    loading: topLoading,
+    error: topError,
+    sortBy: topSort,
+    retry: retryTop,
+    loadMore: loadMoreTop,
+    changeSort: changeTopSort,
+    patchSongVote: patchTopSongVote,
+    toggleVote: toggleTopVote,
+  } = topData;
+
+  const handleRealtimeSongVote = useCallback((trackKey, voteCount) => {
+    patchHistorySongVote(trackKey, voteCount);
+    patchTopSongVote(trackKey, voteCount);
+  }, [patchHistorySongVote, patchTopSongVote]);
+
+  const queueData = useCafeQueue({
+    slug,
+    onHistoryTransition: upsertHistoryRecommendation,
+    onHistoryUpdate: updateHistoryRecommendation,
+    onSongVote: handleRealtimeSongVote,
+  });
+  const {
+    recommendations: recs,
+    isAccepting,
+    notice,
+    cafeName,
+    allowedPlatforms,
+    playbackState,
+    loading,
+    error,
+    nowPlaying,
+    waitingQueue,
+    pendingQueue,
+    activeVideoIds,
+    addRecommendation,
+    updateRecommendation,
+    removeRecommendation,
+    patchSongVote: patchQueueSongVote,
+  } = queueData;
   const tabs = getTabs(cafeName);
 
   useEffect(() => () => {
@@ -81,241 +101,23 @@ export default function CafePage({ slug }) {
     if (copyNoticeTimer.current) clearTimeout(copyNoticeTimer.current);
   }, []);
 
-  useEffect(() => {
-    setHistoryRecs([]);
-    setHistoryHasMore(false);
-    setHistoryLoaded(false);
-    setHistoryError('');
-    setCafeTop([]);
-    setGlobalTop([]);
-    setTopLoaded({ cafeTop: false, globalTop: false });
-    setTopError('');
-  }, [slug]);
-
-  const nowPlaying = recs.find(rec => rec.status === REC_STATUS.PLAYING) || null;
-  const waitingQueue = recs
-    .filter(rec => rec.status === REC_STATUS.ACCEPTED)
-    .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-  const pendingQueue = recs
-    .filter(rec => rec.status === REC_STATUS.PENDING)
-    .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at));
-  const history = [...historyRecs]
-    .sort((a, b) => new Date(b.played_at || b.requested_at) - new Date(a.played_at || a.requested_at));
-
-  useEffect(() => {
-    getRecommendations(slug)
-      .then(({ recommendations, is_accepting, notice: nextNotice, cafe_name, allowed_platforms }) => {
-        setRecs(recommendations);
-        setIsAccepting(is_accepting);
-        setNotice(nextNotice);
-        setCafeName(cafe_name);
-        if (allowed_platforms) setAllowedPlatforms(allowed_platforms);
-      })
-      .catch(caught => setError(caught.message))
-      .finally(() => setLoading(false));
-
-    const socket = getSocket(slug);
-    let connected = false;
-
-    socket.on('connect', () => {
-      if (!connected) {
-        connected = true;
-        return;
-      }
-
-      getRecommendations(slug)
-        .then(({ recommendations, is_accepting, notice: nextNotice, cafe_name, allowed_platforms }) => {
-          setRecs(recommendations);
-          setIsAccepting(is_accepting);
-          setNotice(nextNotice);
-          setCafeName(cafe_name);
-          if (allowed_platforms) setAllowedPlatforms(allowed_platforms);
-        })
-        .catch(() => {});
-    });
-
-    socket.on('recommendations_update', ({ action, rec, id }) => {
-      if (action === 'add') setRecs(previous => previous.some(item => item.id === rec.id) ? previous : [rec, ...previous]);
-      if (action === 'update' || action === 'vote') {
-        if (HISTORY_STATUSES.includes(rec.status)) {
-          setRecs(previous => previous.filter(item => item.id !== rec.id));
-          setHistoryRecs(previous => previous.some(item => item.id === rec.id)
-            ? previous.map(item => item.id === rec.id ? rec : item)
-            : [rec, ...previous]);
-        } else {
-          setRecs(previous => previous.map(item => item.id === rec.id ? { ...rec, is_mine: item.is_mine } : item));
-        }
-      }
-      if (action === 'delete') setRecs(previous => previous.filter(item => item.id !== id));
-    });
-
-    // 곡 좋아요는 그 곡의 모든 행에 걸친다. 행 단위 update 이벤트로는 TOP 목록을
-    // 갱신할 수 없어(TOP은 곡 단위 집계다) 곡 키로 따로 받는다.
-    socket.on('song_vote', ({ track_key, vote_count }) => {
-      applySongVote(track_key, vote_count);
-    });
-
-    socket.on('system_toggled', ({ is_accepting }) => setIsAccepting(is_accepting));
-    socket.on('notice_updated', ({ notice: nextNotice }) => setNotice(nextNotice));
-    socket.on('cafe_updated', ({ cafe_name }) => setCafeName(cafe_name));
-    socket.on('platforms_updated', ({ allowed_platforms }) => setAllowedPlatforms(allowed_platforms));
-    socket.on('playback_state', payload => {
-      if (!Object.values(PLAYBACK_STATE).includes(payload?.state)) return;
-      setPlaybackState({
-        state: payload.state,
-        recommendationId: payload.recommendationId || null,
-        track: payload.track || null,
-      });
-    });
-    socket.on('cafe_moved', ({ movedTo }) => {
-      if (movedTo) window.location.replace(`/${movedTo}`);
-    });
-
-    return () => disconnectSocket();
-  }, [slug]);
-
-  useEffect(() => {
-    if (tab !== 'history' || historyLoaded) return;
-    setHistoryLoading(true);
-    setHistoryError('');
-    getRecentHistory(slug, 0)
-      .then(({ items, hasMore }) => {
-        setHistoryRecs(items);
-        setHistoryHasMore(hasMore);
-        setHistoryLoaded(true);
-      })
-      .catch(() => setHistoryError('잠시 후 다시 시도해 주세요.'))
-      .finally(() => setHistoryLoading(false));
-  }, [tab, slug, historyLoaded, historyRetry]);
-
-  // 실패를 삼키면 목록이 비어 "아직 순위를 만들 데이터가 없어요"가 뜬다.
-  // 데이터는 있는데 못 불러온 것뿐이므로 최근 재생과 같이 오류로 구분한다.
-  useEffect(() => {
-    const load = (fetchTop, apply, key) => {
-      setTopLoading(true);
-      setTopError('');
-      fetchTop()
-        .then(({ items, hasMore }) => {
-          apply(items, hasMore);
-          setTopLoaded(previous => ({ ...previous, [key]: true }));
-        })
-        .catch(() => setTopError('잠시 후 다시 시도해 주세요.'))
-        .finally(() => setTopLoading(false));
-    };
-
-    if (tab === 'cafeTop' && !topLoaded.cafeTop) {
-      load(
-        () => getCafeTop10(slug, 0, topSort.cafeTop),
-        (items, hasMore) => { setCafeTop(items); setCafeTopHasMore(hasMore); },
-        'cafeTop',
-      );
-    }
-
-    if (tab === 'globalTop' && !topLoaded.globalTop) {
-      load(
-        () => getGlobalTop10(0, topSort.globalTop),
-        (items, hasMore) => { setGlobalTop(items); setGlobalTopHasMore(hasMore); },
-        'globalTop',
-      );
-    }
-
-    // 두 TOP 탭이 오류 상태를 공유한다. 이미 불러온 탭으로 옮겼을 때
-    // 다른 탭의 실패 문구가 남지 않게 지운다.
-    if (topLoaded[tab]) setTopError('');
-  }, [tab, slug, topLoaded.cafeTop, topLoaded.globalTop, topSort.cafeTop, topSort.globalTop, topRetry]);
-
-  async function loadMoreTop() {
-    setTopLoading(true);
-    try {
-      if (tab === 'cafeTop') {
-        const { items, hasMore } = await getCafeTop10(slug, cafeTop.length, topSort.cafeTop);
-        setCafeTop(previous => [...previous, ...items]);
-        setCafeTopHasMore(hasMore);
-      } else {
-        const { items, hasMore } = await getGlobalTop10(globalTop.length, topSort.globalTop);
-        setGlobalTop(previous => [...previous, ...items]);
-        setGlobalTopHasMore(hasMore);
-      }
-    } catch {
-      // 기존 목록은 유지하고 다시 시도할 수 있게 둔다.
-    } finally {
-      setTopLoading(false);
-    }
-  }
-
-  async function changeTopSort(sort) {
-    if (!['count', 'votes'].includes(sort) || sort === topSort[tab]) return;
-    setTopSort(previous => ({ ...previous, [tab]: sort }));
-    setTopLoading(true);
-    try {
-      const result = tab === 'cafeTop'
-        ? await getCafeTop10(slug, 0, sort)
-        : await getGlobalTop10(0, sort);
-      if (tab === 'cafeTop') {
-        setCafeTop(result.items);
-        setCafeTopHasMore(result.hasMore);
-      } else {
-        setGlobalTop(result.items);
-        setGlobalTopHasMore(result.hasMore);
-      }
-    } catch {
-      setTopSort(previous => ({ ...previous, [tab]: topSort[tab] }));
-    } finally {
-      setTopLoading(false);
-    }
-  }
-
-  async function loadMoreHistory() {
-    setHistoryLoading(true);
-    try {
-      const { items, hasMore } = await getRecentHistory(slug, historyRecs.length);
-      setHistoryRecs(previous => [...previous, ...items.filter(item => !previous.some(existing => existing.id === item.id))]);
-      setHistoryHasMore(hasMore);
-    } catch {
-      // 기존 이력은 유지하고 다시 시도할 수 있게 둔다.
-    } finally {
-      setHistoryLoading(false);
-    }
-  }
-
   function handleUpdate(updated) {
-    if (HISTORY_STATUSES.includes(updated.status)) {
-      setHistoryRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
-    } else {
-      setRecs(previous => previous.map(rec => rec.id === updated.id ? updated : rec));
-    }
-  }
-
-  // 같은 곡이 큐·최근 재생·양쪽 TOP에 동시에 있을 수 있다. 한 번의 좋아요를
-  // 네 목록 모두에 같은 값으로 반영한다.
-  function applySongVote(trackKey, voteCount) {
-    if (!trackKey) return;
-    const patchRec = list => list.map(rec => (trackKeyOf(rec.video_id) === trackKey
-      ? { ...rec, vote_count: voteCount }
-      : rec));
-    const patchTop = list => list.map(item => (trackKeyOf(item.video_id) === trackKey
-      ? { ...item, total_votes: voteCount }
-      : item));
-    setRecs(patchRec);
-    setHistoryRecs(patchRec);
-    setCafeTop(patchTop);
-    setGlobalTop(patchTop);
+    updateRecommendation(updated);
   }
 
   // 전체 TOP은 다른 매장의 곡도 보여주지만 좋아요는 손님이 있는 이 매장에 남는다.
   async function handleTopVote(trackKey, voted) {
     try {
-      const { vote_count } = voted ? await unvoteSong(slug, trackKey) : await voteSong(slug, trackKey);
-      if (voted) removeVote(slug, trackKey);
-      else markVoted(slug, trackKey);
-      applySongVote(trackKey, vote_count);
+      const voteCount = await toggleTopVote(trackKey, voted);
+      patchQueueSongVote(trackKey, voteCount);
+      patchHistorySongVote(trackKey, voteCount);
     } catch (caught) {
       handleCopyResult({ type: 'error', message: caught.message });
     }
   }
 
   function handleDelete(id) {
-    setRecs(previous => previous.filter(rec => rec.id !== id));
+    removeRecommendation(id);
   }
 
   function handleCopyResult(result) {
@@ -325,9 +127,7 @@ export default function CafePage({ slug }) {
   }
 
   function handleAdded(rec) {
-    setRecs(previous => previous.some(item => item.id === rec.id)
-      ? previous.map(item => item.id === rec.id ? rec : item)
-      : [rec, ...previous]);
+    addRecommendation(rec);
     const position = recs.filter(item => [REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(item.status)).length + 1;
     setSuccessMsg(`신청했어요. 현재 ${position}번째로 기다리고 있어요.`);
     if (successTimer) clearTimeout(successTimer);
@@ -500,7 +300,7 @@ export default function CafePage({ slug }) {
               slug={slug}
               onAdded={handleAdded}
               playingVideoId={nowPlaying?.video_id}
-              activeVideoIds={recs.filter(rec => ACTIVE_STATUSES.includes(rec.status)).map(rec => rec.video_id)}
+              activeVideoIds={activeVideoIds}
               allowedPlatforms={allowedPlatforms}
             />
           )}
@@ -571,7 +371,7 @@ export default function CafePage({ slug }) {
           ) : historyError && history.length === 0 ? (
             <>
               <StatePanel title='최근 재생을 불러오지 못했어요.' description={historyError} />
-              <button type='button' className='button button--secondary button--full' onClick={() => setHistoryRetry(value => value + 1)}>
+              <button type='button' className='button button--secondary button--full' onClick={retryHistory}>
                 다시 시도
               </button>
             </>
@@ -612,14 +412,14 @@ export default function CafePage({ slug }) {
       {(tab === 'cafeTop' || tab === 'globalTop') && (
         <div id={`music-panel-${tab}`} aria-labelledby={`music-tab-${tab}`} key={tab} className={`tab-panel tab-panel--${tabDirection}`} role='tabpanel'>
           <Top10List
-            items={tab === 'cafeTop' ? cafeTop : globalTop}
-            hasMore={tab === 'cafeTop' ? cafeTopHasMore : globalTopHasMore}
+            items={topItems}
+            hasMore={topHasMore}
             loading={topLoading}
             slug={tab === 'cafeTop' ? slug : null}
             voteSlug={slug}
-            sortBy={topSort[tab]}
+            sortBy={topSort}
             error={topError}
-            onRetry={() => setTopRetry(value => value + 1)}
+            onRetry={retryTop}
             onSortChange={changeTopSort}
             onLoadMore={loadMoreTop}
             onCopyResult={handleCopyResult}
