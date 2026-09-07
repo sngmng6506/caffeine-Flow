@@ -22,15 +22,14 @@ function excludePlaylists(query) {
 
 // 곡 라벨은 (platform, track_key) join으로 붙여오므로 결과 row에 annotation_*
 // 컬럼이 평평하게 섞여 있다. 이를 중첩 객체로 되돌린다.
-function attachTrackAnnotation(row) {
+function attachLabelingContext(row) {
   const decision = { ...row };
   for (const key of Object.keys(row)) {
-    if (key.startsWith('annotation_')) delete decision[key];
+    if (key.startsWith('annotation_') || key.startsWith('analysis_')) delete decision[key];
   }
-  if (!row.annotation_id) return { ...decision, track_annotation: null };
-  return {
+  const result = {
     ...decision,
-    track_annotation: {
+    track_annotation: row.annotation_id ? {
       id: row.annotation_id,
       artist_name: row.annotation_artist_name,
       track_version: row.annotation_track_version,
@@ -44,13 +43,51 @@ function attachTrackAnnotation(row) {
       usage_scope: row.annotation_usage_scope,
       schema_version: row.annotation_schema_version,
       updated_at: row.annotation_updated_at,
-    },
+    } : null,
+    audio_analysis: row.analysis_id ? {
+      id: row.analysis_id,
+      model_name: row.analysis_model_name,
+      model_version: row.analysis_model_version,
+      feature_schema_version: row.analysis_feature_schema_version,
+      rights_basis: row.analysis_rights_basis,
+      source_reference: row.analysis_source_reference,
+      features: row.analysis_features,
+      suggested_annotation: row.analysis_suggested_annotation,
+      review_status: row.analysis_review_status,
+      analyzed_at: row.analysis_analyzed_at,
+      reviewed_at: row.analysis_reviewed_at,
+    } : null,
   };
+  return result;
 }
 
 function joinTrackAnnotation() {
   this.on('annotation.platform', '=', 'recommendation.platform')
     .andOn('annotation.track_key', '=', 'recommendation.video_id');
+}
+
+// 모델을 여러 번 비교할 수 있으므로 곡별 최신 분석 한 건만 라벨링 큐에 붙인다.
+// DISTINCT ON의 선두 정렬은 식별자와 같아야 하며, 같은 시각이면 UUID로 결정한다.
+function latestAudioAnalysisQuery() {
+  return db({ audio: 'music_audio_analyses' })
+    .distinctOn('audio.platform', 'audio.track_key')
+    .select(
+      'audio.platform', 'audio.track_key', 'audio.id',
+      'audio.model_name', 'audio.model_version', 'audio.feature_schema_version',
+      'audio.rights_basis', 'audio.source_reference', 'audio.features',
+      'audio.suggested_annotation', 'audio.review_status',
+      'audio.analyzed_at', 'audio.reviewed_at',
+    )
+    .orderBy('audio.platform')
+    .orderBy('audio.track_key')
+    .orderBy('audio.analyzed_at', 'desc')
+    .orderBy('audio.id', 'desc')
+    .as('analysis');
+}
+
+function joinAudioAnalysis() {
+  this.on('analysis.platform', '=', 'recommendation.platform')
+    .andOn('analysis.track_key', '=', 'recommendation.video_id');
 }
 
 const QUEUE_COLUMNS = [
@@ -74,6 +111,17 @@ const QUEUE_COLUMNS = [
   'annotation.usage_scope as annotation_usage_scope',
   'annotation.schema_version as annotation_schema_version',
   'annotation.updated_at as annotation_updated_at',
+  'analysis.id as analysis_id',
+  'analysis.model_name as analysis_model_name',
+  'analysis.model_version as analysis_model_version',
+  'analysis.feature_schema_version as analysis_feature_schema_version',
+  'analysis.rights_basis as analysis_rights_basis',
+  'analysis.source_reference as analysis_source_reference',
+  'analysis.features as analysis_features',
+  'analysis.suggested_annotation as analysis_suggested_annotation',
+  'analysis.review_status as analysis_review_status',
+  'analysis.analyzed_at as analysis_analyzed_at',
+  'analysis.reviewed_at as analysis_reviewed_at',
 ];
 
 const CAFE_AUDIT_COLUMNS = [
@@ -99,8 +147,8 @@ function paginate(rows, pageSize, offset) {
 /**
  * 전체 카페를 가로지르는 라벨링 큐.
  *
- * 완료의 정의는 "정책 검수와 곡 라벨이 모두 있음"이다. 둘 중 하나만 있으면
- * 미검수로 남는다 — 한쪽만 저장하고 넘어간 항목을 놓치지 않기 위해서다.
+ * 완료의 정의는 "정책 검수와 곡 라벨이 있고 최신 자동 분석도 검수됨"이다.
+ * 자동 분석이 없는 곡은 기존처럼 정책 검수와 곡 라벨만으로 완료다.
  */
 async function fetchLabelingQueue({ view, offset }) {
   const processed = excludePlaylists(
@@ -111,15 +159,24 @@ async function fetchLabelingQueue({ view, offset }) {
   const decisionsQuery = processed.clone()
     .leftJoin({ cafe: 'cafes' }, 'cafe.id', 'recommendation.cafe_id')
     .leftJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
-    .leftJoin({ annotation: 'music_track_annotations' }, joinTrackAnnotation);
+    .leftJoin({ annotation: 'music_track_annotations' }, joinTrackAnnotation)
+    .leftJoin(latestAudioAnalysisQuery(), joinAudioAnalysis);
 
   if (view === 'unreviewed') {
     decisionsQuery.where((builder) => {
-      builder.whereNull('review.recommendation_id').orWhereNull('annotation.id');
+      builder
+        .whereNull('review.recommendation_id')
+        .orWhereNull('annotation.id')
+        .orWhere('analysis.review_status', 'pending');
     });
   }
   if (view === 'reviewed') {
-    decisionsQuery.whereNotNull('review.recommendation_id').whereNotNull('annotation.id');
+    decisionsQuery
+      .whereNotNull('review.recommendation_id')
+      .whereNotNull('annotation.id')
+      .where((builder) => {
+        builder.whereNull('analysis.id').orWhere('analysis.review_status', 'reviewed');
+      });
   }
 
   const [totalRow, reviewedRow, decisionRows] = await Promise.all([
@@ -127,6 +184,10 @@ async function fetchLabelingQueue({ view, offset }) {
     processed.clone()
       .innerJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
       .innerJoin({ annotation: 'music_track_annotations' }, joinTrackAnnotation)
+      .leftJoin(latestAudioAnalysisQuery(), joinAudioAnalysis)
+      .where((builder) => {
+        builder.whereNull('analysis.id').orWhere('analysis.review_status', 'reviewed');
+      })
       .count('recommendation.id as count')
       .first(),
     decisionsQuery
@@ -144,7 +205,7 @@ async function fetchLabelingQueue({ view, offset }) {
 
   return {
     summary: { total, reviewed, unreviewed: Math.max(0, total - reviewed) },
-    decisions: page.map(attachTrackAnnotation),
+    decisions: page.map(attachLabelingContext),
     view,
     offset,
     has_more: hasMore,
@@ -200,12 +261,19 @@ async function fetchCafeAudit({ cafeId, offset }) {
 }
 
 /**
- * 정책 검수와 곡 라벨을 한 트랜잭션으로 upsert한다.
+ * 정책 검수와 곡 라벨, 화면에 표시한 자동 분석 검수 상태를 한 트랜잭션으로 반영한다.
  *
  * 둘을 따로 저장하면 한쪽만 남은 항목이 생겨 완료 집계가 어긋난다.
  * AI 판단(`recommendations.filter_status`)과 큐 상태는 건드리지 않는다.
  */
-function saveReview({ recommendation, humanDecision, humanReasonCode, metadataSufficient, annotation }) {
+function saveReview({
+  recommendation,
+  humanDecision,
+  humanReasonCode,
+  metadataSufficient,
+  annotation,
+  audioAnalysisId,
+}) {
   return db.transaction(async (trx) => {
     const reviewedAt = new Date();
     const [savedReview] = await trx('music_filter_reviews')
@@ -261,6 +329,19 @@ function saveReview({ recommendation, humanDecision, humanReasonCode, metadataSu
       })
       .returning('*');
 
+    // 자동 분석값은 참고 자료다. 수동 곡 라벨을 저장한 시점을 해당 분석의
+    // 검수 완료로 기록하되, 자동값 자체나 과거 모델 결과를 덮어쓰지 않는다.
+    if (audioAnalysisId) {
+      await trx('music_audio_analyses')
+        .where({
+          id: audioAnalysisId,
+          platform: recommendation.platform,
+          track_key: recommendation.video_id,
+          review_status: 'pending',
+        })
+        .update({ review_status: 'reviewed', reviewed_at: reviewedAt, updated_at: reviewedAt });
+    }
+
     return { ...savedReview, track_annotation: savedAnnotation };
   });
 }
@@ -274,14 +355,23 @@ function findReviewableRecommendation({ cafeId, recommendationId }) {
     .first();
 }
 
+/** 화면에 표시한 분석 ID가 같은 플랫폼 원본 곡에 속하는지 확인한다. */
+function findTrackAudioAnalysis({ audioAnalysisId, platform, trackKey }) {
+  return db('music_audio_analyses')
+    .where({ id: audioAnalysisId, platform, track_key: trackKey })
+    .select('id')
+    .first();
+}
+
 module.exports = {
   LABELING_VIEWS,
   LABELING_QUEUE_PAGE_SIZE,
   CAFE_AUDIT_PAGE_SIZE,
-  attachTrackAnnotation,
+  attachLabelingContext,
   fetchLabelingQueue,
   fetchArtistLabels,
   fetchCafeAudit,
   saveReview,
   findReviewableRecommendation,
+  findTrackAudioAnalysis,
 };

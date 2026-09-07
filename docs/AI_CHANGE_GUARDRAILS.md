@@ -73,6 +73,23 @@ server/src/routes/admin.js
 - 통합 라벨링 큐와 전체·완료·미검수 집계는 제목에 `Playlist` 또는 `플리`가 포함된 항목을 동일하게 제외한다.
 - 수집된 사람 라벨을 Exact 재사용·프롬프트·동일 아티스트 검색에 연결하려면 별도 평가와 계약 변경이 필요하다.
 
+## Audio Analysis Contract
+
+```text
+audio-analysis-worker/
+server/src/constants/audio-analysis.js
+server/src/features/audio-analysis/
+server/src/db/migrations/20260907090000_music_audio_analyses.js
+server/src/routes/audio-analysis.js
+```
+
+- 외부 음악 링크 등록을 다운로드·분석 권한으로 간주하지 않는다. 워커는 권리가 확인된 로컬 파일만 읽고 서버에는 특징값과 권리 근거 참조만 전송한다.
+- 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
+- 자동 분석은 `(platform, track_key, model_name, model_version)`으로 중복을 방지하고 같은 버전 재분석은 최신 결과로 갱신한다.
+- 자동 추천값은 수동 곡 라벨을 덮어쓰거나 자동 저장하지 않는다. 새 분석은 `pending`, 사람이 곡 라벨을 저장한 뒤 `reviewed`다.
+- Valence/Arousal 값이 없는 경우 템포나 음량 휴리스틱으로 분위기를 추측해 채우지 않는다.
+- 자동 분석은 현재 실시간 LLM 입력이나 추천곡 상태 변경에 사용하지 않는다. 연결 전 골드 라벨 비교, false accept, 라이선스를 별도로 검토한다.
+
 ## Router Mount Order Contract
 
 `server/app.js`에서 사장님 추천곡 라우터를 public 라우터보다 먼저 등록한다.

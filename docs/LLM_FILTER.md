@@ -135,6 +135,13 @@ genre_tags(선택, 최대 2) · note(선택) · usage_scope · schema_version
 - 음악 라벨링은 카페 구분 없이 전체·완료·미검수를 집계하고 최근 판단순 50건씩 가져온다. 저장은 기존 카페·추천곡 범위 검증을 통과한 뒤 두 레코드를 한 트랜잭션으로 반영하며, 둘 다 있어야 완료로 센다. 제목에 `Playlist` 또는 `플리`가 포함된 항목은 큐와 집계에서 제외한다.
 - 현재는 수집만 한다. `usage_scope=operational`이어도 자동수락, LLM 프롬프트, Exact 재사용, 동일 아티스트 검색에 쓰지 않으며 성능 지표도 자동 계산하지 않는다. 라이브 연결은 별도 평가와 계약 변경 후 진행한다.
 
+**자동 음향 분석** — `music_audio_analyses`에 `(platform, track_key, model_name, model_version)`당 한 건.
+
+- `audio-analysis-worker/`가 권리 확인 로컬 파일을 Essentia로 분석하고 서버에는 특징값만 제출한다. 외부 플랫폼 링크를 다운로드하거나 오디오 원본을 전송하지 않는다.
+- 현재 범위는 BPM, 조성, danceability, 음량, 다이내믹 복잡도, spectral centroid, energy와 템포·리듬 추천이다. 라이선스가 별도로 필요한 감정 모델은 포함하지 않아 Valence/Arousal과 분위기 추천은 비워둔다.
+- 곡별 최신 분석은 라벨링 화면에 참고값으로 표시한다. 추천값 적용은 폼 선택만 돕고 자동 저장하지 않으며, 사람이 곡 라벨을 저장해야 `reviewed`가 된다.
+- 같은 모델 버전의 재분석 또는 새 모델 분석은 다시 `pending`이 된다. 자동 분석은 기존 수동 라벨을 덮어쓰지 않고 실시간 LLM 판단에도 사용하지 않는다.
+
 ## 구현 위치
 
 ```text
@@ -146,6 +153,8 @@ server/src/features/music-filter/
 └── decision.policy.js       판단 정규화와 오류 변환
 server/src/features/music-labeling/annotation.js  수동 곡 라벨 정규화·검증
 server/src/constants/music-labeling.js            수동 곡 라벨 코드·개수 제한
+server/src/features/audio-analysis/               자동 분석 결과 검증·저장
+audio-analysis-worker/                            Essentia 특징 추출·추천값 생성
 
 owner/src/pages/dashboard/MusicFilterSettings.jsx
 owner/src/pages/dashboard/useRecommendationQueue.js

@@ -333,6 +333,7 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
 
   const { human_decision: humanDecision, human_reason_code: humanReasonCode } = req.body || {};
   const metadataSufficient = req.body?.metadata_sufficient;
+  const audioAnalysisId = req.body?.audio_analysis_id ?? null;
   if (!HUMAN_DECISIONS.includes(humanDecision)) {
     return res.status(400).json({ error: 'human_decision은 accept, reject 또는 undetermined여야 합니다' });
   }
@@ -341,6 +342,9 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
   }
   if (metadataSufficient !== null && typeof metadataSufficient !== 'boolean') {
     return res.status(400).json({ error: 'metadata_sufficient는 boolean 또는 null이어야 합니다' });
+  }
+  if (audioAnalysisId !== null && !isUuid(audioAnalysisId)) {
+    return res.status(400).json({ error: 'audio_analysis_id가 올바르지 않습니다' });
   }
   const annotationCheck = req.body?.track_annotation === undefined
     ? { value: null }
@@ -352,6 +356,14 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
     recommendationId: req.params.recommendationId,
   });
   if (!recommendation) return res.status(404).json({ error: 'AI 판단 이력을 찾을 수 없습니다' });
+  if (audioAnalysisId) {
+    const analysis = await labelingReview.findTrackAudioAnalysis({
+      audioAnalysisId,
+      platform: recommendation.platform,
+      trackKey: recommendation.video_id,
+    });
+    if (!analysis) return res.status(404).json({ error: '오디오 분석 결과를 찾을 수 없습니다' });
+  }
 
   const saved = await labelingReview.saveReview({
     recommendation,
@@ -359,6 +371,7 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
     humanReasonCode,
     metadataSufficient,
     annotation: annotationCheck.value,
+    audioAnalysisId,
   });
   res.json(saved);
 });

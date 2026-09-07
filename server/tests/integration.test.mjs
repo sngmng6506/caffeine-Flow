@@ -9,11 +9,12 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
 process.env.NODE_ENV = 'test';
+process.env.AUDIO_ANALYSIS_WORKER_TOKEN ||= 'integration-worker-token';
 
 const { app } = await import('../app.js');
 const db = (await import('../src/db/knex.js')).default ?? (await import('../src/db/knex.js'));
 const { issueTrackMetadataToken } = await import('../src/services/track-metadata-token.service.js');
-const { issuePendingToken } = await import('../src/utils/jwt.js');
+const { issuePendingToken, issueAdminToken } = await import('../src/utils/jwt.js');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -1065,5 +1066,87 @@ describe('사장님 상태 변경 — 인증·전이 검증', () => {
 
     expect(res.status).toBe(409);
     expect((await db('recommendations').where({ id: current.id }).first()).status).toBe('playing');
+  });
+});
+
+describe('Essentia 분석 결과와 라벨링 검수', () => {
+  it('전용 토큰으로 저장하고 최신 분석을 검수 완료 처리한다', async () => {
+    const [recommendation] = await db('recommendations').insert({
+      cafe_id: cafe.id,
+      video_id: 'authorized_audio_track',
+      title: '권리 확인 분석곡',
+      channel_title: '테스트 아티스트',
+      platform: 'youtube',
+      status: 'pending',
+      filter_status: 'accepted',
+      filter_checked_at: new Date(),
+    }).returning('*');
+
+    const analysisResponse = await request(app)
+      .post('/api/v1/audio-analysis/results')
+      .set({ Authorization: 'Bearer integration-worker-token' })
+      .send({
+        platform: 'youtube',
+        track_key: recommendation.video_id,
+        model_name: 'essentia-standard',
+        model_version: 'test-version',
+        feature_schema_version: 1,
+        rights_basis: 'licensed',
+        source_reference: 'integration-license-ticket',
+        analyzed_at: new Date().toISOString(),
+        features: { duration_seconds: 180, sample_rate: 44100, bpm: 96, danceability: 1.1 },
+        suggested_annotation: {
+          tempo_class: 'moderate',
+          rhythmic_character: 'steady',
+          mood_tags: [],
+        },
+      });
+
+    expect(analysisResponse.status).toBe(201);
+    expect(analysisResponse.body.review_status).toBe('pending');
+
+    const adminToken = issueAdminToken();
+    const queueResponse = await request(app)
+      .get('/api/v1/admin/music-filter-reviews?view=unreviewed')
+      .set({ Authorization: `Bearer ${adminToken}` });
+    expect(queueResponse.status).toBe(200);
+    const queueItem = queueResponse.body.decisions.find(item => item.id === recommendation.id);
+    expect(queueItem.audio_analysis).toEqual(expect.objectContaining({
+      id: analysisResponse.body.id,
+      review_status: 'pending',
+      features: expect.objectContaining({ bpm: 96 }),
+    }));
+
+    const reviewResponse = await request(app)
+      .put(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit/${recommendation.id}/review`)
+      .set({ Authorization: `Bearer ${adminToken}` })
+      .send({
+        human_decision: 'accept',
+        human_reason_code: 'policy_match',
+        metadata_sufficient: true,
+        audio_analysis_id: analysisResponse.body.id,
+        track_annotation: {
+          artist_name: '테스트 아티스트',
+          track_version: 'original',
+          tempo_class: 'moderate',
+          mood_tags: ['peaceful'],
+          instrumentation_type: 'hybrid',
+          rhythmic_character: 'steady',
+          vocal_type: 'singing',
+          genre_tags: [],
+          note: null,
+          usage_scope: 'evaluation',
+        },
+      });
+    expect(reviewResponse.status).toBe(200);
+    expect((await db('music_audio_analyses')
+      .where({ id: analysisResponse.body.id })
+      .first()).review_status).toBe('reviewed');
+
+    await db('music_track_annotations')
+      .where({ platform: 'youtube', track_key: recommendation.video_id })
+      .del();
+    await db('music_audio_analyses').where({ id: analysisResponse.body.id }).del();
+    await db('recommendations').where({ id: recommendation.id }).del();
   });
 });

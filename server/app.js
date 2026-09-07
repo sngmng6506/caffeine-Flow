@@ -105,6 +105,7 @@ app.use('/api/v1/cafes',                         require('./src/routes/cafes'));
 app.use('/api/v1/cafes/:slug/recommendations',   require('./src/routes/recommendations.owner'));
 app.use('/api/v1/cafes/:slug/recommendations',   require('./src/routes/recommendations'));
 app.use('/api/v1/tracks',                        require('./src/routes/tracks'));
+app.use('/api/v1/audio-analysis',                require('./src/routes/audio-analysis'));
 app.use('/api/v1/cafes/:slug/songs/:videoId/comments', require('./src/routes/song_comments'));
 app.use('/api/v1/songs/:videoId/comments',             require('./src/routes/song_comments'));
 

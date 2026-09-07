@@ -78,6 +78,7 @@ YouTube 아닌 플랫폼, 같은 곡의 추적 파라미터 변형, 전체 TOP �
 | `SERVER_URL` | Naver callback 기준 서버 URL |
 | `DATABASE_SSL` | `disable`, `no-verify`, `verify` |
 | `ADMIN_PASSWORD` | 운영자 콘솔 비밀번호. 없으면 `/admin/login`이 503 |
+| `AUDIO_ANALYSIS_WORKER_TOKEN` | Essentia 워커 결과 제출 전용 토큰. 없으면 결과 수집 API가 503 |
 | `GOOGLE_CLIENT_ID` | Google 로그인 |
 | `NAVER_CLIENT_ID` | Naver 로그인 |
 | `NAVER_CLIENT_SECRET` | Naver 로그인 |
@@ -96,6 +97,29 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 owner Vite 빌드는 `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_ENABLED`를 사용한다.
 
 구조화 출력을 tool(function) call로 받으므로 모델은 tool calling을 지원해야 한다. 동작 계약은 [LLM_FILTER.md](LLM_FILTER.md)를 따른다.
+
+## Essentia 라벨링 워커
+
+`audio-analysis-worker/`는 서버와 별도 Python 프로세스로 실행한다. 권리가 확인된 로컬 파일만 입력받고 원본 음원은 서버에 전송하지 않는다.
+
+```bash
+cd audio-analysis-worker
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python analyze.py ./authorized-track.wav \
+  --platform youtube --track-key VIDEO_ID \
+  --rights-basis licensed --source-reference license-ticket-001 \
+  --server-url http://localhost:3000
+```
+
+서버와 워커에 같은 `AUDIO_ANALYSIS_WORKER_TOKEN`을 설정한다. 상세 옵션과 Windows 실행법은 [audio-analysis-worker/README.md](../audio-analysis-worker/README.md)를 따른다.
+
+```bash
+python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
+```
+
+Essentia와 사전학습 모델은 상업 적용 전에 각각 라이선스를 확인한다. 현재 워커는 라이선스가 별도로 필요한 감정 모델을 포함하지 않으며 Valence/Arousal을 `null`로 저장한다.
 
 ## 마이그레이션
 

@@ -36,6 +36,9 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(app).toContain('/admin/cafes/${item.cafe_id}/music-filter-audit/${item.id}/review');
     expect(app).toContain('/admin/music-filter-artist-labels?');
     expect(app).toContain('track_annotation');
+    expect(app).toContain('audio_analysis');
+    expect(app).toContain('renderAudioAnalysis');
+    expect(app).toContain('applyAnalysisSuggestion');
     expect(app).toContain('기존 곡 라벨 불러옴');
     expect(app).toContain(`metadata_sufficient: item.metadata_sufficient ?? null`);
     expect(app).toContain(`setRadio('tempo_class', annotation.tempo_class)`);
@@ -44,7 +47,8 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).toContain('랩·말하기 위주');
     expect(html).not.toContain('노래와 랩이 섞임');
     expect(html).not.toContain('라벨 확신도');
-    expect(html).not.toContain('에너지');
+    expect(html).toContain('Essentia 자동 분석');
+    expect(html).toContain('자동 분석은 골드 라벨이 아닙니다');
     expect(html).not.toContain('콘텐츠 주의 요소');
     expect(html).not.toContain('선택 기준 도움말');
     expect(html).not.toContain('곡 버전');

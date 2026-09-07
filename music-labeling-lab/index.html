@@ -64,6 +64,31 @@
           </div>
         </details>
 
+        <section id='audioAnalysis' class='audio-analysis' hidden>
+          <div class='audio-analysis-head'>
+            <div>
+              <span class='analysis-eyebrow'>Essentia 자동 분석</span>
+              <h3>음향 특징과 추천값</h3>
+            </div>
+            <span id='analysisStatus' class='analysis-status'></span>
+          </div>
+          <p class='analysis-notice'>자동 분석은 골드 라벨이 아닙니다. 곡을 직접 듣고 추천값을 검수해주세요.</p>
+          <dl class='analysis-metrics'>
+            <div><dt>BPM</dt><dd id='analysisBpm'>—</dd></div>
+            <div><dt>조성</dt><dd id='analysisKey'>—</dd></div>
+            <div><dt>댄서빌리티</dt><dd id='analysisDanceability'>—</dd></div>
+            <div><dt>평균 음량</dt><dd id='analysisLoudness'>—</dd></div>
+            <div><dt>다이내믹</dt><dd id='analysisDynamic'>—</dd></div>
+            <div><dt>스펙트럼 중심</dt><dd id='analysisCentroid'>—</dd></div>
+          </dl>
+          <div class='analysis-suggestion'>
+            <span>추천 라벨</span>
+            <p id='analysisSuggestion'>—</p>
+            <button type='button' id='applyAnalysisSuggestion' class='secondary-button'>추천값을 선택지에 적용</button>
+          </div>
+          <p id='analysisProvenance' class='analysis-provenance'></p>
+        </section>
+
         <form id='reviewForm'>
           <section class='form-section artist-section'>
             <div class='section-title'>

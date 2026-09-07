@@ -68,6 +68,23 @@ pre { margin: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 13
 .policy-result span { color: #677188; }
 .policy-result strong { padding: 4px 8px; border-radius: 5px; }
 
+.audio-analysis { margin-top: 18px; padding: 16px; background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 10px; }
+.audio-analysis-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.analysis-eyebrow { color: #2563eb; font-size: 11px; font-weight: 700; }
+.audio-analysis h3 { margin: 3px 0 0; font-size: 15px; }
+.analysis-status { padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.analysis-status--pending { color: #92400e; background: #fef3c7; }
+.analysis-status--reviewed { color: #166534; background: #dcfce7; }
+.analysis-notice { margin: 10px 0 0; color: #566176; font-size: 12px; }
+.analysis-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 0; }
+.analysis-metrics div { padding: 9px 10px; background: #fff; border: 1px solid #dbeafe; border-radius: 7px; }
+.analysis-metrics dt { font-size: 10px; }
+.analysis-metrics dd { margin-top: 3px; font-size: 13px; font-weight: 700; }
+.analysis-suggestion { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #bfdbfe; }
+.analysis-suggestion > span { color: #566176; font-size: 11px; }
+.analysis-suggestion p { margin: 0; font-size: 12px; font-weight: 700; }
+.analysis-provenance { margin: 10px 0 0; color: #7b8496; font-size: 10px; overflow-wrap: anywhere; }
+
 form { margin-top: 22px; }
 .form-section { padding: 20px 0; border-top: 1px solid #e2e7ef; }
 .form-section:first-child { border-top: 0; }
@@ -138,5 +155,7 @@ legend { margin-bottom: 8px; color: #4a5568; font-size: 12px; font-weight: 700; 
   .choice-grid, .choice-grid.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .mood-grid, .genre-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .artist-input-row { grid-template-columns: 1fr; }
+  .analysis-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .analysis-suggestion { grid-template-columns: 1fr; }
   .section-title { align-items: flex-start; flex-direction: column; }
 }

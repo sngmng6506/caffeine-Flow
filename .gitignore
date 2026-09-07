@@ -14,6 +14,11 @@ node_modules/
 server/public/
 owner/dist/
 
+# Python 분석 워커 로컬 환경·바이트코드
+__pycache__/
+*.py[cod]
+.venv/
+
 # 로컬 임시 스크립트
 server/test-api.js
 server/test-db.js

@@ -126,10 +126,22 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
 
 - 잘못된 UUID와 미존재 카페는 404다. 정지 카페는 손님 HTTP와 Socket.IO 접근이 차단된다.
-- 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
+- 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, audio_analysis_id?, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 화면에 표시한 최신 자동 분석 ID를 함께 보내면 해당 곡·분석 한 건만 `reviewed`로 바뀐다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
 - 해당 카페의 AI 처리 이력만 검수할 수 있고, 사람 라벨은 신청곡 상태나 LLM 판단을 바꾸지 않는다.
 - 곡 라벨은 `(platform, track_key)`당 한 건으로 upsert한다.
 - 라벨링 큐 `view`는 `unreviewed`(기본), `reviewed`, `all`이며 최근 판단순 50건을 반환한다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`다. 저장하면 미검수 목록이 줄어들므로 다음 묶음은 `offset=0`부터 다시 조회한다. 제목에 대소문자 구분 없이 `Playlist` 또는 `플리`가 포함된 항목은 모든 view와 집계에서 제외한다.
+
+## 오디오 분석 워커 — `/audio-analysis`
+
+| Method | Path | 인증 | 요약 |
+| --- | --- | :-: | --- |
+| POST | `/audio-analysis/results` | 워커 | 권리가 확인된 로컬 음원에서 추출한 Essentia 특징과 추천 라벨을 곡·모델 버전별 upsert |
+
+- `Authorization: Bearer <AUDIO_ANALYSIS_WORKER_TOKEN>` 전용 경계이며 관리자·사장님 JWT를 재사용하지 않는다. 토큰 미설정 시 503이다.
+- body는 `platform`, `track_key`, `model_name`, `model_version`, `feature_schema_version`, `rights_basis`, `source_reference`, `features`, `suggested_annotation`, `analyzed_at`을 받는다.
+- `rights_basis`는 `owned`, `licensed`, `public_domain`, `other_authorized`만 허용한다. 오디오 파일이나 외부 다운로드 URL은 받지 않는다.
+- 동일한 `(platform, track_key, model_name, model_version)` 결과는 갱신되고 다시 `pending` 검수 상태가 된다.
+- 라벨링 큐는 곡별 최신 분석을 `audio_analysis`로 반환한다. 새 분석이 `pending`이면 기존 수동 라벨이 있어도 미검수 목록에 다시 나타나며, 수동 곡 라벨 저장 시 `reviewed`가 된다.
 
 ## 통합 TOP10과 헬스체크
 

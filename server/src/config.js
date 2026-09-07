@@ -32,6 +32,10 @@ module.exports = {
   // 못 뜨는 편이 더 나쁘기 때문.
   ADMIN_PASSWORD: env('ADMIN_PASSWORD'),
 
+  // 권리가 확인된 로컬 음원을 분석하는 별도 Essentia 워커 전용 토큰.
+  // 미설정이면 결과 수집 API만 503으로 비활성화되고 서비스 본체는 계속 동작한다.
+  AUDIO_ANALYSIS_WORKER_TOKEN: env('AUDIO_ANALYSIS_WORKER_TOKEN'),
+
   // 운영자 에러 알림용 Discord webhook. 미설정이면 알림 없이 정규화 로그만
   // 남긴다 — 로컬 개발과 테스트에서 웹훅이 나가지 않도록 하는 기본값이다.
   ALERT_WEBHOOK_URL: env('ALERT_WEBHOOK_URL'),

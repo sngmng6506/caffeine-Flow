@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../config');
+const crypto = require('crypto');
+const { JWT_SECRET, AUDIO_ANALYSIS_WORKER_TOKEN } = require('../config');
 const { ADMIN_ROLE } = require('../constants/roles');
 const cafeService = require('../services/cafe.service');
 
@@ -53,4 +54,20 @@ function requireAdmin(req, res, next) {
   }
 }
 
-module.exports = { requireAuth, requireCafeOwner, requireAdmin };
+// Essentia 워커는 관리자 JWT나 사장님 세션을 재사용하지 않는다. 제출 전용
+// 장기 토큰을 해시 비교하고, 미설정 환경에서는 엔드포인트 자체를 비활성화한다.
+function requireAudioAnalysisWorker(req, res, next) {
+  if (!AUDIO_ANALYSIS_WORKER_TOKEN) {
+    return res.status(503).json({ error: '오디오 분석 워커가 비활성화되어 있습니다' });
+  }
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  const provided = crypto.createHash('sha256').update(header.slice(7)).digest();
+  const expected = crypto.createHash('sha256').update(AUDIO_ANALYSIS_WORKER_TOKEN).digest();
+  if (!crypto.timingSafeEqual(provided, expected)) {
+    return res.status(401).json({ error: 'Invalid worker token' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireCafeOwner, requireAdmin, requireAudioAnalysisWorker };

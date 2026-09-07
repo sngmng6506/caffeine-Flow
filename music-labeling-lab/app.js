@@ -37,6 +37,13 @@ const LABELS = Object.freeze({
   },
 });
 
+const RIGHTS_LABELS = Object.freeze({
+  owned: '직접 소유',
+  licensed: '이용 허가',
+  public_domain: '퍼블릭 도메인',
+  other_authorized: '기타 명시적 허가',
+});
+
 let items = [];
 let currentIndex = 0;
 let currentOffset = 0;
@@ -78,6 +85,10 @@ function escapeHtml(value) {
 
 function formatDateTime(value) {
   return value ? new Date(value).toLocaleString('ko-KR') : '기록 없음';
+}
+
+function formatMetric(value, digits = 1, suffix = '') {
+  return Number.isFinite(value) ? `${Number(value).toFixed(digits)}${suffix}` : '—';
 }
 
 function trackUrl(item) {
@@ -135,6 +146,44 @@ function resetForm(item) {
   setRadio('human_decision', item.human_decision);
 }
 
+function renderAudioAnalysis(item) {
+  const panel = $('audioAnalysis');
+  const analysis = item.audio_analysis;
+  panel.hidden = !analysis;
+  if (!analysis) return;
+
+  const features = analysis.features || {};
+  const suggestion = analysis.suggested_annotation || {};
+  const suggestions = [
+    suggestion.tempo_class ? LABELS.tempo_class[suggestion.tempo_class] : null,
+    suggestion.rhythmic_character
+      ? LABELS.rhythmic_character[suggestion.rhythmic_character]
+      : null,
+    ...(suggestion.mood_tags || []).map((tag) => LABELS.mood_tags[tag] || tag),
+  ].filter(Boolean);
+
+  $('analysisStatus').textContent = analysis.review_status === 'reviewed' ? '검수 완료' : '검수 필요';
+  $('analysisStatus').className = `analysis-status analysis-status--${analysis.review_status}`;
+  $('analysisBpm').textContent = formatMetric(features.bpm, 1);
+  $('analysisKey').textContent = features.key
+    ? `${features.key} ${features.scale === 'major' ? '장조' : features.scale === 'minor' ? '단조' : ''}`.trim()
+    : '—';
+  $('analysisDanceability').textContent = formatMetric(features.danceability, 2);
+  $('analysisLoudness').textContent = formatMetric(features.loudness_db, 1, ' dB');
+  $('analysisDynamic').textContent = formatMetric(features.dynamic_complexity, 2);
+  $('analysisCentroid').textContent = formatMetric(features.spectral_centroid_hz, 0, ' Hz');
+  $('analysisSuggestion').textContent = suggestions.length
+    ? suggestions.join(' · ')
+    : '자동 추천 없음 — 직접 듣고 선택';
+  $('applyAnalysisSuggestion').disabled = suggestions.length === 0;
+  $('analysisProvenance').textContent = [
+    `${analysis.model_name} ${analysis.model_version}`,
+    RIGHTS_LABELS[analysis.rights_basis] || analysis.rights_basis,
+    analysis.source_reference,
+    formatDateTime(analysis.analyzed_at),
+  ].filter(Boolean).join(' · ');
+}
+
 function renderItem() {
   renderSummary();
   const item = items[currentIndex];
@@ -163,6 +212,7 @@ function renderItem() {
   $('trackLink').hidden = !url;
 
   resetForm(item);
+  renderAudioAnalysis(item);
   $('aiDecision').textContent = `AI ${item.filter_status === 'accepted' ? '승인' : item.filter_status === 'rejected' ? '거절' : '오류 거절'}`;
   $('aiDecision').className = `decision decision--${item.filter_status}`;
 
@@ -275,6 +325,7 @@ $('reviewForm').addEventListener('submit', async (event) => {
         human_decision: decision,
         human_reason_code: reasonCode,
         metadata_sufficient: item.metadata_sufficient ?? null,
+        audio_analysis_id: item.audio_analysis?.id || null,
         track_annotation: {
           artist_name: form.get('artist_name'),
           track_version: item.track_annotation?.track_version || 'unknown',
@@ -293,6 +344,10 @@ $('reviewForm').addEventListener('submit', async (event) => {
 
     Object.assign(item, data);
     item.track_annotation = data.track_annotation;
+    if (item.audio_analysis) {
+      item.audio_analysis.review_status = 'reviewed';
+      item.audio_analysis.reviewed_at = new Date().toISOString();
+    }
     if (!wasComplete) {
       summary.reviewed += 1;
       summary.unreviewed = Math.max(0, summary.unreviewed - 1);
@@ -328,6 +383,15 @@ document.querySelectorAll('[data-max-choices]').forEach((group) => {
 });
 
 $('findArtistLabels').addEventListener('click', loadArtistReferences);
+$('applyAnalysisSuggestion').addEventListener('click', () => {
+  const suggestion = items[currentIndex]?.audio_analysis?.suggested_annotation;
+  if (!suggestion) return;
+  if (suggestion.tempo_class) setRadio('tempo_class', suggestion.tempo_class);
+  if (suggestion.rhythmic_character) {
+    setRadio('rhythmic_character', suggestion.rhythmic_character);
+  }
+  if (suggestion.mood_tags?.length) setChecks('mood_tags', suggestion.mood_tags);
+});
 $('previousItem').addEventListener('click', () => {
   if (currentIndex > 0) {
     currentIndex -= 1;

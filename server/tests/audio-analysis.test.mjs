@@ -1,0 +1,98 @@
+import { describe, expect, it, vi } from 'vitest';
+import resultModule from '../src/features/audio-analysis/result.js';
+import authModule from '../src/middleware/auth.js';
+
+const { validateAudioAnalysisResult } = resultModule;
+const { requireAudioAnalysisWorker } = authModule;
+
+const validResult = {
+  platform: 'youtube',
+  track_key: 'abc123',
+  model_name: 'essentia-standard',
+  model_version: '2.1b6.dev1389',
+  feature_schema_version: 1,
+  rights_basis: 'licensed',
+  source_reference: 'license-ticket-1',
+  analyzed_at: '2026-09-07T03:00:00.000Z',
+  features: {
+    duration_seconds: 180,
+    sample_rate: 44100,
+    bpm: 92.4,
+    beat_confidence: 2.1,
+    key: 'C#',
+    scale: 'minor',
+    key_strength: 0.71,
+    danceability: 1.2,
+    loudness_db: -12.4,
+    dynamic_complexity: 3.2,
+    spectral_centroid_hz: 2100,
+    energy: 0.08,
+    valence: null,
+    arousal: null,
+  },
+  suggested_annotation: {
+    tempo_class: 'moderate',
+    rhythmic_character: 'steady',
+    mood_tags: [],
+  },
+};
+
+describe('Essentia 분석 결과 검증', () => {
+  it('권리 근거·모델 버전·정규화 특징을 저장 형태로 만든다', () => {
+    const result = validateAudioAnalysisResult(validResult);
+    expect(result.error).toBeUndefined();
+    expect(result.value).toEqual(expect.objectContaining({
+      platform: 'youtube',
+      rights_basis: 'licensed',
+      feature_schema_version: 1,
+      analyzed_at: expect.any(Date),
+      features: expect.objectContaining({ bpm: 92.4, valence: null }),
+    }));
+  });
+
+  it('권리 근거 없는 결과와 범위를 벗어난 특징을 거절한다', () => {
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      rights_basis: 'unknown',
+    }).error).toBeTruthy();
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      features: { ...validResult.features, valence: 1.5 },
+    }).error).toBeTruthy();
+  });
+
+  it('unknown 분위기를 자동 추천값으로 받지 않는다', () => {
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: { ...validResult.suggested_annotation, mood_tags: ['unknown'] },
+    }).error).toBeTruthy();
+  });
+});
+
+describe('오디오 분석 워커 인증', () => {
+  it('전용 토큰만 통과시킨다', () => {
+    const next = vi.fn();
+    const status = vi.fn().mockReturnThis();
+    const json = vi.fn().mockReturnThis();
+    requireAudioAnalysisWorker(
+      { headers: { authorization: 'Bearer unit-audio-analysis-token' } },
+      { status, json },
+      next,
+    );
+    expect(next).toHaveBeenCalledOnce();
+    expect(status).not.toHaveBeenCalled();
+  });
+
+  it('잘못된 토큰을 401로 거절한다', () => {
+    const next = vi.fn();
+    const status = vi.fn().mockReturnThis();
+    const json = vi.fn().mockReturnThis();
+    requireAudioAnalysisWorker(
+      { headers: { authorization: 'Bearer wrong' } },
+      { status, json },
+      next,
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(status).toHaveBeenCalledWith(401);
+  });
+});
