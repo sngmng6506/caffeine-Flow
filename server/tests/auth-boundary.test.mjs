@@ -23,6 +23,29 @@ afterAll(async () => {
   await db.destroy();
 });
 
+// 운영자 전용 알림 테스트는 손님·사장님에게 열리면 안 된다. 웹훅으로 나가는
+// 경로라 공개되면 외부에서 채널을 도배할 수 있다.
+// 계약: docs/AI_CHANGE_GUARDRAILS.md#authentication-and-slug-contract
+describe('운영자 알림 테스트 경계', () => {
+  const url = '/api/v1/admin/alert-test';
+
+  it('인증 없이 → 401', async () => {
+    expect((await request(app).post(url)).status).toBe(401);
+  });
+
+  it('사장님 토큰으로 → 403', async () => {
+    expect((await request(app).post(url).set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
+  });
+
+  it('운영자 토큰이면 통과하고, 알림이 꺼져 있으면 이유를 알려준다', async () => {
+    // NODE_ENV=test에서는 네트워크로 나가지 않으므로 disabled가 정상 응답이다.
+    const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
+    const res = await request(app).post(url).set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(409);
+    expect(res.body.reason).toBe('disabled');
+  });
+});
+
 describe('requireAuth 토큰 경계', () => {
   it('정상 사장님 토큰 → 200', async () => {
     const res = await request(app).get('/api/v1/cafes/me').set({ Authorization: `Bearer ${ownerToken}` });

@@ -1,5 +1,5 @@
 const { ALERT_WEBHOOK_URL } = require('../config');
-const { CAUSE, CAUSES, isDbConnectionError, trackErrorCause, naverCallbackError } = require('./error-taxonomy');
+const { CAUSE, CAUSES, ALERT_TEST_CODE, isDbConnectionError, trackErrorCause, naverCallbackError } = require('./error-taxonomy');
 const { createAlertAggregator } = require('./alert-aggregator');
 const { createAlertChannel, SEND_TIMEOUT_MS } = require('./alert-channel');
 
@@ -67,7 +67,33 @@ function logError({ code, cause, cafe = null, route = null, error = null, messag
   if (summary) channel.deliver(summary);
 }
 
+/**
+ * 운영자가 누르는 전송 확인. 실제 알림과 같은 경로(집계 → 채널 → 웹훅)를 타되
+ * 결과를 기다려 돌려준다 — curl로 웹훅에 직접 쏘는 것과 달리 "서버가 실제로
+ * 보낼 수 있는가"까지 확인된다. 웹훅 URL이 프로세스에 들어갔는지, 네트워크로
+ * 나갈 수 있는지, 페이로드 생성이 정상인지가 한 번에 드러난다.
+ *
+ * 전용 코드를 써서 진짜 에러 코드의 쿨다운을 태우지 않는다.
+ */
+async function sendTestAlert({ route = 'POST /api/v1/admin/alert-test' } = {}) {
+  if (!alertsEnabled) return { sent: false, reason: 'disabled' };
+
+  const summary = aggregator.record({
+    code: ALERT_TEST_CODE,
+    cause: CAUSE.PLATFORM,
+    route,
+    message: '운영자 콘솔에서 보낸 전송 확인입니다. 실제 장애가 아닙니다.',
+  });
+  // 30분 쿨다운은 테스트 코드에도 그대로 적용된다. 예외를 두면 이 경로만
+  // 실제 알림과 다르게 동작해 확인의 의미가 줄어든다.
+  if (!summary) return { sent: false, reason: 'cooldown' };
+
+  const delivered = await channel.deliver(summary);
+  return { sent: delivered, reason: delivered ? null : 'delivery_failed' };
+}
+
 module.exports = {
+  sendTestAlert,
   logError,
   CRASH_EXIT_DELAY_MS,
   isDbConnectionError,
