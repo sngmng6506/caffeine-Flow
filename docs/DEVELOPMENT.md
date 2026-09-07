@@ -23,6 +23,7 @@ npm ci --prefix customer
 npm ci --prefix owner
 
 npm run migrate --prefix server
+npm run seed:demo --prefix server   # 화면 확인용 데모 데이터 (선택)
 npm run dev:server     # 3000
 npm run dev:customer   # 5173
 npm run dev:owner      # 5174
@@ -35,6 +36,17 @@ npm run electron:dev --prefix owner
 Claude Code 웹 세션은 매번 새로 클론돼 `node_modules`가 없다. `.claude/hooks/session-start.sh`가
 세션 시작 시 세 앱의 의존성을 설치하므로 lint·test를 바로 실행할 수 있다. 로컬에서는
 건너뛰며(`CLAUDE_CODE_REMOTE`로 판단), lockfile이 바뀐 브랜치를 받았을 때는 위 `npm ci`를 다시 실행한다.
+
+### 데모 데이터
+
+`npm run seed:demo --prefix server`는 손님 화면의 시각적 상태를 한 번에 만든다 —
+재생 중, 대기 중, 확인 중, 최근 재생, 거절, 썸네일 없는 곡, 긴 제목,
+YouTube 아닌 플랫폼, 같은 곡의 추적 파라미터 변형, 전체 TOP 전용 곡(다른 매장).
+`/demo`로 접속하며, 다시 실행하면 데모 카페 두 개만 지우고 새로 만든다.
+
+통합 테스트는 자기 데이터를 따로 만들므로 이 스크립트에 의존하지 않는다.
+운영 사고를 막기 위해 `NODE_ENV=production`이거나 DB 호스트가 localhost가
+아니면 중단하며, 후자는 `SEED_DEMO_ALLOW_REMOTE=true`로만 넘길 수 있다.
 
 ## 환경변수
 

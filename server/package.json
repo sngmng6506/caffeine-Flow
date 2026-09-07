@@ -7,6 +7,7 @@
     "dev": "nodemon server.js",
     "migrate": "knex migrate:latest --knexfile src/db/knexfile.js",
     "migrate:rollback": "knex migrate:rollback --knexfile src/db/knexfile.js",
+    "seed:demo": "node scripts/seed-demo.js",
     "test": "vitest run",
     "test:unit": "vitest run --config vitest.unit.config.mjs",
     "lint": "eslint ."
