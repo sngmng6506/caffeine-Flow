@@ -37,6 +37,18 @@ Claude Code 웹 세션은 매번 새로 클론돼 `node_modules`가 없다. `.cl
 세션 시작 시 세 앱의 의존성을 설치하므로 lint·test를 바로 실행할 수 있다. 로컬에서는
 건너뛰며(`CLAUDE_CODE_REMOTE`로 판단), lockfile이 바뀐 브랜치를 받았을 때는 위 `npm ci`를 다시 실행한다.
 
+### 기동 로그로 설정 확인
+
+서버는 시작할 때 실제로 적용된 설정을 한 줄 남긴다. 배포 로그에서 이것만 보면
+알림과 CORS 상태를 판정할 수 있다.
+
+```text
+  NODE_ENV=production · 에러 알림 켜짐 · 허용 origin 1개
+```
+
+`NODE_ENV`가 없거나 알림이 꺼져 있으면 경고가 함께 나온다(로컬 `development`·`test`
+제외 — nodemon 재시작마다 반복되면 소음이다). 시크릿은 찍지 않는다.
+
 ### 데모 데이터
 
 `npm run seed:demo --prefix server`는 손님 화면의 시각적 상태를 한 번에 만든다 —
@@ -65,6 +77,7 @@ YouTube 아닌 플랫폼, 같은 곡의 추적 파라미터 변형, 전체 TOP �
 | `NAVER_CLIENT_ID` | Naver 로그인 |
 | `NAVER_CLIENT_SECRET` | Naver 로그인 |
 | `ALERT_WEBHOOK_URL` | 운영자 에러 알림 Discord webhook. 미설정이면 알림 없이 로그만 남는다. **프로세스 시작 시 한 번만 읽으므로 배포 후 추가했다면 재시작해야 켜진다** — production에서 비어 있으면 시작 로그에 경고가 남는다 |
+| `NODE_ENV` | `production` / `development` / `test`. 배포에서는 **명시적으로 `production`을 설정한다** — 없으면 운영이 아닌 것으로 취급돼 개발 localhost origin이 허용되고, CORS·쿠키 Secure·rate limit·알림 경고가 함께 어긋난다 |
 | `OPENROUTER_API_KEY` | OpenRouter 인증. 필터 ON에서 누락 시 fail-closed |
 | `OPENROUTER_BASE_URL` | 기본 `https://openrouter.ai/api/v1` |
 | `OPENROUTER_APP_NAME` | 기본 `Caffeine Flow` |
