@@ -104,13 +104,22 @@ export default function LoginPage({ onLogin, initialPendingToken, oauthError }) 
   const allRequired = agreements.age && agreements.service && agreements.privacy && agreements.copyright;
   const allChecked  = allRequired;
 
-  // Google Identity Services 스크립트 로드
+  // Google Identity Services 스크립트 로드.
+  //
+  // 스크립트는 마운트 시 한 번만 붙인다 — deps에 initGoogle을 넣으면 렌더마다
+  // script 태그를 지웠다 다시 붙여 로그인 버튼이 사라진다. 대신 onload가
+  // 첫 렌더의 initGoogle을 붙잡지 않도록 최신 함수를 ref로 넘긴다.
+  // 지금은 initGoogle이 참조하는 값이 모두 안정적이라 결과가 같지만,
+  // handleGoogleCallback에 렌더마다 바뀌는 값이 들어오면 그때 낡은 콜백이 남는다.
+  const initGoogleRef = useRef(null);
+  useEffect(() => { initGoogleRef.current = initGoogle; });
+
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
-    script.onload = initGoogle;
+    script.onload = () => initGoogleRef.current?.();
     document.body.appendChild(script);
     return () => document.body.removeChild(script);
   }, []);

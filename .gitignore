@@ -1,6 +1,11 @@
 node_modules/
 .env
-.claude/
+# Claude Code 설정 — 팀이 공유하는 세션 시작 훅만 커밋하고
+# 개인 설정(settings.local.json)과 세션 부산물은 계속 무시한다.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/settings.local.json
 
 # 빌드 산출물 — 배포 때마다 재생성된다.
 # customer 빌드가 outDir: '../server/public' + emptyOutDir: true 라
