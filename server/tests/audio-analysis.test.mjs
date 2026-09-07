@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import resultModule from '../src/features/audio-analysis/result.js';
 import authModule from '../src/middleware/auth.js';
 
+// 전체 테스트(`vitest run`)는 unit 전용 setup 파일을 읽지 않는다. CommonJS
+// config가 import 시점에 환경변수를 캡처하므로 정적 import보다 먼저 설정한다.
+vi.hoisted(() => {
+  process.env.AUDIO_ANALYSIS_WORKER_TOKEN ||= 'unit-audio-analysis-token';
+});
+
 const { validateAudioAnalysisResult } = resultModule;
 const { requireAudioAnalysisWorker } = authModule;
 
