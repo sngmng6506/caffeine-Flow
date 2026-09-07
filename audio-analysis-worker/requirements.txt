@@ -1,2 +1,5 @@
+# 기본 Essentia 특징만 쓸 때 설치한다.
+# Valence/Arousal까지 쓰려면 이 파일 대신 requirements-tensorflow.txt를 설치한다 —
+# 두 패키지가 같은 `essentia` 모듈을 제공하므로 함께 설치하지 않는다.
 essentia==2.1b6.dev1389
 numpy>=1.26,<3
