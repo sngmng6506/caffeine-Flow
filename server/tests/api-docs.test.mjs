@@ -24,11 +24,24 @@ const mounts = [...appSrc.matchAll(/app\.use\('([^']+)',\s*require\('\.\/src\/ro
 const directRoutes = [...appSrc.matchAll(/app\.(get|post|put|delete)\('(\/api\/v1[^']*|\/health)'/g)]
   .map(([, method, p]) => ({ method: method.toUpperCase(), full: p, sub: p.replace('/api/v1', '') || '/' }));
 
-// 각 라우트 파일에서 router.METHOD('path') 추출
-function routesInFile(file) {
+// 각 라우트 파일에서 router.METHOD('path') 추출.
+// 조립점(router.use(require('./x')))도 따라간다 — 라우트가 하위 모듈로 옮겨가면
+// 여기서 멈추고, 문서화되지 않은 라우트를 통째로 못 보게 된다.
+function routesInFile(file, seen = new Set()) {
+  if (seen.has(file)) return [];
+  seen.add(file);
+
   const src = fs.readFileSync(path.join(root, 'src/routes', file), 'utf8');
-  return [...src.matchAll(/^router\.(get|post|put|delete)\('([^']*)'/gm)]
+  const own = [...src.matchAll(/^router\.(get|post|put|delete)\('([^']*)'/gm)]
     .map(([, method, sub]) => ({ method: method.toUpperCase(), sub }));
+
+  const composed = [...src.matchAll(/^router\.use\(require\('\.\/([^']+)'\)\)/gm)]
+    .flatMap(([, rel]) => {
+      const child = path.join(path.dirname(file), `${rel}.js`);
+      return routesInFile(child, seen);
+    });
+
+  return [...own, ...composed];
 }
 
 const allRoutes = [
