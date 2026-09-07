@@ -58,4 +58,14 @@ server.listen(PORT, async () => {
 
   app.set('baseUrl', `http://${localIp}:${PORT}`);
   console.log(`\nCaffeine Flow v2 on http://${localIp}:${PORT}\n`);
+
+  // 알림은 프로세스 시작 시 읽은 ALERT_WEBHOOK_URL 하나로 켜지고 꺼진다.
+  // 배포 후 변수를 추가만 하고 재시작하지 않으면 코드가 다 있어도 한 통도
+  // 나가지 않는데, 그 상태는 "조용한 운영"과 구분되지 않는다. 시작할 때 밝힌다.
+  if (!alertsEnabled && process.env.NODE_ENV === 'production') {
+    console.warn(
+      '[observability] ALERT_WEBHOOK_URL이 없어 운영자 에러 알림이 꺼져 있다. '
+      + '에러는 로그에만 남는다. 변수를 추가했다면 이 프로세스가 그 뒤에 시작됐는지 확인한다.',
+    );
+  }
 });
