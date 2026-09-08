@@ -36,7 +36,7 @@ flowchart LR
 | `admin/` | 운영자용 카페 모니터링·정지·삭제와 AI 랩 진입 |
 | `music-filter-lab/` | 모델·프롬프트별 필터 판단을 저장 없이 비교하는 운영자 UI |
 | `music-labeling-lab/` | 전체 카페 AI 처리 이력을 한 큐에서 골드 라벨링하는 운영자 UI |
-| `audio-analysis-worker/` | 로컬 음원의 Essentia 특징 추출과 결과 제출. 디렉터리 큐 기반 상주 워커이며 원본 전송 없음. Valence/Arousal은 명시적으로 켰을 때만 채운다 |
+| `audio-analysis-worker/` | 로컬 음원의 Essentia 특징 추출, 분류 헤드 기반 라벨 추천과 신뢰도 산출, 결과 제출. 디렉터리 큐 기반 상주 워커이며 원본 전송 없음 |
 | `server/` | 인증, 검증, 영속화, 실시간 이벤트, 통계, AI 판단 |
 
 서버는 판단과 데이터 일관성을, Electron은 실제 외부 플랫폼 재생을 책임진다. 여러 사장님이 접속해도 서버가 카페별 재생 리더 Electron 한 대를 정한다. 리더 선출·재연결 lease·재생 시작 확인 순서는 [PLAYBACK.md](PLAYBACK.md)가 기준이다.

@@ -138,7 +138,8 @@ genre_tags(선택, 최대 2) · note(선택) · usage_scope · schema_version
 **자동 음향 분석** — `music_audio_analyses`에 `(platform, track_key, model_name, model_version)`당 한 건.
 
 - `audio-analysis-worker/`가 로컬 파일을 Essentia로 분석하고 서버에는 특징값만 제출한다. 오디오 원본은 전송하지 않는다.
-- 현재 범위는 BPM, 조성, danceability, 음량, 다이내믹 복잡도, spectral centroid, energy와 템포·리듬 추천이다. Valence/Arousal과 분위기 추천은 `ENABLE_VALENCE_AROUSAL`을 켰을 때만 채우고 그 외에는 비워둔다.
+- 음향 수치는 BPM, 조성, danceability, 음량, 다이내믹 복잡도, spectral centroid, energy다. 여기서 템포·리듬 추천을 만든다.
+- 받아 둔 `msd-musicnn` 분류 헤드가 있으면 분위기·사운드 구성·보컬·장르 추천과 칸별 신뢰도까지 채운다. 확신하지 못한 칸은 비우고 검수 신호만 남긴다.
 - 곡별 최신 분석은 라벨링 화면에 참고값으로 표시한다. 추천값 적용은 폼 선택만 돕고 자동 저장하지 않으며, 사람이 곡 라벨을 저장해야 `reviewed`가 된다.
 - 같은 모델 버전의 재분석 또는 새 모델 분석은 다시 `pending`이 된다. 자동 분석은 기존 수동 라벨을 덮어쓰지 않고 실시간 LLM 판단에도 사용하지 않는다.
 

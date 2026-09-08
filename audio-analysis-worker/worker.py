@@ -22,10 +22,16 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from analyze import analyze_audio, build_payload, resolve_emotion_predictor, submit
+from analyze import (
+    analyze_audio,
+    build_payload,
+    resolve_classifiers,
+    resolve_emotion_predictor,
+    submit,
+)
+from classifiers import ClassifierModelError
 from emotion import EmotionModelError
 from manifest import load_job
-from suggestions import build_suggestions
 
 QUEUE_DIRS = ("inbox", "processing", "processed", "failed")
 DEFAULT_POLL_INTERVAL_MS = 5000
@@ -151,13 +157,12 @@ def notify_discord(webhook_url, job_id, message, timeout=10):
         return False
 
 
-def process_job(job_dir, config, predictor):
+def process_job(job_dir, config, predictor, classifiers=None):
     """작업 하나를 끝까지 처리하고 결과 요약을 돌려준다."""
     started = time.monotonic()
     manifest, audio_path = load_job(job_dir)
-    features, model_version = analyze_audio(audio_path, predictor)
-    payload = build_payload(manifest, features, model_version)
-    payload["suggested_annotation"] = build_suggestions(features)
+    features, model_version, scores = analyze_audio(audio_path, predictor, classifiers)
+    payload = build_payload(manifest, features, model_version, scores)
 
     if config.dry_run:
         saved = {"dry_run": True}
@@ -170,18 +175,20 @@ def process_job(job_dir, config, predictor):
         json.dumps({"payload": payload, "saved": saved}, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    suggestion = payload.get("suggested_annotation") or {}
     return {
         "track_key": manifest["track_key"],
         "platform": manifest["platform"],
         "model_version": model_version,
-        "valence": features.get("valence"),
-        "arousal": features.get("arousal"),
         "bpm": features.get("bpm"),
+        # 검수 화면이 무엇을 자동으로 채웠고 어디가 약한지 로그에서 바로 보인다.
+        "min_confidence": suggestion.get("min_confidence"),
+        "review_flags": len(suggestion.get("review_flags") or []),
         "elapsed_seconds": round(elapsed, 2),
     }
 
 
-def run_once(config, predictor):
+def run_once(config, predictor, classifiers=None):
     """inbox에 있으면 한 곡 처리하고 True, 없으면 False."""
     job_dir = next_job_dir(config.root)
     if job_dir is None:
@@ -196,7 +203,7 @@ def run_once(config, predictor):
 
     log("info", "job_claimed", job_id=job_id)
     try:
-        summary = process_job(claimed, config, predictor)
+        summary = process_job(claimed, config, predictor, classifiers)
     except Exception as error:  # noqa: BLE001 - 어떤 실패든 작업을 failed로 보낸다
         reason = f"{type(error).__name__}: {error}"[:500]
         (claimed / ERROR_FILENAME).write_text(reason, encoding="utf-8")
@@ -233,6 +240,13 @@ def main():
             # 분위기를 추측하는 것보다 비워 두는 편이 낫다. 워커는 계속 돈다.
             log("warn", "emotion_model_unavailable", message=str(error)[:300])
 
+    classifiers = None
+    try:
+        classifiers = resolve_classifiers(config.model_dir)
+    except ClassifierModelError as error:
+        # 헤드를 못 만들어도 기본 음향 특징 분석은 계속한다.
+        log("warn", "classifier_models_unavailable", message=str(error)[:300])
+
     log(
         "info",
         "worker_started",
@@ -240,6 +254,7 @@ def main():
         root=str(config.root),
         poll_interval_ms=config.poll_interval_ms,
         valence_arousal=predictor is not None,
+        classifier_heads=list(classifiers.head_names) if classifiers else [],
         dry_run=config.dry_run,
     )
 
@@ -255,7 +270,7 @@ def main():
 
     while running:
         try:
-            handled = run_once(config, predictor)
+            handled = run_once(config, predictor, classifiers)
         except Exception as error:  # noqa: BLE001 - 루프는 어떤 예외로도 멈추지 않는다
             log("error", "worker_error", message=f"{type(error).__name__}: {error}"[:300])
             handled = False

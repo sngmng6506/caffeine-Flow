@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 
 import numpy as np
 
+from classifiers import ClassifierModelError, classify, load_classifiers
 from emotion import (
     EMOTION_MODEL_NAME,
     EMOTION_SAMPLE_RATE,
@@ -24,6 +25,7 @@ from suggestions import build_suggestions
 SAMPLE_RATE = 44100
 FEATURE_SCHEMA_VERSION = 1
 MODEL_NAME = "essentia-standard"
+ANNOTATION_MODEL_NAME = "msd-musicnn-heads"
 DEFAULT_MODEL_DIR = "~/caffeine-audio/models"
 
 
@@ -48,7 +50,11 @@ def mean_spectral_centroid(audio, sample_rate, standard):
     return float(np.mean(values)) if values else None
 
 
-def analyze_audio(path, emotion_predictor=None):
+def analyze_audio(path, emotion_predictor=None, classifiers=None):
+    """특징값, 모델 버전, 분류 헤드 확률을 함께 돌려준다.
+
+    16kHz 로드는 임베딩 모델과 분류 헤드가 함께 쓰므로 한 번만 한다.
+    """
     try:
         import essentia
         import essentia.standard as standard
@@ -91,22 +97,34 @@ def analyze_audio(path, emotion_predictor=None):
     }
 
     model_version = getattr(essentia, "__version__", "unknown")
-    if emotion_predictor is not None:
+    classifier_scores = {}
+
+    if emotion_predictor is not None or classifiers is not None:
         # 모델 카드가 16kHz를 요구한다. 44.1kHz 배열을 재사용하면 조용히 틀린다.
         audio_16k = standard.MonoLoader(
             filename=str(path), sampleRate=EMOTION_SAMPLE_RATE
         )()
-        emotion = estimate_valence_arousal(audio_16k, emotion_predictor)
-        if emotion:
-            features["valence"] = emotion["valence"]
-            features["arousal"] = emotion["arousal"]
-            # 같은 곡의 VA 있는 결과와 없는 결과가 서로를 덮지 않도록 버전을 나눈다.
-            # 서버 upsert 키가 (platform, track_key, model_name, model_version)이다.
-            model_version = f"{model_version}+{EMOTION_MODEL_NAME}"
-    return features, model_version
+
+        if emotion_predictor is not None:
+            emotion = estimate_valence_arousal(audio_16k, emotion_predictor)
+            if emotion:
+                features["valence"] = emotion["valence"]
+                features["arousal"] = emotion["arousal"]
+                # 같은 곡의 VA 있는 결과와 없는 결과가 서로를 덮지 않도록 버전을
+                # 나눈다. 서버 upsert 키가
+                # (platform, track_key, model_name, model_version)이다.
+                model_version = f"{model_version}+{EMOTION_MODEL_NAME}"
+
+        if classifiers is not None:
+            classifier_scores = classify(audio_16k, classifiers)
+            if classifier_scores:
+                # 자동으로 채우는 칸이 늘어난 결과는 예전 결과를 덮지 않는다.
+                model_version = f"{model_version}+{ANNOTATION_MODEL_NAME}-{len(classifier_scores)}"
+
+    return features, model_version, classifier_scores
 
 
-def build_payload(manifest, features, model_version):
+def build_payload(manifest, features, model_version, classifier_scores=None):
     """manifest(dict 또는 argparse 네임스페이스)와 특징값으로 제출 payload를 만든다."""
     read = manifest.get if isinstance(manifest, dict) else lambda key: getattr(manifest, key)
     return {
@@ -116,7 +134,7 @@ def build_payload(manifest, features, model_version):
         "model_version": model_version,
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
         "features": features,
-        "suggested_annotation": build_suggestions(features),
+        "suggested_annotation": build_suggestions(features, classifier_scores),
         "analyzed_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -146,8 +164,16 @@ def env_flag(name):
 
 
 def resolve_emotion_predictor(enabled, model_dir):
-    """켜져 있을 때만 예측기를 만든다. 기본값이 꺼짐인 것이 라이선스 계약이다."""
+    """켜져 있을 때만 예측기를 만든다. 기본값은 꺼짐이다."""
     return load_emotion_predictor(model_dir) if enabled else None
+
+
+def resolve_classifiers(model_dir):
+    """받아 둔 분류 헤드가 있으면 예측기를 만든다. 하나도 없으면 None.
+
+    헤드가 없다고 분석을 막지 않는다. 기본 음향 특징만으로도 템포·리듬은 채워진다.
+    """
+    return load_classifiers(model_dir)
 
 
 def parse_args():
@@ -188,8 +214,9 @@ def main():
         raise ValueError("--token 또는 AUDIO_ANALYSIS_WORKER_TOKEN이 필요합니다.")
 
     predictor = resolve_emotion_predictor(args.enable_valence_arousal, args.model_dir)
-    features, model_version = analyze_audio(audio_path, predictor)
-    payload = build_payload(args, features, model_version)
+    classifiers = resolve_classifiers(args.model_dir)
+    features, model_version, scores = analyze_audio(audio_path, predictor, classifiers)
+    payload = build_payload(args, features, model_version, scores)
     if args.dry_run:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return

@@ -116,7 +116,7 @@ class RunOnceTest(unittest.TestCase):
         seed_job(self.root)
         submitted = []
 
-        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6")), \
+        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6", {})), \
              patch.object(worker, "submit", side_effect=lambda url, token, payload: submitted.append(payload) or {"id": 7}):
             handled, logs = run_quietly(self.config)
 
@@ -153,7 +153,7 @@ class RunOnceTest(unittest.TestCase):
     def test_network_failure_can_be_reprocessed_after_moving_back(self):
         seed_job(self.root)
 
-        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6")), \
+        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6", {})), \
              patch.object(worker, "submit", side_effect=RuntimeError("분석 결과 서버에 연결할 수 없습니다")):
             run_quietly(self.config)
 
@@ -162,7 +162,7 @@ class RunOnceTest(unittest.TestCase):
 
         # 운영자가 실패한 작업을 inbox로 되돌리면 그대로 다시 처리된다.
         failed.rename(self.root / "inbox" / "job-1")
-        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6")), \
+        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6", {})), \
              patch.object(worker, "submit", return_value={"id": 7}):
             handled, _ = run_quietly(self.config)
 
@@ -184,7 +184,7 @@ class RunOnceTest(unittest.TestCase):
         seed_job(self.root)
         config = make_config(self.root, AUDIO_WORKER_DRY_RUN="true")
 
-        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6")), \
+        with patch.object(worker, "analyze_audio", return_value=(FEATURES, "2.1-beta6", {})), \
              patch.object(worker, "submit", side_effect=AssertionError("dry-run은 제출하지 않는다")):
             handled, _ = run_quietly(config)
 

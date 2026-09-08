@@ -30,19 +30,53 @@ Windows PowerShell에서는 `source` 대신 `.\.venv\Scripts\Activate.ps1`, `exp
 
 ## 추출 범위
 
+음향 수치는 항상 나온다.
+
 - BPM과 비트 신뢰도
 - 조성, 장·단조, 조성 강도
 - danceability
 - 평균 음량, 다이내믹 복잡도
 - spectral centroid, energy
-- 위 수치에 기반한 템포·리듬 추천
-- Valence/Arousal (아래 스위치를 명시적으로 켰을 때만)
 
-분위기(`mood_tags`) 추천은 Valence/Arousal 값이 있을 때만 생성한다. 값이 없으면 템포나 음량으로 분위기를 추측하지 않고 두 값을 `null`로 둔다.
+라벨링 화면의 선택지 추천은 두 갈래로 만든다.
+
+| 추천 칸 | 근거 | 신뢰도 |
+| --- | --- | --- |
+| 체감 템포 | BPM 구간 | 없음 (확률이 아님) |
+| 리듬 특징 | danceability 구간 | 없음 (확률이 아님) |
+| 주요 분위기 | `mood_*` 분류 헤드 | 헤드 확률 |
+| 사운드 구성 | `mood_acoustic` + `mood_electronic` | 두 확률 중 낮은 쪽 |
+| 보컬 유형 | `voice_instrumental` (+랩 구분에 장르 보조) | 헤드 확률 |
+| 장르 | `genre_rosamerica` 상위 2개 | 1위 확률 |
+
+**확신하지 못한 칸은 채우지 않는다.** 확률이 `0.6` 미만이면 값을 비우고 `missing:<칸>` 신호를 붙인다. 틀린 값을 채워 두면 눈으로 넘기는 검수에서 그대로 통과하기 때문이다. `0.75` 미만으로 채운 칸은 `low_confidence:<칸>`을 붙인다.
+
+가장 약한 칸의 확률이 `min_confidence`로 남는다. 라벨링 큐를 이 값 오름차순으로 정렬하면 모델이 헷갈린 곡이 위로 온다.
+
+모델끼리 어긋나면 `review_flags`에 남는다 — 목소리가 없다는데 장르가 힙합·랩(`conflict:vocal_genre`), 정반대 분위기가 함께 높음(`conflict:mood`).
+
+## 분류 헤드 모델
+
+`msd-musicnn` 임베딩 하나를 여러 헤드가 나눠 쓴다. 임베딩 추출이 가장 비싼 단계라 곡당 한 번만 계산한다.
+
+```bash
+cd ~/caffeine-audio/models
+BASE=https://essentia.upf.edu/models/classification-heads
+for HEAD in voice_instrumental mood_acoustic mood_electronic \
+            mood_happy mood_sad mood_aggressive mood_relaxed mood_party \
+            genre_rosamerica; do
+  curl -sSfLO "$BASE/$HEAD/$HEAD-msd-musicnn-1.pb"
+  curl -sSfLO "$BASE/$HEAD/$HEAD-msd-musicnn-1.json"
+done
+```
+
+**`.json`을 반드시 `.pb`와 함께 받는다.** 워커가 클래스 순서와 출력 노드 이름을 이 파일에서 읽는다. 헤드마다 순서가 달라서(`["sad", "non_sad"]` vs `["non_party", "party"]`) 코드에 적어 두면 조용히 뒤집힌 값이 나온다.
+
+받은 헤드만 사용하고 없는 것은 건너뛴다. 하나도 없으면 음향 수치와 템포·리듬 추천만 나온다.
 
 ## Valence/Arousal
 
-Essentia 공식 사전학습 모델을 쓴다.
+분류 헤드가 분위기를 채우면 이 값은 쓰이지 않는다. 헤드가 없을 때의 fallback이며, 회귀값을 사분면으로 나눈 것이라 확률이 아니어서 신뢰도가 붙지 않는다.
 
 | 역할 | 파일 | SHA-256 |
 | --- | --- | --- |

@@ -41,6 +41,18 @@ const validResult = {
   },
 };
 
+const fullSuggestion = {
+  tempo_class: 'moderate',
+  rhythmic_character: 'steady',
+  mood_tags: ['peaceful'],
+  instrumentation_type: 'acoustic',
+  vocal_type: 'singing',
+  genre_tags: ['jazz'],
+  confidence: { mood_tags: 0.91, vocal_type: 0.66, genre_tags: 0.86 },
+  min_confidence: 0.66,
+  review_flags: ['low_confidence:vocal_type', 'missing:instrumentation_type'],
+};
+
 describe('Essentia 분석 결과 검증', () => {
   it('모델 버전과 정규화 특징을 저장 형태로 만든다', () => {
     const result = validateAudioAnalysisResult(validResult);
@@ -69,6 +81,50 @@ describe('Essentia 분석 결과 검증', () => {
     expect(validateAudioAnalysisResult({
       ...validResult,
       features: { ...validResult.features, valence: 1.5 },
+    }).error).toBeTruthy();
+  });
+
+  it('분류 헤드가 채운 모든 칸과 신뢰도를 그대로 보존한다', () => {
+    const result = validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: fullSuggestion,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value.suggested_annotation).toEqual(fullSuggestion);
+  });
+
+  it('확률이 없는 휴리스틱 칸에는 신뢰도를 받지 않는다', () => {
+    // 템포는 BPM 구간이라 확률이 없다. 점수가 붙으면 애매한 순 정렬이 거짓말을 한다.
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: { ...fullSuggestion, confidence: { tempo_class: 0.9 } },
+    }).error).toBeTruthy();
+  });
+
+  it('정해지지 않은 검수 신호와 범위를 벗어난 신뢰도를 거절한다', () => {
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: { ...fullSuggestion, review_flags: ['소리가 이상함'] },
+    }).error).toBeTruthy();
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: { ...fullSuggestion, confidence: { mood_tags: 1.4 } },
+    }).error).toBeTruthy();
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: { ...fullSuggestion, min_confidence: -0.1 },
+    }).error).toBeTruthy();
+  });
+
+  it('장르 추천은 2개까지만 받고 unknown을 받지 않는다', () => {
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: { ...fullSuggestion, genre_tags: ['jazz', 'pop', 'rock_metal'] },
+    }).error).toBeTruthy();
+    expect(validateAudioAnalysisResult({
+      ...validResult,
+      suggested_annotation: { ...fullSuggestion, genre_tags: ['unknown'] },
     }).error).toBeTruthy();
   });
 
