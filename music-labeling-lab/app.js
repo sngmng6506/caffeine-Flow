@@ -3,6 +3,34 @@
 const API_BASE = '/api/v1';
 const TOKEN_KEY = 'cf_admin_token';
 const PAGE_SIZE = 50;
+// 서버가 일괄 확정을 허용하는 문턱과 같다. 화면은 후보를 고를 때만 쓰고,
+// 실제 자격은 서버가 저장된 분석으로 다시 판정한다.
+const BULK_MIN_CONFIDENCE = 0.85;
+const BULK_MAX_ITEMS = 50;
+
+// 자동으로 채우는 칸. 배지와 프리필이 이 순서를 따른다.
+const AUTO_FIELDS = Object.freeze([
+  { field: 'tempo_class', kind: 'radio' },
+  { field: 'mood_tags', kind: 'checks' },
+  { field: 'instrumentation_type', kind: 'radio' },
+  { field: 'rhythmic_character', kind: 'radio' },
+  { field: 'vocal_type', kind: 'radio' },
+  { field: 'genre_tags', kind: 'checks' },
+]);
+
+const FLAG_LABELS = Object.freeze({
+  'conflict:mood': '분위기 판단이 서로 어긋납니다',
+  'conflict:vocal_genre': '보컬 유형과 장르가 서로 어긋납니다',
+});
+
+const FIELD_NAMES = Object.freeze({
+  tempo_class: '체감 템포',
+  mood_tags: '주요 분위기',
+  instrumentation_type: '사운드 구성',
+  rhythmic_character: '리듬 특징',
+  vocal_type: '보컬 유형',
+  genre_tags: '장르',
+});
 const $ = (id) => document.getElementById(id);
 
 const LABELS = Object.freeze({
@@ -76,6 +104,15 @@ function escapeHtml(value) {
     .replaceAll(String.fromCharCode(39), '&#039;');
 }
 
+// 목적격 조사는 앞 글자의 받침으로 정해진다. "장르을"처럼 어긋나면 눈에 걸린다.
+function withObjectParticle(word) {
+  const last = String(word).trim().slice(-1);
+  const code = last.charCodeAt(0);
+  const isHangulSyllable = code >= 0xac00 && code <= 0xd7a3;
+  const hasFinalConsonant = isHangulSyllable && (code - 0xac00) % 28 !== 0;
+  return `${word}${hasFinalConsonant ? '을' : '를'}`;
+}
+
 function formatDateTime(value) {
   return value ? new Date(value).toLocaleString('ko-KR') : '기록 없음';
 }
@@ -113,19 +150,69 @@ function renderSummary() {
   $('unreviewedCount').textContent = summary.unreviewed.toLocaleString('ko-KR');
 }
 
+// 자동 추천값을 폼에 채운다. 값이 있는 칸만 건드리고 나머지는 비워 둔다.
+// 반환값은 실제로 채운 칸 목록이다.
+function applySuggestion(suggestion) {
+  const filled = [];
+  if (!suggestion) return filled;
+  for (const { field, kind } of AUTO_FIELDS) {
+    const value = suggestion[field];
+    if (kind === 'radio') {
+      if (!value) continue;
+      setRadio(field, value);
+    } else {
+      if (!Array.isArray(value) || value.length === 0) continue;
+      setChecks(field, value);
+    }
+    filled.push(field);
+  }
+  return filled;
+}
+
+// 어느 칸이 자동으로 채워졌고 얼마나 확신하는지 각 항목 옆에 남긴다.
+// 사람이 폼을 훑을 때 어디를 봐야 하는지가 여기서 정해진다.
+function renderAutoBadges({ suggestion, filled, fromAnnotation }) {
+  const confidence = suggestion?.confidence || {};
+  const flags = new Set(suggestion?.review_flags || []);
+  document.querySelectorAll('[data-auto-badge]').forEach((badge) => {
+    const field = badge.dataset.autoBadge;
+    badge.className = 'auto-badge';
+    if (fromAnnotation) {
+      badge.hidden = true;
+      return;
+    }
+    if (!filled.includes(field)) {
+      badge.hidden = false;
+      badge.textContent = '직접 선택';
+      badge.classList.add('auto-badge--missing');
+      return;
+    }
+    const score = confidence[field];
+    const needsCheck = flags.has(`low_confidence:${field}`);
+    badge.hidden = false;
+    badge.textContent = Number.isFinite(score)
+      ? `자동 ${Math.round(score * 100)}%${needsCheck ? ' · 확인 필요' : ''}`
+      : '자동';
+    badge.classList.add(needsCheck ? 'auto-badge--check' : 'auto-badge--auto');
+  });
+}
+
 function resetForm(item) {
   const form = $('reviewForm');
   form.reset();
   const annotation = item.track_annotation;
+  const suggestion = item.audio_analysis?.suggested_annotation;
   $('artistName').value = annotation?.artist_name || item.channel_title || '';
   $('existingLabelStatus').textContent = annotation
-    ? `기존 곡 라벨 불러옴 · ${formatDateTime(annotation.updated_at)}`
+    ? `기존 곡 라벨 불러옴 · ${formatDateTime(annotation.updated_at)}${annotation.confirmation_mode === 'bulk' ? ' · 일괄 확정' : ''}`
     : '실제 아티스트를 확인해주세요.';
   $('existingLabelStatus').classList.toggle('is-loaded', Boolean(annotation));
   $('artistReferences').hidden = true;
   $('artistReferences').innerHTML = '';
 
+  let filled = [];
   if (annotation) {
+    // 사람이 이미 고른 값이 자동 추천보다 우선한다.
     setRadio('tempo_class', annotation.tempo_class);
     setChecks('mood_tags', annotation.mood_tags || []);
     setRadio('instrumentation_type', annotation.instrumentation_type);
@@ -134,8 +221,11 @@ function resetForm(item) {
     setChecks('genre_tags', annotation.genre_tags || []);
     form.elements.note.value = annotation.note || '';
     setRadio('usage_scope', annotation.usage_scope);
+  } else {
+    filled = applySuggestion(suggestion);
   }
 
+  renderAutoBadges({ suggestion, filled, fromAnnotation: Boolean(annotation) });
   setRadio('human_decision', item.human_decision);
 }
 
@@ -147,13 +237,11 @@ function renderAudioAnalysis(item) {
 
   const features = analysis.features || {};
   const suggestion = analysis.suggested_annotation || {};
-  const suggestions = [
-    suggestion.tempo_class ? LABELS.tempo_class[suggestion.tempo_class] : null,
-    suggestion.rhythmic_character
-      ? LABELS.rhythmic_character[suggestion.rhythmic_character]
-      : null,
-    ...(suggestion.mood_tags || []).map((tag) => LABELS.mood_tags[tag] || tag),
-  ].filter(Boolean);
+  const suggestions = AUTO_FIELDS.flatMap(({ field, kind }) => {
+    const value = suggestion[field];
+    if (kind === 'checks') return (value || []).map((tag) => LABELS[field][tag] || tag);
+    return value ? [LABELS[field][value] || value] : [];
+  });
 
   $('analysisStatus').textContent = analysis.review_status === 'reviewed' ? '검수 완료' : '검수 필요';
   $('analysisStatus').className = `analysis-status analysis-status--${analysis.review_status}`;
@@ -165,6 +253,18 @@ function renderAudioAnalysis(item) {
   $('analysisLoudness').textContent = formatMetric(features.loudness_db, 1, ' dB');
   $('analysisDynamic').textContent = formatMetric(features.dynamic_complexity, 2);
   $('analysisCentroid').textContent = formatMetric(features.spectral_centroid_hz, 0, ' Hz');
+  const flags = suggestion.review_flags || [];
+  const flagPanel = $('analysisFlags');
+  flagPanel.hidden = flags.length === 0;
+  flagPanel.textContent = flags.map((flag) => {
+    if (FLAG_LABELS[flag]) return FLAG_LABELS[flag];
+    const [kind, field] = flag.split(':');
+    const name = FIELD_NAMES[field] || field;
+    return kind === 'missing'
+      ? `${withObjectParticle(name)} 자동으로 채우지 못했습니다`
+      : `${name} 확신도가 낮습니다`;
+  }).join(' · ');
+
   $('analysisSuggestion').textContent = suggestions.length
     ? suggestions.join(' · ')
     : '자동 추천 없음 — 직접 듣고 선택';
@@ -344,6 +444,9 @@ $('reviewForm').addEventListener('submit', async (event) => {
       summary.unreviewed = Math.max(0, summary.unreviewed - 1);
     }
     renderItem();
+    // 미검수 계열 뷰에서는 저장한 곡이 목록에서 빠질 대상이다. 손이 멈추지
+    // 않도록 바로 다음 곡으로 넘어간다.
+    if (['unreviewed', 'ambiguous'].includes($('viewFilter').value)) goToNext();
   } catch (error) {
     alert(error.message);
     button.textContent = wasComplete ? '곡 라벨과 매장 판단 갱신' : '곡 라벨과 매장 판단 저장';
@@ -373,17 +476,99 @@ document.querySelectorAll('[data-max-choices]').forEach((group) => {
   });
 });
 
+// --- 확실한 곡 일괄 확정 ---
+//
+// 여기서 고르는 건 후보일 뿐이다. 무엇이 저장될지는 서버가 저장된 분석에서
+// 다시 판정하므로, 화면 조건이 느슨해도 잘못된 라벨이 들어가지 않는다.
+function bulkCandidates() {
+  return items.filter((item) => {
+    if (item.track_annotation) return false;
+    if (!item.channel_title) return false;
+    const analysis = item.audio_analysis;
+    if (!analysis || analysis.review_status !== 'pending') return false;
+    const suggestion = analysis.suggested_annotation || {};
+    if ((suggestion.review_flags || []).length > 0) return false;
+    return Number(suggestion.min_confidence) >= BULK_MIN_CONFIDENCE;
+  }).slice(0, BULK_MAX_ITEMS);
+}
+
+function renderBulkPanel() {
+  const candidates = bulkCandidates();
+  const list = $('bulkList');
+  $('bulkConfirm').disabled = candidates.length === 0;
+  if (!candidates.length) {
+    list.innerHTML = '<li class="bulk-empty">이 묶음에는 자동으로 확정할 만큼 확실한 곡이 없습니다.</li>';
+    return;
+  }
+  list.innerHTML = candidates.map((item) => {
+    const suggestion = item.audio_analysis.suggested_annotation || {};
+    const percent = Math.round(Number(suggestion.min_confidence) * 100);
+    return `
+      <li>
+        <label>
+          <input type='checkbox' value='${escapeHtml(item.id)}' checked />
+          <span class='bulk-title'>${escapeHtml(item.title || '제목 없음')}</span>
+          <span class='bulk-score'>최저 ${percent}%</span>
+          <span class='bulk-artist'>${escapeHtml(item.channel_title)}</span>
+          <span class='bulk-summary'>${escapeHtml(annotationSummary(suggestion))}</span>
+        </label>
+      </li>`;
+  }).join('');
+}
+
+async function confirmSelectedInBulk() {
+  const selected = [...$('bulkList').querySelectorAll('input[type=checkbox]:checked')]
+    .map((input) => items.find((item) => item.id === input.value))
+    .filter(Boolean);
+  if (!selected.length) {
+    alert('확정할 곡을 선택해주세요.');
+    return;
+  }
+
+  const button = $('bulkConfirm');
+  button.disabled = true;
+  button.textContent = '확정 중…';
+  try {
+    const { ok, data } = await api('POST', '/admin/music-filter-reviews/bulk-confirm', {
+      items: selected.map((item) => ({ cafe_id: item.cafe_id, recommendation_id: item.id })),
+    });
+    if (!ok) throw new Error(data.error || '일괄 확정에 실패했습니다.');
+
+    const result = $('bulkResult');
+    result.hidden = false;
+    result.textContent = data.skipped?.length
+      ? `${data.confirmed.length}건 확정 · ${data.skipped.length}건은 자격을 갖추지 못해 건너뜀`
+      : `${data.confirmed.length}건 확정`;
+    // 서버가 실제로 무엇을 저장했는지 다시 읽는다. 화면에서 추측하지 않는다.
+    await loadPage(0);
+    renderBulkPanel();
+  } catch (error) {
+    alert(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = '선택한 곡 확정';
+  }
+}
+
+$('toggleBulk').addEventListener('click', () => {
+  const panel = $('bulkPanel');
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) renderBulkPanel();
+});
+
+$('bulkSelectAll').addEventListener('click', () => {
+  const inputs = [...$('bulkList').querySelectorAll('input[type=checkbox]')];
+  const turnOn = inputs.some((input) => !input.checked);
+  inputs.forEach((input) => { input.checked = turnOn; });
+});
+
+$('bulkConfirm').addEventListener('click', confirmSelectedInBulk);
+
 $('findArtistLabels').addEventListener('click', loadArtistReferences);
 $('applyAnalysisSuggestion').addEventListener('click', () => {
-  const suggestion = items[currentIndex]?.audio_analysis?.suggested_annotation;
-  if (!suggestion) return;
-  if (suggestion.tempo_class) setRadio('tempo_class', suggestion.tempo_class);
-  if (suggestion.rhythmic_character) {
-    setRadio('rhythmic_character', suggestion.rhythmic_character);
-  }
-  if (suggestion.mood_tags?.length) setChecks('mood_tags', suggestion.mood_tags);
+  applySuggestion(items[currentIndex]?.audio_analysis?.suggested_annotation);
 });
-$('previousItem').addEventListener('click', () => {
+function goToPrevious() {
   if (currentIndex > 0) {
     currentIndex -= 1;
     renderItem();
@@ -391,19 +576,46 @@ $('previousItem').addEventListener('click', () => {
   } else if (currentOffset >= PAGE_SIZE) {
     loadPage(Math.max(0, currentOffset - PAGE_SIZE));
   }
-});
+}
 
-$('nextItem').addEventListener('click', () => {
+function goToNext() {
   if (currentIndex < items.length - 1) {
     currentIndex += 1;
     renderItem();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } else if (hasMore) {
-    loadPage($('viewFilter').value === 'unreviewed' ? 0 : nextOffset);
+    // 미검수 계열은 저장할수록 목록이 줄어드니 처음부터 다시 읽는다.
+    loadPage(['unreviewed', 'ambiguous'].includes($('viewFilter').value) ? 0 : nextOffset);
   }
+}
+
+$('previousItem').addEventListener('click', goToPrevious);
+$('nextItem').addEventListener('click', goToNext);
+$('viewFilter').addEventListener('change', () => {
+  $('bulkPanel').hidden = true;
+  loadPage(0);
 });
 
-$('viewFilter').addEventListener('change', () => loadPage(0));
+// 손을 폼에서 떼지 않고 훑기 위한 단축키. 입력 중에는 가로채지 않는다.
+document.addEventListener('keydown', (event) => {
+  if (event.altKey || event.metaKey) return;
+  const typing = event.target.closest('input, textarea, select');
+
+  if (event.key === 'Enter' && event.ctrlKey) {
+    event.preventDefault();
+    $('reviewForm').requestSubmit();
+    return;
+  }
+  if (typing || event.ctrlKey) return;
+
+  const key = event.key.toLowerCase();
+  if (key === 'j') { event.preventDefault(); goToNext(); }
+  if (key === 'k') { event.preventDefault(); goToPrevious(); }
+  if (key === 'o') {
+    const url = trackUrl(items[currentIndex] || {});
+    if (url) window.open(url, '_blank', 'noopener');
+  }
+});
 
 if (!currentToken()) {
   window.location.replace('/admin');

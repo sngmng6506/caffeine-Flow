@@ -45,7 +45,9 @@ main { width: min(980px, calc(100% - 32px)); margin: 24px auto 48px; }
 }
 .summary span { color: #677188; font-size: 12px; }
 .summary b { margin-top: 4px; font-size: 24px; }
-.toolbar { display: flex; align-items: end; justify-content: space-between; margin: 18px 0 10px; color: #677188; font-size: 12px; }
+.toolbar { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin: 18px 0 10px; color: #677188; font-size: 12px; }
+.toolbar #position { margin-left: auto; }
+.shortcut-hint { color: #8b95a8; font-size: 11px; }
 .toolbar label { display: flex; flex-direction: column; gap: 5px; }
 select { padding: 8px 10px; background: #fff; border: 1px solid #cfd6e3; border-radius: 7px; }
 .message { padding: 70px 20px; color: #677188; text-align: center; }
@@ -159,3 +161,27 @@ legend { margin-bottom: 8px; color: #4a5568; font-size: 12px; font-weight: 700; 
   .analysis-suggestion { grid-template-columns: 1fr; }
   .section-title { align-items: flex-start; flex-direction: column; }
 }
+
+/* 자동 채움 표시 — 사람이 폼을 훑을 때 어디를 봐야 하는지 알려준다. */
+.auto-badge { padding: 2px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; vertical-align: middle; }
+.auto-badge--auto { color: #166534; background: #dcfce7; }
+.auto-badge--check { color: #92400e; background: #fef3c7; }
+.auto-badge--missing { color: #475569; background: #e2e8f0; }
+.analysis-flags { margin: 8px 0 0; padding: 8px 10px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: 12px; }
+
+/* 확실한 곡 일괄 확정 */
+.bulk-panel { padding: 18px 20px; margin-bottom: 14px; background: #fff; border: 1px solid #dfe4ee; border-radius: 12px; }
+.bulk-head h3 { margin: 0 0 6px; font-size: 15px; }
+.bulk-head p { margin: 0 0 12px; color: #566176; font-size: 12px; line-height: 1.6; }
+.bulk-list { max-height: 340px; margin: 0 0 12px; padding: 0; overflow-y: auto; list-style: none; }
+.bulk-list li { border-bottom: 1px solid #eef1f6; }
+.bulk-list li:last-child { border-bottom: 0; }
+.bulk-list label { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 10px; align-items: baseline; padding: 9px 4px; cursor: pointer; }
+.bulk-list input { grid-row: 1 / 4; align-self: center; }
+.bulk-title { font-size: 13px; font-weight: 600; }
+.bulk-score { color: #166534; font-size: 11px; font-weight: 700; text-align: right; white-space: nowrap; }
+.bulk-artist, .bulk-summary { grid-column: 2 / 4; color: #677188; font-size: 11px; }
+.bulk-empty { padding: 18px 4px; color: #677188; font-size: 12px; text-align: center; }
+.bulk-actions { display: flex; gap: 8px; align-items: center; }
+.bulk-actions .save-button { width: auto; padding: 10px 16px; }
+.bulk-result { margin: 10px 0 0; color: #166534; font-size: 12px; font-weight: 600; }

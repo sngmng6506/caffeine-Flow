@@ -13,7 +13,7 @@
       <div>
         <p class='eyebrow'>Caffeine Flow</p>
         <h1>음악 라벨링</h1>
-        <p>곡을 듣고 한국어 선택지를 고른 뒤 매장 정책과 맞는지 판단합니다.</p>
+        <p>자동 분석이 채운 값을 확인하고, 표시된 곡만 직접 들어봅니다.</p>
       </div>
       <nav>
         <a href='/admin'>운영자 콘솔</a>
@@ -31,12 +31,28 @@
       <section class='toolbar'>
         <label>보기
           <select id='viewFilter'>
+            <option value='ambiguous'>애매한 순</option>
             <option value='unreviewed'>미완료</option>
             <option value='reviewed'>완료</option>
             <option value='all'>전체</option>
           </select>
         </label>
+        <button type='button' id='toggleBulk' class='secondary-button'>확실한 곡 일괄 확정</button>
         <span id='position'>—</span>
+        <span class='shortcut-hint'>J 다음 · K 이전 · O 곡 듣기 · Ctrl+Enter 저장</span>
+      </section>
+
+      <section id='bulkPanel' class='bulk-panel' hidden>
+        <div class='bulk-head'>
+          <h3>확실한 곡 일괄 확정</h3>
+          <p>자동 분석이 모든 칸을 채웠고 검수 신호가 없는 곡입니다. 곡 라벨만 저장하며 매장 정책 판단은 남습니다. 저장된 라벨은 <b>일괄 확정</b>으로 표시돼 모델 평가에서 분리됩니다.</p>
+        </div>
+        <ul id='bulkList' class='bulk-list'></ul>
+        <div class='bulk-actions'>
+          <button type='button' id='bulkSelectAll' class='secondary-button'>모두 선택</button>
+          <button type='button' id='bulkConfirm' class='save-button'>선택한 곡 확정</button>
+        </div>
+        <p id='bulkResult' class='bulk-result' hidden></p>
       </section>
 
       <p id='message' class='message'>라벨링 목록을 불러오는 중…</p>
@@ -72,7 +88,8 @@
             </div>
             <span id='analysisStatus' class='analysis-status'></span>
           </div>
-          <p class='analysis-notice'>자동 분석은 골드 라벨이 아닙니다. 곡을 직접 듣고 추천값을 검수해주세요.</p>
+          <p class='analysis-notice'>자동 분석이 채운 값은 아래 폼에 미리 선택돼 있습니다. <b>확인 필요</b> 표시가 붙은 칸만 직접 들어보고 고쳐주세요.</p>
+          <p id='analysisFlags' class='analysis-flags' hidden></p>
           <dl class='analysis-metrics'>
             <div><dt>BPM</dt><dd id='analysisBpm'>—</dd></div>
             <div><dt>조성</dt><dd id='analysisKey'>—</dd></div>
@@ -84,7 +101,7 @@
           <div class='analysis-suggestion'>
             <span>추천 라벨</span>
             <p id='analysisSuggestion'>—</p>
-            <button type='button' id='applyAnalysisSuggestion' class='secondary-button'>추천값을 선택지에 적용</button>
+            <button type='button' id='applyAnalysisSuggestion' class='secondary-button'>추천값 다시 적용</button>
           </div>
           <p id='analysisProvenance' class='analysis-provenance'></p>
         </section>
@@ -110,7 +127,7 @@
               <small>분위기는 최대 2개</small>
             </div>
             <fieldset>
-              <legend>체감 템포</legend>
+              <legend>체감 템포 <span class='auto-badge' data-auto-badge='tempo_class' hidden></span></legend>
               <div class='choice-grid compact'>
                 <label><input type='radio' name='tempo_class' value='very_slow' required /><span>매우 느림</span></label>
                 <label><input type='radio' name='tempo_class' value='slow' /><span>느림</span></label>
@@ -121,7 +138,7 @@
               </div>
             </fieldset>
             <fieldset>
-              <legend>주요 분위기</legend>
+              <legend>주요 분위기 <span class='auto-badge' data-auto-badge='mood_tags' hidden></span></legend>
               <div class='choice-grid mood-grid' data-max-choices='2'>
                 <label><input type='checkbox' name='mood_tags' value='peaceful' /><span>평온·차분</span></label>
                 <label><input type='checkbox' name='mood_tags' value='joyful' /><span>밝음·즐거움</span></label>
@@ -140,7 +157,7 @@
           <section class='form-section'>
             <div class='section-title'><div><span>3</span><h3>소리 특징</h3></div></div>
             <fieldset>
-              <legend>사운드 구성</legend>
+              <legend>사운드 구성 <span class='auto-badge' data-auto-badge='instrumentation_type' hidden></span></legend>
               <div class='choice-grid compact'>
                 <label><input type='radio' name='instrumentation_type' value='acoustic' required /><span>어쿠스틱 중심</span></label>
                 <label><input type='radio' name='instrumentation_type' value='electronic' /><span>전자음 중심</span></label>
@@ -149,7 +166,7 @@
               </div>
             </fieldset>
             <fieldset>
-              <legend>리듬 특징</legend>
+              <legend>리듬 특징 <span class='auto-badge' data-auto-badge='rhythmic_character' hidden></span></legend>
               <div class='choice-grid'>
                 <label><input type='radio' name='rhythmic_character' value='minimal' required /><span>리듬이 거의 드러나지 않음</span></label>
                 <label><input type='radio' name='rhythmic_character' value='steady' /><span>안정적인 리듬</span></label>
@@ -160,7 +177,7 @@
               </div>
             </fieldset>
             <fieldset>
-              <legend>보컬 유형</legend>
+              <legend>보컬 유형 <span class='auto-badge' data-auto-badge='vocal_type' hidden></span></legend>
               <div class='choice-grid compact'>
                 <label><input type='radio' name='vocal_type' value='none' required /><span>목소리 없음</span></label>
                 <label><input type='radio' name='vocal_type' value='singing' /><span>노래 위주</span></label>
@@ -176,7 +193,7 @@
               <small>장르는 선택사항·최대 2개</small>
             </div>
             <fieldset>
-              <legend>장르</legend>
+              <legend>장르 <span class='auto-badge' data-auto-badge='genre_tags' hidden></span></legend>
               <div class='choice-grid genre-grid' data-max-choices='2'>
                 <label><input type='checkbox' name='genre_tags' value='pop' /><span>팝</span></label>
                 <label><input type='checkbox' name='genre_tags' value='ballad' /><span>발라드</span></label>
