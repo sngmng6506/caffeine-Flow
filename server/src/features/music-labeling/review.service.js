@@ -7,11 +7,25 @@
 // docs/AI_CHANGE_GUARDRAILS.md#music-filter-review-contract가 기준이다.
 const db = require('../../db/knex');
 const { FILTER_PROCESSED_STATUSES } = require('../../constants/music-filter-status');
+const {
+  ANNOTATION_CONFIRMATION,
+  AUDIO_BULK_CONFIRM_MIN_CONFIDENCE,
+  AUDIO_REVIEW_STATUS,
+} = require('../../constants/audio-analysis');
+const { MUSIC_LABEL_SCHEMA_VERSION } = require('../../constants/music-labeling');
+const { normalizeArtistKey } = require('./annotation');
 
 const LABELING_QUEUE_PAGE_SIZE = 50;
 const CAFE_AUDIT_PAGE_SIZE = 50;
 
-const LABELING_VIEWS = Object.freeze(['unreviewed', 'reviewed', 'all']);
+// `ambiguous`는 미완료 중에서 모델이 가장 헷갈린 순으로 본다. 귀로 확인할 곡을
+// 위로 올려 두면, 나머지는 눈으로 훑고 넘길 수 있다.
+const LABELING_VIEWS = Object.freeze(['unreviewed', 'reviewed', 'all', 'ambiguous']);
+
+// 곡 라벨에 반드시 있어야 하는 칸. 하나라도 자동으로 못 채우면 일괄 확정 대상이 아니다.
+const REQUIRED_ANNOTATION_FIELDS = Object.freeze([
+  'tempo_class', 'rhythmic_character', 'instrumentation_type', 'vocal_type',
+]);
 
 // 큐와 집계에서 제외할 제목. 재생목록은 곡 단위 라벨링 대상이 아니다.
 function excludePlaylists(query) {
@@ -41,6 +55,7 @@ function attachLabelingContext(row) {
       genre_tags: row.annotation_genre_tags,
       note: row.annotation_note,
       usage_scope: row.annotation_usage_scope,
+      confirmation_mode: row.annotation_confirmation_mode,
       schema_version: row.annotation_schema_version,
       updated_at: row.annotation_updated_at,
     } : null,
@@ -106,6 +121,7 @@ const QUEUE_COLUMNS = [
   'annotation.genre_tags as annotation_genre_tags',
   'annotation.note as annotation_note',
   'annotation.usage_scope as annotation_usage_scope',
+  'annotation.confirmation_mode as annotation_confirmation_mode',
   'annotation.schema_version as annotation_schema_version',
   'annotation.updated_at as annotation_updated_at',
   'analysis.id as analysis_id',
@@ -157,7 +173,7 @@ async function fetchLabelingQueue({ view, offset }) {
     .leftJoin({ annotation: 'music_track_annotations' }, joinTrackAnnotation)
     .leftJoin(latestAudioAnalysisQuery(), joinAudioAnalysis);
 
-  if (view === 'unreviewed') {
+  if (view === 'unreviewed' || view === 'ambiguous') {
     decisionsQuery.where((builder) => {
       builder
         .whereNull('review.recommendation_id')
@@ -187,7 +203,20 @@ async function fetchLabelingQueue({ view, offset }) {
       .first(),
     decisionsQuery
       .select(QUEUE_COLUMNS)
-      .orderBy('recommendation.filter_checked_at', 'desc')
+      .modify((query) => {
+        if (view !== 'ambiguous') {
+          query.orderBy('recommendation.filter_checked_at', 'desc');
+          return;
+        }
+        // 검수 신호가 붙은 곡이 먼저, 그다음 가장 약한 칸의 확률이 낮은 순.
+        // 분석이 아직 없는 곡은 자동으로 채운 것이 없으므로 맨 뒤로 보낸다.
+        query
+          .orderByRaw(`
+            (analysis.suggested_annotation -> 'review_flags') IS NOT NULL DESC,
+            COALESCE((analysis.suggested_annotation ->> 'min_confidence')::float, 2) ASC,
+            recommendation.filter_checked_at DESC
+          `);
+      })
       .orderBy('recommendation.id', 'desc')
       .offset(offset)
       .limit(LABELING_QUEUE_PAGE_SIZE + 1),
@@ -300,6 +329,7 @@ function saveReview({
       // jsonb 컬럼에서 22P02가 발생한다. JSON 문자열로 타입을 명확히 한다.
       mood_tags: JSON.stringify(annotation.mood_tags),
       genre_tags: JSON.stringify(annotation.genre_tags),
+      confirmation_mode: ANNOTATION_CONFIRMATION.REVIEWED,
       updated_at: reviewedAt,
     };
     const [savedAnnotation] = await trx('music_track_annotations')
@@ -320,6 +350,7 @@ function saveReview({
         note: row.note,
         usage_scope: row.usage_scope,
         schema_version: row.schema_version,
+        confirmation_mode: row.confirmation_mode,
         updated_at: row.updated_at,
       })
       .returning('*');
@@ -339,6 +370,140 @@ function saveReview({
 
     return { ...savedReview, track_annotation: savedAnnotation };
   });
+}
+
+/**
+ * 일괄 확정 자격을 저장된 분석으로 다시 판정한다.
+ *
+ * 화면이 보낸 라벨 값을 그대로 받지 않는다. 목록에서 한 번에 확정하는 경로는
+ * 사람이 각 값을 보지 않으므로, 무엇이 저장될지는 서버가 DB의 분석 결과에서
+ * 직접 만들어야 한다.
+ *
+ * 자격을 잃는 경우:
+ * - 자동 분석이 없거나 이미 검수됨
+ * - 자동으로 못 채운 칸이 있거나 모델끼리 어긋남(review_flags)
+ * - 가장 약한 칸의 확률이 문턱 미만
+ * - 아티스트명을 알 수 없음
+ */
+function buildBulkAnnotation({ recommendation, analysis }) {
+  if (!analysis || analysis.review_status !== AUDIO_REVIEW_STATUS.PENDING) {
+    return { skipped: 'no_pending_analysis' };
+  }
+
+  const suggestion = analysis.suggested_annotation || {};
+  if ((suggestion.review_flags || []).length > 0) {
+    return { skipped: 'needs_listening' };
+  }
+  if (typeof suggestion.min_confidence !== 'number'
+    || suggestion.min_confidence < AUDIO_BULK_CONFIRM_MIN_CONFIDENCE) {
+    return { skipped: 'low_confidence' };
+  }
+  if (REQUIRED_ANNOTATION_FIELDS.some((field) => !suggestion[field])) {
+    return { skipped: 'incomplete_suggestion' };
+  }
+  if (!Array.isArray(suggestion.mood_tags) || suggestion.mood_tags.length < 1) {
+    return { skipped: 'incomplete_suggestion' };
+  }
+
+  // 아티스트명은 오디오에서 나오지 않는다. 플랫폼 채널명을 그대로 쓰되, 사람이
+  // 확인한 값이 아니므로 일괄 확정분에만 허용한다.
+  const artistName = (recommendation.channel_title || '').trim();
+  if (!artistName) return { skipped: 'unknown_artist' };
+  const artistKey = normalizeArtistKey(artistName);
+  if (!artistKey) return { skipped: 'unknown_artist' };
+
+  return {
+    annotation: {
+      artist_name: artistName.slice(0, 200),
+      artist_key: artistKey.slice(0, 200),
+      // 원곡·리메이크 구분은 음향으로 알 수 없다. 사람이 채울 몫으로 남긴다.
+      track_version: 'unknown',
+      tempo_class: suggestion.tempo_class,
+      mood_tags: suggestion.mood_tags,
+      instrumentation_type: suggestion.instrumentation_type,
+      rhythmic_character: suggestion.rhythmic_character,
+      vocal_type: suggestion.vocal_type,
+      genre_tags: Array.isArray(suggestion.genre_tags) ? suggestion.genre_tags : [],
+      note: null,
+      usage_scope: 'operational',
+      schema_version: MUSIC_LABEL_SCHEMA_VERSION,
+    },
+  };
+}
+
+/**
+ * 자동 추천값을 곡 라벨로 한 번에 확정한다.
+ *
+ * 곡 라벨만 저장하고 매장 정책 판단(`music_filter_reviews`)은 건드리지 않는다.
+ * 정책 판단은 매장 프롬프트에 달린 문제라 자동 분석이 대신할 수 없고, AI 판단을
+ * 그대로 정답으로 복사하면 나중에 그 AI를 자기 출력으로 채점하게 된다.
+ *
+ * 이미 사람이 저장한 곡 라벨은 덮어쓰지 않는다.
+ */
+async function bulkConfirmAnnotations({ items }) {
+  const confirmed = [];
+  const skipped = [];
+
+  for (const { cafeId, recommendationId } of items) {
+    const recommendation = await db('recommendations')
+      .where({ id: recommendationId, cafe_id: cafeId })
+      .whereIn('filter_status', FILTER_PROCESSED_STATUSES)
+      .select('id', 'platform', 'video_id', 'title', 'channel_title')
+      .first();
+    if (!recommendation) {
+      skipped.push({ recommendation_id: recommendationId, reason: 'not_found' });
+      continue;
+    }
+
+    const existing = await db('music_track_annotations')
+      .where({ platform: recommendation.platform, track_key: recommendation.video_id })
+      .select('id', 'confirmation_mode')
+      .first();
+    if (existing) {
+      // 사람이 이미 고른 라벨을 자동값으로 밀어내지 않는다.
+      skipped.push({ recommendation_id: recommendationId, reason: 'already_labeled' });
+      continue;
+    }
+
+    const analysis = await db('music_audio_analyses')
+      .where({ platform: recommendation.platform, track_key: recommendation.video_id })
+      .select('id', 'suggested_annotation', 'review_status')
+      .orderBy('analyzed_at', 'desc')
+      .orderBy('id', 'desc')
+      .first();
+
+    const { annotation, skipped: reason } = buildBulkAnnotation({ recommendation, analysis });
+    if (!annotation) {
+      skipped.push({ recommendation_id: recommendationId, reason });
+      continue;
+    }
+
+    const confirmedAt = new Date();
+    await db.transaction(async (trx) => {
+      await trx('music_track_annotations').insert({
+        platform: recommendation.platform,
+        track_key: recommendation.video_id,
+        source_recommendation_id: recommendation.id,
+        title: recommendation.title,
+        ...annotation,
+        mood_tags: JSON.stringify(annotation.mood_tags),
+        genre_tags: JSON.stringify(annotation.genre_tags),
+        confirmation_mode: ANNOTATION_CONFIRMATION.BULK,
+        updated_at: confirmedAt,
+      });
+      await trx('music_audio_analyses')
+        .where({ id: analysis.id, review_status: AUDIO_REVIEW_STATUS.PENDING })
+        .update({
+          review_status: AUDIO_REVIEW_STATUS.REVIEWED,
+          reviewed_at: confirmedAt,
+          updated_at: confirmedAt,
+        });
+    });
+
+    confirmed.push({ recommendation_id: recommendationId, track_key: recommendation.video_id });
+  }
+
+  return { confirmed, skipped };
 }
 
 /** 검수 대상 추천곡을 (cafeId, recommendationId) 범위로 조회한다. */
@@ -367,6 +532,7 @@ module.exports = {
   fetchArtistLabels,
   fetchCafeAudit,
   saveReview,
+  bulkConfirmAnnotations,
   findReviewableRecommendation,
   findTrackAudioAnalysis,
 };

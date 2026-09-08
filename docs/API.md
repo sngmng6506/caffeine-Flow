@@ -116,7 +116,8 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/admin/music-filter/test` | 🛡 | 필터 테스트에서 저장 없이 곡 판단. body는 `url`, `prompt`, 선택적 `model` |
 | POST | `/admin/alert-test` | 🛡 | 에러 알림 전송 확인. 실제 알림 경로로 보내며 전용 코드라 진짜 장애의 쿨다운을 건드리지 않는다 |
 | GET | `/admin/music-filter/models` | 🛡 | OpenRouter `/models/user` 목록을 10분 캐시해 반환 |
-| GET | `/admin/music-filter-reviews` | 🛡 | `Playlist`·`플리` 제목을 제외한 전체 카페 라벨링 큐와 전체·완료·미검수 건수. `view`, `offset` 지원 |
+| GET | `/admin/music-filter-reviews` | 🛡 | `Playlist`·`플리` 제목을 제외한 전체 카페 라벨링 큐와 전체·완료·미검수 건수. `view`(`unreviewed`·`reviewed`·`all`·`ambiguous`), `offset` 지원 |
+| POST | `/admin/music-filter-reviews/bulk-confirm` | 🛡 | 자동 추천값을 곡 라벨로 일괄 확정. body는 `items`(`cafe_id`·`recommendation_id`, 최대 50건). 라벨 값은 받지 않고 서버가 저장된 분석에서 자격과 내용을 판정하며, 매장 정책 판단은 바꾸지 않는다 |
 | GET | `/admin/music-filter-artist-labels` | 🛡 | 확인한 아티스트의 다른 곡 라벨 최신 3건. `artist`, 선택적 `platform`·`track_key` |
 | GET | `/admin/cafes` | 🛡 | 전체 카페와 운영 상태, 오늘 QR 접속 브라우저 수(`today_unique_browsers`) |
 | GET | `/admin/cafes/:id/stats` | 🛡 | 특정 카페의 오늘·누적·시간대·요일·AI 필터 통계 |
@@ -129,7 +130,9 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 - 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, audio_analysis_id?, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 화면에 표시한 최신 자동 분석 ID를 함께 보내면 해당 곡·분석 한 건만 `reviewed`로 바뀐다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
 - 해당 카페의 AI 처리 이력만 검수할 수 있고, 사람 라벨은 신청곡 상태나 LLM 판단을 바꾸지 않는다.
 - 곡 라벨은 `(platform, track_key)`당 한 건으로 upsert한다.
-- 라벨링 큐 `view`는 `unreviewed`(기본), `reviewed`, `all`이며 최근 판단순 50건을 반환한다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`다. 저장하면 미검수 목록이 줄어들므로 다음 묶음은 `offset=0`부터 다시 조회한다. 제목에 대소문자 구분 없이 `Playlist` 또는 `플리`가 포함된 항목은 모든 view와 집계에서 제외한다.
+- 곡 라벨 응답의 `confirmation_mode`는 `reviewed`(한 건씩 보고 저장)와 `bulk`(자동 추천값을 목록에서 확정)를 구분한다. 일괄 확정분은 사실상 모델 출력이므로 모델 평가에서 분리한다.
+- 일괄 확정은 자동 분석이 `pending`이고 검수 신호가 없으며 `min_confidence`가 문턱 이상이고 아직 사람 라벨이 없는 곡만 처리한다. 자격을 못 갖춘 항목은 `skipped`에 사유와 함께 돌려주고 저장하지 않는다.
+- 라벨링 큐 `view`는 `unreviewed`(기본), `reviewed`, `all`, `ambiguous`이며 50건을 반환한다. `ambiguous`는 미검수와 같은 범위를 검수 신호가 붙은 곡 먼저, 그다음 `min_confidence` 오름차순으로 정렬한다 — 귀로 확인할 곡이 위로 온다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`다. 저장하면 미검수 목록이 줄어들므로 다음 묶음은 `offset=0`부터 다시 조회한다. 제목에 대소문자 구분 없이 `Playlist` 또는 `플리`가 포함된 항목은 모든 view와 집계에서 제외한다.
 
 ## 오디오 분석 워커 — `/audio-analysis`
 

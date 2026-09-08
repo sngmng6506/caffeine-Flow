@@ -24,6 +24,7 @@ const { isUuid, validateString } = require('../utils/validate');
 const { parseOffset } = require('../utils/pagination');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { HUMAN_DECISIONS, HUMAN_REASON_CODES } = require('../constants/music-filter-review');
+const { AUDIO_BULK_CONFIRM_MAX_ITEMS } = require('../constants/audio-analysis');
 const { normalizeArtistKey, validateMusicAnnotation } = require('../features/music-labeling/annotation');
 const labelingReview = require('../features/music-labeling/review.service');
 const { LABELING_VIEWS } = labelingReview;
@@ -194,10 +195,39 @@ router.get('/music-filter-reviews', requireAdmin, async (req, res) => {
 
   const view = req.query.view || 'unreviewed';
   if (!LABELING_VIEWS.includes(view)) {
-    return res.status(400).json({ error: 'view는 unreviewed, reviewed 또는 all이어야 합니다' });
+    return res.status(400).json({ error: `view는 ${LABELING_VIEWS.join(', ')} 중 하나여야 합니다` });
   }
 
   res.json(await labelingReview.fetchLabelingQueue({ view, offset: offset.value }));
+});
+
+// POST /api/v1/admin/music-filter-reviews/bulk-confirm
+// 자동 추천값을 곡 라벨로 한 번에 확정한다. 화면이 보낸 라벨 값은 받지 않고
+// 서버가 저장된 분석에서 자격과 내용을 다시 판정한다. 매장 정책 판단은 건드리지
+// 않는다 — 자동 분석이 대신할 수 없고, AI 판단을 정답으로 복사하면 나중에 그
+// AI를 자기 출력으로 채점하게 된다.
+router.post('/music-filter-reviews/bulk-confirm', requireAdmin, async (req, res) => {
+  const items = req.body?.items;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: '확정할 항목이 필요합니다' });
+  }
+  if (items.length > AUDIO_BULK_CONFIRM_MAX_ITEMS) {
+    return res.status(400).json({
+      error: `한 번에 ${AUDIO_BULK_CONFIRM_MAX_ITEMS}건까지 확정할 수 있습니다`,
+    });
+  }
+
+  const parsed = [];
+  for (const item of items) {
+    const cafeId = item?.cafe_id;
+    const recommendationId = item?.recommendation_id;
+    if (!isUuid(cafeId) || !isUuid(recommendationId)) {
+      return res.status(400).json({ error: '확정 항목의 식별자가 올바르지 않습니다' });
+    }
+    parsed.push({ cafeId, recommendationId });
+  }
+
+  res.json(await labelingReview.bulkConfirmAnnotations({ items: parsed }));
 });
 
 // GET /api/v1/admin/music-filter-artist-labels?artist=...

@@ -1147,4 +1147,157 @@ describe('Essentia 분석 결과와 라벨링 검수', () => {
     await db('music_audio_analyses').where({ id: analysisResponse.body.id }).del();
     await db('recommendations').where({ id: recommendation.id }).del();
   });
+
+  // 일괄 확정용 곡을 만든다. 확신도 높은 추천값과 채널명이 함께 있어야 자격이 된다.
+  async function seedConfidentTrack(trackKey, suggestion) {
+    const [recommendation] = await db('recommendations').insert({
+      cafe_id: cafe.id,
+      video_id: trackKey,
+      title: `일괄 확정 대상 ${trackKey}`,
+      channel_title: '자동 아티스트',
+      platform: 'youtube',
+      status: 'pending',
+      filter_status: 'accepted',
+      filter_checked_at: new Date(),
+    }).returning('*');
+
+    const analysis = await request(app)
+      .post('/api/v1/audio-analysis/results')
+      .set({ Authorization: 'Bearer integration-worker-token' })
+      .send({
+        platform: 'youtube',
+        track_key: trackKey,
+        model_name: 'essentia-standard',
+        model_version: 'bulk-version',
+        feature_schema_version: 1,
+        analyzed_at: new Date().toISOString(),
+        features: { duration_seconds: 180, sample_rate: 44100, bpm: 96, danceability: 1.1 },
+        suggested_annotation: suggestion,
+      });
+    expect(analysis.status).toBe(201);
+    return { recommendation, analysisId: analysis.body.id };
+  }
+
+  const confidentSuggestion = {
+    tempo_class: 'moderate',
+    rhythmic_character: 'steady',
+    mood_tags: ['peaceful'],
+    instrumentation_type: 'acoustic',
+    vocal_type: 'singing',
+    genre_tags: ['jazz'],
+    confidence: { mood_tags: 0.93, instrumentation_type: 0.91, vocal_type: 0.9, genre_tags: 0.88 },
+    min_confidence: 0.88,
+  };
+
+  it('확신도 높은 곡만 일괄 확정하고 정책 판단은 건드리지 않는다', async () => {
+    const confident = await seedConfidentTrack('bulk_confident_track', confidentSuggestion);
+    const weak = await seedConfidentTrack('bulk_weak_track', {
+      ...confidentSuggestion,
+      confidence: { ...confidentSuggestion.confidence, vocal_type: 0.62 },
+      min_confidence: 0.62,
+      review_flags: ['low_confidence:vocal_type'],
+    });
+
+    const adminToken = issueAdminToken();
+    const response = await request(app)
+      .post('/api/v1/admin/music-filter-reviews/bulk-confirm')
+      .set({ Authorization: `Bearer ${adminToken}` })
+      .send({
+        items: [
+          { cafe_id: cafe.id, recommendation_id: confident.recommendation.id },
+          { cafe_id: cafe.id, recommendation_id: weak.recommendation.id },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.confirmed).toHaveLength(1);
+    expect(response.body.confirmed[0].recommendation_id).toBe(confident.recommendation.id);
+    expect(response.body.skipped).toEqual([
+      { recommendation_id: weak.recommendation.id, reason: 'needs_listening' },
+    ]);
+
+    const saved = await db('music_track_annotations')
+      .where({ platform: 'youtube', track_key: 'bulk_confident_track' })
+      .first();
+    expect(saved).toEqual(expect.objectContaining({
+      confirmation_mode: 'bulk',
+      artist_name: '자동 아티스트',
+      instrumentation_type: 'acoustic',
+      vocal_type: 'singing',
+      // 원곡·리메이크는 음향으로 알 수 없어 사람 몫으로 남긴다.
+      track_version: 'unknown',
+    }));
+    expect(saved.mood_tags).toEqual(['peaceful']);
+
+    // 매장 정책 판단은 생기지 않는다. AI 판단을 정답으로 복사하지 않는다.
+    expect(await db('music_filter_reviews')
+      .where({ recommendation_id: confident.recommendation.id })
+      .first()).toBeUndefined();
+
+    expect((await db('music_audio_analyses').where({ id: confident.analysisId }).first())
+      .review_status).toBe('reviewed');
+    expect((await db('music_audio_analyses').where({ id: weak.analysisId }).first())
+      .review_status).toBe('pending');
+
+    await db('music_track_annotations').whereIn('track_key', ['bulk_confident_track', 'bulk_weak_track']).del();
+    await db('music_audio_analyses').whereIn('id', [confident.analysisId, weak.analysisId]).del();
+    await db('recommendations').whereIn('id', [confident.recommendation.id, weak.recommendation.id]).del();
+  });
+
+  it('사람이 이미 저장한 곡 라벨은 일괄 확정이 덮어쓰지 않는다', async () => {
+    const track = await seedConfidentTrack('bulk_existing_label', confidentSuggestion);
+    await db('music_track_annotations').insert({
+      platform: 'youtube',
+      track_key: 'bulk_existing_label',
+      title: '사람이 라벨한 곡',
+      artist_name: '사람이 확인한 아티스트',
+      artist_key: '사람이 확인한 아티스트',
+      track_version: 'live',
+      tempo_class: 'slow',
+      mood_tags: JSON.stringify(['sad']),
+      instrumentation_type: 'electronic',
+      rhythmic_character: 'minimal',
+      vocal_type: 'none',
+      genre_tags: JSON.stringify([]),
+      usage_scope: 'operational',
+    });
+
+    const response = await request(app)
+      .post('/api/v1/admin/music-filter-reviews/bulk-confirm')
+      .set({ Authorization: `Bearer ${issueAdminToken()}` })
+      .send({ items: [{ cafe_id: cafe.id, recommendation_id: track.recommendation.id }] });
+
+    expect(response.body.skipped).toEqual([
+      { recommendation_id: track.recommendation.id, reason: 'already_labeled' },
+    ]);
+    const kept = await db('music_track_annotations')
+      .where({ platform: 'youtube', track_key: 'bulk_existing_label' })
+      .first();
+    expect(kept.tempo_class).toBe('slow');
+    expect(kept.confirmation_mode).toBe('reviewed');
+
+    await db('music_track_annotations').where({ track_key: 'bulk_existing_label' }).del();
+    await db('music_audio_analyses').where({ id: track.analysisId }).del();
+    await db('recommendations').where({ id: track.recommendation.id }).del();
+  });
+
+  it('다른 카페의 추천곡은 일괄 확정에서 조용히 제외한다', async () => {
+    const track = await seedConfidentTrack('bulk_other_cafe', confidentSuggestion);
+
+    const response = await request(app)
+      .post('/api/v1/admin/music-filter-reviews/bulk-confirm')
+      .set({ Authorization: `Bearer ${issueAdminToken()}` })
+      .send({
+        items: [{
+          cafe_id: '00000000-0000-4000-8000-000000000000',
+          recommendation_id: track.recommendation.id,
+        }],
+      });
+
+    expect(response.body.confirmed).toHaveLength(0);
+    expect(response.body.skipped[0].reason).toBe('not_found');
+
+    await db('music_audio_analyses').where({ id: track.analysisId }).del();
+    await db('recommendations').where({ id: track.recommendation.id }).del();
+  });
 });
