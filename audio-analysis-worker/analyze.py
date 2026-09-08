@@ -115,8 +115,6 @@ def build_payload(manifest, features, model_version):
         "model_name": MODEL_NAME,
         "model_version": model_version,
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
-        "rights_basis": read("rights_basis"),
-        "source_reference": read("source_reference"),
         "features": features,
         "suggested_annotation": build_suggestions(features),
         "analyzed_at": datetime.now(timezone.utc).isoformat(),
@@ -159,12 +157,6 @@ def parse_args():
     parser.add_argument("audio_file", type=Path)
     parser.add_argument("--platform", required=True, choices=["youtube", "soundcloud", "spotify"])
     parser.add_argument("--track-key", required=True)
-    parser.add_argument(
-        "--rights-basis",
-        required=True,
-        choices=["owned", "licensed", "public_domain", "other_authorized"],
-    )
-    parser.add_argument("--source-reference", required=True)
     parser.add_argument(
         "--server-url",
         default=os.environ.get("CAFFEINE_FLOW_SERVER_URL", "http://localhost:3000"),

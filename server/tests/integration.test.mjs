@@ -1091,8 +1091,6 @@ describe('Essentia 분석 결과와 라벨링 검수', () => {
         model_name: 'essentia-standard',
         model_version: 'test-version',
         feature_schema_version: 1,
-        rights_basis: 'licensed',
-        source_reference: 'integration-license-ticket',
         analyzed_at: new Date().toISOString(),
         features: { duration_seconds: 180, sample_rate: 44100, bpm: 96, danceability: 1.1 },
         suggested_annotation: {

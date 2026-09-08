@@ -107,9 +107,8 @@ cd audio-analysis-worker
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python analyze.py ./authorized-track.wav \
+python analyze.py ./track.wav \
   --platform youtube --track-key VIDEO_ID \
-  --rights-basis licensed --source-reference license-ticket-001 \
   --server-url http://localhost:3000
 ```
 

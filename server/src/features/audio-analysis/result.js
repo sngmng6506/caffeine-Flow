@@ -5,10 +5,7 @@ const {
   RHYTHMIC_CHARACTERS,
   MAX_MOOD_TAGS,
 } = require('../../constants/music-labeling');
-const {
-  AUDIO_FEATURE_SCHEMA_VERSION,
-  AUDIO_RIGHTS_BASES,
-} = require('../../constants/audio-analysis');
+const { AUDIO_FEATURE_SCHEMA_VERSION } = require('../../constants/audio-analysis');
 const { validateString } = require('../../utils/validate');
 
 const FEATURE_RANGES = Object.freeze({
@@ -117,13 +114,9 @@ function validateAudioAnalysisResult(input) {
     track_key: validateString(input.track_key, { max: 2000, name: '곡 식별자' }),
     model_name: validateString(input.model_name, { max: 100, name: '분석 모델명' }),
     model_version: validateString(input.model_version, { max: 100, name: '분석 모델 버전' }),
-    source_reference: validateString(input.source_reference, { max: 500, name: '권리 출처 참조' }),
   };
   for (const result of Object.values(strings)) {
     if (result.error) return result;
-  }
-  if (!AUDIO_RIGHTS_BASES.includes(input.rights_basis)) {
-    return { error: '권리 근거가 올바르지 않습니다' };
   }
   if (input.feature_schema_version !== AUDIO_FEATURE_SCHEMA_VERSION) {
     return { error: `feature_schema_version은 ${AUDIO_FEATURE_SCHEMA_VERSION}이어야 합니다` };
@@ -144,8 +137,6 @@ function validateAudioAnalysisResult(input) {
       model_name: strings.model_name.value,
       model_version: strings.model_version.value,
       feature_schema_version: AUDIO_FEATURE_SCHEMA_VERSION,
-      rights_basis: input.rights_basis,
-      source_reference: strings.source_reference.value,
       features: features.value,
       suggested_annotation: suggestion.value,
       analyzed_at: analyzedAt,

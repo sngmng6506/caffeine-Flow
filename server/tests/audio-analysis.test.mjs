@@ -17,8 +17,6 @@ const validResult = {
   model_name: 'essentia-standard',
   model_version: '2.1b6.dev1389',
   feature_schema_version: 1,
-  rights_basis: 'licensed',
-  source_reference: 'license-ticket-1',
   analyzed_at: '2026-09-07T03:00:00.000Z',
   features: {
     duration_seconds: 180,
@@ -44,23 +42,30 @@ const validResult = {
 };
 
 describe('Essentia 분석 결과 검증', () => {
-  it('권리 근거·모델 버전·정규화 특징을 저장 형태로 만든다', () => {
+  it('모델 버전과 정규화 특징을 저장 형태로 만든다', () => {
     const result = validateAudioAnalysisResult(validResult);
     expect(result.error).toBeUndefined();
     expect(result.value).toEqual(expect.objectContaining({
       platform: 'youtube',
-      rights_basis: 'licensed',
       feature_schema_version: 1,
       analyzed_at: expect.any(Date),
       features: expect.objectContaining({ bpm: 92.4, valence: null }),
     }));
   });
 
-  it('권리 근거 없는 결과와 범위를 벗어난 특징을 거절한다', () => {
-    expect(validateAudioAnalysisResult({
+  it('예전 워커가 보내는 권리 필드는 받아들이되 저장 형태에 담지 않는다', () => {
+    const result = validateAudioAnalysisResult({
       ...validResult,
-      rights_basis: 'unknown',
-    }).error).toBeTruthy();
+      rights_basis: 'licensed',
+      source_reference: 'license-ticket-1',
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.value).not.toHaveProperty('rights_basis');
+    expect(result.value).not.toHaveProperty('source_reference');
+  });
+
+  it('범위를 벗어난 특징을 거절한다', () => {
     expect(validateAudioAnalysisResult({
       ...validResult,
       features: { ...validResult.features, valence: 1.5 },

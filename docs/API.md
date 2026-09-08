@@ -138,8 +138,8 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/audio-analysis/results` | 워커 | 로컬 음원에서 추출한 Essentia 특징과 추천 라벨을 곡·모델 버전별 upsert |
 
 - `Authorization: Bearer <AUDIO_ANALYSIS_WORKER_TOKEN>` 전용 경계이며 관리자·사장님 JWT를 재사용하지 않는다. 토큰 미설정 시 503이다.
-- body는 `platform`, `track_key`, `model_name`, `model_version`, `feature_schema_version`, `rights_basis`, `source_reference`, `features`, `suggested_annotation`, `analyzed_at`을 받는다.
-- `rights_basis`는 `owned`, `licensed`, `public_domain`, `other_authorized`만 허용한다. 오디오 파일이나 외부 다운로드 URL은 받지 않는다.
+- body는 `platform`, `track_key`, `model_name`, `model_version`, `feature_schema_version`, `features`, `suggested_annotation`, `analyzed_at`을 받는다. 그 밖의 필드는 무시한다.
+- 오디오 파일이나 외부 다운로드 URL은 받지 않는다.
 - 동일한 `(platform, track_key, model_name, model_version)` 결과는 갱신되고 다시 `pending` 검수 상태가 된다.
 - 라벨링 큐는 곡별 최신 분석을 `audio_analysis`로 반환한다. 새 분석이 `pending`이면 기존 수동 라벨이 있어도 미검수 목록에 다시 나타나며, 수동 곡 라벨 저장 시 `reviewed`가 된다.
 

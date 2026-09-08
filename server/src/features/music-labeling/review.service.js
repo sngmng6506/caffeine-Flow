@@ -49,8 +49,6 @@ function attachLabelingContext(row) {
       model_name: row.analysis_model_name,
       model_version: row.analysis_model_version,
       feature_schema_version: row.analysis_feature_schema_version,
-      rights_basis: row.analysis_rights_basis,
-      source_reference: row.analysis_source_reference,
       features: row.analysis_features,
       suggested_annotation: row.analysis_suggested_annotation,
       review_status: row.analysis_review_status,
@@ -74,8 +72,7 @@ function latestAudioAnalysisQuery() {
     .select(
       'audio.platform', 'audio.track_key', 'audio.id',
       'audio.model_name', 'audio.model_version', 'audio.feature_schema_version',
-      'audio.rights_basis', 'audio.source_reference', 'audio.features',
-      'audio.suggested_annotation', 'audio.review_status',
+      'audio.features', 'audio.suggested_annotation', 'audio.review_status',
       'audio.analyzed_at', 'audio.reviewed_at',
     )
     .orderBy('audio.platform')
@@ -115,8 +112,6 @@ const QUEUE_COLUMNS = [
   'analysis.model_name as analysis_model_name',
   'analysis.model_version as analysis_model_version',
   'analysis.feature_schema_version as analysis_feature_schema_version',
-  'analysis.rights_basis as analysis_rights_basis',
-  'analysis.source_reference as analysis_source_reference',
   'analysis.features as analysis_features',
   'analysis.suggested_annotation as analysis_suggested_annotation',
   'analysis.review_status as analysis_review_status',

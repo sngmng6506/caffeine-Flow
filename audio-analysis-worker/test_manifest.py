@@ -8,8 +8,6 @@ from manifest import ManifestError, load_job, parse_manifest, resolve_audio_path
 VALID = {
     "platform": "youtube",
     "track_key": "abc123",
-    "rights_basis": "public_domain",
-    "source_reference": "commons: FurElise.ogg (CC0)",
     "audio_filename": "audio.ogg",
 }
 
@@ -34,11 +32,17 @@ class ParseManifestTest(unittest.TestCase):
         with self.assertRaisesRegex(ManifestError, "없는 항목"):
             parse_manifest(payload)
 
-    def test_rejects_unknown_platform_and_rights_basis(self):
+    def test_rejects_unknown_platform(self):
         with self.assertRaises(ManifestError):
             parse_manifest(manifest_text(platform="bandcamp"))
-        with self.assertRaises(ManifestError):
-            parse_manifest(manifest_text(rights_basis="probably_fine"))
+
+    def test_ignores_retired_rights_fields(self):
+        parsed = parse_manifest(
+            manifest_text(rights_basis="probably_fine", source_reference="x" * 900)
+        )
+
+        self.assertNotIn("rights_basis", parsed)
+        self.assertNotIn("source_reference", parsed)
 
     def test_rejects_unsupported_extension(self):
         with self.assertRaisesRegex(ManifestError, "확장자"):
@@ -54,7 +58,7 @@ class ParseManifestTest(unittest.TestCase):
         with self.assertRaises(ManifestError):
             parse_manifest(manifest_text(track_key="   "))
         with self.assertRaises(ManifestError):
-            parse_manifest(manifest_text(source_reference="x" * 501))
+            parse_manifest(manifest_text(track_key="x" * 2001))
 
 
 class ResolveAudioPathTest(unittest.TestCase):

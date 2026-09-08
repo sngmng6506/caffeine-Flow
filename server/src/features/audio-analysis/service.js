@@ -16,8 +16,6 @@ function saveResult(result) {
     .onConflict(['platform', 'track_key', 'model_name', 'model_version'])
     .merge({
       feature_schema_version: row.feature_schema_version,
-      rights_basis: row.rights_basis,
-      source_reference: row.source_reference,
       features: row.features,
       suggested_annotation: row.suggested_annotation,
       review_status: row.review_status,

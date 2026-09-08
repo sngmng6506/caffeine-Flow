@@ -12,8 +12,6 @@ from worker import WorkerConfig, acquire_lock, ensure_queue_dirs, finish, next_j
 MANIFEST = {
     "platform": "youtube",
     "track_key": "track-1",
-    "rights_basis": "public_domain",
-    "source_reference": "commons: FurElise.ogg (CC0)",
     "audio_filename": "audio.ogg",
 }
 

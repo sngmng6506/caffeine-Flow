@@ -18,17 +18,15 @@ python -m pip install -r requirements.txt          # Valence/Arousal까지 쓰�
                                                   # requirements-tensorflow.txt
 
 export AUDIO_ANALYSIS_WORKER_TOKEN='서버와 같은 랜덤 토큰'
-python analyze.py ./authorized-track.wav \
+python analyze.py ./track.wav \
   --platform youtube \
   --track-key VIDEO_ID \
-  --rights-basis licensed \
-  --source-reference 'my-archive-2026-001' \
   --server-url http://localhost:3000
 ```
 
 Windows PowerShell에서는 `source` 대신 `.\.venv\Scripts\Activate.ps1`, `export` 대신 `$env:AUDIO_ANALYSIS_WORKER_TOKEN='...'`를 사용한다.
 
-`--dry-run`을 사용하면 서버에 제출하지 않고 JSON 결과만 확인한다. `--source-reference`에는 이 음원이 어디서 왔는지 나중에 되짚을 수 있는 내부 참조값을 넣고 개인 정보나 시크릿을 넣지 않는다.
+`--dry-run`을 사용하면 서버에 제출하지 않고 JSON 결과만 확인한다.
 
 ## 추출 범위
 
@@ -89,8 +87,6 @@ sha256sum *.pb   # 위 표와 같아야 한다
 {
   "platform": "youtube",
   "track_key": "곡 식별자",
-  "rights_basis": "public_domain",
-  "source_reference": "음원 출처 메모",
   "audio_filename": "audio.ogg"
 }
 ```

@@ -9,14 +9,13 @@ from pathlib import Path
 
 # analyze.py의 CLI 선택지와 같은 값을 쓴다. 서버 검증(result.js)도 같은 목록이다.
 VALID_PLATFORMS = ("youtube", "soundcloud", "spotify")
-VALID_RIGHTS_BASES = ("owned", "licensed", "public_domain", "other_authorized")
 
 # Essentia MonoLoader가 읽을 수 있고 우리가 실제로 다루는 확장자만 받는다.
 ALLOWED_EXTENSIONS = (".wav", ".ogg", ".flac", ".mp3", ".m4a")
 MAX_AUDIO_BYTES = 200 * 1024 * 1024
 
 MANIFEST_FILENAME = "manifest.json"
-REQUIRED_FIELDS = ("platform", "track_key", "rights_basis", "source_reference", "audio_filename")
+REQUIRED_FIELDS = ("platform", "track_key", "audio_filename")
 
 
 class ManifestError(ValueError):
@@ -64,16 +63,9 @@ def parse_manifest(raw_text):
     platform = _require_text(data["platform"], "platform", 50)
     if platform not in VALID_PLATFORMS:
         raise ManifestError(f"platform이 올바르지 않습니다: {', '.join(VALID_PLATFORMS)}")
-    rights_basis = _require_text(data["rights_basis"], "rights_basis", 50)
-    if rights_basis not in VALID_RIGHTS_BASES:
-        raise ManifestError(f"rights_basis가 올바르지 않습니다: {', '.join(VALID_RIGHTS_BASES)}")
-
     return {
         "platform": platform,
         "track_key": _require_text(data["track_key"], "track_key", 2000),
-        "rights_basis": rights_basis,
-        # 서버 검증과 같은 500자 제한. 시크릿이나 개인정보를 넣지 않는다.
-        "source_reference": _require_text(data["source_reference"], "source_reference", 500),
         "audio_filename": validate_audio_filename(data["audio_filename"]),
     }
 

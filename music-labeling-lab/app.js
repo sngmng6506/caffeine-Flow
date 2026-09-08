@@ -37,13 +37,6 @@ const LABELS = Object.freeze({
   },
 });
 
-const RIGHTS_LABELS = Object.freeze({
-  owned: '직접 소유',
-  licensed: '이용 허가',
-  public_domain: '퍼블릭 도메인',
-  other_authorized: '기타 명시적 허가',
-});
-
 let items = [];
 let currentIndex = 0;
 let currentOffset = 0;
@@ -178,8 +171,6 @@ function renderAudioAnalysis(item) {
   $('applyAnalysisSuggestion').disabled = suggestions.length === 0;
   $('analysisProvenance').textContent = [
     `${analysis.model_name} ${analysis.model_version}`,
-    RIGHTS_LABELS[analysis.rights_basis] || analysis.rights_basis,
-    analysis.source_reference,
     formatDateTime(analysis.analyzed_at),
   ].filter(Boolean).join(' · ');
 }

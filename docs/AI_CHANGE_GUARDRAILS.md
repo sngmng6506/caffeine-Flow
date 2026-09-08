@@ -80,10 +80,12 @@ audio-analysis-worker/
 server/src/constants/audio-analysis.js
 server/src/features/audio-analysis/
 server/src/db/migrations/20260907090000_music_audio_analyses.js
+server/src/db/migrations/20260908090000_optional_audio_analysis_rights.js
 server/src/routes/audio-analysis.js
 ```
 
 - 워커는 로컬 파일만 읽고 서버에는 특징값만 전송한다. 원본 오디오는 업로드하지 않는다.
+- 레거시 `rights_basis`·`source_reference` 컬럼은 마이그레이션 호환으로만 남기고 manifest·제출 API·라벨링 응답에서 사용하거나 노출하지 않는다. 예전 워커가 보내면 무시한다.
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
 - 자동 분석은 `(platform, track_key, model_name, model_version)`으로 중복을 방지하고 같은 버전 재분석은 최신 결과로 갱신한다.
 - 자동 추천값은 수동 곡 라벨을 덮어쓰거나 자동 저장하지 않는다. 새 분석은 `pending`, 사람이 곡 라벨을 저장한 뒤 `reviewed`다.
