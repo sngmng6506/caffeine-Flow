@@ -135,7 +135,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
-| POST | `/audio-analysis/results` | 워커 | 권리가 확인된 로컬 음원에서 추출한 Essentia 특징과 추천 라벨을 곡·모델 버전별 upsert |
+| POST | `/audio-analysis/results` | 워커 | 로컬 음원에서 추출한 Essentia 특징과 추천 라벨을 곡·모델 버전별 upsert |
 
 - `Authorization: Bearer <AUDIO_ANALYSIS_WORKER_TOKEN>` 전용 경계이며 관리자·사장님 JWT를 재사용하지 않는다. 토큰 미설정 시 503이다.
 - body는 `platform`, `track_key`, `model_name`, `model_version`, `feature_schema_version`, `rights_basis`, `source_reference`, `features`, `suggested_annotation`, `analyzed_at`을 받는다.

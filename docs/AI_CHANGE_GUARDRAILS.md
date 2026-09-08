@@ -83,14 +83,14 @@ server/src/db/migrations/20260907090000_music_audio_analyses.js
 server/src/routes/audio-analysis.js
 ```
 
-- 외부 음악 링크 등록을 다운로드·분석 권한으로 간주하지 않는다. 워커는 권리가 확인된 로컬 파일만 읽고 서버에는 특징값과 권리 근거 참조만 전송한다.
+- 워커는 로컬 파일만 읽고 서버에는 특징값만 전송한다. 원본 오디오는 업로드하지 않는다.
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
 - 자동 분석은 `(platform, track_key, model_name, model_version)`으로 중복을 방지하고 같은 버전 재분석은 최신 결과로 갱신한다.
 - 자동 추천값은 수동 곡 라벨을 덮어쓰거나 자동 저장하지 않는다. 새 분석은 `pending`, 사람이 곡 라벨을 저장한 뒤 `reviewed`다.
 - Valence/Arousal 값이 없는 경우 템포나 음량 휴리스틱으로 분위기를 추측해 채우지 않는다.
-- Valence/Arousal 추정에 쓰는 사전학습 모델은 비상업(CC BY-NC-SA 4.0)이다. `ENABLE_VALENCE_AROUSAL` 기본값을 켜지 않으며, 이 값을 신청곡 자동 승인·거절이나 라이브 LLM 입력에 연결하지 않는다. 상업 적용에는 별도 라이선스가 필요하다.
-- 모델 가중치 파일을 저장소에 커밋하지 않는다. 워커가 시작할 때 SHA-256으로 공식 배포본인지 확인한다.
-- 자동 분석은 현재 실시간 LLM 입력이나 추천곡 상태 변경에 사용하지 않는다. 연결 전 골드 라벨 비교, false accept, 라이선스를 별도로 검토한다.
+- Valence/Arousal은 `ENABLE_VALENCE_AROUSAL=true`일 때만 채운다. 기본값은 꺼짐이다.
+- 모델 가중치 파일을 저장소에 커밋하지 않는다. 워커가 시작할 때 SHA-256으로 받아 둔 파일이 공식 배포본인지 확인한다.
+- 자동 분석은 현재 실시간 LLM 입력이나 추천곡 상태 변경에 사용하지 않는다. 연결 전 골드 라벨 비교와 false accept를 별도로 검토한다.
 
 ## Router Mount Order Contract
 

@@ -1,6 +1,6 @@
 # Essentia 오디오 분석 워커
 
-권리가 확인된 **로컬 음원 파일**에서 특징값을 추출해 Caffeine Flow 라벨링 Lab에 전달한다. 외부 플랫폼 URL을 다운로드하지 않으며 원본 오디오는 서버로 전송하지 않는다.
+**로컬 음원 파일**에서 특징값을 추출해 Caffeine Flow 라벨링 Lab에 전달한다. 원본 오디오는 서버로 전송하지 않고 수치만 보낸다.
 
 실행 방식은 두 가지다.
 
@@ -22,13 +22,13 @@ python analyze.py ./authorized-track.wav \
   --platform youtube \
   --track-key VIDEO_ID \
   --rights-basis licensed \
-  --source-reference 'license-ticket-2026-001' \
+  --source-reference 'my-archive-2026-001' \
   --server-url http://localhost:3000
 ```
 
 Windows PowerShell에서는 `source` 대신 `.\.venv\Scripts\Activate.ps1`, `export` 대신 `$env:AUDIO_ANALYSIS_WORKER_TOKEN='...'`를 사용한다.
 
-`--dry-run`을 사용하면 서버에 제출하지 않고 JSON 결과만 확인한다. `--source-reference`에는 계약·허가·소유권을 다시 확인할 수 있는 내부 참조값을 넣고 개인 정보나 시크릿을 넣지 않는다.
+`--dry-run`을 사용하면 서버에 제출하지 않고 JSON 결과만 확인한다. `--source-reference`에는 이 음원이 어디서 왔는지 나중에 되짚을 수 있는 내부 참조값을 넣고 개인 정보나 시크릿을 넣지 않는다.
 
 ## 추출 범위
 
@@ -68,14 +68,7 @@ sha256sum *.pb   # 위 표와 같아야 한다
 - 비정상 프레임(NaN, inf, 학습 범위를 크게 벗어난 값)은 버리고, 남은 프레임이 없으면 `null`이다.
 - Valence/Arousal이 붙은 결과는 `model_version`에 `+deam-msd-musicnn-2`가 붙는다. 서버 upsert 키가 `(platform, track_key, model_name, model_version)`이라, 감정값이 있는 결과와 없는 결과가 서로를 덮지 않는다.
 
-### 라이선스 — 평가 전용
-
-Essentia가 배포하는 이 사전학습 모델들은 **CC BY-NC-SA 4.0(비상업)** 이다([licensing information](https://essentia.upf.edu/licensing_information.html), [models](https://essentia.upf.edu/models.html)). 그래서 다음을 지킨다.
-
-- `ENABLE_VALENCE_AROUSAL` 기본값은 `false`다. `true`라고 정확히 적었을 때만 모델이 돌아간다.
-- 결과는 라벨링 Lab에서 **사람이 검수하는 보조값**으로만 쓴다.
-- 실제 신청곡 자동 승인·거절에 연결하지 않는다.
-- **상업화 전에 별도 라이선스가 필요하다.** 상업 서비스에 이 값을 쓰려면 UPF와 라이선스를 맺거나, 상업 이용이 허용된 모델로 교체해야 한다.
+`ENABLE_VALENCE_AROUSAL` 기본값은 `false`이며 `true`라고 정확히 적었을 때만 모델이 돌아간다. 결과는 라벨링 Lab에서 사람이 검수하는 보조값이고, 신청곡 자동 승인·거절에는 아직 연결하지 않는다.
 
 ## 미니PC 상주 워커
 
@@ -97,7 +90,7 @@ Essentia가 배포하는 이 사전학습 모델들은 **CC BY-NC-SA 4.0(비상�
   "platform": "youtube",
   "track_key": "곡 식별자",
   "rights_basis": "public_domain",
-  "source_reference": "권리 근거",
+  "source_reference": "음원 출처 메모",
   "audio_filename": "audio.ogg"
 }
 ```
@@ -139,7 +132,7 @@ journalctl --user -u caffeine-audio-worker -f
 | --- | --- | --- |
 | `CAFFEINE_FLOW_SERVER_URL` | — | 결과를 제출할 서버 |
 | `AUDIO_ANALYSIS_WORKER_TOKEN` | — | 서버와 같은 값. 없으면 워커가 시작하지 않는다 |
-| `ENABLE_VALENCE_AROUSAL` | `false` | 비상업 라이선스 모델 스위치. `true`만 참으로 본다 |
+| `ENABLE_VALENCE_AROUSAL` | `false` | Valence/Arousal 추정 스위치. `true`만 참으로 본다 |
 | `AUDIO_WORKER_ROOT` | `~/caffeine-audio` | 큐 디렉터리 루트 |
 | `AUDIO_MODEL_DIR` | `~/caffeine-audio/models` | 모델 `.pb` 위치 |
 | `POLL_INTERVAL_MS` | `5000` | 큐가 비었을 때 재확인 간격 |
@@ -154,4 +147,4 @@ python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 
 모델 예측기는 주입 가능하다. 단위 테스트는 실제 모델이나 네트워크 없이 정규화·평균·빈 결과·범위 검증과 파일 상태 전이를 확인한다.
 
-Essentia와 사전학습 모델은 상업 서비스 적용 전에 각각 라이선스를 확인해야 한다. 이 워커는 평가·라벨링용이며 실시간 신청 승인에는 사용하지 않는다.
+모델 예측기는 주입 가능하므로 실제 모델 파일이나 네트워크 없이 워커 로직을 검증할 수 있다.

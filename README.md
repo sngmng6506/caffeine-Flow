@@ -16,7 +16,7 @@ Electron        → YouTube·SoundCloud·Spotify 실제 재생
 - YouTube·SoundCloud·Spotify 메타데이터 처리와 overlay 재생
 - 매장 분위기 설명 기반 AI 음악 필터. 판단은 `accept`/`reject`뿐이고 오류는 fail-closed다
 - 투표·댓글·재생 이력·운영 통계
-- 권리가 확인된 로컬 음원의 Essentia 특징 추출과 운영자 골드 라벨링 보조
+- 로컬 음원의 Essentia 특징 추출과 운영자 골드 라벨링 보조
 - Google·Naver 로그인과 Electron 자동 업데이트
 
 ## 기술 스택
@@ -55,7 +55,7 @@ owner/src/        사장님 React UI
 owner/electron/   데스크톱 재생 엔진
 admin/            플랫폼 운영자 정적 콘솔
 music-labeling-lab/ 운영자 골드 라벨링 UI
-audio-analysis-worker/ 권리 확인 로컬 음원의 Essentia 분석
+audio-analysis-worker/ 로컬 음원의 Essentia 분석
 ```
 
 ## 문서
