@@ -18,9 +18,10 @@
 
 1. 서버가 신청 저장 트랜잭션에서 작업을 등록한다. 동일 플랫폼·곡은 한 번만 분석한다.
 2. 미니PC가 `/audio-analysis/jobs/claim`으로 작업을 가져와 YouTube·SoundCloud 오디오를 임시 다운로드한다. Spotify는 서버가 unsupported로 처리한다.
-3. 곡마다 **별도 프로세스**에서 Essentia 기본 특징, MAEST 519 스타일, Valence/Arousal을 추론한다. 세 모델이 같은 16kHz 배열을 나눠 쓴다. 보컬·악기는 미확정으로 남긴다.
-4. 분석 원본·자동 라벨·작업 완료를 한 트랜잭션에 저장한다. 임시 음원은 성공·실패 모두 삭제한다. 사람이 수정한 라벨은 덮어쓰지 않는다.
-5. 중단된 작업은 20분 lease 만료 후 회수하며 최대 3회 처리한다. 완료 응답 유실은 같은 lease로 재전송한다.
+3. 곡마다 **별도 프로세스**에서 Essentia 기본 특징, MAEST 519 스타일, Valence/Arousal을 추론한다. 세 모델이 같은 16kHz 배열을 나눠 쓴다.
+4. `ENABLE_AUDIO_LLM=true`면 곡에서 고르게 뽑은 구간을 오디오 입력 LLM에 보내 무드·악기·보컬을 자유 서술로 받는다([2단 Audio LLM](#2단-audio-llm)).
+5. 분석 원본·자동 라벨·작업 완료를 한 트랜잭션에 저장한다. 임시 음원은 성공·실패 모두 삭제한다. 사람이 수정한 라벨은 덮어쓰지 않는다.
+6. 중단된 작업은 20분 lease 만료 후 회수하며 최대 3회 처리한다. 완료 응답 유실은 같은 lease로 재전송한다.
 
 API 계약은 [docs/API.md](../docs/API.md), 데이터 흐름은 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)를 따른다.
 
@@ -106,7 +107,7 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 | --- | --- |
 | 원본 | 입력 URL·SHA-256·모델 버전, 519개 점수, 구간별 점수와 mean/max |
 | 구간 | 마지막 구간의 `end_sec`가 곡 끝에 도달 |
-| 범위 | `pipeline_mode=FULL`, 무드 태그가 감정값에서 나옴. 보컬·악기는 `unknown` |
+| 범위 | 실제로 돈 단계와 `pipeline_mode`·`sources_used`가 일치 |
 | 자원 | 곡 길이 대비 처리 시간과 최대 메모리가 서비스 한도 안 |
 
 전체 결과 JSON은 미니PC에 두고 오디오·가중치·토큰은 저장소에 올리지 않는다. 소수의 곡으로 정확도를 단정하거나 임계값을 임의로 조정하지 않는다. Audio LLM 비교와 캘리브레이션은 [ROADMAP](../docs/ROADMAP.md)에 있다.
@@ -125,6 +126,28 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 HTTP 응답에서는 401·503이 토큰 설정, 404가 서버 배포 버전, 413이 본문 제한, 400이 원본 스키마, 409가 lease 만료나 이미 바뀐 검토 버전을 가리킨다.
 
 인증서 오류가 나도 TLS 검증을 끄지 않는다. 문제가 계속되면 워커를 정지해 추가 작업 소비를 멈춘다. 원본 이력이 있는 마이그레이션은 자동 롤백이 거절되므로 운영 DB 롤백을 복구 절차로 쓰지 않는다.
+
+### 2단 Audio LLM
+
+오디오를 직접 듣는 LLM에게 무드·악기·보컬·구간 변화를 **자유 서술**로 받는다. 기본은 꺼짐이며 `ENABLE_AUDIO_LLM=true`와 `OPENROUTER_API_KEY`가 함께 있어야 동작한다. 모델은 `AUDIO_LLM_MODEL`로 고른다.
+
+동작 계약 — 이 세 가지가 이 단계의 존재 이유다.
+
+- **1단 결과를 프롬프트에 넣지 않는다.** MAEST 장르를 보여주면 LLM이 거기에 동조해 앙상블 효과가 사라지고, 두 결과가 갈리는 곡이 곧 어려운 곡이라는 신호도 잃는다. `audio_llm.py`에는 장르를 받을 인자 자체가 없다.
+- **임베딩 벡터를 텍스트로 넣지 않는다.** 오디오 인코더의 잠재공간과 LLM 토큰공간은 정렬돼 있지 않다. LLM에는 오디오 자체를 준다.
+- **택소노미를 주지 않는다.** 선택지를 좁히면 학습 분포 밖 음악(국악, 트로트 등)의 정보가 통째로 사라진다. 정규화는 나중에 사람이 하거나 별도 매핑이 한다.
+
+곡 전체를 고르게 나눠 `AUDIO_LLM_SEGMENTS`개 구간을 `AUDIO_LLM_CLIP_SEC`초씩 16kHz 모노 wav로 잘라 보낸다. 인트로만 듣지 않으며 마지막 구간은 곡 끝에 닿는다. 원본에는 모델 ID, 프롬프트 버전, 샘플 구간, 입력 파일 해시를 함께 남겨 재현할 수 있게 한다.
+
+2단이 실패해도 1단 결과는 그대로 저장하고 `audio_llm_raw`만 null로 남는다.
+
+`pipeline_mode`는 실제로 돈 단계를 가리킨다.
+
+| 값 | 실행한 단계 |
+| --- | --- |
+| `MAEST_ONLY` | MAEST만 |
+| `MAEST_EMOTION` | MAEST + Valence/Arousal |
+| `FULL` | 위에 더해 Audio LLM |
 
 ## 수동 CLI (호환)
 
@@ -182,6 +205,12 @@ manifest 필드와 허용 확장자·크기 제한, 경로 검증 규칙은 `man
 | `ENABLE_VALENCE_AROUSAL` | `true` | 수동 CLI 감정 모델 스위치. 자동 큐는 모델이 있으면 항상 돌린다 |
 | `AUDIO_WORKER_DRY_RUN` | `false` | 자동 워커는 `true`면 **기동을 거절한다**. 수동 큐에서는 제출을 생략한다 |
 | `DISCORD_AUDIO_WEBHOOK_URL` | — | 수동 큐 실패 알림. 자동 워커는 작업 상태와 journald로 진단한다 |
+| `ENABLE_AUDIO_LLM` | `false` | 2단 Audio LLM 스위치. 켜면 `OPENROUTER_API_KEY`가 필요하다 |
+| `OPENROUTER_API_KEY` | — | 2단 인증. 없이 켜면 워커가 기동하지 않는다 |
+| `AUDIO_LLM_MODEL` | `google/gemini-2.5-pro` | 사용할 오디오 입력 모델 |
+| `AUDIO_LLM_SEGMENTS` | `4` | 곡에서 고르게 뽑을 구간 수 |
+| `AUDIO_LLM_CLIP_SEC` | `30` | 구간 길이(초) |
+| `AUDIO_LLM_TIMEOUT_SEC` | `180` | 2단 호출 제한 시간 |
 
 ## 테스트
 

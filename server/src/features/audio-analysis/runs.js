@@ -6,7 +6,28 @@ const MODEL = 'discogs-maest-30s-pw-519l-2';
 const EMBEDDING_MODEL = 'msd-musicnn-1';
 const EMOTION_MODEL = 'deam-msd-musicnn-2';
 const MAEST_ONLY_SOURCES = [MODEL];
-const FULL_SOURCES = [MODEL, EMBEDDING_MODEL, EMOTION_MODEL];
+const EMOTION_SOURCES = [MODEL, EMBEDDING_MODEL, EMOTION_MODEL];
+const MODES = ['MAEST_ONLY', 'MAEST_EMOTION', 'FULL'];
+const TEXT_MAX = 4000;
+const ITEM_MAX = 120;
+const LIST_MAX = 12;
+const LLM_FIELDS = ['mood', 'instruments', 'vocal', 'structure'];
+const text = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+const list = (v) => Array.isArray(v) && v.length <= LIST_MAX && v.every((i) => text(i, ITEM_MAX));
+
+// 2단 원본. 자유 서술이라 값을 검사하지 않고 형태와 크기만 본다. 입력 해시가
+// 같은 파일을 가리켜야 1단과 2단이 같은 오디오를 들었다고 말할 수 있다.
+function validAudioLlm(raw, mode, audioSha256, duration) {
+  if (mode !== 'FULL') return raw === null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  if (!text(raw.model_id, 200) || !text(raw.prompt_version, 100)) return false;
+  if (raw.input_sha256 !== audioSha256) return false;
+  if (!text(raw.description, TEXT_MAX)) return false;
+  if (!LLM_FIELDS.every((field) => list(raw[field]))) return false;
+  if (!Array.isArray(raw.segments) || raw.segments.length < 1 || raw.segments.length > 8) return false;
+  return raw.segments.every((v) => finite(v.start_sec) && finite(v.duration_sec)
+    && v.start_sec >= 0 && v.duration_sec > 0 && v.start_sec + v.duration_sec <= duration + 0.001);
+}
 const hash = (v) => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
 const score = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 const vector = (v) => Array.isArray(v) && v.length === 519 && v.every(score);
@@ -26,16 +47,19 @@ function validMood(mood, full, features) {
 
 function validateRun(input, result) {
   const invalid = () => ({ error: 'MAEST 원본·입력 정보가 올바르지 않습니다' });
-  const full = input?.pipeline_mode === 'FULL';
-  const expectedSources = full ? FULL_SOURCES : MAEST_ONLY_SOURCES;
-  if (!input || input.schema_version !== 1 || !['MAEST_ONLY', 'FULL'].includes(input.pipeline_mode) ||
+  const mode = input?.pipeline_mode;
+  const withEmotion = mode === 'MAEST_EMOTION' || mode === 'FULL';
+  const expectedSources = withEmotion ? EMOTION_SOURCES : MAEST_ONLY_SOURCES;
+  if (!input || input.schema_version !== 1 || !MODES.includes(mode) ||
       input.maest_model_version !== MODEL || !hash(input.model_sha256) || !hash(input.audio_sha256) ||
-      input.audio_local_path !== null || input.audio_llm_raw !== null ||
+      input.audio_local_path !== null ||
       !finite(input.audio_duration_sec) || Math.abs(input.audio_duration_sec - result.features.duration_seconds) > 0.001 || input.audio_sample_rate !== 16000 ||
       input.audio_duration_sec < 10 || input.audio_duration_sec > 900 ||
       input.audio_source_url !== result.source_reference || !Array.isArray(input.sources_used) ||
-      input.sources_used.length !== expectedSources.length ||
-      expectedSources.some((v, i) => input.sources_used[i] !== v)) return invalid();
+      input.sources_used.length !== expectedSources.length + (mode === 'FULL' ? 1 : 0) ||
+      expectedSources.some((v, i) => input.sources_used[i] !== v) ||
+      (mode === 'FULL' && input.sources_used.at(-1) !== input.audio_llm_raw?.model_id) ||
+      !validAudioLlm(input.audio_llm_raw, mode, input.audio_sha256, input.audio_duration_sec)) return invalid();
   const raw = input.maest_raw;
   if (!raw || !Array.isArray(raw.classes) || raw.classes.length !== 519 || new Set(raw.classes).size !== 519 ||
       raw.classes.some((v) => typeof v !== 'string' || v.length > 120 || !v.includes('---')) ||
@@ -59,15 +83,19 @@ function validateRun(input, result) {
   }
   const normalized = input.normalized;
   if (!normalized || typeof normalized.taxonomy_version !== 'string' || normalized.taxonomy_version.length > 100 ||
-      normalized.calibrated !== false || !validMood(normalized.mood, full, result.features) ||
+      normalized.calibrated !== false || !validMood(normalized.mood, withEmotion, result.features) ||
       !Array.isArray(normalized.genre) || normalized.genre.length > 2 ||
       normalized.genre.some((v) => !GENRE_TAGS.includes(v.label) || v.source !== 'maest' || !score(v.confidence) ||
         !raw.classes.includes(v.raw_label) || Math.abs(raw.mean[raw.classes.indexOf(v.raw_label)] - v.confidence) > 0.000001)) return invalid();
   return { value: {
-    schema_version: 1, pipeline_mode: input.pipeline_mode, sources_used: expectedSources, maest_model_version: MODEL,
+    schema_version: 1,
+    pipeline_mode: input.pipeline_mode,
+    // FULL이면 2단 모델까지 저장한다. 검증만 하고 빼면 원본으로 재현할 수 없다.
+    sources_used: mode === 'FULL' ? [...expectedSources, input.audio_llm_raw.model_id] : expectedSources,
+    maest_model_version: MODEL,
     model_sha256: input.model_sha256, audio_source_url: input.audio_source_url, audio_local_path: null,
     audio_sha256: input.audio_sha256, audio_duration_sec: input.audio_duration_sec, audio_sample_rate: input.audio_sample_rate,
-    audio_llm_raw: null, normalized,
+    audio_llm_raw: input.audio_llm_raw, normalized,
     maest_raw: { classes: raw.classes, mean: raw.mean, max: raw.max, settings,
       essentia_version: raw.essentia_version,
       segments: raw.segments.map(({ start_sec, end_sec, scores }) => ({ start_sec, end_sec, scores })) },

@@ -23,6 +23,13 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from analyze import analyze_audio, build_payload, resolve_emotion_predictor, submit
+from audio_llm import (
+    DEFAULT_BASE_URL as AUDIO_LLM_DEFAULT_BASE_URL,
+    DEFAULT_CLIP_SEC as AUDIO_LLM_DEFAULT_CLIP_SEC,
+    DEFAULT_MODEL as AUDIO_LLM_DEFAULT_MODEL,
+    DEFAULT_SEGMENTS as AUDIO_LLM_DEFAULT_SEGMENTS,
+    DEFAULT_TIMEOUT_SEC as AUDIO_LLM_DEFAULT_TIMEOUT,
+)
 from emotion import EmotionModelError
 from manifest import load_job
 from suggestions import build_suggestions
@@ -59,11 +66,27 @@ class WorkerConfig:
             env.get("POLL_INTERVAL_MS"), DEFAULT_POLL_INTERVAL_MS
         )
         self.discord_webhook_url = env.get("DISCORD_AUDIO_WEBHOOK_URL", "").strip()
+        # 2단 Audio LLM. 외부 유료 API를 호출하고 오디오 구간이 밖으로 나가므로
+        # 기본은 꺼짐이다. 모델은 운영자가 고른다.
+        self.enable_audio_llm = read_flag(env, "ENABLE_AUDIO_LLM")
+        self.audio_llm = {
+            "model": env.get("AUDIO_LLM_MODEL", "").strip() or AUDIO_LLM_DEFAULT_MODEL,
+            "base_url": env.get("OPENROUTER_BASE_URL", "").strip() or AUDIO_LLM_DEFAULT_BASE_URL,
+            "api_key": env.get("OPENROUTER_API_KEY", "").strip(),
+            "app_url": env.get("CAFFEINE_FLOW_SERVER_URL", "").strip(),
+            "app_name": env.get("OPENROUTER_APP_NAME", "").strip() or "Caffeine Flow",
+            "segments": read_positive_int(env.get("AUDIO_LLM_SEGMENTS"), AUDIO_LLM_DEFAULT_SEGMENTS),
+            "clip_sec": read_positive_int(env.get("AUDIO_LLM_CLIP_SEC"), AUDIO_LLM_DEFAULT_CLIP_SEC),
+            "timeout_sec": read_positive_int(env.get("AUDIO_LLM_TIMEOUT_SEC"), AUDIO_LLM_DEFAULT_TIMEOUT),
+        }
         self.dry_run = read_flag(env, "AUDIO_WORKER_DRY_RUN")
 
     def require(self):
         if not self.server_url:
             raise ValueError("CAFFEINE_FLOW_SERVER_URL이 필요합니다")
+        # 켜 놓고 키가 없으면 곡마다 실패한다. 시작할 때 알린다.
+        if self.enable_audio_llm and not self.audio_llm["api_key"]:
+            raise ValueError("ENABLE_AUDIO_LLM에는 OPENROUTER_API_KEY가 필요합니다")
         if not self.token and not self.dry_run:
             raise ValueError("AUDIO_ANALYSIS_WORKER_TOKEN이 필요합니다")
         return self

@@ -50,10 +50,23 @@ function maestBody(job, count = 3, value = 0.3) {
 function fullBody(job, valence = 0.7, arousal = 0.7) {
   const body = maestBody(job);
   body.result.features = { ...body.result.features, valence, arousal };
-  body.maest_run.pipeline_mode = 'FULL';
+  body.maest_run.pipeline_mode = 'MAEST_EMOTION';
   body.maest_run.sources_used = ['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2'];
   body.maest_run.normalized.mood = { valence, arousal, source: 'deam-msd-musicnn-2', tags: ['joyful', 'uplifting'] };
   body.automatic_annotation = { ...body.automatic_annotation, mood_tags: ['joyful', 'uplifting'] };
+  return body;
+}
+// 2단까지 돈 실행. audio_llm_raw의 입력 해시가 1단과 같은 파일을 가리켜야 한다.
+function llmBody(job) {
+  const body = fullBody(job);
+  body.maest_run.pipeline_mode = 'FULL';
+  body.maest_run.sources_used = [...body.maest_run.sources_used, 'google/gemini-2.5-pro'];
+  body.maest_run.audio_llm_raw = {
+    model_id: 'google/gemini-2.5-pro', prompt_version: 'audio-llm-1',
+    input_sha256: body.maest_run.audio_sha256, description: '잔잔한 피아노가 이어진다',
+    mood: ['차분함'], instruments: ['피아노'], vocal: ['보컬 없음'], structure: ['후반에 커진다'],
+    segments: [{ start_sec: 0, duration_sec: 30 }, { start_sec: 15, duration_sec: 30 }],
+  };
   return body;
 }
 beforeAll(async () => {
@@ -90,14 +103,14 @@ describe('자동 음향 분석 파이프라인', () => {
     expect(read.body).not.toHaveProperty('lease_token');
     expect(read.body.payload.audio_llm_raw).toBeNull();
   });
-  it('감정 모델까지 돌린 FULL 실행을 저장하고 무드를 함께 남긴다', async () => {
+  it('감정 모델까지 돌린 MAEST_EMOTION 실행을 저장하고 무드를 함께 남긴다', async () => {
     await seed(); const job = await jobs.claim();
     const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
       .set(auth()).send(fullBody(job));
 
     expect(response.status, JSON.stringify(response.body)).toBe(200);
     const [run] = await db('music_audio_runs').where({ track_key: job.track_key });
-    expect(run.payload.pipeline_mode).toBe('FULL');
+    expect(run.payload.pipeline_mode).toBe('MAEST_EMOTION');
     expect(run.payload.sources_used).toEqual(['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2']);
     expect(run.payload.normalized.mood.tags).toEqual(['joyful', 'uplifting']);
     expect(run.payload.audio_llm_raw).toBeNull();
@@ -112,7 +125,7 @@ describe('자동 음향 분석 파이프라인', () => {
     expect(response.status).toBe(400);
     expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
   });
-  it('FULL이 아닌 실행에 무드를 넣거나 모델 목록이 다르면 거절한다', async () => {
+  it('감정 단계가 아닌 실행에 무드를 넣거나 모델 목록이 다르면 거절한다', async () => {
     await seed(); const job = await jobs.claim();
     const send = (b) => request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(b);
     const withMood = maestBody(job);
@@ -122,6 +135,42 @@ describe('자동 음향 분석 파이프라인', () => {
     const wrongSources = fullBody(job);
     wrongSources.maest_run.sources_used = ['discogs-maest-30s-pw-519l-2'];
     expect((await send(wrongSources)).status).toBe(400);
+  });
+  it('2단 Audio LLM 원본을 자유 서술 그대로 보존한다', async () => {
+    await seed(); const job = await jobs.claim();
+    const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
+      .set(auth()).send(llmBody(job));
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const [run] = await db('music_audio_runs').where({ track_key: job.track_key });
+    expect(run.payload.pipeline_mode).toBe('FULL');
+    expect(run.payload.audio_llm_raw.description).toBe('잔잔한 피아노가 이어진다');
+    expect(run.payload.audio_llm_raw.instruments).toEqual(['피아노']);
+    expect(run.payload.sources_used).toEqual(['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1',
+      'deam-msd-musicnn-2', 'google/gemini-2.5-pro']);
+  });
+  it('2단 원본의 입력 해시·모델·구간이 어긋나면 거절한다', async () => {
+    await seed(); const job = await jobs.claim();
+    const send = (b) => request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(b);
+
+    const wrongHash = llmBody(job);
+    wrongHash.maest_run.audio_llm_raw.input_sha256 = 'c'.repeat(64);
+    expect((await send(wrongHash)).status).toBe(400);
+
+    const wrongModel = llmBody(job);
+    wrongModel.maest_run.sources_used.pop();
+    wrongModel.maest_run.sources_used.push('openai/gpt-4o-audio-preview');
+    expect((await send(wrongModel)).status).toBe(400);
+
+    const pastEnd = llmBody(job);
+    pastEnd.maest_run.audio_llm_raw.segments = [{ start_sec: 0, duration_sec: 99999 }];
+    expect((await send(pastEnd)).status).toBe(400);
+
+    const emptyDescription = llmBody(job);
+    emptyDescription.maest_run.audio_llm_raw.description = '';
+    expect((await send(emptyDescription)).status).toBe(400);
+
+    expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
   });
   it('MAEST 구간 누락·집계 불일치는 완료와 원본 저장을 모두 거절한다', async () => {
     await seed(); const job = await jobs.claim();

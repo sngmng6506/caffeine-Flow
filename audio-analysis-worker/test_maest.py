@@ -102,7 +102,7 @@ class MoodNormalizeTest(unittest.TestCase):
         self.assertEqual(mood['tags'], [])
         self.assertEqual(mood['valence'], 0.44)
 
-    def test_remote_result_records_full_pipeline_when_emotion_runs(self):
+    def test_remote_result_records_emotion_stage_when_it_runs(self):
         import tempfile, wave
         from pathlib import Path
         import remote_analyze
@@ -121,8 +121,21 @@ class MoodNormalizeTest(unittest.TestCase):
                 result = remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
                                                     'artist_name': 'unknown'}, Path(directory) / 'result.json')
             run_data = result['maest_run']
-            self.assertEqual(run_data['pipeline_mode'], 'FULL')
+            self.assertEqual(run_data['pipeline_mode'], 'MAEST_EMOTION')
             self.assertEqual(run_data['sources_used'],
                              ['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2'])
             self.assertEqual(run_data['normalized']['mood']['tags'], ['joyful', 'uplifting'])
             self.assertEqual(result['automatic_annotation']['mood_tags'], ['joyful', 'uplifting'])
+
+
+class PipelineModeTest(unittest.TestCase):
+    def test_mode_reflects_which_stages_ran(self):
+        from remote_analyze import pipeline_mode
+        mood = {'valence': 0.5, 'arousal': 0.5}
+        llm = {'model_id': 'google/gemini-2.5-pro'}
+
+        self.assertEqual(pipeline_mode(None, None), 'MAEST_ONLY')
+        self.assertEqual(pipeline_mode(mood, None), 'MAEST_EMOTION')
+        self.assertEqual(pipeline_mode(mood, llm), 'FULL')
+        # 감정 모델이 없어도 2단이 돌면 FULL이다. sources_used가 실제 목록을 남긴다.
+        self.assertEqual(pipeline_mode(None, llm), 'FULL')
