@@ -18,7 +18,7 @@
 
 1. 서버가 신청 저장 트랜잭션에서 작업을 등록한다. 동일 플랫폼·곡은 한 번만 분석한다.
 2. 미니PC가 `/audio-analysis/jobs/claim`으로 작업을 가져와 YouTube·SoundCloud 오디오를 임시 다운로드한다. Spotify는 서버가 unsupported로 처리한다.
-3. 곡마다 **별도 프로세스**에서 Essentia 기본 특징과 MAEST 519 스타일을 추론한다. 자동 큐는 `MAEST_ONLY`이며 무드·보컬·악기를 미확정으로 남긴다.
+3. 곡마다 **별도 프로세스**에서 Essentia 기본 특징, MAEST 519 스타일, Valence/Arousal을 추론한다. 세 모델이 같은 16kHz 배열을 나눠 쓴다. 보컬·악기는 미확정으로 남긴다.
 4. 분석 원본·자동 라벨·작업 완료를 한 트랜잭션에 저장한다. 임시 음원은 성공·실패 모두 삭제한다. 사람이 수정한 라벨은 덮어쓰지 않는다.
 5. 중단된 작업은 20분 lease 만료 후 회수하며 최대 3회 처리한다. 완료 응답 유실은 같은 lease로 재전송한다.
 
@@ -88,7 +88,7 @@ systemctl --user daemon-reload
 - WAV mono 16kHz로 변환한 뒤 **실제 입력 파일**의 SHA-256을 계산한다. 추론 설정(patch 크기·hop·마지막 구간 처리)은 `maest.py`가 단일 기준이며 Essentia 버전과 함께 원본에 기록한다.
 - 전체 구간의 519개 점수와 mean/max를 저장한다. 점수는 보정된 정확도가 아니고 곡의 기원 증명도 아니다. max는 특정 구간의 높은 반응을 보여준다.
 - `taxonomy.json`의 정적 매핑과 태그별 임계값으로 Lab 장르를 최대 2개 만든다. 기본 임계값은 **미보정 실험 기준**이다. `maest.normalize(raw, taxonomy)`로 재추론 없이 정규화만 다시 돌릴 수 있다. 지원되지 않거나 약한 장르는 `unknown`이다.
-- 무드·보컬·악기는 `unknown`으로 남긴다. **장르에서 추측해 채우지 않는다.**
+- 무드는 Valence/Arousal에서만 만든다. 감정 모델을 쓸 수 없으면 `pipeline_mode=MAEST_ONLY`로 남고 무드는 null이다. 보컬·악기는 `unknown`이며 **장르에서 추측해 채우지 않는다.**
 - 입력 파일은 처리 후 삭제하므로 `audio_local_path`는 null이다. 재분석은 원본을 새 이력으로 추가하고 사람이 수정한 최종 라벨은 보존한다. 재다운로드 파일의 해시가 다르면 다른 입력으로 구분한다.
 - 길이·용량·시간 제한과 다운로드 간격은 `download.py`가 단일 기준이다. 로그인·지역제한·삭제·플랫폼 변경은 실패로 남기며 DRM·쿠키 우회는 하지 않는다.
 
@@ -106,7 +106,7 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 | --- | --- |
 | 원본 | 입력 URL·SHA-256·모델 버전, 519개 점수, 구간별 점수와 mean/max |
 | 구간 | 마지막 구간의 `end_sec`가 곡 끝에 도달 |
-| 범위 | `pipeline_mode=MAEST_ONLY`, 무드 원본·정규화 null, 선택형 라벨 `unknown` |
+| 범위 | `pipeline_mode=FULL`, 무드 태그가 감정값에서 나옴. 보컬·악기는 `unknown` |
 | 자원 | 곡 길이 대비 처리 시간과 최대 메모리가 서비스 한도 안 |
 
 전체 결과 JSON은 미니PC에 두고 오디오·가중치·토큰은 저장소에 올리지 않는다. 소수의 곡으로 정확도를 단정하거나 임계값을 임의로 조정하지 않는다. Audio LLM 비교와 캘리브레이션은 [ROADMAP](../docs/ROADMAP.md)에 있다.
@@ -146,7 +146,7 @@ python analyze.py ./authorized-track.wav \
 
 ### Valence/Arousal
 
-수동 CLI에서 동작하며 `ENABLE_VALENCE_AROUSAL=false`로 끌 수 있다. 자동 MAEST 큐는 호출하지 않는다.
+자동 큐와 수동 CLI 모두에서 동작한다. 수동 CLI는 `ENABLE_VALENCE_AROUSAL=false`로 끌 수 있다.
 
 | 역할 | 파일 | SHA-256 |
 | --- | --- | --- |
@@ -179,7 +179,7 @@ manifest 필드와 허용 확장자·크기 제한, 경로 검증 규칙은 `man
 | `AUDIO_MODEL_DIR` | `~/caffeine-audio/models` | 모델 `.pb` 위치 |
 | `AUDIO_WORKER_ROOT` | `~/caffeine-audio` | 락 파일과 수동 큐 디렉터리 루트 |
 | `POLL_INTERVAL_MS` | `5000` | 큐가 비었을 때 재확인 간격 |
-| `ENABLE_VALENCE_AROUSAL` | `true` | 수동 CLI 감정 모델 스위치. 자동 큐는 사용하지 않는다 |
+| `ENABLE_VALENCE_AROUSAL` | `true` | 수동 CLI 감정 모델 스위치. 자동 큐는 모델이 있으면 항상 돌린다 |
 | `AUDIO_WORKER_DRY_RUN` | `false` | 자동 워커는 `true`면 **기동을 거절한다**. 수동 큐에서는 제출을 생략한다 |
 | `DISCORD_AUDIO_WEBHOOK_URL` | — | 수동 큐 실패 알림. 자동 워커는 작업 상태와 journald로 진단한다 |
 

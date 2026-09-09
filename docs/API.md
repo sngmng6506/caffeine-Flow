@@ -191,6 +191,6 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 `ready`는 자동 라벨 저장이 끝났고 사람 검토가 남은 곡만 보여준다. Lab 기본 보기이며 대기·실패·Spotify 상태는 미검토 전체/전체 보기에서 확인한다.
 
-MAEST 완료 요청은 `maest_run`에 schema_version=1, pipeline_mode=MAEST_ONLY, sources_used, maest_model_version, model_sha256, audio_source_url, audio_local_path=null, audio_sha256, audio_duration_sec, audio_sample_rate=16000, maest_raw, audio_llm_raw=null, normalized를 포함한다. maest_raw는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이다. 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. normalized에는 taxonomy_version, calibrated=false, genre(label/source/raw_label/confidence), mood=null을 보낸다. 원본·자동 라벨·최신 분석·작업 완료는 같은 트랜잭션이다.
+MAEST 완료 요청은 `maest_run`에 schema_version=1, pipeline_mode(`MAEST_ONLY` 또는 감정 모델을 함께 돌린 `FULL`), sources_used, maest_model_version, model_sha256, audio_source_url, audio_local_path=null, audio_sha256, audio_duration_sec, audio_sample_rate=16000, maest_raw, audio_llm_raw=null, normalized를 포함한다. maest_raw는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이다. 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. normalized에는 taxonomy_version, calibrated=false, genre(label/source/raw_label/confidence), mood=null을 보낸다. 원본·자동 라벨·최신 분석·작업 완료는 같은 트랜잭션이다.
 
 `essentia-maest` 모델은 원본이 필수다. 이전 MSD 워커 제출 형식은 이행 기간에 허용한다. MAEST 작업 경로만 워커 인증 후 1MB JSON을 허용하며 나머지 API의 64KB 제한은 유지한다. 목록의 maest_summary에는 상위 평균/최댓값, 구간 수, 매핑 정보, 입력 해시를 포함하고 전체 구간 원본은 별도 조회한다. 원본 보존은 이 마이그레이션 이후 MAEST 실행부터 적용되며 과거 덮어쓴 분석을 복원하지 않는다.

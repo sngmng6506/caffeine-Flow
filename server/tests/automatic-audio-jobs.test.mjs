@@ -46,6 +46,16 @@ function maestBody(job, count = 3, value = 0.3) {
           last_patch_mode: 'repeat', resample_quality: 4, output: 'PartitionedCall/Identity_13', batch_size: 1 } },
     } };
 }
+// 감정 모델까지 돌린 실행. features와 normalized.mood가 같은 값을 가리켜야 한다.
+function fullBody(job, valence = 0.7, arousal = 0.7) {
+  const body = maestBody(job);
+  body.result.features = { ...body.result.features, valence, arousal };
+  body.maest_run.pipeline_mode = 'FULL';
+  body.maest_run.sources_used = ['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2'];
+  body.maest_run.normalized.mood = { valence, arousal, source: 'deam-msd-musicnn-2', tags: ['joyful', 'uplifting'] };
+  body.automatic_annotation = { ...body.automatic_annotation, mood_tags: ['joyful', 'uplifting'] };
+  return body;
+}
 beforeAll(async () => {
   [cafe] = await db('cafes').insert({ slug: `audio-${Date.now()}`, name: 'audio test', owner_email: 'audio@example.test' }).returning('*');
 });
@@ -79,6 +89,39 @@ describe('자동 음향 분석 파이프라인', () => {
     expect(read.status).toBe(200);
     expect(read.body).not.toHaveProperty('lease_token');
     expect(read.body.payload.audio_llm_raw).toBeNull();
+  });
+  it('감정 모델까지 돌린 FULL 실행을 저장하고 무드를 함께 남긴다', async () => {
+    await seed(); const job = await jobs.claim();
+    const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
+      .set(auth()).send(fullBody(job));
+
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const [run] = await db('music_audio_runs').where({ track_key: job.track_key });
+    expect(run.payload.pipeline_mode).toBe('FULL');
+    expect(run.payload.sources_used).toEqual(['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2']);
+    expect(run.payload.normalized.mood.tags).toEqual(['joyful', 'uplifting']);
+    expect(run.payload.audio_llm_raw).toBeNull();
+  });
+  it('무드와 features의 감정값이 어긋나면 거절한다', async () => {
+    await seed(); const job = await jobs.claim();
+    const body = fullBody(job);
+    body.maest_run.normalized.mood.valence = 0.2;   // features는 0.7
+
+    const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
+
+    expect(response.status).toBe(400);
+    expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
+  });
+  it('FULL이 아닌 실행에 무드를 넣거나 모델 목록이 다르면 거절한다', async () => {
+    await seed(); const job = await jobs.claim();
+    const send = (b) => request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(b);
+    const withMood = maestBody(job);
+    withMood.maest_run.normalized.mood = { valence: 0.5, arousal: 0.5, source: 'deam-msd-musicnn-2', tags: [] };
+    expect((await send(withMood)).status).toBe(400);
+
+    const wrongSources = fullBody(job);
+    wrongSources.maest_run.sources_used = ['discogs-maest-30s-pw-519l-2'];
+    expect((await send(wrongSources)).status).toBe(400);
   });
   it('MAEST 구간 누락·집계 불일치는 완료와 원본 저장을 모두 거절한다', async () => {
     await seed(); const job = await jobs.claim();

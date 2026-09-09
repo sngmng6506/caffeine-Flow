@@ -87,7 +87,7 @@ server/src/routes/audio-analysis.js
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
 - 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. MAEST 원본은 별도 music_audio_runs에 lease당 한 번 추가한다. 재분석·검토에서 원본을 수정·삭제하지 않으며 DB trigger로도 차단한다.
 - 자동 라벨은 즉시 DB에 저장한다. 자동 원본과 최종 라벨을 분리하고 사람이 확인·수정한 최종 라벨은 자동 분석으로 덮어쓰지 않는다. 분석 revision과 최종 라벨 revision이 화면과 같을 때만 검토한다.
-- Valence/Arousal 값이 없으면 null이다. 자동 큐 MAEST_ONLY에서는 무드 원본/정규화 값은 null, 기존 UI 라벨은 unknown이다. 장르에서 무드·보컬·악기를 추측하지 않는다. 수동 CLI 감정 분석은 별도다.
+- Valence/Arousal 값이 없으면 null이고 무드 원본·정규화도 null이다. 감정 모델을 함께 돌린 실행만 `pipeline_mode=FULL`이며 `sources_used`에 임베딩·회귀 모델을 함께 남긴다. 원본의 무드 값은 `features`의 감정값과 일치해야 한다. 보컬·악기는 unknown이며 장르에서 추측하지 않는다.
 - 모델 가중치 파일을 저장소에 커밋하지 않는다. 워커가 시작할 때 SHA-256으로 공식 배포본인지 확인한다.
 - 자동 분석을 실시간 LLM 입력이나 추천곡 상태 변경에 연결하기 전에 골드 라벨 비교와 false accept를 확인한다.
 

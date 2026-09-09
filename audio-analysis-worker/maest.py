@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 import numpy as np
-from emotion import EmotionModelError, file_sha256
+from emotion import EMOTION_MODEL_NAME, EmotionModelError, file_sha256
 from suggestions import build_suggestions
 
 ROOT = Path(__file__).parent
@@ -42,12 +42,19 @@ def summarize(frames, duration):
     }
 
 
-def predict(audio_path, model_dir):
+def load_audio(audio_path):
+    """MAEST와 감정 모델이 함께 쓰는 16kHz 모노 배열. 같은 파일을 두 번 디코딩하지 않는다."""
+    import essentia.standard as standard
+    return standard.MonoLoader(filename=str(audio_path), sampleRate=SAMPLE_RATE, resampleQuality=4)()
+
+
+def predict(audio_path, model_dir, audio=None):
     path = verify_tag_model(model_dir)
     try:
         import essentia
         import essentia.standard as standard
-        audio = standard.MonoLoader(filename=str(audio_path), sampleRate=SAMPLE_RATE, resampleQuality=4)()
+        if audio is None:
+            audio = load_audio(audio_path)
         model = standard.TensorflowPredictMAEST(graphFilename=str(path), output=OUTPUT,
                     patchSize=PATCH_SIZE, patchHopSize=PATCH_HOP, batchSize=1, lastPatchMode='repeat')
         raw = summarize(model(audio), len(audio) / SAMPLE_RATE)
@@ -57,7 +64,16 @@ def predict(audio_path, model_dir):
         raise EmotionModelError('MAEST 추론에 실패했습니다') from error
 
 
-def normalize(raw, taxonomy=None):
+def normalize_mood(features):
+    """감정값이 있을 때만 무드를 만든다. 없으면 None — 장르로 추측하지 않는다."""
+    valence, arousal = features.get('valence'), features.get('arousal')
+    if valence is None or arousal is None:
+        return None
+    return {'valence': valence, 'arousal': arousal, 'source': EMOTION_MODEL_NAME,
+            'tags': build_suggestions(features).get('mood_tags') or []}
+
+
+def normalize(raw, taxonomy=None, features=None):
     taxonomy = taxonomy or json.loads((ROOT / 'taxonomy.json').read_text())
     candidates = {}
     for style, score in zip(raw['classes'], raw['mean']):
@@ -67,7 +83,7 @@ def normalize(raw, taxonomy=None):
             candidates[label] = {'label': label, 'source': 'maest', 'raw_label': style, 'confidence': score}
     return {'taxonomy_version': taxonomy['version'], 'calibrated': taxonomy['calibrated'],
             'genre': sorted(candidates.values(), key=lambda x: (-x['confidence'], x['label']))[:taxonomy['max_genres']],
-            'mood': None}
+            'mood': normalize_mood(features or {})}
 
 
 def make_annotation(features, normalized, artist='unknown'):
@@ -76,5 +92,6 @@ def make_annotation(features, normalized, artist='unknown'):
             'tempo_class': suggestions.get('tempo_class', 'unknown'),
             'rhythmic_character': suggestions.get('rhythmic_character', 'unknown'),
             'genre_tags': [v['label'] for v in normalized['genre']] or ['unknown'],
-            'mood_tags': ['unknown'], 'vocal_type': 'unknown', 'instrumentation_type': 'unknown',
+            'mood_tags': (normalized.get('mood') or {}).get('tags') or ['unknown'],
+            'vocal_type': 'unknown', 'instrumentation_type': 'unknown',
             'usage_scope': 'operational', 'note': None}

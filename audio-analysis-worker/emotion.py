@@ -16,6 +16,7 @@ EMOTION_SAMPLE_RATE = 16000
 EMBEDDING_MODEL_FILE = "msd-musicnn-1.pb"
 EMOTION_MODEL_FILE = "deam-msd-musicnn-2.pb"
 EMOTION_MODEL_NAME = "deam-msd-musicnn-2"
+EMBEDDING_MODEL_NAME = "msd-musicnn-1"
 
 # msd-musicnn-1.json / deam-msd-musicnn-2.json의 schema에서 읽은 노드 이름이다.
 EMBEDDING_OUTPUT_NODE = "model/dense/BiasAdd"

@@ -63,3 +63,66 @@ class MaestTest(unittest.TestCase):
             self.assertIsNone(result['maest_run']['audio_llm_raw'])
             self.assertIsNone(result['maest_run']['audio_local_path'])
             self.assertEqual(result['maest_run']['pipeline_mode'], 'MAEST_ONLY')
+
+
+class MoodNormalizeTest(unittest.TestCase):
+    def test_mood_is_none_without_valence_arousal(self):
+        raw = {'classes': CLASSES, 'mean': [0.0] * len(CLASSES)}
+        self.assertIsNone(normalize(raw, features={'bpm': 100})['mood'])
+        self.assertIsNone(normalize(raw, features={'valence': 0.5, 'arousal': None})['mood'])
+
+    def test_mood_carries_scores_and_source(self):
+        raw = {'classes': CLASSES, 'mean': [0.0] * len(CLASSES)}
+        mood = normalize(raw, features={'valence': 0.7, 'arousal': 0.7})['mood']
+
+        self.assertEqual(mood['valence'], 0.7)
+        self.assertEqual(mood['arousal'], 0.7)
+        self.assertEqual(mood['source'], 'deam-msd-musicnn-2')
+        self.assertEqual(mood['tags'], ['joyful', 'uplifting'])
+
+    def test_annotation_uses_mood_tags_when_present(self):
+        raw = {'classes': CLASSES, 'mean': [0.0] * len(CLASSES)}
+        features = {'bpm': 100, 'valence': 0.7, 'arousal': 0.7}
+        normalized = normalize(raw, features=features)
+
+        self.assertEqual(make_annotation(features, normalized)['mood_tags'], ['joyful', 'uplifting'])
+
+    def test_annotation_stays_unknown_without_mood(self):
+        # 감정값이 없으면 장르에서 분위기를 추측하지 않는다.
+        raw = {'classes': CLASSES, 'mean': [0.0] * len(CLASSES)}
+        normalized = normalize(raw, features={'bpm': 100})
+
+        self.assertEqual(make_annotation({'bpm': 100}, normalized)['mood_tags'], ['unknown'])
+
+    def test_mid_range_scores_produce_no_mood_tag(self):
+        # 애매한 곡에 억지로 분위기를 붙이지 않는다(실측: 엘리제를 위하여 0.44/0.45).
+        raw = {'classes': CLASSES, 'mean': [0.0] * len(CLASSES)}
+        mood = normalize(raw, features={'valence': 0.44, 'arousal': 0.45})['mood']
+
+        self.assertEqual(mood['tags'], [])
+        self.assertEqual(mood['valence'], 0.44)
+
+    def test_remote_result_records_full_pipeline_when_emotion_runs(self):
+        import tempfile, wave
+        from pathlib import Path
+        import remote_analyze
+        raw = summarize(np.zeros((1, 519)), 20)
+        raw['essentia_version'] = 'test'
+        features = {'duration_seconds': 20, 'sample_rate': 16000, 'valence': 0.7, 'arousal': 0.7}
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / 'input.wav'
+            with wave.open(str(audio), 'wb') as output:
+                output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
+                output.writeframes(b'\0\0' * 16000 * 20)
+            with patch.object(remote_analyze, 'load_emotion_predictor', return_value=lambda a: None), \
+                 patch.object(remote_analyze, 'load_audio', return_value=[0.0]), \
+                 patch.object(remote_analyze, 'analyze_audio', return_value=(features, 'test')), \
+                 patch.object(remote_analyze, 'predict', return_value=raw):
+                result = remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
+                                                    'artist_name': 'unknown'}, Path(directory) / 'result.json')
+            run_data = result['maest_run']
+            self.assertEqual(run_data['pipeline_mode'], 'FULL')
+            self.assertEqual(run_data['sources_used'],
+                             ['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2'])
+            self.assertEqual(run_data['normalized']['mood']['tags'], ['joyful', 'uplifting'])
+            self.assertEqual(result['automatic_annotation']['mood_tags'], ['joyful', 'uplifting'])

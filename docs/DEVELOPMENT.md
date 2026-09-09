@@ -294,6 +294,6 @@ server/src/db/migrations/
 owner/package.json
 ```
 
-자동 MAEST 워커 설치·실제 곡 비교 명령은 [워커 README](../audio-analysis-worker/README.md#실제-곡-테스트-서버-쓰기-없음)를 따른다. 서버는 20260909100000_maest_runs 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다. MAEST_ONLY 자동 큐는 ENABLE_VALENCE_AROUSAL을 사용하지 않으며 기존 수동 CLI만 이 옵션을 따른다.
+자동 MAEST 워커 설치·실제 곡 비교 명령은 [워커 README](../audio-analysis-worker/README.md#실제-곡-테스트-서버-쓰기-없음)를 따른다. 서버는 20260909100000_maest_runs 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다. 자동 큐는 MAEST와 감정 모델을 함께 돌려 무드까지 채운다. 모델 파일이 없으면 감정값만 비우고 장르 분석은 그대로 진행한다.
 
 워커 설치·서비스 등록과 실패 코드별 진단은 [워커 README](../audio-analysis-worker/README.md#실패-진단)를 따른다.

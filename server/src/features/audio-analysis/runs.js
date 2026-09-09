@@ -1,20 +1,41 @@
 const db = require('../../db/knex');
-const { GENRE_TAGS } = require('../../constants/music-labeling');
+const { GENRE_TAGS, MOOD_TAGS, MAX_MOOD_TAGS } = require('../../constants/music-labeling');
 const MODEL = 'discogs-maest-30s-pw-519l-2';
+// 감정값을 채운 실행은 임베딩·회귀 모델을 함께 기록한다. 순서까지 고정해 원본만 보고
+// 어떤 모델이 돌았는지 알 수 있게 한다.
+const EMBEDDING_MODEL = 'msd-musicnn-1';
+const EMOTION_MODEL = 'deam-msd-musicnn-2';
+const MAEST_ONLY_SOURCES = [MODEL];
+const FULL_SOURCES = [MODEL, EMBEDDING_MODEL, EMOTION_MODEL];
 const hash = (v) => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
 const score = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 const vector = (v) => Array.isArray(v) && v.length === 519 && v.every(score);
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 
+// 감정값은 features와 원본이 같은 값을 가리켜야 한다. 한쪽만 고쳐 보내는 것을 막는다.
+function validMood(mood, full, features) {
+  if (!full) return mood === null;
+  if (!mood || typeof mood !== 'object' || Array.isArray(mood)) return false;
+  if (mood.source !== EMOTION_MODEL) return false;
+  if (!score(mood.valence) || !score(mood.arousal)) return false;
+  if (mood.valence !== features.valence || mood.arousal !== features.arousal) return false;
+  if (!Array.isArray(mood.tags) || mood.tags.length > MAX_MOOD_TAGS) return false;
+  return new Set(mood.tags).size === mood.tags.length
+    && mood.tags.every((v) => MOOD_TAGS.includes(v) && v !== 'unknown');
+}
+
 function validateRun(input, result) {
   const invalid = () => ({ error: 'MAEST 원본·입력 정보가 올바르지 않습니다' });
-  if (!input || input.schema_version !== 1 || input.pipeline_mode !== 'MAEST_ONLY' ||
+  const full = input?.pipeline_mode === 'FULL';
+  const expectedSources = full ? FULL_SOURCES : MAEST_ONLY_SOURCES;
+  if (!input || input.schema_version !== 1 || !['MAEST_ONLY', 'FULL'].includes(input.pipeline_mode) ||
       input.maest_model_version !== MODEL || !hash(input.model_sha256) || !hash(input.audio_sha256) ||
       input.audio_local_path !== null || input.audio_llm_raw !== null ||
       !finite(input.audio_duration_sec) || Math.abs(input.audio_duration_sec - result.features.duration_seconds) > 0.001 || input.audio_sample_rate !== 16000 ||
       input.audio_duration_sec < 10 || input.audio_duration_sec > 900 ||
       input.audio_source_url !== result.source_reference || !Array.isArray(input.sources_used) ||
-      input.sources_used.length !== 1 || input.sources_used[0] !== MODEL) return invalid();
+      input.sources_used.length !== expectedSources.length ||
+      expectedSources.some((v, i) => input.sources_used[i] !== v)) return invalid();
   const raw = input.maest_raw;
   if (!raw || !Array.isArray(raw.classes) || raw.classes.length !== 519 || new Set(raw.classes).size !== 519 ||
       raw.classes.some((v) => typeof v !== 'string' || v.length > 120 || !v.includes('---')) ||
@@ -38,11 +59,12 @@ function validateRun(input, result) {
   }
   const normalized = input.normalized;
   if (!normalized || typeof normalized.taxonomy_version !== 'string' || normalized.taxonomy_version.length > 100 ||
-      normalized.calibrated !== false || normalized.mood !== null || !Array.isArray(normalized.genre) || normalized.genre.length > 2 ||
+      normalized.calibrated !== false || !validMood(normalized.mood, full, result.features) ||
+      !Array.isArray(normalized.genre) || normalized.genre.length > 2 ||
       normalized.genre.some((v) => !GENRE_TAGS.includes(v.label) || v.source !== 'maest' || !score(v.confidence) ||
         !raw.classes.includes(v.raw_label) || Math.abs(raw.mean[raw.classes.indexOf(v.raw_label)] - v.confidence) > 0.000001)) return invalid();
   return { value: {
-    schema_version: 1, pipeline_mode: 'MAEST_ONLY', sources_used: [MODEL], maest_model_version: MODEL,
+    schema_version: 1, pipeline_mode: input.pipeline_mode, sources_used: expectedSources, maest_model_version: MODEL,
     model_sha256: input.model_sha256, audio_source_url: input.audio_source_url, audio_local_path: null,
     audio_sha256: input.audio_sha256, audio_duration_sec: input.audio_duration_sec, audio_sample_rate: input.audio_sample_rate,
     audio_llm_raw: null, normalized,

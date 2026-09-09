@@ -49,7 +49,7 @@ def mean_spectral_centroid(audio, sample_rate, standard):
     return float(np.mean(values)) if values else None
 
 
-def analyze_audio(path, emotion_predictor=None):
+def analyze_audio(path, emotion_predictor=None, audio_16k=None):
     try:
         import essentia
         import essentia.standard as standard
@@ -94,9 +94,11 @@ def analyze_audio(path, emotion_predictor=None):
     model_version = getattr(essentia, "__version__", "unknown")
     if emotion_predictor is not None:
         # 모델 카드가 16kHz를 요구한다. 44.1kHz 배열을 재사용하면 조용히 틀린다.
-        audio_16k = standard.MonoLoader(
-            filename=str(path), sampleRate=EMOTION_SAMPLE_RATE
-        )()
+        # 호출부가 이미 16kHz로 읽어 두었으면 그것을 쓰고 다시 디코딩하지 않는다.
+        if audio_16k is None:
+            audio_16k = standard.MonoLoader(
+                filename=str(path), sampleRate=EMOTION_SAMPLE_RATE
+            )()
         emotion = estimate_valence_arousal(audio_16k, emotion_predictor)
         if emotion:
             features["valence"] = emotion["valence"]
