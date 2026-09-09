@@ -13,7 +13,7 @@ const { issueAdminToken } = await import('../src/utils/jwt.js');
 let cafe;
 const annotation = { artist_name: 'artist', track_version: 'unknown', tempo_class: 'moderate',
   mood_tags: ['peaceful'], instrumentation_type: 'acoustic', rhythmic_character: 'steady',
-  vocal_type: 'none', genre_tags: ['jazz'], usage_scope: 'evaluation', note: null };
+  vocal_type: 'none', genre_tags: ['jazz'], usage_scope: 'operational', note: null };
 function result(job) {
   return { platform: job.platform, track_key: job.track_key, model_name: 'essentia-standard',
     model_version: 'test-tags-1', feature_schema_version: 1, rights_basis: 'platform_stream',

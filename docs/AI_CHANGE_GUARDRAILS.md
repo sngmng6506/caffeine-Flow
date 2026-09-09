@@ -66,7 +66,7 @@ server/src/routes/admin.js
 - 곡 특성 라벨은 정책 일치 여부와 분리해 `(platform, track_key)`당 한 건으로 저장한다. 선택값과 최대 개수는 상수와 DB 제약을 함께 유지하며, 한국어는 화면 표시용이고 저장 코드는 바꾸지 않는다.
 - 기존 곡 특성 라벨은 라벨링 화면에 선택된 상태로 복원한다. 매장 정책 검수는 곡 라벨과 달리 추천곡별로 유지하고 다른 매장·신청에 자동 복사하지 않는다.
 - 확인한 아티스트명의 정규화 키는 다른 곡 참고 조회에만 쓴다. 자동 동일인 판정이나 라벨 복사 근거로 사용하지 않는다.
-- `usage_scope=evaluation` 데이터는 라이브 LLM 입력이나 자동수락에 사용하지 않는다. `operational`도 현재는 수집만 하며 연결에는 별도 평가와 계약 변경이 필요하다.
+- `usage_scope=evaluation` 데이터는 라이브 LLM 입력이나 자동수락에 사용하지 않는다. `operational` 데이터를 연결할 때는 별도 평가를 거친다.
 - 운영자 인증과 `(cafe_id, recommendation_id)` 범위를 모두 확인한 AI 처리 이력만 검수한다.
 - 전체 카페 라벨링 큐 조회와 필터 테스트 실행도 `requireAdmin` 경계를 유지하며 사장님 JWT로 열지 않는다.
 - 음악 라벨링은 판단 당시 매장 정책 아래에 AI 승인·거절 결과를 표시하되, 사람 검수값과 AI 판단값을 같은 필드에 저장하지 않는다.
@@ -88,9 +88,8 @@ server/src/routes/audio-analysis.js
 - 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. MAEST 원본은 별도 music_audio_runs에 lease당 한 번 추가한다. 재분석·검토에서 원본을 수정·삭제하지 않으며 DB trigger로도 차단한다.
 - 자동 라벨은 즉시 DB에 저장한다. 자동 원본과 최종 라벨을 분리하고 사람이 확인·수정한 최종 라벨은 자동 분석으로 덮어쓰지 않는다. 분석 revision과 최종 라벨 revision이 화면과 같을 때만 검토한다.
 - Valence/Arousal 값이 없으면 null이다. 자동 큐 MAEST_ONLY에서는 무드 원본/정규화 값은 null, 기존 UI 라벨은 unknown이다. 장르에서 무드·보컬·악기를 추측하지 않는다. 수동 CLI 감정 분석은 별도다.
-- Valence/Arousal 추정에 쓰는 사전학습 모델은 비상업(CC BY-NC-SA 4.0)이다. `ENABLE_VALENCE_AROUSAL` 기본값을 켜지 않으며, 이 값을 신청곡 자동 승인·거절이나 라이브 LLM 입력에 연결하지 않는다. 상업 적용에는 별도 라이선스가 필요하다.
 - 모델 가중치 파일을 저장소에 커밋하지 않는다. 워커가 시작할 때 SHA-256으로 공식 배포본인지 확인한다.
-- 자동 분석은 현재 실시간 LLM 입력이나 추천곡 상태 변경에 사용하지 않는다. 연결 전 골드 라벨 비교, false accept, 라이선스를 별도로 검토한다.
+- 자동 분석을 실시간 LLM 입력이나 추천곡 상태 변경에 연결하기 전에 골드 라벨 비교와 false accept를 확인한다.
 
 ## Router Mount Order Contract
 

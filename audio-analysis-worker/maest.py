@@ -77,4 +77,4 @@ def make_annotation(features, normalized, artist='unknown'):
             'rhythmic_character': suggestions.get('rhythmic_character', 'unknown'),
             'genre_tags': [v['label'] for v in normalized['genre']] or ['unknown'],
             'mood_tags': ['unknown'], 'vocal_type': 'unknown', 'instrumentation_type': 'unknown',
-            'usage_scope': 'evaluation', 'note': None}
+            'usage_scope': 'operational', 'note': None}

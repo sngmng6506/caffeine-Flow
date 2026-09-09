@@ -70,7 +70,7 @@ class WorkerConfig:
 
 
 def read_flag(env, name):
-    """`true`만 참으로 본다. 비상업 모델 스위치가 오타로 켜지면 안 된다."""
+    """`true`만 참으로 본다. 오타나 빈 값이 스위치를 켜지 않게 한다."""
     return env.get(name, "").strip().lower() == "true"
 
 

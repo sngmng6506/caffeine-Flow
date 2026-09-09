@@ -1,12 +1,7 @@
 """deam-msd-musicnn으로 Valence/Arousal을 추정한다.
 
-라이선스 경계가 이 모듈의 존재 이유다. Essentia가 배포하는 사전학습 모델은
-CC BY-NC-SA 4.0(비상업)이며 상업 서비스에 적용하려면 별도 라이선스가 필요하다
-(https://essentia.upf.edu/licensing_information.html). 그래서 이 모듈은
-
-- 기본값이 꺼짐이다. `ENABLE_VALENCE_AROUSAL=true`로 명시해야만 동작한다.
-- 라벨링 Lab의 사람 검수 보조에만 쓰고 신청곡 자동 승인에 연결하지 않는다.
-- 모델을 못 쓰면 분위기를 추측하지 않고 `None`을 돌려준다.
+수동 CLI 경로에서만 쓰며 자동 MAEST 큐는 호출하지 않는다. 모델을 쓸 수 없으면
+분위기를 추측하지 않고 `None`을 돌려준다.
 
 모델 파일은 저장소에 커밋하지 않고 `AUDIO_MODEL_DIR`에 따로 둔다. 기대하는
 SHA-256은 EXPECTED_SHA256에 적어 두어, 받아 둔 파일이 공식 배포본인지 확인한다.

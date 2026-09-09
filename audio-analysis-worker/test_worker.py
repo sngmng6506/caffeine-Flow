@@ -195,15 +195,14 @@ class RunOnceTest(unittest.TestCase):
 
 
 class ConfigTest(unittest.TestCase):
-    def test_valence_arousal_is_off_unless_explicitly_enabled(self):
+    def test_valence_arousal_switch_reads_only_an_exact_true(self):
+        # 자동 워커 설정의 스위치는 `true`만 참으로 본다. 오타로 켜지지 않게 한다.
         with tempfile.TemporaryDirectory() as name:
             self.assertFalse(make_config(Path(name)).enable_valence_arousal)
-            enabled = make_config(Path(name), ENABLE_VALENCE_AROUSAL="true")
-            self.assertTrue(enabled.enable_valence_arousal)
+            self.assertTrue(
+                make_config(Path(name), ENABLE_VALENCE_AROUSAL="true").enable_valence_arousal)
             self.assertFalse(
-                make_config(Path(name), ENABLE_VALENCE_AROUSAL="1").enable_valence_arousal,
-                "true 외의 값으로 비상업 모델이 켜지면 안 된다",
-            )
+                make_config(Path(name), ENABLE_VALENCE_AROUSAL="1").enable_valence_arousal)
 
     def test_missing_server_url_or_token_stops_the_worker(self):
         with tempfile.TemporaryDirectory() as name:

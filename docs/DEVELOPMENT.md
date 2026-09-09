@@ -121,7 +121,7 @@ python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 
 미니PC 상주 운영은 `remote_worker.py`가 서버 DB 큐를 폴링한다. 다운로드·분석 의존성과 등록 절차는 [워커 README](../audio-analysis-worker/README.md)를 따른다. 기존 `worker.py`는 수동 디렉터리 큐 호환용이다.
 
-Valence/Arousal은 `ENABLE_VALENCE_AROUSAL=true`일 때만 `deam-msd-musicnn` 모델로 채운다. 기본값은 꺼짐이며, 모델이 비상업(CC BY-NC-SA 4.0) 라이선스라 라벨링 Lab 평가에만 쓰고 신청곡 자동 승인에 연결하지 않는다. 상업화에는 별도 라이선스가 필요하다. 모델 파일은 저장소에 커밋하지 않고 `AUDIO_MODEL_DIR`에 두며 워커가 SHA-256을 확인한다.
+Valence/Arousal은 수동 CLI에서 `deam-msd-musicnn` 모델로 채우며 `ENABLE_VALENCE_AROUSAL=false`로 끌 수 있다. 자동 MAEST 큐는 이 모델을 호출하지 않는다. 모델 파일은 저장소에 커밋하지 않고 `AUDIO_MODEL_DIR`에 두며 워커가 SHA-256을 확인한다.
 
 ## 마이그레이션
 

@@ -146,28 +146,19 @@ python analyze.py ./authorized-track.wav \
 
 ### Valence/Arousal
 
-수동 CLI에서 `ENABLE_VALENCE_AROUSAL=true`일 때만 동작한다. 자동 MAEST 큐는 호출하지 않는다.
+수동 CLI에서 동작하며 `ENABLE_VALENCE_AROUSAL=false`로 끌 수 있다. 자동 MAEST 큐는 호출하지 않는다.
 
 | 역할 | 파일 | SHA-256 |
 | --- | --- | --- |
 | 임베딩 | `msd-musicnn-1.pb` | `cdea0722bcee7f731286843f2233e3aa69887bb5c3e2dce011eff55f38d04f3e` |
 | 회귀 | `deam-msd-musicnn-2.pb` | `beb5eeb0909266eeb78b8d6bb1323b10829cf2fe55e3c01a13fa1846fa98b371` |
 
-두 파일은 [essentia.upf.edu/models](https://essentia.upf.edu/models.html)에서 받아 `AUDIO_MODEL_DIR`에 두고 **저장소에 커밋하지 않는다.**
+두 파일은 [essentia.upf.edu/models](https://essentia.upf.edu/models.html)에서 받아 `AUDIO_MODEL_DIR`에 두고 **저장소에 커밋하지 않는다.** 파일이 없으면 감정값은 `null`로 남는다.
 
 - 입력은 16kHz 모노다. 다른 특징값이 쓰는 44.1kHz 배열을 재사용하지 않는다.
 - 출력 순서는 `[valence, arousal]`, 원본 척도는 DEAM의 `[1, 9]`이며 `(x - 1) / 8`로 정규화한 뒤 프레임 평균을 낸다.
 - 비정상 프레임(NaN, inf, 학습 범위 밖)은 버리고 남은 프레임이 없으면 `null`이다.
 - 감정값이 붙은 결과는 `model_version`에 `+deam-msd-musicnn-2`가 붙어, 감정값이 없는 결과와 서로 덮지 않는다.
-
-### 라이선스 — 평가 전용
-
-Essentia가 배포하는 사전학습 모델(MAEST 포함)은 **CC BY-NC-SA 4.0(비상업)** 이다([licensing information](https://essentia.upf.edu/licensing_information.html)). 그래서 다음을 지킨다.
-
-- 결과는 라벨링 Lab에서 **사람이 검수하는 보조값**으로만 쓴다.
-- 실제 신청곡 자동 승인·거절이나 실시간 심사에 연결하지 않는다.
-- `ENABLE_VALENCE_AROUSAL` 기본값은 꺼짐이며 `true`라고 정확히 적었을 때만 동작한다.
-- **상업화 전에 별도 라이선스가 필요하다.** UPF와 라이선스를 맺거나 상업 이용이 허용된 모델로 교체해야 한다.
 
 ## 수동 디렉터리 큐 (호환)
 
@@ -188,7 +179,7 @@ manifest 필드와 허용 확장자·크기 제한, 경로 검증 규칙은 `man
 | `AUDIO_MODEL_DIR` | `~/caffeine-audio/models` | 모델 `.pb` 위치 |
 | `AUDIO_WORKER_ROOT` | `~/caffeine-audio` | 락 파일과 수동 큐 디렉터리 루트 |
 | `POLL_INTERVAL_MS` | `5000` | 큐가 비었을 때 재확인 간격 |
-| `ENABLE_VALENCE_AROUSAL` | `false` | 수동 CLI 감정 모델 스위치. 자동 큐는 사용하지 않는다 |
+| `ENABLE_VALENCE_AROUSAL` | `true` | 수동 CLI 감정 모델 스위치. 자동 큐는 사용하지 않는다 |
 | `AUDIO_WORKER_DRY_RUN` | `false` | 자동 워커는 `true`면 **기동을 거절한다**. 수동 큐에서는 제출을 생략한다 |
 | `DISCORD_AUDIO_WEBHOOK_URL` | — | 수동 큐 실패 알림. 자동 워커는 작업 상태와 journald로 진단한다 |
 

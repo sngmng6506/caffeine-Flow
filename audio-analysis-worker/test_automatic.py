@@ -31,7 +31,7 @@ class AutomaticTest(unittest.TestCase):
         self.assertEqual(labels['genre_tags'], ['jazz'])
         self.assertEqual(labels['vocal_type'], 'none')
         self.assertEqual(labels['mood_tags'], ['unknown'])
-        self.assertEqual(labels['usage_scope'], 'evaluation')
+        self.assertEqual(labels['usage_scope'], 'operational')
         self.assertEqual(make_annotation({}, {})['instrumentation_type'], 'unknown')
 
     def test_emotion_failure_does_not_discard_base_features(self):

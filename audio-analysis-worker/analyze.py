@@ -14,6 +14,7 @@ import numpy as np
 
 from emotion import (
     EMOTION_MODEL_NAME,
+    EmotionModelError,
     EMOTION_SAMPLE_RATE,
     estimate_valence_arousal,
     load_emotion_predictor,
@@ -143,13 +144,25 @@ def submit(server_url, token, payload):
         raise RuntimeError(f"분석 결과 서버에 연결할 수 없습니다: {error.reason}") from error
 
 
-def env_flag(name):
-    return os.environ.get(name, "").strip().lower() == "true"
+def env_flag(name, default=False):
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    return raw == "true"
 
 
 def resolve_emotion_predictor(enabled, model_dir):
-    """켜져 있을 때만 예측기를 만든다. 기본값이 꺼짐인 것이 라이선스 계약이다."""
-    return load_emotion_predictor(model_dir) if enabled else None
+    """켜져 있고 모델을 쓸 수 있을 때만 예측기를 만든다.
+
+    모델 파일이 없는 설치에서도 기본 특징 추출은 그대로 돌아야 하므로, 준비되지
+    않은 경우는 실패로 보지 않고 감정값을 비운다.
+    """
+    if not enabled:
+        return None
+    try:
+        return load_emotion_predictor(model_dir)
+    except EmotionModelError:
+        return None
 
 
 def parse_args():
@@ -175,9 +188,9 @@ def parse_args():
     )
     parser.add_argument(
         "--enable-valence-arousal",
-        action="store_true",
-        default=env_flag("ENABLE_VALENCE_AROUSAL"),
-        help="비상업 라이선스 모델로 Valence/Arousal을 추정한다(기본 꺼짐).",
+        action=argparse.BooleanOptionalAction,
+        default=env_flag("ENABLE_VALENCE_AROUSAL", default=True),
+        help="deam-msd-musicnn으로 Valence/Arousal을 추정한다(기본 켜짐).",
     )
     parser.add_argument(
         "--model-dir",

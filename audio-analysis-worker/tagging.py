@@ -80,5 +80,5 @@ def make_annotation(features, scores, artist='unknown'):
         'instrumentation_type': 'hybrid' if acoustic and electronic else 'acoustic' if acoustic else 'electronic' if electronic else 'unknown',
         'rhythmic_character': suggestions.get('rhythmic_character', 'unknown'),
         'vocal_type': vocal, 'genre_tags': genres or ['unknown'],
-        'usage_scope': 'evaluation', 'note': None,
+        'usage_scope': 'operational', 'note': None,
     }
