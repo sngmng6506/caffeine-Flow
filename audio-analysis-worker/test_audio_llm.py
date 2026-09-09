@@ -45,7 +45,7 @@ class PlanSegmentsTest(unittest.TestCase):
 
 class PromptTest(unittest.TestCase):
     def test_prompt_carries_no_genre_or_taxonomy(self):
-        # 2단은 1단과 독립이어야 한다. 앵커링되면 앙상블이 아니라 복창이 된다.
+        # 3단은 1단과 독립이어야 한다. 앵커링되면 앙상블이 아니라 복창이 된다.
         messages = build_messages([b'RIFF0', b'RIFF1'])
         text = json.dumps(messages, ensure_ascii=False)
 

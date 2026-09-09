@@ -1,4 +1,4 @@
-"""오디오를 직접 듣는 LLM으로 무드·악기·보컬을 서술받는다(2단).
+"""오디오를 직접 듣는 LLM으로 무드·악기·보컬을 서술받는다(3단).
 
 MAEST(1단)와 **독립적으로** 돈다. 이 모듈은 장르 결과도 택소노미도 받지 않으며,
 프롬프트에 넣을 방법 자체를 두지 않는다. 두 단계가 서로를 보고 나면 앙상블이
@@ -56,7 +56,7 @@ SYSTEM_PROMPT = (
 
 
 class AudioLLMError(RuntimeError):
-    """2단 호출이 실패했을 때. 1단 결과는 그대로 두고 무드만 비운다."""
+    """3단 호출이 실패했을 때. 1단 결과는 그대로 두고 무드만 비운다."""
 
 
 def plan_segments(duration_sec, count=DEFAULT_SEGMENTS, clip_sec=DEFAULT_CLIP_SEC):

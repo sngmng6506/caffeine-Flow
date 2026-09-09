@@ -66,7 +66,7 @@ class WorkerConfig:
             env.get("POLL_INTERVAL_MS"), DEFAULT_POLL_INTERVAL_MS
         )
         self.discord_webhook_url = env.get("DISCORD_AUDIO_WEBHOOK_URL", "").strip()
-        # 2단 Audio LLM. 외부 유료 API를 호출하고 오디오 구간이 밖으로 나가므로
+        # 3단 Audio LLM. 외부 유료 API를 호출하고 오디오 구간이 밖으로 나가므로
         # 기본은 꺼짐이다. 모델은 운영자가 고른다.
         self.enable_audio_llm = read_flag(env, "ENABLE_AUDIO_LLM")
         self.audio_llm = {

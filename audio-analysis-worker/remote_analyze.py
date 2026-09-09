@@ -25,7 +25,7 @@ def pipeline_mode(mood, audio_llm_raw):
 
 
 def audio_llm_config():
-    """2단 설정만 환경에서 읽는다. 토큰은 부모가 이미 걷어낸 뒤다."""
+    """3단 설정만 환경에서 읽는다. 토큰은 부모가 이미 걷어낸 뒤다."""
     from worker import WorkerConfig
     return WorkerConfig(os.environ).audio_llm
 
@@ -52,14 +52,14 @@ def run(audio, job, output):
     if normalized['mood'] is not None:
         sources_used += [EMBEDDING_MODEL_NAME, EMOTION_MODEL_NAME]
 
-    # 2단은 1단 결과를 보지 않는다. 장르·택소노미를 넘길 통로 자체를 두지 않았다.
+    # 3단은 1단 결과를 보지 않는다. 장르·택소노미를 넘길 통로 자체를 두지 않았다.
     audio_llm_raw = None
     if os.environ.get('ENABLE_AUDIO_LLM', '').strip().lower() == 'true':
         try:
             audio_llm_raw = describe(audio, audio_duration, audio_sha256, audio_llm_config())
             sources_used.append(audio_llm_raw['model_id'])
         except AudioLLMError:
-            # 2단이 실패해도 1단 결과는 그대로 저장한다.
+            # 3단이 실패해도 1단 결과는 그대로 저장한다.
             audio_llm_raw = None
     manifest = {**job, 'rights_basis': 'platform_stream',
                 'source_reference': source_url(job['platform'], job['track_key'])}

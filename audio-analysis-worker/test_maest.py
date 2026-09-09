@@ -137,5 +137,5 @@ class PipelineModeTest(unittest.TestCase):
         self.assertEqual(pipeline_mode(None, None), 'MAEST_ONLY')
         self.assertEqual(pipeline_mode(mood, None), 'MAEST_EMOTION')
         self.assertEqual(pipeline_mode(mood, llm), 'FULL')
-        # 감정 모델이 없어도 2단이 돌면 FULL이다. sources_used가 실제 목록을 남긴다.
+        # 감정 모델이 없어도 3단이 돌면 FULL이다. sources_used가 실제 목록을 남긴다.
         self.assertEqual(pipeline_mode(None, llm), 'FULL')
