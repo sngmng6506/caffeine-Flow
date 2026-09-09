@@ -102,26 +102,13 @@ owner Vite 빌드는 `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_ENABLED`를 사용한�
 
 `audio-analysis-worker/`는 서버와 별도 Python 프로세스로 실행한다. 기존 로컬 CLI와 서버 작업 큐 기반 자동 워커를 제공한다. 원본 음원은 서버에 전송하지 않는다.
 
-```bash
-cd audio-analysis-worker
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python analyze.py ./authorized-track.wav \
-  --platform youtube --track-key VIDEO_ID \
-  --rights-basis licensed --source-reference license-ticket-001 \
-  --server-url http://localhost:3000
-```
-
-서버와 워커에 같은 `AUDIO_ANALYSIS_WORKER_TOKEN`을 설정한다. 상세 옵션과 Windows 실행법은 [audio-analysis-worker/README.md](../audio-analysis-worker/README.md)를 따른다.
+서버와 워커에 같은 `AUDIO_ANALYSIS_WORKER_TOKEN`을 설정한다. 설치·실행·환경변수는 [워커 README](../audio-analysis-worker/README.md)가 단일 기준이다.
 
 ```bash
 python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 ```
 
-미니PC 상주 운영은 `remote_worker.py`가 서버 DB 큐를 폴링한다. 다운로드·분석 의존성과 등록 절차는 [워커 README](../audio-analysis-worker/README.md)를 따른다. 기존 `worker.py`는 수동 디렉터리 큐 호환용이다.
-
-Valence/Arousal은 수동 CLI에서 `deam-msd-musicnn` 모델로 채우며 `ENABLE_VALENCE_AROUSAL=false`로 끌 수 있다. 자동 MAEST 큐는 이 모델을 호출하지 않는다. 모델 파일은 저장소에 커밋하지 않고 `AUDIO_MODEL_DIR`에 두며 워커가 SHA-256을 확인한다.
+미니PC 상주 운영은 `remote_worker.py`가 서버 DB 큐를 폴링한다. 기존 `worker.py`는 수동 디렉터리 큐 호환용이다.
 
 ## 마이그레이션
 
@@ -294,6 +281,6 @@ server/src/db/migrations/
 owner/package.json
 ```
 
-자동 MAEST 워커 설치·실제 곡 비교 명령은 [워커 README](../audio-analysis-worker/README.md#실제-곡-테스트-서버-쓰기-없음)를 따른다. 서버는 20260909100000_maest_runs 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다. 자동 큐는 MAEST와 감정 모델을 함께 돌려 무드까지 채운다. 모델 파일이 없으면 감정값만 비우고 장르 분석은 그대로 진행한다. 2단 Audio LLM은 `ENABLE_AUDIO_LLM=true`와 `OPENROUTER_API_KEY`가 함께 있을 때만 동작하며 모델은 `AUDIO_LLM_MODEL`로 고른다.
+자동 워커 설치·실행과 단계별 동작은 [워커 README](../audio-analysis-worker/README.md)를 따른다. 서버는 20260909100000_maest_runs 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다.
 
 워커 설치·서비스 등록과 실패 코드별 진단은 [워커 README](../audio-analysis-worker/README.md#실패-진단)를 따른다.

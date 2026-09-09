@@ -81,11 +81,13 @@ server/src/constants/audio-analysis.js
 server/src/features/audio-analysis/
 server/src/db/migrations/20260907090000_music_audio_analyses.js
 server/src/routes/audio-analysis.js
+server/src/features/audio-analysis/runs.js
 ```
 
 - 자동 워커는 사용자가 지정한 YouTube·SoundCloud 신청곡 URL을 임시 다운로드한다. `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않는다. 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
 - 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. MAEST 원본은 별도 music_audio_runs에 lease당 한 번 추가한다. 재분석·검토에서 원본을 수정·삭제하지 않으며 DB trigger로도 차단한다.
+- 신청 저장과 작업 등록은 한 트랜잭션이며 플랫폼·곡별 unique로 중복을 막는다. `/admin/audio-labels`의 Lab 큐는 `/admin/music-filter-reviews`의 정책 골드 큐와 완료 정의를 혼용하지 않는다.
 - 자동 라벨은 즉시 DB에 저장한다. 자동 원본과 최종 라벨을 분리하고 사람이 확인·수정한 최종 라벨은 자동 분석으로 덮어쓰지 않는다. 분석 revision과 최종 라벨 revision이 화면과 같을 때만 검토한다.
 - `pipeline_mode`는 실제로 돈 단계를 가리킨다(`MAEST_ONLY` / `MAEST_EMOTION` / Audio LLM까지 돈 `FULL`). `sources_used`에 실행한 모델을 순서대로 남기고, 원본의 무드 값은 `features`의 감정값과 일치해야 한다. 보컬·악기는 unknown이며 장르에서 추측하지 않는다.
 - 3단 Audio LLM 프롬프트에 MAEST 결과·임베딩 벡터·고정 택소노미를 넣지 않는다. 두 단계는 독립이어야 한다. `audio_llm_raw`는 자유 서술 원문과 모델 ID·프롬프트 버전·샘플 구간·입력 해시를 보존하고, 입력 해시는 1단이 분석한 파일과 같아야 한다.
@@ -297,10 +299,3 @@ customer/src/votedSongs.js
 - [ ] CSP/origin/외부 리소스 변경은 보안 경계 테스트를 확인했다.
 - [ ] 현재 구현과 미래 계획을 같은 문서에 섞지 않았다.
 - [ ] 시크릿·토큰·개인정보가 코드와 로그에 없다.
-
-### Automatic Label Contract
-
-- 신청 저장과 작업 등록은 한 트랜잭션이다. 플랫폼·곡별 unique로 중복을 막고 lease로 오래된 워커의 쓰기를 막는다.
-- `/admin/audio-labels`는 모든 신청곡을 곡별로 보여주는 Lab 큐다. 기존 `/admin/music-filter-reviews`의 정책 골드 큐와 완료 정의를 혼용하지 않는다.
-- 사람의 확인과 수정은 human_review_status로 구분한다. 자동 라벨을 사람 골드 판단으로 기록하지 않는다.
-- 자동 태그 매핑은 모델/매핑 버전과 원시 점수를 남긴다. 모델이 지원하지 않거나 임계값 미달인 항목은 unknown이다.
