@@ -118,6 +118,16 @@ def _clean_items(value):
     return items[:MAX_ITEMS]
 
 
+def read_usage(data):
+    """토큰 사용량만 골라 남긴다. 요금 추적과 구간 수 조정 판단에 쓴다."""
+    usage = data.get('usage')
+    if not isinstance(usage, dict):
+        return None
+    picked = {k: usage[k] for k in ('prompt_tokens', 'completion_tokens', 'total_tokens')
+              if isinstance(usage.get(k), int)}
+    return picked or None
+
+
 def parse_response(data):
     """tool call 우선, content fallback. 자유 서술이 비면 실패로 본다."""
     message = (data.get('choices') or [{}])[0].get('message') or {}
@@ -174,7 +184,10 @@ def describe(audio_path, duration_sec, audio_sha256, config,
         raise AudioLLMError('샘플 구간을 만들 수 없습니다')
     clips = [extract_clip(audio_path, segment, config.get('ffmpeg', 'ffmpeg'), runner)
              for segment in segments]
-    parsed = parse_response(call_openrouter(build_messages(clips), config, opener))
+    data = call_openrouter(build_messages(clips), config, opener)
+    parsed = parse_response(data)
+    usage = read_usage(data)
+    generation_id = data.get('id') if isinstance(data.get('id'), str) else None
     return {
         'model_id': config['model'],
         'prompt_version': PROMPT_VERSION,
@@ -182,5 +195,7 @@ def describe(audio_path, duration_sec, audio_sha256, config,
         'clip_sample_rate': CLIP_SAMPLE_RATE,
         'input_sha256': audio_sha256,
         'created_at': datetime.now(timezone.utc).isoformat(),
+        **({'usage': usage} if usage else {}),
+        **({'generation_id': generation_id[:200]} if generation_id else {}),
         **parsed,
     }

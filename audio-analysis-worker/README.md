@@ -139,7 +139,11 @@ HTTP 응답에서는 401·503이 토큰 설정, 404가 서버 배포 버전, 413
 
 곡 전체를 고르게 나눠 `AUDIO_LLM_SEGMENTS`개 구간을 `AUDIO_LLM_CLIP_SEC`초씩 16kHz 모노 wav로 잘라 보낸다. 인트로만 듣지 않으며 마지막 구간은 곡 끝에 닿는다. 원본에는 모델 ID, 프롬프트 버전, 샘플 구간, 입력 파일 해시를 함께 남겨 재현할 수 있게 한다.
 
+토큰 사용량과 generation ID도 함께 남긴다. 요금 추적과 구간 수 조정 판단에 쓴다.
+
 2단이 실패해도 1단 결과는 그대로 저장하고 `audio_llm_raw`만 null로 남는다.
+
+실측(3~4분 곡, `google/gemini-2.5-pro`, 4구간 × 30초): 곡당 **$0.023**, LLM 호출 지연 약 9초. 구간을 16kHz 모노로 자르면 요청 하나가 5MB 안팎이다. 비용을 줄이려면 `AUDIO_LLM_MODEL`을 `google/gemini-2.5-flash`로 바꾸거나 `AUDIO_LLM_SEGMENTS`·`AUDIO_LLM_CLIP_SEC`을 줄인다. 대량 재분석에는 `:batch` 변형이 절반 가격이다.
 
 `pipeline_mode`는 실제로 돈 단계를 가리킨다.
 

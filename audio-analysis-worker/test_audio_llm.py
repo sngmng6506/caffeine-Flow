@@ -114,3 +114,29 @@ class DescribeTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class UsageTest(unittest.TestCase):
+    def test_records_tokens_and_generation_id(self):
+        data = response()
+        data['id'] = 'gen-abc'
+        data['usage'] = {'prompt_tokens': 10, 'completion_tokens': 5, 'total_tokens': 15, 'cost': 0.01}
+        clip = SimpleNamespace(stdout=b'RIFFdata')
+        with patch.object(audio_llm, 'call_openrouter', return_value=data):
+            raw = describe('/tmp/a.wav', 100, 'a' * 64,
+                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           runner=lambda *a, **k: clip)
+
+        # 서버가 세 항목만 허용한다. cost 같은 추가 필드는 걸러 보낸다.
+        self.assertEqual(raw['usage'], {'prompt_tokens': 10, 'completion_tokens': 5, 'total_tokens': 15})
+        self.assertEqual(raw['generation_id'], 'gen-abc')
+
+    def test_missing_usage_is_simply_absent(self):
+        clip = SimpleNamespace(stdout=b'RIFFdata')
+        with patch.object(audio_llm, 'call_openrouter', return_value=response()):
+            raw = describe('/tmp/a.wav', 100, 'a' * 64,
+                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           runner=lambda *a, **k: clip)
+
+        self.assertNotIn('usage', raw)
+        self.assertNotIn('generation_id', raw)

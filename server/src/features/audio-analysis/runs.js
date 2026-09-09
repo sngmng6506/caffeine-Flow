@@ -15,6 +15,15 @@ const LLM_FIELDS = ['mood', 'instruments', 'vocal', 'structure'];
 const text = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
 const list = (v) => Array.isArray(v) && v.length <= LIST_MAX && v.every((i) => text(i, ITEM_MAX));
 
+// 토큰 사용량은 선택 항목이다. 프로바이더가 안 주면 없이 저장한다.
+function validUsage(usage) {
+  if (!usage || typeof usage !== 'object' || Array.isArray(usage)) return false;
+  const keys = Object.keys(usage);
+  return keys.length > 0 && keys.length <= 3
+    && keys.every((k) => ['prompt_tokens', 'completion_tokens', 'total_tokens'].includes(k)
+      && Number.isSafeInteger(usage[k]) && usage[k] >= 0);
+}
+
 // 2단 원본. 자유 서술이라 값을 검사하지 않고 형태와 크기만 본다. 입력 해시가
 // 같은 파일을 가리켜야 1단과 2단이 같은 오디오를 들었다고 말할 수 있다.
 function validAudioLlm(raw, mode, audioSha256, duration) {
@@ -25,6 +34,8 @@ function validAudioLlm(raw, mode, audioSha256, duration) {
   if (!text(raw.description, TEXT_MAX)) return false;
   if (!LLM_FIELDS.every((field) => list(raw[field]))) return false;
   if (!Array.isArray(raw.segments) || raw.segments.length < 1 || raw.segments.length > 8) return false;
+  if (raw.generation_id !== undefined && !text(raw.generation_id, 200)) return false;
+  if (raw.usage !== undefined && !validUsage(raw.usage)) return false;
   return raw.segments.every((v) => finite(v.start_sec) && finite(v.duration_sec)
     && v.start_sec >= 0 && v.duration_sec > 0 && v.start_sec + v.duration_sec <= duration + 0.001);
 }
