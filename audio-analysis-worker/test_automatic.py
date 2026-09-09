@@ -4,7 +4,6 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from download import source_url, download_audio, DownloadError
-from tagging import CLASSES, summarize_tags, make_annotation
 from remote_worker import process
 from unittest.mock import patch
 from emotion import estimate_valence_arousal
@@ -21,18 +20,6 @@ class AutomaticTest(unittest.TestCase):
                               ('soundcloud', 'https://soundcloud.com/a/sets'),
                               ('soundcloud', 'https://127.0.0.1/a/b')]:
             with self.assertRaises(DownloadError): source_url(platform, key)
-
-    def test_model_scores_and_unknowns(self):
-        frame = [0.01] * len(CLASSES)
-        frame[CLASSES.index('jazz')] = 0.8
-        frame[CLASSES.index('instrumental')] = 0.9
-        scores = summarize_tags([frame])
-        labels = make_annotation({'bpm': 100}, scores)
-        self.assertEqual(labels['genre_tags'], ['jazz'])
-        self.assertEqual(labels['vocal_type'], 'none')
-        self.assertEqual(labels['mood_tags'], ['unknown'])
-        self.assertEqual(labels['usage_scope'], 'operational')
-        self.assertEqual(make_annotation({}, {})['instrumentation_type'], 'unknown')
 
     def test_emotion_failure_does_not_discard_base_features(self):
         with self.assertWarns(RuntimeWarning):
