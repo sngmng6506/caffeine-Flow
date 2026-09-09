@@ -16,6 +16,10 @@ Type=simple
 WorkingDirectory=%h/caffeine-Flow/audio-analysis-worker
 EnvironmentFile=%h/caffeine-audio/worker.env
 ExecStart=%h/caffeine-audio/venv/bin/python remote_worker.py
+# ffmpeg/ffprobe/deno가 /usr/bin에 없으면 PATH를 넓힌다. user 서비스의 기본 PATH는
+# 최소라, 이게 없으면 손으로는 되는데 서비스에서만 전곡이 DOWNLOAD_FAILED다.
+# 기계마다 다르므로 여기 대신 drop-in으로 덮어도 된다(README '서비스 등록').
+#Environment=PATH=%h/caffeine-audio/bin:/usr/local/bin:/usr/bin:/bin
 
 # 큐가 비어 있어도 계속 돌며 폴링한다. 조용히 멈춰 있는 것이 가장 나쁜 실패다.
 Restart=always

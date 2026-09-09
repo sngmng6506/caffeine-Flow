@@ -13,13 +13,15 @@ flowchart LR
     G["손님 모바일 웹"] -->|"신청·투표·댓글"| S
     O["사장님 React/Electron"] -->|"큐 관리·재생 상태"| S
     A["플랫폼 운영자 콘솔"] -->|"카페 모니터링·관리"| S
-    W["Essentia 분석 워커"] -->|"권리 확인 음원의 특징값만"| S
+    S -->|"분석 작업 lease"| W["미니PC 분석 워커<br/>Essentia · MAEST"]
+    W -->|"특징값·자동 라벨만"| S
 
     subgraph Railway
         S["Express + Socket.IO"] --- DB[("PostgreSQL")]
     end
 
     S -->|"트랙 메타데이터"| MUSIC["YouTube · SoundCloud · Spotify"]
+    W -->|"임시 다운로드(원본은 서버로 보내지 않음)"| MUSIC
     S -->|"곡 심사"| LLM["OpenRouter LLM"]
     S -->|"사장님 로그인"| OAUTH["Google · Naver"]
 ```

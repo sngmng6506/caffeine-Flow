@@ -78,7 +78,7 @@ YouTube 아닌 플랫폼, 같은 곡의 추적 파라미터 변형, 전체 TOP �
 | `SERVER_URL` | Naver callback 기준 서버 URL |
 | `DATABASE_SSL` | `disable`, `no-verify`, `verify` |
 | `ADMIN_PASSWORD` | 운영자 콘솔 비밀번호. 없으면 `/admin/login`이 503 |
-| `AUDIO_ANALYSIS_WORKER_TOKEN` | Essentia 워커 결과 제출 전용 토큰. 없으면 결과 수집 API가 503 |
+| `AUDIO_ANALYSIS_WORKER_TOKEN` | 워커 전용 토큰. 결과 제출과 자동 작업 큐(`/audio-analysis/jobs/*`)를 함께 게이트한다. 없으면 두 경로 모두 503이라 자동 라벨링이 아예 돌지 않는다 |
 | `GOOGLE_CLIENT_ID` | Google 로그인 |
 | `NAVER_CLIENT_ID` | Naver 로그인 |
 | `NAVER_CLIENT_SECRET` | Naver 로그인 |

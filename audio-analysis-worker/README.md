@@ -138,6 +138,20 @@ systemctl --user status caffeine-audio-worker
 journalctl --user -u caffeine-audio-worker -f
 ```
 
+**systemd user 서비스의 PATH는 최소다.** `/usr/bin`에 없는 ffmpeg·ffprobe·deno를
+쓰면 손으로 실행할 때는 되는데 서비스에서만 모든 곡이 `DOWNLOAD_FAILED`로 떨어진다.
+바이너리를 홈 아래에 뒀다면 유닛에 PATH를 명시하거나, 저장소 유닛을 그대로 두고
+기계별 drop-in으로 덮는다.
+
+```bash
+mkdir -p ~/.config/systemd/user/caffeine-audio-worker.service.d
+cat > ~/.config/systemd/user/caffeine-audio-worker.service.d/10-path.conf <<'CONF'
+[Service]
+Environment=PATH=%h/caffeine-audio/bin:/usr/local/bin:/usr/bin:/bin
+CONF
+systemctl --user daemon-reload
+```
+
 같은 미니PC에서 CafeStudy ADB 워커가 함께 돈다면 `Nice=10`, `IOSchedulingClass=idle`, `CPUQuota`로 분석이 양보하게 둔다. 유닛의 자원 한도는 기존 감정 모델 운영을 기준으로 설정한 값이다. MAEST의 CPU·메모리·소요 시간은 미니PC에서 별도로 측정하며 기존 모델 수치를 MAEST 성능으로 간주하지 않는다.
 
 ## 환경변수
@@ -181,6 +195,14 @@ python -m pip uninstall -y essentia
 python -m pip install -r requirements-tensorflow.txt
 # ffmpeg/ffprobe와 yt-dlp가 지원하는 JavaScript 런타임(예: Deno)도 설치한다.
 # 지원 런타임 설치 안내: https://github.com/yt-dlp/yt-dlp/wiki/EJS
+# 배포판 패키지로 설치할 수 없으면(sudo 없음 등) 정적 빌드를 홈 아래에 둔다:
+#   mkdir -p ~/caffeine-audio/bin
+#   curl -fL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \
+#     | tar -xJ --strip-components=1 -C ~/caffeine-audio/bin --wildcards '*/ffmpeg' '*/ffprobe'
+#   curl -fL -o /tmp/deno.zip \
+#     https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
+#   unzip -o /tmp/deno.zip -d ~/caffeine-audio/bin && chmod +x ~/caffeine-audio/bin/deno
+# 이 경우 서비스 PATH도 함께 넓혀야 한다 — 아래 "서비스 등록"을 본다.
 python -m yt_dlp --version
 ffmpeg -version
 mkdir -p ~/caffeine-audio/models
