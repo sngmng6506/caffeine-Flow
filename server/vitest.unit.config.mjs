@@ -9,6 +9,7 @@ export default defineConfig({
       'tests/alert-aggregator.test.mjs',
       'tests/alert-channel.test.mjs',
       'tests/audio-analysis.test.mjs',
+      'tests/audio-prompt-styles.test.mjs',
       'tests/api-docs.test.mjs',
       'tests/docs-links.test.mjs',
       'tests/electron-navigation-policy.test.mjs',

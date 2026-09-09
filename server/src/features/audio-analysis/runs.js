@@ -113,12 +113,34 @@ function validateRun(input, result) {
   } };
 }
 
+// 소비 시점 프롬프트에 넣을 스타일만 추린다.
+//
+// 절대 임계값을 쓰지 않는 이유는 점수 스케일이 곡·장르마다 다르기 때문이다. 1위가
+// 0.33인 빅밴드 재즈 곡이 0.97인 K-pop 곡보다 덜 확실하다는 뜻이 아니다. 1위 대비
+// 상대 기준을 쓰면 상위권이 붙어 있는 곡만 여러 개가 뽑혀, 개수 자체가 난이도
+// 신호가 된다.
+//
+// 계수와 상한은 소수 표본의 잠정값이다. 519개 원본이 남아 있으므로 재추론 없이
+// 다시 뽑을 수 있다.
+const PROMPT_STYLE_RATIO = 0.5;
+const PROMPT_STYLE_MAX = 5;
+
+function selectPromptStyles(raw, ratio = PROMPT_STYLE_RATIO, cap = PROMPT_STYLE_MAX) {
+  const scored = raw.classes.map((label, i) => ({ label, score: raw.mean[i] }))
+    .sort((a, b) => b.score - a.score);
+  const best = scored[0]?.score ?? 0;
+  if (!(best > 0)) return [];
+  return scored.filter((v) => v.score >= best * ratio).slice(0, cap);
+}
+
 function summary(run) {
   const raw = run.maest_raw;
   const top = (key) => raw.classes.map((label, i) => ({ label, mean: raw.mean[i], max: raw.max[i] }))
     .sort((a, b) => b[key] - a[key]).slice(0, 10);
   return { model_version: run.maest_model_version, segment_count: raw.segments.length,
-    top_mean: top('mean'), top_max: top('max'), normalized: run.normalized, audio_sha256: run.audio_sha256 };
+    top_mean: top('mean'), top_max: top('max'), normalized: run.normalized, audio_sha256: run.audio_sha256,
+    // 보정되지 않은 상대 점수다. 소비처는 이 사실을 프롬프트에 함께 밝힌다.
+    prompt_styles: selectPromptStyles(raw), prompt_style_calibrated: false };
 }
 
 async function history(jobId) {
@@ -128,4 +150,4 @@ async function history(jobId) {
     .select('id', 'created_at').orderBy('created_at', 'desc').limit(100);
 }
 
-module.exports = { validateRun, summary, history };
+module.exports = { validateRun, summary, history, selectPromptStyles };
