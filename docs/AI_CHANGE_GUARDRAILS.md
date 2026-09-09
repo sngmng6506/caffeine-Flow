@@ -83,11 +83,11 @@ server/src/db/migrations/20260907090000_music_audio_analyses.js
 server/src/routes/audio-analysis.js
 ```
 
-- 외부 음악 링크 등록을 다운로드·분석 권한으로 간주하지 않는다. 워커는 권리가 확인된 로컬 파일만 읽고 서버에는 특징값과 권리 근거 참조만 전송한다.
+- 자동 워커는 사용자가 지정한 YouTube·SoundCloud 신청곡 URL을 임시 다운로드한다. `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않는다. 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
-- 자동 분석은 `(platform, track_key, model_name, model_version)`으로 중복을 방지하고 같은 버전 재분석은 최신 결과로 갱신한다.
-- 자동 추천값은 수동 곡 라벨을 덮어쓰거나 자동 저장하지 않는다. 새 분석은 `pending`, 사람이 곡 라벨을 저장한 뒤 `reviewed`다.
-- Valence/Arousal 값이 없는 경우 템포나 음량 휴리스틱으로 분위기를 추측해 채우지 않는다.
+- 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. MAEST 원본은 별도 music_audio_runs에 lease당 한 번 추가한다. 재분석·검토에서 원본을 수정·삭제하지 않으며 DB trigger로도 차단한다.
+- 자동 라벨은 즉시 DB에 저장한다. 자동 원본과 최종 라벨을 분리하고 사람이 확인·수정한 최종 라벨은 자동 분석으로 덮어쓰지 않는다. 분석 revision과 최종 라벨 revision이 화면과 같을 때만 검토한다.
+- Valence/Arousal 값이 없으면 null이다. 자동 큐 MAEST_ONLY에서는 무드 원본/정규화 값은 null, 기존 UI 라벨은 unknown이다. 장르에서 무드·보컬·악기를 추측하지 않는다. 수동 CLI 감정 분석은 별도다.
 - Valence/Arousal 추정에 쓰는 사전학습 모델은 비상업(CC BY-NC-SA 4.0)이다. `ENABLE_VALENCE_AROUSAL` 기본값을 켜지 않으며, 이 값을 신청곡 자동 승인·거절이나 라이브 LLM 입력에 연결하지 않는다. 상업 적용에는 별도 라이선스가 필요하다.
 - 모델 가중치 파일을 저장소에 커밋하지 않는다. 워커가 시작할 때 SHA-256으로 공식 배포본인지 확인한다.
 - 자동 분석은 현재 실시간 LLM 입력이나 추천곡 상태 변경에 사용하지 않는다. 연결 전 골드 라벨 비교, false accept, 라이선스를 별도로 검토한다.
@@ -295,3 +295,10 @@ customer/src/votedSongs.js
 - [ ] CSP/origin/외부 리소스 변경은 보안 경계 테스트를 확인했다.
 - [ ] 현재 구현과 미래 계획을 같은 문서에 섞지 않았다.
 - [ ] 시크릿·토큰·개인정보가 코드와 로그에 없다.
+
+### Automatic Label Contract
+
+- 신청 저장과 작업 등록은 한 트랜잭션이다. 플랫폼·곡별 unique로 중복을 막고 lease로 오래된 워커의 쓰기를 막는다.
+- `/admin/audio-labels`는 모든 신청곡을 곡별로 보여주는 Lab 큐다. 기존 `/admin/music-filter-reviews`의 정책 골드 큐와 완료 정의를 혼용하지 않는다.
+- 사람의 확인과 수정은 human_review_status로 구분한다. 자동 라벨을 사람 골드 판단으로 기록하지 않는다.
+- 자동 태그 매핑은 모델/매핑 버전과 원시 점수를 남긴다. 모델이 지원하지 않거나 임계값 미달인 항목은 unknown이다.

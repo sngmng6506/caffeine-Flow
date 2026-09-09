@@ -31,11 +31,13 @@
       <section class='toolbar'>
         <label>보기
           <select id='viewFilter'>
-            <option value='unreviewed'>미완료</option>
+            <option value='ready'>검토할 자동 라벨</option>
+            <option value='unreviewed'>미검토 전체 · 대기/실패 포함</option>
             <option value='reviewed'>완료</option>
             <option value='all'>전체</option>
           </select>
         </label>
+        <button type='button' id='refreshQueue'>새로고침</button>
         <span id='position'>—</span>
       </section>
 
@@ -55,15 +57,7 @@
           <div><dt>판단 시각</dt><dd id='checkedAt'></dd></div>
         </dl>
 
-        <details open>
-          <summary>판단 당시 매장 정책</summary>
-          <pre id='policy'></pre>
-          <div class='policy-result'>
-            <span>AI 판단 결과</span>
-            <strong id='aiDecision'></strong>
-          </div>
-        </details>
-
+        <p id='jobStatus' role='status'></p>
         <section id='audioAnalysis' class='audio-analysis' hidden>
           <div class='audio-analysis-head'>
             <div>
@@ -72,8 +66,10 @@
             </div>
             <span id='analysisStatus' class='analysis-status'></span>
           </div>
-          <p class='analysis-notice'>자동 분석은 골드 라벨이 아닙니다. 곡을 직접 듣고 추천값을 검수해주세요.</p>
+          <p class='analysis-notice'>자동 라벨은 이미 저장되어 있습니다. 맞으면 그대로 확인하고, 다른 부분만 수정해주세요.</p>
           <dl class='analysis-metrics'>
+            <div><dt>Valence</dt><dd id='analysisValence'>—</dd></div>
+            <div><dt>Arousal</dt><dd id='analysisArousal'>—</dd></div>
             <div><dt>BPM</dt><dd id='analysisBpm'>—</dd></div>
             <div><dt>조성</dt><dd id='analysisKey'>—</dd></div>
             <div><dt>댄서빌리티</dt><dd id='analysisDanceability'>—</dd></div>
@@ -86,6 +82,9 @@
             <p id='analysisSuggestion'>—</p>
             <button type='button' id='applyAnalysisSuggestion' class='secondary-button'>추천값을 선택지에 적용</button>
           </div>
+          <div id='maestSummary'></div>
+          <button type='button' id='loadMaestRaw' hidden>구간별 원본·이력 보기</button>
+          <pre id='maestRaw' hidden></pre>
           <p id='analysisProvenance' class='analysis-provenance'></p>
         </section>
 
@@ -200,27 +199,19 @@
           </section>
 
           <section class='form-section decision-section'>
-            <div class='section-title'><div><span>5</span><h3>매장 정책 판단</h3></div></div>
-            <fieldset>
-              <legend>이 매장 정책과 맞나요?</legend>
-              <div class='choice-grid compact decision-grid'>
-                <label><input type='radio' name='human_decision' value='accept' required /><span>매장과 잘 맞음</span></label>
-                <label><input type='radio' name='human_decision' value='reject' /><span>매장과 맞지 않음</span></label>
-                <label><input type='radio' name='human_decision' value='undetermined' /><span>판단하기 어려움</span></label>
-              </div>
-            </fieldset>
             <fieldset>
               <legend>라벨 사용 목적</legend>
               <div class='choice-grid compact'>
-                <label><input type='radio' name='usage_scope' value='operational' required checked /><span>실서비스 참고용</span></label>
-                <label><input type='radio' name='usage_scope' value='evaluation' /><span>성능 평가용</span></label>
+                <label><input type='radio' name='usage_scope' value='operational' required /><span>실서비스 참고용</span></label>
+                <label><input type='radio' name='usage_scope' value='evaluation' checked /><span>성능 평가용</span></label>
               </div>
             </fieldset>
           </section>
 
-          <button type='submit' id='saveReview' class='save-button'>곡 라벨과 매장 판단 저장</button>
+          <button type='submit' id='saveReview' class='save-button'>수정 저장 · 다음</button>
         </form>
 
+        <button type='button' id='confirmReview' class='save-button'>이대로 확인 · 다음</button>
         <div class='navigation'>
           <button type='button' id='previousItem'>이전</button>
           <button type='button' id='nextItem'>다음</button>

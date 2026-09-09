@@ -42,6 +42,7 @@ const RIGHTS_LABELS = Object.freeze({
   licensed: '이용 허가',
   public_domain: '퍼블릭 도메인',
   other_authorized: '기타 명시적 허가',
+  platform_stream: '플랫폼 스트림',
 });
 
 let items = [];
@@ -125,8 +126,9 @@ function resetForm(item) {
   form.reset();
   const annotation = item.track_annotation;
   $('artistName').value = annotation?.artist_name || item.channel_title || '';
+  const labelOrigin = annotation?.label_source === 'automatic' ? '자동 라벨' : annotation?.human_review_status === 'corrected' ? '사람 수정 라벨' : '사람 확인 라벨';
   $('existingLabelStatus').textContent = annotation
-    ? `기존 곡 라벨 불러옴 · ${formatDateTime(annotation.updated_at)}`
+    ? `기존 곡 라벨 불러옴 · ${labelOrigin} · ${formatDateTime(annotation.updated_at)}`
     : '실제 아티스트를 확인해주세요.';
   $('existingLabelStatus').classList.toggle('is-loaded', Boolean(annotation));
   $('artistReferences').hidden = true;
@@ -152,14 +154,28 @@ function renderAudioAnalysis(item) {
   panel.hidden = !analysis;
   if (!analysis) return;
 
+  const maest = analysis.maest_summary;
+  $('maestRaw').hidden = true;
+  $('maestRaw').textContent = '';
+  $('loadMaestRaw').hidden = !analysis.latest_run_id;
+  $('loadMaestRaw').disabled = false;
+  $('maestSummary').innerHTML = maest ? `
+    <p>MAEST · ${escapeHtml(maest.segment_count)}개 구간 · 평균 기준 상위 스타일 (미보정 점수)</p>
+    <table><thead><tr><th>스타일</th><th>평균</th><th>최댓값</th></tr></thead><tbody>
+    ${maest.top_mean.map((v) => `<tr><td>${escapeHtml(v.label)}</td><td>${formatMetric(v.mean, 3)}</td><td>${formatMetric(v.max, 3)}</td></tr>`).join('')}
+    </tbody></table><p>구간 최댓값 상위: ${maest.top_max.slice(0, 5).map((v) => `${escapeHtml(v.label)} ${formatMetric(v.max, 3)}`).join(' · ')}</p>
+    <p>무드·보컬·악기: 이번 모델의 분석 대상 아님. 확인 버튼은 미확정 항목도 그대로 저장합니다.</p>` : '';
   const features = analysis.features || {};
-  const suggestion = analysis.suggested_annotation || {};
+  const suggestion = analysis.automatic_annotation || analysis.suggested_annotation || {};
   const suggestions = [
     suggestion.tempo_class ? LABELS.tempo_class[suggestion.tempo_class] : null,
     suggestion.rhythmic_character
       ? LABELS.rhythmic_character[suggestion.rhythmic_character]
       : null,
     ...(suggestion.mood_tags || []).map((tag) => LABELS.mood_tags[tag] || tag),
+    LABELS.instrumentation_type[suggestion.instrumentation_type],
+    LABELS.vocal_type[suggestion.vocal_type],
+    ...(suggestion.genre_tags || []).map((tag) => LABELS.genre_tags[tag] || tag),
   ].filter(Boolean);
 
   $('analysisStatus').textContent = analysis.review_status === 'reviewed' ? '검수 완료' : '검수 필요';
@@ -171,6 +187,8 @@ function renderAudioAnalysis(item) {
   $('analysisDanceability').textContent = formatMetric(features.danceability, 2);
   $('analysisLoudness').textContent = formatMetric(features.loudness_db, 1, ' dB');
   $('analysisDynamic').textContent = formatMetric(features.dynamic_complexity, 2);
+  $('analysisValence').textContent = formatMetric(features.valence, 2);
+  $('analysisArousal').textContent = formatMetric(features.arousal, 2);
   $('analysisCentroid').textContent = formatMetric(features.spectral_centroid_hz, 0, ' Hz');
   $('analysisSuggestion').textContent = suggestions.length
     ? suggestions.join(' · ')
@@ -190,33 +208,33 @@ function renderItem() {
   if (!item) {
     $('reviewCard').hidden = true;
     $('message').hidden = false;
-    $('message').textContent = $('viewFilter').value === 'unreviewed'
-      ? '남은 미완료 항목이 없습니다.'
-      : '표시할 AI 판단 이력이 없습니다.';
+    $('message').textContent = ['unreviewed', 'ready'].includes($('viewFilter').value)
+      ? '현재 검토할 항목이 없습니다. 새로고침으로 분석 진행 상태를 확인하세요.'
+      : '표시할 곡이 없습니다.';
     $('position').textContent = '0건';
     return;
   }
 
-  const complete = Boolean(item.human_decision && item.track_annotation);
+  const complete = item.track_annotation && item.track_annotation.human_review_status !== 'unreviewed' && (!item.audio_analysis || item.audio_analysis.review_status === 'reviewed');
   const url = trackUrl(item);
   $('message').hidden = true;
   $('reviewCard').hidden = false;
   $('position').textContent = `${currentOffset + currentIndex + 1}번째 · 현재 묶음 ${items.length}건`;
-  $('cafeName').textContent = item.cafe_name || '카페 정보 없음';
+  $('cafeName').textContent = '전체 매장 신청곡 · 같은 곡은 한 번만 분석';
   $('trackTitle').textContent = item.title || '제목 없음';
   $('trackArtist').textContent = item.channel_title || '아티스트 정보 없음';
   $('platform').textContent = item.platform || '기록 없음';
-  $('checkedAt').textContent = formatDateTime(item.filter_checked_at);
-  $('policy').textContent = item.filter_prompt_snapshot || '기록 없음 — 감사 기능 도입 전 판단입니다.';
+  $('checkedAt').textContent = formatDateTime(item.audio_analysis?.analyzed_at || item.created_at);
   $('trackLink').href = url || '#';
   $('trackLink').hidden = !url;
 
   resetForm(item);
   renderAudioAnalysis(item);
-  $('aiDecision').textContent = `AI ${item.filter_status === 'accepted' ? '승인' : item.filter_status === 'rejected' ? '거절' : '오류 거절'}`;
-  $('aiDecision').className = `decision decision--${item.filter_status}`;
-
-  $('saveReview').textContent = complete ? '곡 라벨과 매장 판단 갱신' : '곡 라벨과 매장 판단 저장';
+  const states = { queued: '분석 대기', processing: '분석 중', completed: '자동 라벨링 완료', failed: '분석 실패 · 재시도 한도 초과', unsupported: 'Spotify 자동 분석 미지원' };
+  $('jobStatus').textContent = `${states[item.job_status] || item.job_status}${item.error_code ? ` · ${item.error_code}` : ''}`;
+  $('confirmReview').disabled = !item.track_annotation;
+  $('confirmReview').textContent = complete ? '확인됨 · 다음' : '이대로 확인 · 다음';
+  $('saveReview').textContent = '수정 저장 · 다음';
   $('previousItem').disabled = currentIndex === 0 && currentOffset === 0;
   $('nextItem').disabled = currentIndex >= items.length - 1 && !hasMore;
 }
@@ -226,7 +244,7 @@ async function loadPage(offset = 0) {
   $('message').hidden = false;
   $('message').textContent = '라벨링 목록을 불러오는 중…';
   const view = $('viewFilter').value;
-  const { ok, data } = await api('GET', `/admin/music-filter-reviews?view=${view}&offset=${offset}`);
+  const { ok, data } = await api('GET', `/admin/audio-labels?view=${view}&offset=${offset}`);
   if (!ok) {
     $('message').textContent = data.error || '라벨링 목록을 불러오지 못했습니다.';
     return;
@@ -309,23 +327,17 @@ $('reviewForm').addEventListener('submit', async (event) => {
   }
 
   const form = new FormData(formElement);
-  const decision = form.get('human_decision');
-  const reasonCode = decision === 'accept'
-    ? 'policy_match'
-    : decision === 'reject' ? 'policy_mismatch' : 'metadata_insufficient';
-  const wasComplete = Boolean(item.human_decision && item.track_annotation);
   const button = $('saveReview');
   button.disabled = true;
   button.textContent = '저장 중…';
   try {
     const { ok, data } = await api(
       'PUT',
-      `/admin/cafes/${item.cafe_id}/music-filter-audit/${item.id}/review`,
+      `/admin/audio-labels/${item.id}/review`,
       {
-        human_decision: decision,
-        human_reason_code: reasonCode,
-        metadata_sufficient: item.metadata_sufficient ?? null,
+        annotation_revision: item.track_annotation?.revision || 0,
         audio_analysis_id: item.audio_analysis?.id || null,
+        audio_analysis_revision: item.audio_analysis?.revision || null,
         track_annotation: {
           artist_name: form.get('artist_name'),
           track_version: item.track_annotation?.track_version || 'unknown',
@@ -342,24 +354,40 @@ $('reviewForm').addEventListener('submit', async (event) => {
     );
     if (!ok) throw new Error(data.error || '라벨을 저장하지 못했습니다.');
 
-    Object.assign(item, data);
-    item.track_annotation = data.track_annotation;
-    if (item.audio_analysis) {
-      item.audio_analysis.review_status = 'reviewed';
-      item.audio_analysis.reviewed_at = new Date().toISOString();
-    }
-    if (!wasComplete) {
-      summary.reviewed += 1;
-      summary.unreviewed = Math.max(0, summary.unreviewed - 1);
-    }
-    renderItem();
+    await advanceAfterReview();
   } catch (error) {
     alert(error.message);
-    button.textContent = wasComplete ? '곡 라벨과 매장 판단 갱신' : '곡 라벨과 매장 판단 저장';
+    button.textContent = '수정 저장 · 다음';
   } finally {
     button.disabled = false;
   }
 });
+
+async function advanceAfterReview() {
+  const index = currentIndex;
+  await loadPage(['unreviewed', 'ready'].includes($('viewFilter').value) ? 0 : currentOffset);
+  if (!['unreviewed', 'ready'].includes($('viewFilter').value)) {
+    currentIndex = Math.min(index + 1, Math.max(0, items.length - 1));
+    renderItem();
+  }
+}
+$('confirmReview').addEventListener('click', async () => {
+  const item = items[currentIndex];
+  if (!item?.track_annotation) return;
+  const button = $('confirmReview');
+  button.disabled = true;
+  try {
+    const { ok, data } = await api('PUT', `/admin/audio-labels/${item.id}/review`, {
+      annotation_revision: item.track_annotation.revision,
+      audio_analysis_id: item.audio_analysis?.id || null,
+      audio_analysis_revision: item.audio_analysis?.revision || null,
+    });
+    if (!ok) throw new Error(data.error || '검토를 저장하지 못했습니다');
+    await advanceAfterReview();
+  } catch (error) { alert(error.message); }
+  finally { button.disabled = !items[currentIndex]?.track_annotation; }
+});
+$('refreshQueue').addEventListener('click', () => loadPage(0));
 
 document.querySelectorAll('[data-max-choices]').forEach((group) => {
   group.addEventListener('change', (event) => {
@@ -384,13 +412,17 @@ document.querySelectorAll('[data-max-choices]').forEach((group) => {
 
 $('findArtistLabels').addEventListener('click', loadArtistReferences);
 $('applyAnalysisSuggestion').addEventListener('click', () => {
-  const suggestion = items[currentIndex]?.audio_analysis?.suggested_annotation;
+  const analysis = items[currentIndex]?.audio_analysis;
+  const suggestion = analysis?.automatic_annotation || analysis?.suggested_annotation;
   if (!suggestion) return;
   if (suggestion.tempo_class) setRadio('tempo_class', suggestion.tempo_class);
   if (suggestion.rhythmic_character) {
     setRadio('rhythmic_character', suggestion.rhythmic_character);
   }
   if (suggestion.mood_tags?.length) setChecks('mood_tags', suggestion.mood_tags);
+  if (suggestion.instrumentation_type) setRadio('instrumentation_type', suggestion.instrumentation_type);
+  if (suggestion.vocal_type) setRadio('vocal_type', suggestion.vocal_type);
+  if (suggestion.genre_tags) setChecks('genre_tags', suggestion.genre_tags);
 });
 $('previousItem').addEventListener('click', () => {
   if (currentIndex > 0) {
@@ -408,7 +440,7 @@ $('nextItem').addEventListener('click', () => {
     renderItem();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } else if (hasMore) {
-    loadPage($('viewFilter').value === 'unreviewed' ? 0 : nextOffset);
+    loadPage(['unreviewed', 'ready'].includes($('viewFilter').value) ? 0 : nextOffset);
   }
 });
 
@@ -419,3 +451,25 @@ if (!currentToken()) {
 } else {
   loadPage();
 }
+
+$('loadMaestRaw').addEventListener('click', async () => {
+  const item = items[currentIndex];
+  const runId = item?.audio_analysis?.latest_run_id;
+  if (!runId) return;
+  $('loadMaestRaw').disabled = true;
+  try {
+    const [raw, history] = await Promise.all([api('GET', `/admin/audio-runs/${runId}`), api('GET', `/admin/audio-labels/${item.id}/runs`)]);
+    if (items[currentIndex]?.audio_analysis?.latest_run_id !== runId) return;
+    $('maestRaw').hidden = false;
+    $('maestRaw').textContent = raw.ok && history.ok
+      ? JSON.stringify({ history: history.data, latest: raw.data }, null, 2)
+      : '원본을 불러오지 못했습니다. 다시 시도해주세요.';
+  } catch {
+    if (items[currentIndex]?.audio_analysis?.latest_run_id === runId) {
+      $('maestRaw').hidden = false;
+      $('maestRaw').textContent = '원본을 불러오지 못했습니다. 다시 시도해주세요.';
+    }
+  } finally {
+    if (items[currentIndex]?.audio_analysis?.latest_run_id === runId) $('loadMaestRaw').disabled = false;
+  }
+});

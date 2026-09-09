@@ -126,7 +126,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
 
 - 잘못된 UUID와 미존재 카페는 404다. 정지 카페는 손님 HTTP와 Socket.IO 접근이 차단된다.
-- 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, audio_analysis_id?, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 화면에 표시한 최신 자동 분석 ID를 함께 보내면 해당 곡·분석 한 건만 `reviewed`로 바뀐다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
+- 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, audio_analysis_id?, audio_analysis_revision?, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 화면에 표시한 최신 자동 분석 ID를 함께 보내면 해당 곡·분석 한 건만 `reviewed`로 바뀐다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
 - 해당 카페의 AI 처리 이력만 검수할 수 있고, 사람 라벨은 신청곡 상태나 LLM 판단을 바꾸지 않는다.
 - 곡 라벨은 `(platform, track_key)`당 한 건으로 upsert한다.
 - 라벨링 큐 `view`는 `unreviewed`(기본), `reviewed`, `all`이며 최근 판단순 50건을 반환한다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`다. 저장하면 미검수 목록이 줄어들므로 다음 묶음은 `offset=0`부터 다시 조회한다. 제목에 대소문자 구분 없이 `Playlist` 또는 `플리`가 포함된 항목은 모든 view와 집계에서 제외한다.
@@ -139,7 +139,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 - `Authorization: Bearer <AUDIO_ANALYSIS_WORKER_TOKEN>` 전용 경계이며 관리자·사장님 JWT를 재사용하지 않는다. 토큰 미설정 시 503이다.
 - body는 `platform`, `track_key`, `model_name`, `model_version`, `feature_schema_version`, `rights_basis`, `source_reference`, `features`, `suggested_annotation`, `analyzed_at`을 받는다.
-- `rights_basis`는 `owned`, `licensed`, `public_domain`, `other_authorized`만 허용한다. 오디오 파일이나 외부 다운로드 URL은 받지 않는다.
+- `rights_basis`는 `owned`, `licensed`, `public_domain`, `other_authorized`, `platform_stream`을 허용한다. `platform_stream`은 허가 증명이 아닌 다운로드 출처 구분이다. 오디오 파일이나 외부 다운로드 URL은 받지 않는다.
 - 동일한 `(platform, track_key, model_name, model_version)` 결과는 갱신되고 다시 `pending` 검수 상태가 된다.
 - 라벨링 큐는 곡별 최신 분석을 `audio_analysis`로 반환한다. 새 분석이 `pending`이면 기존 수동 라벨이 있어도 미검수 목록에 다시 나타나며, 수동 곡 라벨 저장 시 `reviewed`가 된다.
 
@@ -168,3 +168,29 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | 429 | 요청 제한 또는 큐 한도 |
 | 500 | 서버 오류 |
 | 503 | 외부 AI 판단 실패 |
+
+## 자동 라벨링 작업과 검토
+
+| Method | Path | 인증 | 요약 |
+| --- | --- | :-: | --- |
+| POST | `/audio-analysis/jobs/claim` | 워커 | 대기 작업 1건을 20분 lease로 획득. 없으면 204 |
+| POST | `/audio-analysis/jobs/:id/complete` | 워커 | `lease_token`, `result`, `automatic_annotation`, `tag_scores`, `maest_run` 제출. 분석·자동 라벨·작업 완료를 한 트랜잭션에 저장 |
+| POST | `/audio-analysis/jobs/:id/fail` | 워커 | `lease_token`, `error_code` 제출. 최대 3회, 지수 지연 재시도 |
+| GET | `/admin/audio-labels` | 🛡 | 모든 신청곡을 플랫폼·곡별 중복 제거해 조회. `view=ready|unreviewed|reviewed|all`, `offset`, 50건. 작업 상태도 반환 |
+| GET | `/admin/audio-labels/:id/runs` | 🛡 | 해당 곡의 최근 원본 이력 ID·시각 최대 100건 |
+| GET | `/admin/audio-runs/:id` | 🛡 | 실행별 전체 원본 JSON. lease 토큰 제외, 수정 API 없음 |
+| PUT | `/admin/audio-labels/:id/review` | 🛡 | 작업 ID에 해당하는 곡의 라벨 확인·수정. 매장 정책 판단 불필요 |
+
+- 신규 신청과 작업 등록은 같은 트랜잭션이며 기존 신청은 마이그레이션에서 등록한다. AI 필터 OFF·거절 곡도 포함한다. Spotify는 `unsupported`로 등록하며 claim하지 않는다.
+- 완료 응답 유실 시 같은 lease로 재전송하면 기존 결과를 반환한다. 만료되거나 교체된 lease는 409이며 결과를 저장하지 않는다. 완료되지 않은 lease는 만료 후 다음 claim에서 회수한다.
+- `error_code`: `DOWNLOAD_FAILED`, `ANALYSIS_FAILED`, `MODEL_UNAVAILABLE`, `SOURCE_UNSUPPORTED`. 플랫폼 원문 오류·토큰·음원은 보내지 않는다.
+- 자동 라벨은 `evaluation`으로 저장하며 원본은 분석 행의 `automatic_annotation`, 최종 라벨은 `music_track_annotations`에 남긴다. 사람 확인·수정 후에는 자동 갱신이 최종 라벨을 덮어쓰지 않는다.
+- 검토 body: `{ annotation_revision, audio_analysis_id, audio_analysis_revision, track_annotation? }`. `track_annotation` 생략은 그대로 확인, 포함은 수정 저장이다. 화면에서 본 분석 ID·revision과 최종 라벨 revision을 잠금 안에서 비교하고 변경됐으면 409로 전체 롤백한다. 자동 라벨이 없으면 단순 확인은 409다.
+- 검토 완료는 최종 라벨의 `human_review_status`가 `confirmed|corrected`이고 연결된 분석이 없거나 `reviewed`일 때다. 매장 정책 골드 판단과 무관하다. 저장 후 서버 집계를 다시 조회한다.
+- 기존 정책 검수 API에서 `audio_analysis_id`를 보낼 경우에도 `audio_analysis_revision`이 필요하다. 분석 없이 정책 판단만 저장하는 기존 요청은 유지한다.
+
+`ready`는 자동 라벨 저장이 끝났고 사람 검토가 남은 곡만 보여준다. Lab 기본 보기이며 대기·실패·Spotify 상태는 미검토 전체/전체 보기에서 확인한다.
+
+MAEST 완료 요청은 `maest_run`에 schema_version=1, pipeline_mode=MAEST_ONLY, sources_used, maest_model_version, model_sha256, audio_source_url, audio_local_path=null, audio_sha256, audio_duration_sec, audio_sample_rate=16000, maest_raw, audio_llm_raw=null, normalized를 포함한다. maest_raw는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이다. 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. normalized에는 taxonomy_version, calibrated=false, genre(label/source/raw_label/confidence), mood=null을 보낸다. 원본·자동 라벨·최신 분석·작업 완료는 같은 트랜잭션이다.
+
+`essentia-maest` 모델은 원본이 필수다. 이전 MSD 워커 제출 형식은 이행 기간에 허용한다. MAEST 작업 경로만 워커 인증 후 1MB JSON을 허용하며 나머지 API의 64KB 제한은 유지한다. 목록의 maest_summary에는 상위 평균/최댓값, 구간 수, 매핑 정보, 입력 해시를 포함하고 전체 구간 원본은 별도 조회한다. 원본 보존은 이 마이그레이션 이후 MAEST 실행부터 적용되며 과거 덮어쓴 분석을 복원하지 않는다.

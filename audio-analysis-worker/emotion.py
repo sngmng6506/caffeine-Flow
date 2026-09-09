@@ -122,15 +122,18 @@ def load_emotion_predictor(model_dir):
             "python -m pip install -r requirements.txt를 실행하세요."
         ) from error
 
-    embeddings = standard.TensorflowPredictMusiCNN(
-        graphFilename=str(paths[EMBEDDING_MODEL_FILE]),
-        output=EMBEDDING_OUTPUT_NODE,
-    )
-    regression = standard.TensorflowPredict2D(
-        graphFilename=str(paths[EMOTION_MODEL_FILE]),
-        input=EMOTION_INPUT_NODE,
-        output=EMOTION_OUTPUT_NODE,
-    )
+    try:
+        embeddings = standard.TensorflowPredictMusiCNN(
+            graphFilename=str(paths[EMBEDDING_MODEL_FILE]),
+            output=EMBEDDING_OUTPUT_NODE,
+        )
+        regression = standard.TensorflowPredict2D(
+            graphFilename=str(paths[EMOTION_MODEL_FILE]),
+            input=EMOTION_INPUT_NODE,
+            output=EMOTION_OUTPUT_NODE,
+        )
+    except Exception as error:
+        raise EmotionModelError("감정 모델 초기화 실패") from error
 
     def predict(audio_16k):
         return regression(embeddings(audio_16k))
@@ -142,4 +145,9 @@ def estimate_valence_arousal(audio_16k, predictor):
     """예측기를 돌려 요약값을 만든다. 실패하면 None — 분위기를 추측하지 않는다."""
     if predictor is None:
         return None
-    return summarize_predictions(predictor(audio_16k))
+    try:
+        return summarize_predictions(predictor(audio_16k))
+    except Exception:
+        import warnings
+        warnings.warn("감정 모델 추론 실패: 기본 음향 특징만 저장합니다", RuntimeWarning)
+        return None

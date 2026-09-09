@@ -1,8 +1,10 @@
 # Essentia 오디오 분석 워커
 
-권리가 확인된 **로컬 음원 파일**에서 특징값을 추출해 Caffeine Flow 라벨링 Lab에 전달한다. 외부 플랫폼 URL을 다운로드하지 않으며 원본 오디오는 서버로 전송하지 않는다.
+기본 서비스는 신청곡 URL을 자동 다운로드·분석해 Lab에 라벨을 저장한다. 원본 오디오는 서버로 전송하지 않는다. [신청곡 자동 워커](#신청곡-자동-워커-기본-서비스)를 먼저 따른다. 아래 CLI·디렉터리 큐 설명은 기존 로컬 파일 분석 호환 기능이다.
 
-실행 방식은 두 가지다.
+실행 방식은 세 가지다.
+
+- `remote_worker.py` — 서버 신청곡 작업 큐를 자동 처리하는 기본 서비스.
 
 - `analyze.py` — 한 곡을 직접 분석하는 CLI. 처음 확인하거나 한두 곡만 볼 때 쓴다.
 - `worker.py` — 디렉터리 큐를 폴링하는 상주 워커. 미니PC에 systemd 서비스로 올려 둔다.
@@ -155,3 +157,54 @@ python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 모델 예측기는 주입 가능하다. 단위 테스트는 실제 모델이나 네트워크 없이 정규화·평균·빈 결과·범위 검증과 파일 상태 전이를 확인한다.
 
 Essentia와 사전학습 모델은 상업 서비스 적용 전에 각각 라이선스를 확인해야 한다. 이 워커는 평가·라벨링용이며 실시간 신청 승인에는 사용하지 않는다.
+
+## 신청곡 자동 워커 (기본 서비스)
+
+2026-09-09부터 systemd 서비스는 `remote_worker.py`를 실행한다. 위 `worker.py` 디렉터리 큐는 수동 작업 호환용이며 같은 락을 쓰므로 둘을 동시에 실행하지 않는다.
+
+1. 서버 마이그레이션이 기존 신청곡을 DB 작업 큐에 등록한다. 신규 신청은 저장 트랜잭션에서 등록한다. 동일 플랫폼·곡은 한 번만 분석한다.
+2. 미니PC가 `/audio-analysis/jobs/claim`으로 작업을 가져와 YouTube·SoundCloud 오디오를 임시 다운로드한다. Spotify는 서버에서 unsupported 처리한다.
+3. 곡마다 별도 프로세스에서 Essentia 기본 특징과 MAEST 519 스타일을 추론한다. 자동 큐는 MAEST_ONLY로 무드·보컬·악기를 미확정으로 남긴다.
+4. 분석 원본·최종 자동 라벨·작업 완료를 서버에 함께 저장한다. 임시 음원은 성공·실패 모두 삭제한다. 사람 확인·수정 라벨은 덮어쓰지 않는다.
+5. 워커 중단은 20분 lease 만료 후 회수하며 최대 3회 처리한다. 완료 응답 유실은 같은 lease로 재전송한다.
+
+### 설치 및 변경 적용
+
+```bash
+# 기존 venv에서 essentia 일반 패키지와 tensorflow 패키지를 함께 설치하지 않는다.
+python -m pip uninstall -y essentia
+python -m pip install -r requirements-tensorflow.txt
+# ffmpeg/ffprobe와 yt-dlp가 지원하는 JavaScript 런타임(예: Deno)도 설치한다.
+# 지원 런타임 설치 안내: https://github.com/yt-dlp/yt-dlp/wiki/EJS
+python -m yt_dlp --version
+ffmpeg -version
+mkdir -p ~/caffeine-audio/models
+curl -fL https://essentia.upf.edu/models/feature-extractors/maest/discogs-maest-30s-pw-519l-2.pb -o ~/caffeine-audio/models/discogs-maest-30s-pw-519l-2.pb
+# SHA-256: 92783feb21187443d058b4f16d7a76f47888d43fbdc7a28e8bcc8e024603bd20
+python remote_worker.py
+```
+
+서비스 등록 파일을 다시 복사하고 daemon-reload/restart한다. 서버 API와 미니PC 코드가 모두 갱신돼야 동작한다. `AUDIO_WORKER_DRY_RUN=true`는 서버 작업을 소비하지 않도록 시작을 거절한다. CLI dry-run은 유지한다.
+
+### MAEST 추론과 원본
+
+- 모델은 `discogs-maest-30s-pw-519l-2`, 출력은 `PartitionedCall/Identity_13` sigmoid다. [공식 메타데이터](https://essentia.upf.edu/models/feature-extractors/maest/discogs-maest-30s-pw-519l-2.json)의 클래스 순서를 maest-metadata.json에 보존한다.
+- WAV mono 16kHz로 변환 후 실제 입력 파일 SHA-256을 계산한다. MAEST patchSize=1876, patchHopSize=938(약 15.008초), batchSize=1, lastPatchMode=repeat로 마지막 구간을 포함한다. 원본에는 전처리·Essentia 버전도 기록한다.
+- 전체 구간의 519개 점수와 mean/max를 저장한다. 점수는 보정된 정확도나 곡의 기원 증명이 아니다. max는 특정 구간의 높은 반응을 보여준다.
+- taxonomy.json의 정적 매핑·태그별 임계값으로 기존 Lab 장르 최대 2개를 만든다. 현재 기본 임계값 0.2는 미보정 실험 기준이다. `maest.normalize(raw, taxonomy)`로 재추론 없이 정규화할 수 있다. 지원되지 않거나 약한 장르는 unknown이다.
+- 자동 큐에서는 무드 정규화는 null, 기존 선택형 라벨은 unknown이다. 보컬·악기도 unknown이다. 수동 CLI의 선택적 DEAM 분석은 유지하지만 자동 MAEST 큐에서는 호출하지 않는다.
+- 입력 파일은 처리 후 삭제하므로 audio_local_path=null이다. 재분석 원본은 별도 이력으로 추가하고 사람이 수정한 최종 라벨은 보존한다. 재다운로드 파일의 해시가 달라지면 다른 입력으로 구분하지만 동일 파일을 다시 확보할 수 있다고 보장하지 않는다.
+- 단일 곡 10초~15분, 최대 200MB, 다운로드·변환 5분, 분석 10분 제한이다. ffmpeg/ffprobe가 필요하다. 다운로드 시 2~5초 간격을 둔다. 로그인·지역제한·삭제·플랫폼 변경은 실패로 남기며 DRM/쿠키 우회는 없다.
+- 서버에 오디오를 전송하지 않는다. 모델 이용 조건은 [기존 라이선스 설명](#라이선스--평가-전용)을 확인하며 실시간 심사에 연결하지 않는다.
+
+### 실제 곡 테스트 (서버 쓰기 없음)
+
+서버·서비스를 바꾸기 전에 미니PC의 동일 venv에서 실행한다. 임시 음원은 지우고 전체 결과 JSON과 콘솔 상위 10개를 남긴다.
+
+```bash
+export AUDIO_MODEL_DIR="$HOME/caffeine-audio/models"
+python test_track.py --platform youtube --track-key Q4_qJi_jrUg --title 'Big Band Jazz Cover' --output "$HOME/caffeine-audio/test-results/big-band.json"
+python test_track.py --platform youtube --track-key yCcvpI-8E4I --title 'Leave Me Now' --output "$HOME/caffeine-audio/test-results/trap.json"
+```
+
+기존 Claude 테스트와 동일 영상 ID를 사용한 비교용 예시다. 영상 접근 가능성과 실제 다운로드 성공은 실행 시 확인한다. 상세 원본의 구간 수·마지막 end_sec, 평균/최댓값 순위, 자동 장르를 살펴본다. Audio LLM 비교와 캘리브레이션은 [로드맵](../docs/ROADMAP.md)에만 기록했다.

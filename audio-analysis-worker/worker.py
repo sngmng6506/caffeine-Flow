@@ -225,6 +225,12 @@ def main():
         log("error", "worker_start_failed", message=str(error))
         return 1
 
+    # 이전 프로세스의 중단 작업을 무한 재시도하지 않고 실패로 보존한다.
+    for abandoned in (config.root / 'processing').iterdir():
+        if abandoned.is_dir():
+            (abandoned / ERROR_FILENAME).write_text('WORKER_INTERRUPTED', encoding='utf-8')
+            finish(abandoned, config.root, 'failed')
+
     predictor = None
     if config.enable_valence_arousal:
         try:

@@ -1,0 +1,28 @@
+{
+  "version": "maest-lab-1",
+  "calibrated": false,
+  "default_threshold": 0.2,
+  "max_genres": 2,
+  "style_overrides": {
+    "Pop---Ballad": "ballad",
+    "Electronic---Ambient": "ambient_lofi",
+    "Electronic---Dark Ambient": "ambient_lofi",
+    "Pop---K-pop": "pop",
+    "Pop---J-pop": "pop"
+  },
+  "parent_mapping": {
+    "Blues": "rnb_soul",
+    "Classical": "classical",
+    "Electronic": "electronic_dance",
+    "Folk, World, & Country": "world_latin_reggae",
+    "Funk / Soul": "rnb_soul",
+    "Hip Hop": "hiphop_rap",
+    "Jazz": "jazz",
+    "Latin": "world_latin_reggae",
+    "Pop": "pop",
+    "Reggae": "world_latin_reggae",
+    "Rock": "rock_metal",
+    "Stage & Screen": "ost_instrumental"
+  },
+  "thresholds": {}
+}

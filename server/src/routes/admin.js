@@ -334,6 +334,8 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
   const { human_decision: humanDecision, human_reason_code: humanReasonCode } = req.body || {};
   const metadataSufficient = req.body?.metadata_sufficient;
   const audioAnalysisId = req.body?.audio_analysis_id ?? null;
+  const audioAnalysisRevision = req.body?.audio_analysis_revision;
+  if (audioAnalysisId && !Number.isSafeInteger(audioAnalysisRevision)) return res.status(400).json({ error: '분석 버전이 필요합니다' });
   if (!HUMAN_DECISIONS.includes(humanDecision)) {
     return res.status(400).json({ error: 'human_decision은 accept, reject 또는 undetermined여야 합니다' });
   }
@@ -365,15 +367,21 @@ router.put('/cafes/:id/music-filter-audit/:recommendationId/review', requireAdmi
     if (!analysis) return res.status(404).json({ error: '오디오 분석 결과를 찾을 수 없습니다' });
   }
 
-  const saved = await labelingReview.saveReview({
-    recommendation,
-    humanDecision,
-    humanReasonCode,
-    metadataSufficient,
-    annotation: annotationCheck.value,
-    audioAnalysisId,
-  });
-  res.json(saved);
+  try {
+    const saved = await labelingReview.saveReview({
+      recommendation,
+      humanDecision,
+      humanReasonCode,
+      metadataSufficient,
+      annotation: annotationCheck.value,
+      audioAnalysisId,
+      audioAnalysisRevision,
+    });
+    res.json(saved);
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    throw error;
+  }
 });
 
 // PUT /api/v1/admin/cafes/:id/suspend  { is_suspended: boolean }
@@ -402,5 +410,43 @@ router.delete('/cafes/:id', requireAdmin, async (req, res) => {
   res.json({ id: req.params.id, deleted: true });
 });
 
+
+// 곡 자동 라벨 검토는 매장 정책의 골드 판단을 요구하지 않는다.
+const audioLabels = require('../features/audio-analysis/labels');
+router.get('/audio-labels', requireAdmin, async (req, res) => {
+  const view = req.query.view || 'unreviewed';
+  const offset = Number(req.query.offset || 0);
+  if (!['all', 'reviewed', 'unreviewed', 'ready'].includes(view) || !Number.isSafeInteger(offset) || offset < 0) {
+    return res.status(400).json({ error: '목록 조건이 올바르지 않습니다' });
+  }
+  res.json(await audioLabels.list({ view, offset }));
+});
+router.put('/audio-labels/:id/review', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id) || !Number.isSafeInteger(req.body?.annotation_revision) || req.body.annotation_revision < 0 ||
+      (req.body.audio_analysis_id && (!isUuid(req.body.audio_analysis_id) || !Number.isSafeInteger(req.body.audio_analysis_revision)))) {
+    return res.status(400).json({ error: '검토 대상 버전이 올바르지 않습니다' });
+  }
+  const annotation = req.body.track_annotation === undefined ? { value: null } : validateMusicAnnotation(req.body.track_annotation);
+  if (annotation.error) return res.status(400).json({ error: annotation.error });
+  try {
+    res.json(await audioLabels.review(req.params.id, req.body, annotation.value));
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    throw error;
+  }
+});
 module.exports = router;
 module.exports.CAFE_STATUS = CAFE_STATUS;
+
+// 원본은 이력별 읽기만 제공한다. 사용자 검토로 수정하지 않는다.
+router.get('/audio-labels/:id/runs', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(400).json({ error: '곡 식별자가 올바르지 않습니다' });
+  try { res.json(await require('../features/audio-analysis/runs').history(req.params.id)); }
+  catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
+});
+router.get('/audio-runs/:id', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(400).json({ error: '분석 식별자가 올바르지 않습니다' });
+  const run = await db('music_audio_runs').where({ id: req.params.id }).select('id', 'platform', 'track_key', 'payload', 'created_at').first();
+  if (!run) return res.status(404).json({ error: '분석을 찾을 수 없습니다' });
+  res.json(run);
+});

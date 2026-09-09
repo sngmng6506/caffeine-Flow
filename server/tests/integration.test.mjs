@@ -1125,6 +1125,7 @@ describe('Essentia 분석 결과와 라벨링 검수', () => {
         human_reason_code: 'policy_match',
         metadata_sufficient: true,
         audio_analysis_id: analysisResponse.body.id,
+        audio_analysis_revision: analysisResponse.body.revision,
         track_annotation: {
           artist_name: '테스트 아티스트',
           track_version: 'original',

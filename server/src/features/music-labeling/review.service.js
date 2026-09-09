@@ -46,6 +46,7 @@ function attachLabelingContext(row) {
     } : null,
     audio_analysis: row.analysis_id ? {
       id: row.analysis_id,
+      revision: row.analysis_revision,
       model_name: row.analysis_model_name,
       model_version: row.analysis_model_version,
       feature_schema_version: row.analysis_feature_schema_version,
@@ -72,7 +73,7 @@ function latestAudioAnalysisQuery() {
   return db({ audio: 'music_audio_analyses' })
     .distinctOn('audio.platform', 'audio.track_key')
     .select(
-      'audio.platform', 'audio.track_key', 'audio.id',
+      'audio.platform', 'audio.track_key', 'audio.id', 'audio.revision',
       'audio.model_name', 'audio.model_version', 'audio.feature_schema_version',
       'audio.rights_basis', 'audio.source_reference', 'audio.features',
       'audio.suggested_annotation', 'audio.review_status',
@@ -112,6 +113,7 @@ const QUEUE_COLUMNS = [
   'annotation.schema_version as annotation_schema_version',
   'annotation.updated_at as annotation_updated_at',
   'analysis.id as analysis_id',
+  'analysis.revision as analysis_revision',
   'analysis.model_name as analysis_model_name',
   'analysis.model_version as analysis_model_version',
   'analysis.feature_schema_version as analysis_feature_schema_version',
@@ -220,7 +222,7 @@ async function fetchLabelingQueue({ view, offset }) {
  */
 function fetchArtistLabels({ artistKey, platform, trackKey }) {
   return db('music_track_annotations')
-    .where({ artist_key: artistKey })
+    .where({ artist_key: artistKey, label_source: 'human' })
     .modify((query) => {
       if (platform && trackKey) {
         query.whereNot((builder) => builder.where({ platform, track_key: trackKey }));
@@ -273,8 +275,16 @@ function saveReview({
   metadataSufficient,
   annotation,
   audioAnalysisId,
+  audioAnalysisRevision,
 }) {
   return db.transaction(async (trx) => {
+    if (audioAnalysisId) {
+      const analysis = await trx('music_audio_analyses').where({ id: audioAnalysisId,
+        platform: recommendation.platform, track_key: recommendation.video_id }).forUpdate().first();
+      if (!analysis || analysis.revision !== audioAnalysisRevision) {
+        throw Object.assign(new Error('분석 결과가 갱신되었습니다. 다시 불러와주세요.'), { status: 409 });
+      }
+    }
     const reviewedAt = new Date();
     const [savedReview] = await trx('music_filter_reviews')
       .insert({
@@ -301,6 +311,8 @@ function saveReview({
       source_recommendation_id: recommendation.id,
       title: recommendation.title,
       ...annotation,
+      label_source: 'human',
+      human_review_status: 'corrected',
       // pg 드라이버가 JS 배열을 PostgreSQL 배열 리터럴({"pop"})로 바꾸면
       // jsonb 컬럼에서 22P02가 발생한다. JSON 문자열로 타입을 명확히 한다.
       mood_tags: JSON.stringify(annotation.mood_tags),
@@ -326,6 +338,9 @@ function saveReview({
         usage_scope: row.usage_scope,
         schema_version: row.schema_version,
         updated_at: row.updated_at,
+        label_source: 'human',
+        human_review_status: 'corrected',
+        revision: trx.raw('music_track_annotations.revision + 1'),
       })
       .returning('*');
 

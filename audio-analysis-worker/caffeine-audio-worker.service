@@ -15,11 +15,12 @@ Type=simple
 # 설치하는 기계에 맞게 고친다. %h는 서비스를 등록한 사용자의 홈이다.
 WorkingDirectory=%h/caffeine-Flow/audio-analysis-worker
 EnvironmentFile=%h/caffeine-audio/worker.env
-ExecStart=%h/caffeine-audio/venv/bin/python worker.py
+ExecStart=%h/caffeine-audio/venv/bin/python remote_worker.py
 
 # 큐가 비어 있어도 계속 돌며 폴링한다. 조용히 멈춰 있는 것이 가장 나쁜 실패다.
 Restart=always
 RestartSec=10
+TimeoutStopSec=1000
 
 # 같은 미니PC에서 CafeStudy ADB 워커가 함께 돈다. 분석은 급하지 않은 배치이므로
 # 양보하게 두어, ADB 자동화가 정해진 시각에 밀리지 않도록 한다.

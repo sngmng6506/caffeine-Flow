@@ -1,7 +1,9 @@
-# Valence/Arousal(deam-msd-musicnn)까지 쓸 때 설치한다. TensorFlow 런타임이 포함돼
+# 자동 MAEST 워커 또는 수동 Valence/Arousal 분석에 설치한다. TensorFlow 런타임이 포함돼
 # 있어 requirements.txt의 `essentia`를 대체한다. 둘을 같이 설치하지 않는다.
 #
 # 이 버전이 cp39~cp313 wheel을 제공하는 마지막 릴리스다. 최신(dev1438)은 cp314만
 # 올라와 있어 Python 3.12에서는 설치되지 않는다.
 essentia-tensorflow==2.1b6.dev1389
 numpy>=1.26,<3
+
+yt-dlp[default]>=2026.1.1

@@ -89,6 +89,8 @@ app.use(helmet({
   crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
 }));
 app.use(cookieParser());
+// 519개 구간별 점수는 인증된 워커 경로에서만 큰 본문을 허용한다.
+app.use('/api/v1/audio-analysis/jobs', require('./src/middleware/auth').requireAudioAnalysisWorker, express.json({ limit: '1mb' }));
 app.use(express.json({ limit: '64kb' })); // body 크기 상한 — DoS 방어
 app.use(rateLimit(GLOBAL_API_RATE_LIMIT)); // 전체 API 분당 120회
 

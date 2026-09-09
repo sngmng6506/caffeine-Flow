@@ -35,8 +35,8 @@ flowchart LR
 | `owner/electron/` | 창 관리, 실제 음악 재생, 종료 감지 |
 | `admin/` | 운영자용 카페 모니터링·정지·삭제와 AI 랩 진입 |
 | `music-filter-lab/` | 모델·프롬프트별 필터 판단을 저장 없이 비교하는 운영자 UI |
-| `music-labeling-lab/` | 전체 카페 AI 처리 이력을 한 큐에서 골드 라벨링하는 운영자 UI |
-| `audio-analysis-worker/` | 권리가 확인된 로컬 음원의 Essentia 특징 추출과 결과 제출. 디렉터리 큐 기반 상주 워커이며 원본 전송 없음. Valence/Arousal은 명시적으로 켠 평가 모드에서만 채운다 |
+| `music-labeling-lab/` | 전체 신청곡 자동 라벨을 곡별로 빠르게 확인·수정하는 운영자 UI |
+| `audio-analysis-worker/` | 서버 큐에서 YouTube·SoundCloud 신청곡을 받아 임시 다운로드·Essentia/MAEST 분석 후 자동 라벨 저장. Spotify 미지원. 원본 전송 없음. 자동 큐는 MAEST_ONLY, 수동 CLI 감정 모델은 별도 |
 | `server/` | 인증, 검증, 영속화, 실시간 이벤트, 통계, AI 판단 |
 
 서버는 판단과 데이터 일관성을, Electron은 실제 외부 플랫폼 재생을 책임진다. 여러 사장님이 접속해도 서버가 카페별 재생 리더 Electron 한 대를 정한다. 리더 선출·재연결 lease·재생 시작 확인 순서는 [PLAYBACK.md](PLAYBACK.md)가 기준이다.
@@ -177,3 +177,14 @@ stateDiagram-v2
 - Electron 설치 파일: GitHub Release
 
 명령과 환경변수는 [DEVELOPMENT.md](DEVELOPMENT.md), Electron 업데이트 동작은 [PLAYBACK.md](PLAYBACK.md)를 참고한다.
+
+## 자동 음향 라벨링
+
+신청 저장 → 플랫폼·곡별 DB 작업 등록 → 미니PC가 lease 획득 → URL 오디오 임시 다운로드 → 기본 특징·MAEST 519 스타일 추론 → 자동 라벨/최종 라벨/작업 완료를 원자적으로 저장 → 임시 음원 삭제 → Lab에서 확인·수정한다.
+
+- `music_audio_jobs`는 기존·신규 신청 모두 포함한다. 필터 OFF/거절도 대상이며 같은 곡은 한 건이다. Spotify는 unsupported로 남긴다.
+- `music_audio_runs`는 실행별 전체 구간 점수·평균·최댓값·입력 해시·모델/전처리/매핑 버전·자동 라벨의 추가 전용 원본이다. `music_audio_analyses`는 최신 검토용 특징·자동 라벨·MAEST 요약과 latest_run_id를 유지하며 재분석 시 revision이 증가한다.
+- `music_track_annotations`는 처음 자동 라벨을 보관한다. 사람 확인·수정 시 label_source=human으로 보호하고 confirmed/corrected를 구분한다. 재분석은 새 원본 이력과 최신 분석을 저장하며 사람 최종 라벨을 덮어쓰지 않는다.
+- 워커 중단 시 20분 lease 만료 후 회수하고 최대 세 번 실패하면 failed다. 만료 워커 결과는 거절하며 완료 재전송은 멱등이다.
+- Lab의 곡 검토와 매장 정책 골드 판단은 별개다. 최종 라벨과 분석 revision을 비교해 보지 않은 결과가 검토 완료되지 않게 한다.
+- 원본 음원은 서버에 전송하지 않는다. 사람 라벨과 자동 라벨 모두 현재 라이브 LLM 입력·자동수락에는 연결하지 않는다.

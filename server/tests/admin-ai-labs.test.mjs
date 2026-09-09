@@ -26,21 +26,22 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).toContain('<h1>필터 테스트</h1>');
   });
 
-  it('음악 라벨링은 통합 큐를 읽고 기존 검수 API로 저장한다', () => {
+  it('음악 라벨링은 자동 곡 큐에서 확인 또는 수정한다', () => {
     const app = read('music-labeling-lab/app.js');
     const html = read('music-labeling-lab/index.html');
     const adminRoute = read('server/src/routes/admin.js');
     const reviewService = read('server/src/features/music-labeling/review.service.js');
     const nullableMigration = read('server/src/db/migrations/20260828090000_nullable_music_filter_metadata_sufficient.js');
-    expect(app).toContain(`/admin/music-filter-reviews?view=`);
-    expect(app).toContain('/admin/cafes/${item.cafe_id}/music-filter-audit/${item.id}/review');
+    expect(app).toContain(`/admin/audio-labels?view=`);
+    expect(app).toContain('/admin/audio-labels/${item.id}/review');
     expect(app).toContain('/admin/music-filter-artist-labels?');
     expect(app).toContain('track_annotation');
     expect(app).toContain('audio_analysis');
     expect(app).toContain('renderAudioAnalysis');
     expect(app).toContain('applyAnalysisSuggestion');
     expect(app).toContain('기존 곡 라벨 불러옴');
-    expect(app).toContain(`metadata_sufficient: item.metadata_sufficient ?? null`);
+    expect(app).toContain('audio_analysis_revision');
+    expect(app).toContain('annotation_revision');
     expect(app).toContain(`setRadio('tempo_class', annotation.tempo_class)`);
     expect(app).toContain(`sessionStorage.getItem(TOKEN_KEY)`);
     expect(html).toContain('보컬 유형');
@@ -48,13 +49,13 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).not.toContain('노래와 랩이 섞임');
     expect(html).not.toContain('라벨 확신도');
     expect(html).toContain('Essentia 자동 분석');
-    expect(html).toContain('자동 분석은 골드 라벨이 아닙니다');
+    expect(html).toContain('자동 라벨은 이미 저장되어 있습니다');
     expect(html).not.toContain('콘텐츠 주의 요소');
     expect(html).not.toContain('선택 기준 도움말');
     expect(html).not.toContain('곡 버전');
     expect(html).not.toContain('기본 메타데이터만으로 판단 가능했나요?');
-    expect(html).toContain('판단 당시 매장 정책');
-    expect(html).toContain('AI 판단 결과');
+    expect(html).toContain("id='confirmReview'");
+    expect(html).not.toContain("name='human_decision'");
     expect(html).toContain(`id='existingLabelStatus'`);
     expect(html).toContain('<h1>음악 라벨링</h1>');
     // 재생목록 제외는 라우트가 아니라 라벨링 서비스가 담당한다

@@ -109,7 +109,7 @@ filter_error_code · filter_checked_at · filter_prompt_snapshot
 
 ## 평가 데이터셋
 
-운영자는 관리자 콘솔의 카페별 판단 이력 또는 `/labeling-lab`의 통합 큐에서 골드 라벨을 기록한다. 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이다.
+운영자는 관리자 콘솔의 카페별 판단 이력 에서 정책 골드 라벨을 기록한다. `/labeling-lab`은 별도의 곡 자동 라벨 검토 화면이다. 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이다.
 
 **정책 검수** — `music_filter_reviews`에 추천곡당 한 건.
 
@@ -130,17 +130,14 @@ genre_tags(선택, 최대 2) · note(선택) · usage_scope · schema_version
 - 화면에는 한국어로 표시하고 DB에는 상수의 코드로 저장한다. `unknown`은 같은 항목의 다른 값과 함께 저장하지 않는다.
 - 아티스트명은 운영자가 곡을 듣고 확인한다. 정규화 키는 같은 아티스트의 다른 곡 라벨을 찾는 용도로만 쓰며 자동 추정이나 라벨 복사는 하지 않는다. 참고 조회는 운영자가 요청할 때 최대 3건이다.
 - 재검수는 최신 값으로 upsert한다. 정책 검수는 추천곡 삭제 시 함께 삭제되고, 곡 특성은 출처 추천곡만 비워 재사용 가능한 라벨을 보존한다.
-- 사람 라벨은 `recommendations.filter_status`와 큐 `status`를 바꾸지 않는다. 음악 라벨링은 곡 버전과 메타데이터 충분성을 묻지 않고 기존 값은 보존하며 신규 값은 각각 `unknown`, `null`을 사용한다. `null`은 미확인을 뜻하며 메타데이터 부족으로 해석하지 않는다. AI 승인·거절 결과는 판단 당시 매장 정책 아래에 표시한다.
+- 사람 라벨은 `recommendations.filter_status`와 큐 `status`를 바꾸지 않는다. 음악 라벨링은 곡 버전과 메타데이터 충분성을 묻지 않고 기존 값은 보존하며 신규 값은 각각 `unknown`, `null`을 사용한다. `null`은 미확인을 뜻하며 메타데이터 부족으로 해석하지 않는다. AI 승인·거절 결과는 카페별 감사 화면에서 확인한다.
 - 동일한 `(platform, track_key)`의 기존 곡 라벨이 있으면 선택값을 자동 복원하고 저장 시각을 표시한다. 매장 정책 판단은 추천곡·매장별 값이므로 다른 신청에서 복사하지 않는다.
-- 음악 라벨링은 카페 구분 없이 전체·완료·미검수를 집계하고 최근 판단순 50건씩 가져온다. 저장은 기존 카페·추천곡 범위 검증을 통과한 뒤 두 레코드를 한 트랜잭션으로 반영하며, 둘 다 있어야 완료로 센다. 제목에 `Playlist` 또는 `플리`가 포함된 항목은 큐와 집계에서 제외한다.
+- 기존 정책 골드 큐는 정책 검수와 곡 라벨이 모두 있어야 완료이며 Playlist·플리 제목을 제외한다. 새 Lab의 곡 검토 큐는 이 조건을 사용하지 않는다.
 - 현재는 수집만 한다. `usage_scope=operational`이어도 자동수락, LLM 프롬프트, Exact 재사용, 동일 아티스트 검색에 쓰지 않으며 성능 지표도 자동 계산하지 않는다. 라이브 연결은 별도 평가와 계약 변경 후 진행한다.
 
-**자동 음향 분석** — `music_audio_analyses`에 `(platform, track_key, model_name, model_version)`당 한 건.
+**자동 음향 분석과 곡 검토**
 
-- `audio-analysis-worker/`가 권리 확인 로컬 파일을 Essentia로 분석하고 서버에는 특징값만 제출한다. 외부 플랫폼 링크를 다운로드하거나 오디오 원본을 전송하지 않는다.
-- 현재 범위는 BPM, 조성, danceability, 음량, 다이내믹 복잡도, spectral centroid, energy와 템포·리듬 추천이다. 라이선스가 별도로 필요한 감정 모델은 포함하지 않아 Valence/Arousal과 분위기 추천은 비워둔다.
-- 곡별 최신 분석은 라벨링 화면에 참고값으로 표시한다. 추천값 적용은 폼 선택만 돕고 자동 저장하지 않으며, 사람이 곡 라벨을 저장해야 `reviewed`가 된다.
-- 같은 모델 버전의 재분석 또는 새 모델 분석은 다시 `pending`이 된다. 자동 분석은 기존 수동 라벨을 덮어쓰지 않고 실시간 LLM 판단에도 사용하지 않는다.
+신청곡 URL에서 자동 분석·라벨 저장을 수행하고 Lab에서 확인·수정한다. 흐름과 저장 경계는 [ARCHITECTURE.md#자동-음향-라벨링](ARCHITECTURE.md#자동-음향-라벨링)이 기준이다. 자동 원본과 사람 최종 라벨은 분리하며 라이브 LLM 판단에 사용하지 않는다.
 
 ## 구현 위치
 

@@ -100,7 +100,7 @@ owner Vite 빌드는 `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_ENABLED`를 사용한�
 
 ## Essentia 라벨링 워커
 
-`audio-analysis-worker/`는 서버와 별도 Python 프로세스로 실행한다. 권리가 확인된 로컬 파일만 입력받고 원본 음원은 서버에 전송하지 않는다.
+`audio-analysis-worker/`는 서버와 별도 Python 프로세스로 실행한다. 기존 로컬 CLI와 서버 작업 큐 기반 자동 워커를 제공한다. 원본 음원은 서버에 전송하지 않는다.
 
 ```bash
 cd audio-analysis-worker
@@ -119,7 +119,7 @@ python analyze.py ./authorized-track.wav \
 python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 ```
 
-미니PC 상주 운영은 `worker.py`가 담당한다. `~/caffeine-audio/{inbox,processing,processed,failed,models}` 디렉터리 큐를 폴링하고 결과만 outbound HTTPS로 제출하며, 들어오는 포트는 열지 않는다. 등록 절차와 `CAFFEINE_FLOW_SERVER_URL`·`AUDIO_WORKER_ROOT`·`AUDIO_MODEL_DIR`·`POLL_INTERVAL_MS`·`DISCORD_AUDIO_WEBHOOK_URL` 설명은 [audio-analysis-worker/README.md](../audio-analysis-worker/README.md)에 있다.
+미니PC 상주 운영은 `remote_worker.py`가 서버 DB 큐를 폴링한다. 다운로드·분석 의존성과 등록 절차는 [워커 README](../audio-analysis-worker/README.md)를 따른다. 기존 `worker.py`는 수동 디렉터리 큐 호환용이다.
 
 Valence/Arousal은 `ENABLE_VALENCE_AROUSAL=true`일 때만 `deam-msd-musicnn` 모델로 채운다. 기본값은 꺼짐이며, 모델이 비상업(CC BY-NC-SA 4.0) 라이선스라 라벨링 Lab 평가에만 쓰고 신청곡 자동 승인에 연결하지 않는다. 상업화에는 별도 라이선스가 필요하다. 모델 파일은 저장소에 커밋하지 않고 `AUDIO_MODEL_DIR`에 두며 워커가 SHA-256을 확인한다.
 
@@ -293,3 +293,5 @@ railway.json
 server/src/db/migrations/
 owner/package.json
 ```
+
+자동 MAEST 워커 설치·실제 곡 비교 명령은 [워커 README](../audio-analysis-worker/README.md#실제-곡-테스트-서버-쓰기-없음)를 따른다. 서버는 20260909100000_maest_runs 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다. MAEST_ONLY 자동 큐는 ENABLE_VALENCE_AROUSAL을 사용하지 않으며 기존 수동 CLI만 이 옵션을 따른다.

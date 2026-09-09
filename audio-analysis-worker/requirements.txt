@@ -3,3 +3,5 @@
 # 두 패키지가 같은 `essentia` 모듈을 제공하므로 함께 설치하지 않는다.
 essentia==2.1b6.dev1389
 numpy>=1.26,<3
+
+yt-dlp[default]>=2026.1.1

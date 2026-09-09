@@ -117,11 +117,12 @@ async function insertRecommendation(dbOrTrx, cafeId, {
       filter_checked_at: hasFilterResult ? db.fn.now() : null,
     })
     .returning('*');
+  await require('../features/audio-analysis/jobs').enqueue(rec, dbOrTrx);
   return rec;
 }
 
 async function add(cafeId, payload) {
-  return insertRecommendation(db, cafeId, payload);
+  return db.transaction((trx) => insertRecommendation(trx, cafeId, payload));
 }
 
 // 공개 신청은 cafe 행 잠금 안에서 최종 중복·큐 한도와 insert를 묶는다.

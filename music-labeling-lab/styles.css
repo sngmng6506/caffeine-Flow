@@ -159,3 +159,8 @@ legend { margin-bottom: 8px; color: #4a5568; font-size: 12px; font-weight: 700; 
   .analysis-suggestion { grid-template-columns: 1fr; }
   .section-title { align-items: flex-start; flex-direction: column; }
 }
+
+/* 전체 구간 원본을 열어도 검토 화면 너비를 넘기지 않는다. */
+#maestRaw { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
+#maestSummary table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#maestSummary th, #maestSummary td { padding: 5px; text-align: left; border-bottom: 1px solid #e2e7ef; }
