@@ -295,3 +295,5 @@ owner/package.json
 ```
 
 자동 MAEST 워커 설치·실제 곡 비교 명령은 [워커 README](../audio-analysis-worker/README.md#실제-곡-테스트-서버-쓰기-없음)를 따른다. 서버는 20260909100000_maest_runs 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다. MAEST_ONLY 자동 큐는 ENABLE_VALENCE_AROUSAL을 사용하지 않으며 기존 수동 CLI만 이 옵션을 따른다.
+
+미니PC에 연결된 Claude 세션의 업데이트 순서·시험 완료 기준·실패 진단은 [워커 인수인계](../audio-analysis-worker/README.md#claude-세션-인수인계)를 따른다.

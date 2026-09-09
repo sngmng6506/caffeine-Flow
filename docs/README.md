@@ -13,6 +13,7 @@ AI는 모든 문서를 읽지 않는다. 작업별 필수 문서와 갱신 조�
 | [PLAYBACK.md](PLAYBACK.md) | Electron이 외부 음악을 어떻게 재생하나 |
 | [API.md](API.md) | 지금 존재하는 엔드포인트는 무엇인가 |
 | [../admin/README.md](../admin/README.md) | 플랫폼 운영자 콘솔의 화면과 API 경계는 무엇인가 |
+| [../audio-analysis-worker/README.md](../audio-analysis-worker/README.md) | 미니PC 워커를 어떻게 업데이트하고 실제 신청곡을 검증하나 |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | 어떻게 실행·검증·배포하나 |
 | [LLM_FILTER.md](LLM_FILTER.md) | AI 음악 필터는 현재 어떻게 동작하나 |
 | [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md) | 무엇을 깨뜨리면 안 되나 |
