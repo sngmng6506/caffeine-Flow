@@ -103,7 +103,8 @@ async function saveAudioSettings(event) {
 async function requestCollection() {
   const button = $('collectApple');
   button.disabled = true;
-  const { ok, data } = await api('POST', '/admin/audio-discoveries', { source: 'apple_kr', limit: 20 });
+  const { ok, data } = await api('POST', '/admin/audio-discoveries',
+    { source: $('collectSource').value, limit: 20 });
   button.disabled = false;
   $('message').hidden = false;
   if (!ok) {

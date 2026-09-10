@@ -193,6 +193,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 - 곡별 최신 분석의 `maest_summary`에는 상위 10개(mean·max)와 소비 프롬프트용 `prompt_styles`가 들어간다. `prompt_styles`는 1위 점수의 0.5배 이상인 스타일 최대 5개이며 `prompt_style_calibrated`는 항상 false다.
 
+- 날짜로 진도를 잡는 소스(`musicbrainz_kr`)는 claim 응답에 `offset` 대신 `window`(`from`·`to`)가 온다. 완료 시 그 창을 그대로 돌려주면 커서가 움직인다. 백필 하한(12개월)에 닿으면 `window`가 null이다.
 - 최신곡 수집은 곡 목록 조회와 플랫폼 검색을 워커가 한다. 서버에 yt-dlp가 없고 Railway 공용 IP에서 검색을 반복하면 막힐 수 있다. claim 응답의 `offset`부터 `requested_limit`개를 훑고, 완료 시 `offset`과 실제로 훑은 `scanned`를 함께 보고한다. `scanned`가 요청 개수보다 작으면 소스를 끝까지 본 것이라 진도가 0으로 돌아간다. `enqueued_count`는 새로 등록된 곡 수이며 이미 있던 곡은 세지 않는다.
 - 길이가 계약 범위(`audio_duration_sec`) 밖이면 워커가 다운로드 전에 `SOURCE_UNSUPPORTED`로 실패시키며 재시도하지 않는다.
 - 3단 Audio LLM 실행 여부는 서버 설정이 정한다. `/jobs/claim` 응답에 `audio_llm_enabled`가 실려 오며 워커는 이 값을 따른다. 워커에 키가 없으면 켜져 있어도 건너뛴다.

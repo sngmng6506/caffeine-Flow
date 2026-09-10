@@ -1,6 +1,7 @@
 const db = require('../../db/knex');
 const crypto = require('node:crypto');
 const jobs = require('./jobs');
+const window = require('./discovery-window');
 const {
   DISCOVERY_SOURCES, DISCOVERY_MAX_LIMIT, DISCOVERY_LEASE_MINUTES, DISCOVERY_MAX_ATTEMPTS,
 } = require('../../constants/audio-discovery');
@@ -48,9 +49,13 @@ function claim() {
       lease_until: trx.raw("now() + (? * interval '1 minute')", [DISCOVERY_LEASE_MINUTES]),
       updated_at: trx.fn.now(),
     }).returning('*');
-    // 어디서부터 가져올지 알려준다. 같은 상위 N을 반복해서 훑지 않기 위해서다.
+    // 어디서부터 가져올지 알려준다. 같은 구간을 반복해서 훑지 않기 위해서다.
     const cursor = await trx('music_source_cursors')
       .where({ source: claimed.source, query_key: claimed.query || '' }).first();
+    if (window.isDateWindowSource(claimed.source)) {
+      // 날짜 소스는 순위 offset이 의미 없다. 훑을 구간을 직접 계산해 준다.
+      return { ...claimed, window: window.nextWindow(cursor, new Date()) };
+    }
     return { ...claimed, offset: cursor ? cursor.next_offset : 0 };
   });
 }
@@ -76,15 +81,22 @@ function complete(id, token, tracks, meta = {}) {
 
     // 다음 요청은 이번에 훑은 구간 다음부터 본다. 소스가 바닥나면 처음으로 돌아가
     // 그 사이 바뀐 차트를 다시 본다. offset은 워커가 실제로 사용한 값을 신뢰한다.
-    const positive = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
-    const usedOffset = positive(meta.offset) ?? 0;
-    const scanned = positive(meta.scanned) ?? tracks.length;
-    const nextOffset = scanned < request.requested_limit ? 0 : usedOffset + request.requested_limit;
-    await trx('music_source_cursors')
-      .insert({ source: request.source, query_key: request.query || '',
-        next_offset: nextOffset, updated_at: trx.fn.now() })
-      .onConflict(['source', 'query_key'])
-      .merge({ next_offset: nextOffset, updated_at: trx.fn.now() });
+    const key = { source: request.source, query_key: request.query || '' };
+    const cursor = await trx('music_source_cursors').where(key).first();
+    let next;
+    if (window.isDateWindowSource(request.source)) {
+      // 창을 못 받았으면 백필 하한에 닿은 것이라 커서를 그대로 둔다.
+      next = meta.window ? window.advance(cursor, meta.window) : null;
+    } else {
+      const positive = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+      const usedOffset = positive(meta.offset) ?? 0;
+      const scanned = positive(meta.scanned) ?? tracks.length;
+      next = { next_offset: scanned < request.requested_limit ? 0 : usedOffset + request.requested_limit };
+    }
+    if (next) {
+      await trx('music_source_cursors').insert({ ...key, ...next, updated_at: trx.fn.now() })
+        .onConflict(['source', 'query_key']).merge({ ...next, updated_at: trx.fn.now() });
+    }
 
     const [row] = await trx('music_source_discoveries').where({ id }).update({
       status: 'done', found_count: tracks.length, enqueued_count: added,

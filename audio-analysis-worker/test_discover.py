@@ -131,3 +131,76 @@ class CollectTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+MB = {'recordings': [
+    {'title': 'Flame', 'artist-credit': [{'name': 'PLAVE'}], 'length': 187000},
+    {'title': '그대라면 (inst.)', 'artist-credit': [{'name': '범진'}], 'length': 251000},
+    {'title': '그대라면', 'artist-credit': [{'name': '범진'}], 'length': 251000},
+    {'title': '그대라면', 'artist-credit': [{'name': '범진'}], 'length': 251000},
+    {'title': '오아시스', 'artist-credit': [{'name': '정동하'}], 'length': None},
+]}
+
+
+class MusicBrainzTest(unittest.TestCase):
+    def rows(self):
+        from discover import fetch_musicbrainz_kr
+        return fetch_musicbrainz_kr({'from': '2026-09-03', 'to': '2026-09-10'}, opener_for(MB))
+
+    def test_drops_instrumentals_and_duplicates(self):
+        rows = self.rows()
+
+        self.assertEqual([r['title'] for r in rows], ['Flame', '그대라면', '오아시스'])
+
+    def test_carries_expected_length_for_verification(self):
+        rows = self.rows()
+
+        self.assertEqual(rows[0]['expected_sec'], 187)
+        self.assertIsNone(rows[2]['expected_sec'], '길이를 모르는 곡도 버리지 않는다')
+
+    def test_fetch_failure_is_reported(self):
+        from discover import fetch_musicbrainz_kr
+        def broken(*_a, **_k):
+            raise OSError('down')
+        with self.assertRaisesRegex(DiscoveryError, '^SOURCE_FETCH_FAILED$'):
+            fetch_musicbrainz_kr({'from': 'a', 'to': 'b'}, broken)
+
+
+class DurationVerificationTest(unittest.TestCase):
+    """MusicBrainz가 주는 곡 길이로 동명이인·풀앨범을 거른다."""
+
+    def test_rejects_results_far_from_the_expected_length(self):
+        # 실측: 'Giant' 검색이 1972년 동명이인 곡(2281초)을 물어왔다.
+        payload = {'entries': [{'id': 'aaaaaaaaaaa', 'duration': 2281},
+                               {'id': 'bbbbbbbbbbb', 'duration': 240}]}
+
+        self.assertEqual(find_youtube_id('Giant', 'x', runner_for(payload), expected_sec=240),
+                         'bbbbbbbbbbb')
+
+    def test_accepts_small_differences(self):
+        payload = {'entries': [{'id': 'abcdefghijk', 'duration': 283}]}
+
+        self.assertEqual(find_youtube_id('전건호', '병원에 가다', runner_for(payload), expected_sec=281),
+                         'abcdefghijk')
+
+    def test_no_expected_length_means_no_duration_check(self):
+        payload = {'entries': [{'id': 'abcdefghijk', 'duration': 500}]}
+
+        self.assertEqual(find_youtube_id('a', 'b', runner_for(payload)), 'abcdefghijk')
+
+
+class MusicBrainzCollectTest(unittest.TestCase):
+    def test_uses_the_given_window(self):
+        with patch.object(discover, 'fetch_musicbrainz_kr', return_value=[
+                {'artist': 'A', 'title': 'One', 'expected_sec': 200}]) as fetch, \
+             patch.object(discover, 'find_youtube_id', return_value='aaaaaaaaaaa'):
+            tracks, scanned = collect('musicbrainz_kr', None, 10,
+                                      window={'from': '2026-09-03', 'to': '2026-09-10'})
+
+        self.assertEqual(fetch.call_args[0][0], {'from': '2026-09-03', 'to': '2026-09-10'})
+        self.assertEqual(len(tracks), 1)
+        self.assertEqual(scanned, 10, '날짜 창은 다 본 것으로 보고한다')
+
+    def test_no_window_means_backfill_is_finished(self):
+        # 서버가 백필 하한에 닿으면 창을 주지 않는다.
+        self.assertEqual(collect('musicbrainz_kr', None, 10, window=None), ([], 0))

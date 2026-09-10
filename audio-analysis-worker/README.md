@@ -133,6 +133,11 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 | --- | --- |
 | `apple_kr` | Apple 인기곡 차트의 아티스트·곡명을 YouTube에서 찾아 등록 |
 | `soundcloud` | 검색어로 찾아 길이로 거른 뒤 재생 수 상위 N개 등록 |
+| `musicbrainz_kr` | 한국 발매 곡을 날짜 구간으로 조회해 YouTube에서 찾아 등록 |
+
+`musicbrainz_kr`은 곡(recording) 단위로 조회한다. 릴리스(앨범) 단위로 검색하면 YouTube에서 풀앨범 업로드가 잡힌다. MusicBrainz가 주는 곡 길이로 매칭 결과를 검증해 동명이인과 앨범 전체를 거른다.
+
+날짜 소스의 진도는 순위가 아니라 **절대 날짜**로 남긴다. 상대적인 "며칠 전"으로 잡으면 한동안 버튼을 안 누른 사이에 나온 곡이 통째로 빠진다. 누르면 최신 쪽 공백을 먼저 메우고, 다 따라잡은 뒤 과거로 12개월까지 내려간다.
 
 곡 목록 조회와 플랫폼 검색을 워커가 맡는 이유는 서버에 yt-dlp가 없고, Railway 공용 IP에서 검색을 반복하면 막힐 수 있어서다.
 

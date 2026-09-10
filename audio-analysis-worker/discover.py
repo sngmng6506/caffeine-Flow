@@ -14,10 +14,17 @@ unique로 무시한다.
 import json
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 APPLE_FEED = 'https://rss.applemarketingtools.com/api/v2/{country}/music/most-played/{limit}/songs.json'
+# 곡(recording) 단위로 조회한다. 릴리스(앨범) 단위로 검색하면 YouTube에서 풀앨범
+# 업로드가 잡힌다 — 실측에서 8곡 중 3곡이 앨범 전체였다.
+MUSICBRAINZ_URL = 'https://musicbrainz.org/ws/2/recording'
+# 매칭한 영상 길이가 이만큼 넘게 다르면 다른 곡으로 본다. MusicBrainz가 곡 길이를
+# 주므로 Apple 소스에는 없는 검증을 할 수 있다.
+DURATION_TOLERANCE_SEC = 20
 APPLE_COUNTRY = 'kr'
 USER_AGENT = 'caffeine-flow-audio-worker/1.0'
 FETCH_TIMEOUT = 30
@@ -50,6 +57,36 @@ def fetch_apple_chart(limit, country=APPLE_COUNTRY, opener=urllib.request.urlope
             for item in feed.get('results', []) if item.get('name')]
 
 
+def fetch_musicbrainz_kr(window, opener=urllib.request.urlopen):
+    """한국 발매 곡을 날짜 구간으로 가져온다. 곡 길이도 함께 준다."""
+    params = urllib.parse.urlencode({
+        'query': f"country:KR AND firstreleasedate:[{window['from']} TO {window['to']}]",
+        'fmt': 'json', 'limit': 100,
+    })
+    request = urllib.request.Request(f'{MUSICBRAINZ_URL}?{params}',
+                                     headers={'User-Agent': USER_AGENT})
+    try:
+        with opener(request, timeout=FETCH_TIMEOUT) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+    except Exception as error:
+        raise DiscoveryError('SOURCE_FETCH_FAILED') from error
+
+    rows, seen = [], set()
+    for item in payload.get('recordings', []):
+        title = item.get('title') or ''
+        artist = ((item.get('artist-credit') or [{}])[0].get('name') or '')
+        # 인스트루멘털은 같은 곡의 다른 버전이라 분석 예산만 쓴다.
+        if not title or '(inst.)' in title.lower():
+            continue
+        if (artist, title) in seen:
+            continue
+        seen.add((artist, title))
+        length = item.get('length')
+        rows.append({'artist': artist, 'title': title,
+                     'expected_sec': (length // 1000) if length else None})
+    return rows
+
+
 def _yt_dlp(args, runner=subprocess.run, timeout=SEARCH_TIMEOUT):
     command = [sys.executable, '-m', 'yt_dlp', '--ignore-config', '--no-cache-dir',
                '--quiet', '--no-warnings', '-J', '--flat-playlist', *args]
@@ -66,12 +103,17 @@ def _yt_dlp(args, runner=subprocess.run, timeout=SEARCH_TIMEOUT):
         raise DiscoveryError('SEARCH_FAILED') from error
 
 
-def find_youtube_id(artist, title, runner=subprocess.run):
-    """곡 하나를 YouTube에서 찾는다. 못 찾으면 None."""
+def find_youtube_id(artist, title, runner=subprocess.run, expected_sec=None):
+    """곡 하나를 YouTube에서 찾는다. 못 찾으면 None.
+
+    기대 길이를 알면 그것과 크게 다른 결과를 버린다. 동명이인이나 풀앨범 업로드를
+    거르는 유일한 장치다.
+    """
     query = f'{artist} {title}'.strip()
     if not query:
         return None
-    entries = _yt_dlp([f'ytsearch1:{query}'], runner).get('entries') or []
+    entries = _yt_dlp([f'ytsearch3:{query}' if expected_sec else f'ytsearch1:{query}'],
+                      runner).get('entries') or []
     for entry in entries:
         video_id = entry.get('id')
         if not video_id or len(video_id) != 11:
@@ -79,6 +121,8 @@ def find_youtube_id(artist, title, runner=subprocess.run):
         # 길이를 아는 경우에만 거른다. 검색 결과가 길이를 안 주는 경우가 있다.
         duration = entry.get('duration')
         if duration is not None and not MIN_DURATION <= duration <= MAX_DURATION:
+            continue
+        if expected_sec and duration is not None and abs(duration - expected_sec) > DURATION_TOLERANCE_SEC:
             continue
         return video_id
     return None
@@ -114,7 +158,8 @@ def search_soundcloud(query, limit, runner=subprocess.run):
 APPLE_FEED_MAX = 100
 
 
-def collect(source, query, limit, offset=0, runner=subprocess.run, opener=urllib.request.urlopen):
+def collect(source, query, limit, offset=0, window=None,
+            runner=subprocess.run, opener=urllib.request.urlopen):
     """요청 하나를 처리해 분석 큐에 넣을 곡 목록과 실제로 훑은 개수를 돌려준다.
 
     `offset`부터 `limit`개를 본다. 돌려주는 `scanned`가 `limit`보다 작으면 소스를
@@ -122,6 +167,20 @@ def collect(source, query, limit, offset=0, runner=subprocess.run, opener=urllib
     """
     offset = max(0, int(offset))
     limit = int(limit)
+    if source == 'musicbrainz_kr':
+        if not window:
+            # 서버가 백필 하한에 닿았다고 판단하면 창을 주지 않는다.
+            return [], 0
+        rows = fetch_musicbrainz_kr(window, opener=opener)[:limit]
+        tracks = []
+        for item in rows:
+            video_id = find_youtube_id(item['artist'], item['title'], runner, item['expected_sec'])
+            if video_id:
+                tracks.append({'platform': 'youtube', 'track_key': video_id,
+                               'title': item['title'][:500],
+                               'artist_name': (item['artist'] or 'unknown')[:200]})
+        # 날짜 창은 순위처럼 이어 붙이지 않는다. 창을 다 본 것이므로 limit을 채운 것으로 본다.
+        return tracks, limit
     if source == 'soundcloud':
         candidates = search_soundcloud(query, offset + limit, runner)
     elif source == 'apple_kr':
