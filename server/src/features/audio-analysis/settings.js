@@ -36,12 +36,13 @@ function validate(input) {
   if (raw !== undefined && raw !== null && typeof raw !== 'string') {
     return { error: '프롬프트는 문자열이어야 합니다' };
   }
-  const prompt = typeof raw === 'string' ? raw.trim() : null;
-  // 빈 문자열은 "기본 템플릿으로 되돌린다"는 뜻이다.
+  // 필드를 아예 보내지 않으면 프롬프트를 건드리지 않는다. 스위치만 바꾸는 요청이
+  // 저장해둔 문장을 지우면 안 된다. 빈 문자열·null은 "기본 문장으로 되돌린다"는 뜻이다.
+  const prompt = raw === undefined ? undefined : ((typeof raw === 'string' && raw.trim()) || null);
   if (prompt && prompt.length > PROMPT_MAX) {
     return { error: `프롬프트는 ${PROMPT_MAX}자를 넘을 수 없습니다` };
   }
-  return { value: { audio_llm_enabled: input.audio_llm_enabled, audio_llm_prompt: prompt || null } };
+  return { value: { audio_llm_enabled: input.audio_llm_enabled, audio_llm_prompt: prompt } };
 }
 
 async function update(input) {
@@ -54,9 +55,11 @@ async function update(input) {
       await trx('audio_prompt_revisions').insert({ sha256: sha256(prompt), body: prompt })
         .onConflict('sha256').ignore();
     }
-    const row = { id: 1, audio_llm_enabled: enabled, audio_llm_prompt: prompt, updated_at: trx.fn.now() };
-    await trx('audio_pipeline_settings').insert(row).onConflict('id')
-      .merge({ audio_llm_enabled: enabled, audio_llm_prompt: prompt, updated_at: trx.fn.now() });
+    const changed = prompt === undefined
+      ? { audio_llm_enabled: enabled, updated_at: trx.fn.now() }
+      : { audio_llm_enabled: enabled, audio_llm_prompt: prompt, updated_at: trx.fn.now() };
+    await trx('audio_pipeline_settings').insert({ id: 1, audio_llm_prompt: null, ...changed })
+      .onConflict('id').merge(changed);
     return { value: normalize(await trx('audio_pipeline_settings').where({ id: 1 }).first()) };
   });
 }

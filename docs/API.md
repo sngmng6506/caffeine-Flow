@@ -185,13 +185,13 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/admin/audio-labels/:id/runs` | 🛡 | 해당 곡의 최근 원본 이력 ID·시각 최대 100건 |
 | GET | `/admin/audio-runs/:id` | 🛡 | 실행별 전체 원본 JSON. lease 토큰 제외, 수정 API 없음 |
 | POST | `/admin/audio-labels/:id/requeue` | 🛡 | generation을 비교해 실패 재시도·완료곡 재분석 등록. 처리 중은 409, Spotify는 400 |
-| POST | `/admin/audio-labels/requeue-rejected` | 🛡 | 사람이 틀림으로 표시한 곡을 한 번에 재분석 큐에 등록. 처리 중과 자동 분석 미지원 플랫폼은 건너뜀. `{requeued}` 반환 |
+| POST | `/admin/audio-labels/requeue-rejected` | 🛡 | 사람이 틀림으로 표시한 곡을 한 번에 재분석 큐에 등록. 처리 중과 자동 분석 미지원 플랫폼은 건너뜀. `{dry_run:true}`면 큐를 건드리지 않고 대상 건수만 반환. `{eligible, requeued}` 반환 |
 | POST | `/admin/audio-labels/:id/renormalize` | 🛡 | generation, analysis_id, analysis_revision을 비교해 원본에 현재 택소노미 적용. 원본·사람 라벨 보존 |
 | PUT | `/admin/audio-labels/:id/review` | 🛡 | 작업 ID에 해당하는 곡의 라벨 확인·수정. 매장 정책 판단 불필요 |
 | GET | `/admin/audio-discoveries` | 🛡 | 최근 최신곡 수집 요청 목록 |
 | POST | `/admin/audio-discoveries` | 🛡 | 수집 요청. body는 `{ source, query?, limit? }`. 같은 소스가 대기 중이면 기존 요청을 200으로 돌려준다 |
 | GET | `/admin/audio-settings` | 🛡 | 3단 Audio LLM 스위치와 프롬프트 조회. `audio_llm_prompt_version`은 기본 `audio-llm-1` 또는 `custom-<sha256 앞 12자>` |
-| PUT | `/admin/audio-settings` | 🛡 | 스위치·프롬프트 변경. body는 `{ audio_llm_enabled: boolean, audio_llm_prompt?: string }`. 빈 문자열·null은 워커 기본 문장으로 되돌림, 4000자 제한 |
+| PUT | `/admin/audio-settings` | 🛡 | 스위치·프롬프트 변경. body는 `{ audio_llm_enabled: boolean, audio_llm_prompt?: string }`. 필드를 생략하면 저장된 프롬프트를 유지하고, 빈 문자열·null이면 워커 기본 문장으로 되돌림. 4000자 제한 |
 | GET | `/admin/audio-prompt-revisions` | 🛡 | 3단 프롬프트 수정 이력 최근 20건. 추가만 되며 수정·삭제는 DB trigger가 막음 |
 
 - 곡별 최신 분석의 `maest_summary`에는 상위 10개(mean·max)와 소비 프롬프트용 `prompt_styles`가 들어간다. `prompt_styles`는 1위 점수의 0.5배 이상인 스타일 최대 5개이며 `prompt_style_calibrated`는 항상 false다.

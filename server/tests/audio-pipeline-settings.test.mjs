@@ -46,6 +46,20 @@ describe('자동 분석 판정', () => {
     expect((await db('audio_prompt_revisions').where({ body }).first())).toBeTruthy();
   });
 
+  it('스위치만 바꾸는 요청은 저장한 프롬프트를 건드리지 않는다', async () => {
+    // 필드를 안 보냈다고 지워버리면, Lab에서 스위치를 끄는 것만으로 프롬프트가 날아간다.
+    const body = `보존 확인 ${Date.now()}`;
+    await request(app).put('/api/v1/admin/audio-settings')
+      .set(admin()).send({ audio_llm_enabled: true, audio_llm_prompt: body });
+
+    const toggled = await request(app).put('/api/v1/admin/audio-settings')
+      .set(admin()).send({ audio_llm_enabled: false });
+
+    expect(toggled.status).toBe(200);
+    expect(toggled.body.audio_llm_enabled).toBe(false);
+    expect(toggled.body.audio_llm_prompt).toBe(body, '보내지 않은 필드는 그대로 둔다');
+  });
+
   it('프롬프트 이력은 고치거나 지울 수 없다', async () => {
     const body = `불변 확인 ${Date.now()}`;
     await request(app).put('/api/v1/admin/audio-settings')
@@ -59,6 +73,16 @@ describe('자동 분석 판정', () => {
       .set(admin()).send({ audio_llm_enabled: true, audio_llm_prompt: 'ㄱ'.repeat(4001) });
     expect(response.status).toBe(400);
     expect(response.body.error).toMatch(/4000/);
+  });
+
+  it('일괄 재분석은 먼저 대상 건수만 세어 준다', async () => {
+    // 곡마다 외부 유료 API를 다시 부르므로, 몇 곡인지 모르고 누르게 하면 안 된다.
+    const counted = await request(app).post('/api/v1/admin/audio-labels/requeue-rejected')
+      .set(admin()).send({ dry_run: true });
+
+    expect(counted.status).toBe(200);
+    expect(counted.body.requeued).toBe(0, 'dry run은 큐를 건드리지 않는다');
+    expect(Number.isSafeInteger(counted.body.eligible)).toBe(true);
   });
 
   it('틀림 보기를 조회 조건으로 받는다', async () => {

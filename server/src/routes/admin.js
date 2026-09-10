@@ -458,8 +458,9 @@ router.put('/audio-settings', requireAdmin, async (req, res) => {
 });
 // 프롬프트를 고친 뒤 옛 서술이 어떤 문장으로 만들어졌는지 되짚는다. 이력은 추가만 된다.
 // 틀림으로 표시한 곡을 한 번에 재분석 큐에 넣는다. 프롬프트를 고친 뒤 쓰는 경로다.
-router.post('/audio-labels/requeue-rejected', requireAdmin, async (_req, res) => {
-  res.json(await require('../features/audio-analysis/jobs').requeueRejected());
+router.post('/audio-labels/requeue-rejected', requireAdmin, async (req, res) => {
+  const dryRun = req.body?.dry_run === true;
+  res.json(await require('../features/audio-analysis/jobs').requeueRejected({ dryRun }));
 });
 router.get('/audio-prompt-revisions', requireAdmin, async (_req, res) => {
   res.json({ revisions: await require('../features/audio-analysis/settings').revisions() });

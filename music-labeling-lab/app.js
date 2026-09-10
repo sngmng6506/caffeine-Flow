@@ -68,8 +68,7 @@ async function saveAudioSettings(event) {
   const toggle = event.target;
   const wanted = toggle.checked;
   toggle.disabled = true;
-  const { ok, data } = await api('PUT', '/admin/audio-settings',
-    { audio_llm_enabled: wanted, audio_llm_prompt: $('promptBody').value });
+  const { ok, data } = await api('PUT', '/admin/audio-settings', { audio_llm_enabled: wanted });
   toggle.checked = ok ? data.audio_llm_enabled : !wanted;
   toggle.disabled = false;
   $('message').hidden = false;
@@ -124,13 +123,20 @@ function resetPrompt() {
 async function requeueRejected() {
   const button = $('requeueRejected');
   button.disabled = true;
-  const { ok, data } = await api('POST', '/admin/audio-labels/requeue-rejected');
-  button.disabled = false;
-  if (!ok) { promptNote(data.error || '재분석을 요청하지 못했습니다.'); return; }
-  promptNote(data.requeued
-    ? `${data.requeued}곡을 재분석 큐에 넣었습니다. 워커가 순서대로 처리합니다.`
-    : '재분석할 곡이 없습니다.');
-  await loadPage(0);
+  try {
+    const counted = await api('POST', '/admin/audio-labels/requeue-rejected', { dry_run: true });
+    if (!counted.ok) { promptNote(counted.data.error || '대상을 세지 못했습니다.'); return; }
+    if (!counted.data.eligible) { promptNote('재분석할 곡이 없습니다.'); return; }
+    if (!window.confirm(`${counted.data.eligible}곡을 다시 분석합니다.\n`
+      + '곡마다 오디오 구간을 외부 LLM에 다시 보내므로 요금이 듭니다. 계속할까요?')) {
+      promptNote('재분석을 취소했습니다.');
+      return;
+    }
+    const { ok, data } = await api('POST', '/admin/audio-labels/requeue-rejected');
+    if (!ok) { promptNote(data.error || '재분석을 요청하지 못했습니다.'); return; }
+    promptNote(`${data.requeued}곡을 재분석 큐에 넣었습니다. 워커가 순서대로 처리합니다.`);
+    await loadPage(0);
+  } finally { button.disabled = false; }
 }
 
 function escapeHtml(value) {
