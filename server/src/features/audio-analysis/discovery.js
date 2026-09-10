@@ -48,7 +48,10 @@ function claim() {
       lease_until: trx.raw("now() + (? * interval '1 minute')", [DISCOVERY_LEASE_MINUTES]),
       updated_at: trx.fn.now(),
     }).returning('*');
-    return claimed;
+    // 어디서부터 가져올지 알려준다. 같은 상위 N을 반복해서 훑지 않기 위해서다.
+    const cursor = await trx('music_source_cursors')
+      .where({ source: claimed.source, query_key: claimed.query || '' }).first();
+    return { ...claimed, offset: cursor ? cursor.next_offset : 0 };
   });
 }
 
@@ -58,18 +61,33 @@ async function locked(trx, id, token) {
   return row;
 }
 
-// 워커가 찾은 곡을 분석 큐에 넣는다. 중복은 jobs.enqueue의 unique가 무시한다.
-function complete(id, token, tracks) {
+// 워커가 찾은 곡을 분석 큐에 넣고 소스 진도를 옮긴다. 중복은 jobs.enqueue가 무시한다.
+function complete(id, token, tracks, meta = {}) {
   return db.transaction(async (trx) => {
-    await locked(trx, id, token);
+    const request = await locked(trx, id, token);
+    let added = 0;
     for (const track of tracks) {
-      await jobs.enqueue({
+      const inserted = await jobs.enqueue({
         platform: track.platform, video_id: track.track_key,
         title: track.title, channel_title: track.artist_name,
       }, trx);
+      if (inserted) added += 1;
     }
+
+    // 다음 요청은 이번에 훑은 구간 다음부터 본다. 소스가 바닥나면 처음으로 돌아가
+    // 그 사이 바뀐 차트를 다시 본다. offset은 워커가 실제로 사용한 값을 신뢰한다.
+    const positive = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
+    const usedOffset = positive(meta.offset) ?? 0;
+    const scanned = positive(meta.scanned) ?? tracks.length;
+    const nextOffset = scanned < request.requested_limit ? 0 : usedOffset + request.requested_limit;
+    await trx('music_source_cursors')
+      .insert({ source: request.source, query_key: request.query || '',
+        next_offset: nextOffset, updated_at: trx.fn.now() })
+      .onConflict(['source', 'query_key'])
+      .merge({ next_offset: nextOffset, updated_at: trx.fn.now() });
+
     const [row] = await trx('music_source_discoveries').where({ id }).update({
-      status: 'done', found_count: tracks.length, enqueued_count: tracks.length,
+      status: 'done', found_count: tracks.length, enqueued_count: added,
       lease_token: null, lease_until: null, error_code: null, updated_at: trx.fn.now(),
     }).returning('*');
     return row;

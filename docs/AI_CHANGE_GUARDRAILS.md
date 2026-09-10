@@ -84,7 +84,7 @@ server/src/routes/audio-analysis.js
 server/src/features/audio-analysis/runs.js
 ```
 
-- 최신곡 수집은 워커가 곡 목록과 플랫폼 검색을 맡는다. 서버에서 검색하지 않는다. 수집 커서를 두지 않으며 중복은 `(platform, track_key)` unique로 무시한다.
+- 최신곡 수집은 워커가 곡 목록과 플랫폼 검색을 맡는다. 서버에서 검색하지 않는다. 소스별 진도는 `music_source_cursors`가 단일 기준이며 끝까지 보면 0으로 돌아간다. 곡 중복은 `(platform, track_key)` unique로 무시하고 기존 작업 상태를 건드리지 않는다.
 - 길이 한도를 벗어난 소스는 다운로드 전에 `SOURCE_UNSUPPORTED`로 영구 실패시킨다. `DOWNLOAD_FAILED`는 재시도가 끝나지 않는 코드라, 영원히 성공할 수 없는 소스에 쓰면 6시간마다 반복된다.
 - 자동 워커는 사용자가 지정한 YouTube·SoundCloud 신청곡 URL을 임시 다운로드한다. `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않는다. 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.

@@ -129,12 +129,13 @@ class DiscoveryLoopTest(unittest.TestCase):
             return {'status': 'done'}
 
         with patch.object(remote_worker, 'api', side_effect=api):
-            handled = remote_worker.run_discovery(None, collector=lambda *a: [
-                {'platform': 'youtube', 'track_key': 'abcdefghijk', 'title': 'x', 'artist_name': 'y'}])
+            handled = remote_worker.run_discovery(None, collector=lambda *a: (
+                [{'platform': 'youtube', 'track_key': 'abcdefghijk', 'title': 'x', 'artist_name': 'y'}], 5))
 
         self.assertTrue(handled)
         self.assertIn('/discoveries/d1/complete', posted)
         self.assertEqual(posted['/discoveries/d1/complete']['tracks'][0]['track_key'], 'abcdefghijk')
+        self.assertEqual(posted['/discoveries/d1/complete']['scanned'], 5, '훑은 개수를 함께 보고한다')
 
     def test_collection_failure_is_reported_not_raised(self):
         import remote_worker

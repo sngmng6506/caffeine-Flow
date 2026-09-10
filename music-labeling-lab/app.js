@@ -112,7 +112,7 @@ async function requestCollection() {
   }
   $('message').textContent = data.already
     ? '이미 수집이 대기 중입니다. 끝나면 목록에 새 곡이 나타납니다.'
-    : '최신곡 수집을 요청했습니다. 워커가 처리하는 동안 다른 작업을 계속해도 됩니다.';
+    : '최신곡 수집을 요청했습니다. 다음 구간부터 가져오며, 끝나면 새로 등록된 곡 수가 목록에 반영됩니다.';
 }
 
 function escapeHtml(value) {

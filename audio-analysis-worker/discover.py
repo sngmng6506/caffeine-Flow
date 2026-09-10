@@ -3,8 +3,12 @@
 곡 목록 조회와 플랫폼 검색을 워커가 맡는 이유는 두 가지다. 서버에 yt-dlp가 없고,
 Railway 공용 IP에서 검색을 반복하면 막힐 수 있다.
 
-중복은 걸러내지 않는다. 서버 `jobs.enqueue`가 (platform, track_key) unique로
-무시하므로, 여기서 커서를 들고 있으면 오히려 차트에 뒤늦게 오른 곡을 놓친다.
+곡 중복은 여기서 걸러내지 않는다. 서버 `jobs.enqueue`가 (platform, track_key)
+unique로 무시한다.
+
+대신 서버가 소스별 진도(offset)를 들고 있어, 버튼을 누를 때마다 같은 상위 N을
+다시 훑지 않고 다음 구간을 본다. 끝까지 보면 처음으로 돌아가므로 차트에 뒤늦게
+오른 곡도 다음 바퀴에서 잡힌다.
 """
 
 import json
@@ -106,20 +110,33 @@ def search_soundcloud(query, limit, runner=subprocess.run):
     return [{k: v for k, v in track.items() if k != 'plays'} for track in usable[:int(limit)]]
 
 
-def collect(source, query, limit, runner=subprocess.run, opener=urllib.request.urlopen):
-    """수집 요청 하나를 처리해 분석 큐에 넣을 곡 목록을 만든다."""
+# Apple 차트가 한 번에 주는 최대 곡 수. 그 이상은 서버가 500을 준다.
+APPLE_FEED_MAX = 100
+
+
+def collect(source, query, limit, offset=0, runner=subprocess.run, opener=urllib.request.urlopen):
+    """요청 하나를 처리해 분석 큐에 넣을 곡 목록과 실제로 훑은 개수를 돌려준다.
+
+    `offset`부터 `limit`개를 본다. 돌려주는 `scanned`가 `limit`보다 작으면 소스를
+    끝까지 본 것이라, 서버가 다음 요청을 처음부터 다시 시작한다.
+    """
+    offset = max(0, int(offset))
+    limit = int(limit)
     if source == 'soundcloud':
-        return search_soundcloud(query, limit, runner)
-    if source != 'apple_kr':
+        candidates = search_soundcloud(query, offset + limit, runner)
+    elif source == 'apple_kr':
+        chart = fetch_apple_chart(APPLE_FEED_MAX, opener=opener)
+        candidates = chart[offset:offset + limit]
+        tracks = []
+        for item in candidates:
+            video_id = find_youtube_id(item['artist'], item['title'], runner)
+            if video_id:
+                tracks.append({'platform': 'youtube', 'track_key': video_id,
+                               'title': item['title'][:500],
+                               'artist_name': (item['artist'] or 'unknown')[:200]})
+        return tracks, len(candidates)
+    else:
         raise DiscoveryError('SOURCE_UNSUPPORTED')
 
-    tracks = []
-    for item in fetch_apple_chart(limit, opener=opener):
-        video_id = find_youtube_id(item['artist'], item['title'], runner)
-        if not video_id:
-            continue
-        tracks.append({'platform': 'youtube', 'track_key': video_id,
-                       'title': item['title'][:500], 'artist_name': (item['artist'] or 'unknown')[:200]})
-        if len(tracks) >= int(limit):
-            break
-    return tracks
+    window = candidates[offset:offset + limit]
+    return window, len(window)

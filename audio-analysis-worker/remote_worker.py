@@ -73,16 +73,19 @@ def run_discovery(config, collector=collect):
         return False
     log('info', 'discovery_claimed', discovery_id=request['id'], source=request['source'])
     try:
-        tracks = collector(request['source'], request.get('query'), request['requested_limit'])
+        tracks, scanned = collector(request['source'], request.get('query'),
+                                    request['requested_limit'], request.get('offset', 0))
     except DiscoveryError as error:
         api(config, f"/discoveries/{request['id']}/fail",
             {'lease_token': request['lease_token'], 'error_code': str(error)})
         log('warning', 'discovery_failed', discovery_id=request['id'], error_code=str(error))
         return True
     result = api(config, f"/discoveries/{request['id']}/complete",
-                 {'lease_token': request['lease_token'], 'tracks': tracks})
-    log('info', 'discovery_finished', discovery_id=request['id'],
-        source=request['source'], found=len(tracks))
+                 {'lease_token': request['lease_token'], 'tracks': tracks,
+                  'offset': request.get('offset', 0), 'scanned': scanned})
+    log('info', 'discovery_finished', discovery_id=request['id'], source=request['source'],
+        offset=request.get('offset', 0), scanned=scanned, found=len(tracks),
+        added=(result or {}).get('enqueued_count'))
     return True
 
 

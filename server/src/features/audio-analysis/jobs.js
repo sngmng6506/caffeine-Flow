@@ -9,12 +9,15 @@ const conflict = () => Object.assign(new Error('작업이 만료되었거나 이
 
 async function enqueue(rec, connection = db) {
   const supported = ['youtube', 'soundcloud'].includes(rec.platform);
-  await connection('music_audio_jobs').insert({
+  // 이미 있는 곡은 무시한다. 상태가 completed든 failed든 건드리지 않는다.
+  // 새로 들어갔는지 돌려주어 호출부가 진도를 셀 수 있게 한다.
+  const inserted = await connection('music_audio_jobs').insert({
     platform: rec.platform, track_key: rec.video_id, title: rec.title,
     artist_name: (rec.channel_title || 'unknown').slice(0, 200),
     status: supported ? 'queued' : 'unsupported',
     error_code: supported ? null : 'PLATFORM_UNSUPPORTED',
-  }).onConflict(['platform', 'track_key']).ignore();
+  }).onConflict(['platform', 'track_key']).ignore().returning('id');
+  return inserted.length > 0;
 }
 
 function claim() {

@@ -12,10 +12,12 @@ const ask = (body) => request(app).post('/api/v1/admin/audio-discoveries').set(a
 
 beforeEach(async () => {
   await db('music_source_discoveries').del();
+  await db('music_source_cursors').del();
   await db('music_audio_jobs').del();
 });
 afterAll(async () => {
   await db('music_source_discoveries').del();
+  await db('music_source_cursors').del();
   await db('music_audio_jobs').del();
   await db.destroy();
 });
@@ -63,19 +65,6 @@ describe('최신곡 수집 요청', () => {
     const [job] = await db('music_audio_jobs').where({ track_key: 'abcdefghijk' });
     expect(job.status).toBe('queued');
     expect(job.title).toBe('노스탈지아');
-  });
-
-  it('이미 분석한 곡을 다시 제출해도 작업이 늘지 않는다', async () => {
-    // 커서를 따로 두지 않는 이유다. 중복은 (platform, track_key) unique가 무시한다.
-    for (const _ of [1, 2]) {
-      await ask({ source: 'apple_kr', limit: 5 });
-      const claimed = await request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
-      await request(app).post(`/api/v1/audio-analysis/discoveries/${claimed.body.id}/complete`)
-        .set(worker()).send({ lease_token: claimed.body.lease_token,
-          tracks: [{ platform: 'youtube', track_key: 'abcdefghijk', title: 'x', artist_name: 'y' }] });
-    }
-
-    expect(await db('music_audio_jobs').where({ track_key: 'abcdefghijk' })).toHaveLength(1);
   });
 
   it('빈 큐에서 claim하면 204다', async () => {

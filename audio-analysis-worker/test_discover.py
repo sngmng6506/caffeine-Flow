@@ -85,15 +85,36 @@ class SoundCloudTest(unittest.TestCase):
 
 
 class CollectTest(unittest.TestCase):
+    def test_offset_moves_the_window(self):
+        chart = [{'artist': str(i), 'title': str(i), 'released_at': None} for i in range(10)]
+        with patch.object(discover, 'fetch_apple_chart', return_value=chart), \
+             patch.object(discover, 'find_youtube_id', side_effect=lambda a, t, r: f'id{a}'.ljust(11, 'x')):
+            first, scanned_first = collect('apple_kr', None, 3, offset=0)
+            second, scanned_second = collect('apple_kr', None, 3, offset=3)
+
+        self.assertEqual([t['title'] for t in first], ['0', '1', '2'])
+        self.assertEqual([t['title'] for t in second], ['3', '4', '5'], '다음 요청은 다음 구간을 본다')
+        self.assertEqual((scanned_first, scanned_second), (3, 3))
+
+    def test_scanned_shrinks_at_the_end_of_the_source(self):
+        # scanned < limit이면 서버가 다음 요청을 처음부터 다시 시작한다.
+        chart = [{'artist': str(i), 'title': str(i), 'released_at': None} for i in range(5)]
+        with patch.object(discover, 'fetch_apple_chart', return_value=chart), \
+             patch.object(discover, 'find_youtube_id', return_value='aaaaaaaaaaa'):
+            _, scanned = collect('apple_kr', None, 10, offset=3)
+
+        self.assertEqual(scanned, 2)
+
     def test_apple_source_resolves_each_track(self):
         with patch.object(discover, 'fetch_apple_chart', return_value=[
                 {'artist': 'A', 'title': 'One', 'released_at': '2026-09-01'},
                 {'artist': 'B', 'title': 'Two', 'released_at': '2026-09-02'}]), \
              patch.object(discover, 'find_youtube_id', side_effect=['aaaaaaaaaaa', None]):
-            tracks = collect('apple_kr', None, 10)
+            tracks, scanned = collect('apple_kr', None, 10)
 
         # 매칭에 실패한 곡은 조용히 빠진다. 큐에 넣을 수 없으니 실패로 볼 이유가 없다.
         self.assertEqual(len(tracks), 1)
+        self.assertEqual(scanned, 2, '훑은 개수는 매칭 성공 여부와 별개다')
         self.assertEqual(tracks[0], {'platform': 'youtube', 'track_key': 'aaaaaaaaaaa',
                                      'title': 'One', 'artist_name': 'A'})
 
@@ -101,7 +122,7 @@ class CollectTest(unittest.TestCase):
         with patch.object(discover, 'fetch_apple_chart', return_value=[
                 {'artist': str(i), 'title': str(i), 'released_at': None} for i in range(10)]), \
              patch.object(discover, 'find_youtube_id', return_value='aaaaaaaaaaa'):
-            self.assertEqual(len(collect('apple_kr', None, 3)), 3)
+            self.assertEqual(len(collect('apple_kr', None, 3)[0]), 3)
 
     def test_unknown_source_is_rejected(self):
         with self.assertRaisesRegex(DiscoveryError, '^SOURCE_UNSUPPORTED$'):
