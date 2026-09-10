@@ -9,6 +9,9 @@ const { findForTrack } = require('./track-analysis');
 // 필터를 멈추지 않고 제목·아티스트만으로 판단한다. 여기서 던지면 fail-closed 정책상
 // 곡이 거절되므로, 분석 조회 실패가 손님의 신청을 막는 일이 생긴다.
 async function lookupAnalysis(track, context) {
+  // 메시지 구성 자체가 실패할 입력이다. 조회를 시도하면 TypeError가 아래 catch에
+  // 걸려 실제로는 일어나지 않은 조회 실패가 오류 채널에 남는다.
+  if (!track?.platform) return null;
   try {
     return await findForTrack(track.platform, track.videoId || track.trackKey);
   } catch (error) {

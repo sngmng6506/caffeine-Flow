@@ -142,17 +142,26 @@ function requeue(id, generation) {
 // 틀림으로 표시한 곡을 한 번에 다시 큐에 넣는다. 프롬프트를 고친 뒤 그 곡들만
 // 다시 돌리는 것이 이 기능의 목적이라, 대상은 사람이 틀렸다고 표시한 것으로 한정한다.
 // 처리 중인 곡과 자동 분석을 지원하지 않는 플랫폼은 건너뛴다.
+// 조립을 따로 둔 이유는 DB 없이 검사하기 위해서다. 잘못된 빌더 호출은 통합
+// 테스트에서만 드러나는데, 그건 Postgres가 있어야 돌아 로컬에서 건너뛰기 쉽다.
+// 잠그는 것은 작업 행뿐이다. 인자를 빼면 조인한 라벨 행까지 FOR UPDATE에 걸려,
+// 일괄 재분석이 도는 동안 사람 판정 저장이 막힌다(labels.review가
+// music_track_annotations를 forUpdate로 잡는다).
+function rejectedJobsQuery(connection) {
+  return connection({ job: 'music_audio_jobs' })
+    .join({ annotation: 'music_track_annotations' }, function () {
+      this.on('annotation.platform', 'job.platform').andOn('annotation.track_key', 'job.track_key');
+    })
+    .whereIn('annotation.human_review_status', ['inaccurate', 'unclear'])
+    .whereNot('job.status', 'processing')
+    .whereIn('job.platform', ['youtube', 'soundcloud'])
+    .forUpdate('job')
+    .select('job.id', 'job.generation');
+}
+
 function requeueRejected({ dryRun = false } = {}) {
   return db.transaction(async (trx) => {
-    const rows = await trx({ job: 'music_audio_jobs' })
-      .join({ annotation: 'music_track_annotations' }, function () {
-        this.on('annotation.platform', 'job.platform').andOn('annotation.track_key', 'job.track_key');
-      })
-      .whereIn('annotation.human_review_status', ['inaccurate', 'unclear'])
-      .whereNot('job.status', 'processing')
-      .whereIn('job.platform', ['youtube', 'soundcloud'])
-      .forUpdate().of('job')
-      .select('job.id', 'job.generation');
+    const rows = await rejectedJobsQuery(trx);
     // 곡마다 외부 유료 API를 다시 부른다. 몇 곡인지 먼저 알려주고 확인을 받는다.
     if (dryRun || !rows.length) return { eligible: rows.length, requeued: 0 };
     await trx('music_audio_jobs').whereIn('id', rows.map((row) => row.id)).update({
@@ -164,4 +173,4 @@ function requeueRejected({ dryRun = false } = {}) {
   });
 }
 
-module.exports = { enqueue, claim, complete, fail, resume, requeue, requeueRejected };
+module.exports = { enqueue, claim, complete, fail, resume, requeue, requeueRejected, rejectedJobsQuery };

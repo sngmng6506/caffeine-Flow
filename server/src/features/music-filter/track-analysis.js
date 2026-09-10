@@ -59,7 +59,9 @@ async function findForTrack(platform, trackKey) {
   const row = await db('music_audio_analyses')
     .where({ platform, track_key: canonicalizeVideoId(trackKey) })
     .orderBy('analyzed_at', 'desc').first()
-    .timeout(LOOKUP_TIMEOUT_MS, { cancel: true });
+    // cancel은 취소 질의를 보내려고 커넥션을 하나 더 잡는다. 풀이 붐비면 타임아웃
+    // 처리가 도리어 막히므로 쓰지 않는다. 여기서는 요청을 붙잡지 않는 것으로 충분하다.
+    .timeout(LOOKUP_TIMEOUT_MS);
   return shape(row);
 }
 
