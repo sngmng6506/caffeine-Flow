@@ -14,6 +14,7 @@ export default defineConfig({
       'tests/discovery-window.test.mjs',
       'tests/api-docs.test.mjs',
       'tests/docs-links.test.mjs',
+      'tests/music-filter-analysis.test.mjs',
       'tests/electron-navigation-policy.test.mjs',
       'tests/electron-auto-update.test.mjs',
       'tests/electron-panel-layout.test.mjs',

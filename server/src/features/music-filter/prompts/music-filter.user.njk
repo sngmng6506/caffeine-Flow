@@ -7,6 +7,20 @@
 아티스트/채널: {{ channel_title }}
 길이: {{ duration }}
 
+{% if analysis %}[음향 분석 — 곡을 직접 들어 기계가 뽑은 정보]
+{% if analysis.description %}들은 내용: {{ analysis.description }}
+{% endif %}{% if analysis.mood.length %}분위기: {{ analysis.mood | join(', ') }}
+{% endif %}{% if analysis.instruments.length %}악기: {{ analysis.instruments | join(', ') }}
+{% endif %}{% if analysis.vocal.length %}보컬: {{ analysis.vocal | join(', ') }}
+{% endif %}{% if analysis.styles.length %}장르 후보: {{ analysis.styles | join(', ') }}
+{% endif %}{% if analysis.tempo %}템포: {{ analysis.tempo }}
+{% endif %}{% if analysis.energy %}밝기·활력: {{ analysis.energy }}
+{% endif %}
+장르 후보 점수는 보정되지 않은 상대값이라 곡끼리 비교할 수 없다. 순위만 참고한다.
+분석은 제목·아티스트보다 곡의 실제 소리를 잘 나타내지만 틀릴 수 있다. 매장 분위기와
+어긋나는지 판단할 때 함께 읽되, 분석에 없는 사실을 지어내지 않는다.
+{% else %}이 곡은 음향 분석 기록이 없다. 제목과 아티스트만으로 판단한다.
+{% endif %}
 판단 기준:
 - 매장 분위기와 맞으면 accept.
 - 매장 분위기를 해치거나, 사장님이 피하라고 한 특징과 맞으면 reject.
