@@ -6,6 +6,19 @@ from emotion import EmotionModelError
 
 
 class MaestTest(unittest.TestCase):
+    def test_server_and_worker_normalization_match(self):
+        import shutil
+        import subprocess
+        import json
+        from pathlib import Path
+        if not shutil.which('node'):
+            self.skipTest('교차 언어 계약 검증에는 Node가 필요합니다')
+        raw = summarize(np.array([[((i * 7) % 101) / 100 for i in range(519)]]), 20)
+        server = Path(__file__).resolve().parents[1] / 'server/src/features/audio-analysis/normalization.js'
+        script = "const {normalize}=require(process.argv[1]);let s='';process.stdin.on('data',v=>s+=v);process.stdin.on('end',()=>console.log(JSON.stringify(normalize(JSON.parse(s)))));"
+        result = subprocess.run(['node', '-e', script, str(server)], input=json.dumps(raw), text=True, capture_output=True, check=True)
+        self.assertEqual(normalize(raw), json.loads(result.stdout))
+
     def test_full_scores_mean_max_and_tail(self):
         scores = np.zeros((3, 1, 519))
         i = CLASSES.index('Jazz---Big Band')
@@ -41,7 +54,7 @@ class MaestTest(unittest.TestCase):
         # 원본 재추론 없이 외부 매핑·임계값 변경만으로 파생 태그를 재생성한다.
         import json
         from maest import ROOT
-        taxonomy = json.loads((ROOT / 'taxonomy.json').read_text())
+        taxonomy = json.loads((ROOT / 'music-taxonomy.json').read_text())
         taxonomy['thresholds']['Pop---Ballad'] = 0.1
         self.assertEqual([v['label'] for v in normalize(raw, taxonomy)['genre']], ['pop', 'ballad'])
 

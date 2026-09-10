@@ -189,6 +189,8 @@ stateDiagram-v2
 - `music_audio_jobs`는 기존·신규 신청 모두 포함한다. 필터 OFF/거절도 대상이며 같은 곡은 한 건이다. Spotify는 unsupported로 남긴다.
 - `music_audio_runs`는 실행별 전체 구간 점수·평균·최댓값·입력 해시·모델/전처리/매핑 버전·자동 라벨의 추가 전용 원본이다. `music_audio_analyses`는 최신 검토용 특징·자동 라벨·MAEST 요약과 latest_run_id를 유지하며 재분석 시 revision이 증가한다.
 - `music_track_annotations`는 처음 자동 라벨을 보관한다. 사람 확인·수정 시 label_source=human으로 보호하고 confirmed/corrected를 구분한다. 재분석은 새 원본 이력과 최신 분석을 저장하며 사람 최종 라벨을 덮어쓰지 않는다.
-- 워커 중단 시 20분 lease 만료 후 회수하고 최대 세 번 실패하면 failed다. 만료 워커 결과는 거절하며 완료 재전송은 멱등이다.
+- 워커는 결과를 디스크 outbox에 기록한 뒤 전송한다. 재시작 시 outbox를 먼저 복구하고 미인계 lease만 갱신한다. 오류별 지연·중단과 공통 장애 시 워커 휴지기로 무분별한 실패 소진을 막는다. 관리자 재큐잉은 generation으로 경쟁을 막으며 오래된 토큰을 폐기한다.
 - Lab의 곡 검토와 매장 정책 골드 판단은 별개다. 최종 라벨과 분석 revision을 비교해 보지 않은 결과가 검토 완료되지 않게 한다.
 - 원본 음원은 서버에 전송하지 않는다. 사람 라벨과 자동 라벨 모두 현재 라이브 LLM 입력·자동수락에는 연결하지 않는다.
+
+자동 분석 모델 메타데이터·설정·택소노미는 server/src/constants의 JSON을 서버와 Python이 공유한다. 정규화 서버 검증과 Lab 재정규화는 같은 함수를 사용한다. 곡 검토 완료는 모든 필드의 정답 확정을 뜻하지 않으며 reviewed_fields와 artist_confirmed로 확인 범위를 구분한다.

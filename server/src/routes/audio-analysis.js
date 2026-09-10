@@ -8,6 +8,7 @@ const audioAnalysis = require('../features/audio-analysis/service');
 router.post('/results', requireAudioAnalysisWorker, async (req, res) => {
   const result = validateAudioAnalysisResult(req.body);
   if (result.error) return res.status(400).json({ error: result.error });
+  if (result.value.model_name === 'essentia-maest') return res.status(400).json({ error: 'MAEST는 작업 완료 API로 원본과 함께 제출해야 합니다' });
   const saved = await audioAnalysis.saveResult(result.value);
   res.status(201).json(saved);
 });
@@ -27,8 +28,8 @@ router.post('/jobs/:id/complete', requireAudioAnalysisWorker, async (req, res) =
   const result = validateAudioAnalysisResult(req.body?.result);
   if (result.error) return res.status(400).json({ error: result.error });
   const scores = req.body?.tag_scores;
-  if (!scores || typeof scores !== 'object' || Array.isArray(scores) || Object.keys(scores).length > 519 ||
-      Object.entries(scores).some(([k, v]) => k.length > 120 || typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1)) {
+  if ((!req.body?.maest_run || scores !== undefined) && (!scores || typeof scores !== 'object' || Array.isArray(scores) || Object.keys(scores).length > 519 ||
+      Object.entries(scores).some(([k, v]) => k.length > 120 || typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 1))) {
     return res.status(400).json({ error: '태그 점수가 올바르지 않습니다' });
   }
   const run = req.body?.maest_run;
@@ -46,7 +47,8 @@ router.post('/jobs/:id/complete', requireAudioAnalysisWorker, async (req, res) =
 
 router.post('/jobs/:id/fail', requireAudioAnalysisWorker, async (req, res) => {
   if (!isUuid(req.params.id) || !isUuid(req.body?.lease_token)) return res.status(400).json({ error: '작업 식별자가 올바르지 않습니다' });
-  const codes = ['DOWNLOAD_FAILED', 'ANALYSIS_FAILED', 'MODEL_UNAVAILABLE', 'SOURCE_UNSUPPORTED'];
+  const { retry } = require('../constants/audio-pipeline.json');
+  const codes = [...retry.infrastructure_codes, ...retry.permanent_codes, ...retry.temporary_codes, 'ANALYSIS_FAILED'];
   if (!codes.includes(req.body.error_code)) return res.status(400).json({ error: '실패 코드가 올바르지 않습니다' });
   try {
     res.json(await jobs.fail(req.params.id, req.body.lease_token, req.body.error_code));
@@ -54,5 +56,10 @@ router.post('/jobs/:id/fail', requireAudioAnalysisWorker, async (req, res) => {
     if (error.status) return res.status(error.status).json({ error: error.message });
     throw error;
   }
+});
+router.post('/jobs/:id/resume', requireAudioAnalysisWorker, async (req, res) => {
+  if (!isUuid(req.params.id) || !isUuid(req.body?.lease_token)) return res.status(400).json({ error: '작업 식별자가 올바르지 않습니다' });
+  try { res.json(await jobs.resume(req.params.id, req.body.lease_token)); }
+  catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
 });
 module.exports = router;

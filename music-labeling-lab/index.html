@@ -43,6 +43,7 @@
 
       <p id='message' class='message'>라벨링 목록을 불러오는 중…</p>
       <article id='reviewCard' class='review-card' hidden>
+        <div><button id='requeueAudio' type='button'>재시도·재분석</button> <button id='renormalizeAudio' type='button'>현재 장르 체계 적용</button></div>
         <div class='track-head'>
           <div>
             <span id='cafeName' class='cafe-name'></span>
@@ -97,6 +98,7 @@
             <label class='text-field'>확인한 아티스트명
               <div class='artist-input-row'>
                 <input id='artistName' name='artist_name' maxlength='200' required />
+                <label><input id='artistConfirmed' type='checkbox' /> 실제 아티스트명 확인</label>
                 <button type='button' id='findArtistLabels' class='secondary-button'>같은 아티스트 참고</button>
               </div>
             </label>

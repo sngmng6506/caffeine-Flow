@@ -126,6 +126,7 @@ function resetForm(item) {
   form.reset();
   const annotation = item.track_annotation;
   $('artistName').value = annotation?.artist_name || item.channel_title || '';
+  $('artistConfirmed').checked = annotation?.artist_confirmed === true;
   const labelOrigin = annotation?.label_source === 'automatic' ? '자동 라벨' : annotation?.human_review_status === 'corrected' ? '사람 수정 라벨' : '사람 확인 라벨';
   $('existingLabelStatus').textContent = annotation
     ? `기존 곡 라벨 불러옴 · ${labelOrigin} · ${formatDateTime(annotation.updated_at)}`
@@ -205,6 +206,8 @@ function renderAudioAnalysis(item) {
 function renderItem() {
   renderSummary();
   const item = items[currentIndex];
+  $('requeueAudio').disabled = !item || ['processing', 'queued', 'unsupported'].includes(item.job_status);
+  $('renormalizeAudio').disabled = !item || item.job_status !== 'completed' || !item.audio_analysis?.latest_run_id;
   if (!item) {
     $('reviewCard').hidden = true;
     $('message').hidden = false;
@@ -335,6 +338,7 @@ $('reviewForm').addEventListener('submit', async (event) => {
       'PUT',
       `/admin/audio-labels/${item.id}/review`,
       {
+        artist_confirmed: $('artistConfirmed').checked,
         annotation_revision: item.track_annotation?.revision || 0,
         audio_analysis_id: item.audio_analysis?.id || null,
         audio_analysis_revision: item.audio_analysis?.revision || null,
@@ -374,10 +378,12 @@ async function advanceAfterReview() {
 $('confirmReview').addEventListener('click', async () => {
   const item = items[currentIndex];
   if (!item?.track_annotation) return;
+  if ($('artistName').value !== item.track_annotation.artist_name) { alert('아티스트명을 변경했다면 수정 저장을 사용해주세요.'); return; }
   const button = $('confirmReview');
   button.disabled = true;
   try {
     const { ok, data } = await api('PUT', `/admin/audio-labels/${item.id}/review`, {
+      artist_confirmed: $('artistConfirmed').checked,
       annotation_revision: item.track_annotation.revision,
       audio_analysis_id: item.audio_analysis?.id || null,
       audio_analysis_revision: item.audio_analysis?.revision || null,
@@ -473,3 +479,20 @@ $('loadMaestRaw').addEventListener('click', async () => {
     if (items[currentIndex]?.audio_analysis?.latest_run_id === runId) $('loadMaestRaw').disabled = false;
   }
 });
+
+$('artistName').addEventListener('input', () => { $('artistConfirmed').checked = false; });
+for (const [buttonId, action] of [['requeueAudio', 'requeue'], ['renormalizeAudio', 'renormalize']]) {
+  $(buttonId).addEventListener('click', async () => {
+    const item = items[currentIndex];
+    if (!item) return;
+    $(buttonId).disabled = true;
+    try {
+      const { ok, data } = await api('POST', `/admin/audio-labels/${item.id}/${action}`, {
+        generation: item.generation, analysis_id: item.audio_analysis?.id,
+        analysis_revision: item.audio_analysis?.revision,
+      });
+      if (!ok) throw new Error(data.error || '처리하지 못했습니다');
+      await loadPage(currentOffset);
+    } catch (error) { alert(error.message); renderItem(); }
+  });
+}

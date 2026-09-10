@@ -1,0 +1,30 @@
+{
+  "model_version": "discogs-maest-30s-pw-519l-2",
+  "model_sha256": "92783feb21187443d058b4f16d7a76f47888d43fbdc7a28e8bcc8e024603bd20",
+  "settings": {
+    "sample_rate": 16000,
+    "patch_size": 1876,
+    "patch_hop_size": 938,
+    "frame_hop": 256,
+    "last_patch_mode": "repeat",
+    "resample_quality": 4,
+    "output": "PartitionedCall/Identity_13",
+    "batch_size": 1
+  },
+  "max_segments": 64,
+  "retry": {
+    "infrastructure_codes": [
+      "DOWNLOAD_INFRASTRUCTURE",
+      "MODEL_UNAVAILABLE"
+    ],
+    "permanent_codes": [
+      "SOURCE_UNSUPPORTED",
+      "SOURCE_UNAVAILABLE"
+    ],
+    "temporary_codes": [
+      "DOWNLOAD_FAILED"
+    ],
+    "cooldown_seconds": 300,
+    "long_retry_minutes": 360
+  }
+}

@@ -3,6 +3,8 @@ const db = require('../../db/knex');
 const analysisService = require('./service');
 const { validateMusicAnnotation } = require('../music-labeling/annotation');
 const { JOB_MAX_ATTEMPTS, JOB_LEASE_MINUTES } = require('../../constants/audio-analysis');
+const { retry } = require('../../constants/audio-pipeline.json');
+const { genreTags } = require('./normalization');
 const conflict = () => Object.assign(new Error('작업이 만료되었거나 이미 변경되었습니다'), { status: 409 });
 
 async function enqueue(rec, connection = db) {
@@ -21,7 +23,7 @@ function claim() {
     await trx('music_audio_jobs').where({ status: 'processing' })
       .where('lease_until', '<', trx.fn.now()).update({
         status: trx.raw("CASE WHEN attempts >= ? THEN 'failed' ELSE 'queued' END", [JOB_MAX_ATTEMPTS]),
-        lease_token: null, lease_until: null, error_code: 'LEASE_EXPIRED', updated_at: trx.fn.now(),
+        lease_until: null, error_code: 'LEASE_EXPIRED', updated_at: trx.fn.now(),
       });
     const row = await trx('music_audio_jobs').where({ status: 'queued' })
       .where('available_at', '<=', trx.fn.now()).orderBy('available_at').orderBy('id')
@@ -53,9 +55,20 @@ function complete(id, token, result, automaticAnnotation, tagScores, maestRun = 
     if (checked.error) throw Object.assign(new Error(checked.error), { status: 400 });
     const automatic = checked.value;
     let runFields = {};
+    if (result.model_name === 'essentia-maest' && !maestRun) throw Object.assign(new Error('MAEST 원본이 필요합니다'), { status: 400 });
     if (maestRun) {
       const checkedRun = require('./runs').validateRun(maestRun, result);
       if (checkedRun.error) throw Object.assign(new Error(checkedRun.error), { status: 400 });
+      const raw = checkedRun.value.maest_raw;
+      const derivedScores = Object.fromEntries(raw.classes.map((name, i) => [name, raw.mean[i]]));
+      if (tagScores && (Object.keys(tagScores).length !== raw.classes.length || raw.classes.some((name, i) => Math.abs(tagScores[name] - raw.mean[i]) > 0.000001 || !Number.isFinite(tagScores[name])))) {
+        throw Object.assign(new Error('원본과 태그 점수가 다릅니다'), { status: 400 });
+      }
+      if (JSON.stringify(automatic.genre_tags) !== JSON.stringify(genreTags(checkedRun.value.normalized)) ||
+          JSON.stringify(automatic.mood_tags) !== JSON.stringify(checkedRun.value.normalized.mood?.tags?.length ? checkedRun.value.normalized.mood.tags : ['unknown']) || automatic.vocal_type !== 'unknown' || automatic.instrumentation_type !== 'unknown') {
+        throw Object.assign(new Error('원본과 자동 라벨이 다릅니다'), { status: 400 });
+      }
+      tagScores = derivedScores;
       const [run] = await trx('music_audio_runs').insert({ lease_token: token, platform: job.platform,
         track_key: job.track_key, payload: JSON.stringify({ ...checkedRun.value, result, automatic_annotation: automatic }) }).returning('id');
       runFields = { latest_run_id: run.id, maest_summary: require('./runs').summary(checkedRun.value) };
@@ -64,7 +77,7 @@ function complete(id, token, result, automaticAnnotation, tagScores, maestRun = 
     const row = {
       ...automatic, platform: job.platform, track_key: job.track_key, title: job.title,
       mood_tags: JSON.stringify(automatic.mood_tags), genre_tags: JSON.stringify(automatic.genre_tags),
-      label_source: 'automatic', human_review_status: 'unreviewed', updated_at: trx.fn.now(),
+      label_source: 'automatic', human_review_status: 'unreviewed', artist_confirmed: false, reviewed_fields: '[]', updated_at: trx.fn.now(),
     };
     // DB 안에서 조건을 평가하므로 사람 편집과 경합해도 덮어쓰지 않는다.
     await trx('music_track_annotations').insert(row).onConflict(['platform', 'track_key'])
@@ -81,13 +94,41 @@ function fail(id, token, errorCode) {
   return db.transaction(async (trx) => {
     const job = await lockedJob(trx, id, token);
     if (job.status !== 'processing' || new Date(job.lease_until) <= new Date()) throw conflict();
-    const retry = job.attempts < JOB_MAX_ATTEMPTS;
+    const infrastructure = retry.infrastructure_codes.includes(errorCode);
+    const temporary = retry.temporary_codes.includes(errorCode);
+    const again = infrastructure || temporary || (!retry.permanent_codes.includes(errorCode) && job.attempts < JOB_MAX_ATTEMPTS);
+    const delay = infrastructure ? retry.cooldown_seconds / 60 : temporary && job.attempts >= JOB_MAX_ATTEMPTS
+      ? retry.long_retry_minutes : 2 ** Math.min(job.attempts, JOB_MAX_ATTEMPTS);
     await trx('music_audio_jobs').where({ id }).update({
-      status: retry ? 'queued' : 'failed', error_code: errorCode,
-      available_at: trx.raw("now() + (? * interval '1 minute')", [2 ** job.attempts]),
+      status: again ? 'queued' : 'failed', error_code: errorCode,
+      available_at: trx.raw("now() + (? * interval '1 minute')", [delay]),
       lease_token: null, lease_until: null, updated_at: trx.fn.now(),
     });
-    return { status: retry ? 'queued' : 'failed' };
+    return { status: again ? 'queued' : 'failed' };
   });
 }
-module.exports = { enqueue, claim, complete, fail };
+// 아직 다른 워커가 가져가지 않은 만료 lease만 결과 전송을 위해 갱신한다.
+function resume(id, token) {
+  return db.transaction(async (trx) => {
+    const job = await lockedJob(trx, id, token);
+    if (job.status === 'completed') return { status: 'completed' };
+    if (!['processing', 'queued'].includes(job.status) && job.error_code !== 'LEASE_EXPIRED') throw conflict();
+    await trx('music_audio_jobs').where({ id }).update({ status: 'processing',
+      lease_until: trx.raw("now() + (? * interval '1 minute')", [JOB_LEASE_MINUTES]), updated_at: trx.fn.now() });
+    return { status: 'processing' };
+  });
+}
+
+function requeue(id, generation) {
+  return db.transaction(async (trx) => {
+    const job = await trx('music_audio_jobs').where({ id }).forUpdate().first();
+    if (!job) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
+    if (job.generation !== generation || job.status === 'processing') throw conflict();
+    if (!['youtube', 'soundcloud'].includes(job.platform)) throw Object.assign(new Error('지원하지 않는 플랫폼입니다'), { status: 400 });
+    const [saved] = await trx('music_audio_jobs').where({ id }).update({ status: 'queued', attempts: 0,
+      generation: job.generation + 1, lease_token: null, lease_until: null, error_code: null,
+      available_at: trx.fn.now(), updated_at: trx.fn.now() }).returning(['id', 'status', 'generation']);
+    return saved;
+  });
+}
+module.exports = { enqueue, claim, complete, fail, resume, requeue };

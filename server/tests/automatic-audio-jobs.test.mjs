@@ -10,6 +10,9 @@ const labels = (await import('../src/features/audio-analysis/labels.js')).defaul
 const analyses = (await import('../src/features/audio-analysis/service.js')).default;
 const recService = (await import('../src/services/recommendation.service.js')).default;
 const { issueAdminToken } = await import('../src/utils/jwt.js');
+const metadata = (await import('../src/constants/maest-metadata.json', { with: { type: 'json' } })).default;
+const contract = (await import('../src/constants/audio-pipeline.json', { with: { type: 'json' } })).default;
+const normalization = (await import('../src/features/audio-analysis/normalization.js')).default;
 let cafe;
 const annotation = { artist_name: 'artist', track_version: 'unknown', tempo_class: 'moderate',
   mood_tags: ['peaceful'], instrumentation_type: 'acoustic', rhythmic_character: 'steady',
@@ -28,17 +31,17 @@ const auth = () => ({ Authorization: `Bearer ${process.env.AUDIO_ANALYSIS_WORKER
 function maestBody(job, count = 3, value = 0.3) {
   const duration = count * 15.008;
   const scores = Array(519).fill(value);
-  const classes = Array.from({ length: 519 }, (_, i) => `Jazz---Style ${i}`);
-  const output = { ...result(job), model_name: 'essentia-maest',
+  const classes = metadata.classes;
+  const output = { ...result(job), model_name: 'essentia-maest', model_version: `test+${contract.model_version}`,
     source_reference: `https://www.youtube.com/watch?v=${job.track_key}`,
     features: { duration_seconds: duration, sample_rate: 16000 } };
-  return { lease_token: job.lease_token, result: output, automatic_annotation: annotation,
+  return { lease_token: job.lease_token, result: output, automatic_annotation: { ...annotation, genre_tags: normalization.genreTags(normalization.normalize({ classes, mean: scores })), mood_tags: ['unknown'], vocal_type: 'unknown', instrumentation_type: 'unknown' },
     tag_scores: Object.fromEntries(classes.map((k) => [k, value])), maest_run: {
       schema_version: 1, pipeline_mode: 'MAEST_ONLY', sources_used: ['discogs-maest-30s-pw-519l-2'],
-      maest_model_version: 'discogs-maest-30s-pw-519l-2', model_sha256: 'a'.repeat(64),
+      maest_model_version: 'discogs-maest-30s-pw-519l-2', model_sha256: contract.model_sha256,
       audio_source_url: output.source_reference, audio_local_path: null, audio_sha256: 'b'.repeat(64),
       audio_duration_sec: duration, audio_sample_rate: 16000, audio_llm_raw: null,
-      normalized: { taxonomy_version: 'test-1', calibrated: false, genre: [], mood: null },
+      normalized: normalization.normalize({ classes, mean: scores }),
       maest_raw: { classes, mean: scores, max: scores, essentia_version: 'test',
         segments: Array.from({ length: count }, (_, i) => ({ start_sec: i * 15.008,
           end_sec: Math.min(duration, (i + 2) * 15.008), scores })),
@@ -79,6 +82,76 @@ afterAll(async () => {
   await db.destroy();
 });
 describe('자동 음향 분석 파이프라인', () => {
+  it('만료 lease의 보관 결과는 인계 전 복구하고 인계·관리 재실행 뒤에는 거절한다', async () => {
+    await seed(); const old = await jobs.claim();
+    await db('music_audio_jobs').where({ id: old.id }).update({ lease_until: new Date(0) });
+    expect(await jobs.resume(old.id, old.lease_token)).toEqual({ status: 'processing' });
+    await jobs.complete(old.id, old.lease_token, result(old), annotation, {});
+    expect(await jobs.resume(old.id, old.lease_token)).toEqual({ status: 'completed' });
+    const next = await jobs.requeue(old.id, old.generation);
+    await expect(jobs.resume(old.id, old.lease_token)).rejects.toMatchObject({ status: 409 });
+    await expect(jobs.requeue(old.id, old.generation)).rejects.toMatchObject({ status: 409 });
+    expect(next.generation).toBe(2);
+    const claimed = await jobs.claim();
+    await expect(jobs.requeue(old.id, next.generation)).rejects.toMatchObject({ status: 409 });
+    await db('music_audio_jobs').where({ id: old.id }).update({ lease_until: new Date(0) });
+    await jobs.claim();
+    await expect(jobs.resume(old.id, claimed.lease_token)).rejects.toMatchObject({ status: 409 });
+  });
+  it('일시 다운로드 오류는 세 번 이후에도 지연 재시도하고 영구 소스 오류는 중단한다', async () => {
+    await seed(); const job = await jobs.claim();
+    await db('music_audio_jobs').where({ id: job.id }).update({ attempts: 5 });
+    expect(await jobs.fail(job.id, job.lease_token, 'DOWNLOAD_FAILED')).toEqual({ status: 'queued' });
+    const row = await db('music_audio_jobs').where({ id: job.id }).first();
+    expect(new Date(row.available_at).getTime() - Date.now()).toBeGreaterThan(5 * 3600 * 1000);
+    await jobs.requeue(job.id, row.generation);
+    const retried = await jobs.claim();
+    expect(await jobs.fail(job.id, retried.lease_token, 'SOURCE_UNAVAILABLE')).toEqual({ status: 'failed' });
+  });
+  it('MAEST 중복 필드 불일치와 수동 결과 API 우회를 거절한다', async () => {
+    await seed(); const job = await jobs.claim();
+    const body = maestBody(job);
+    body.automatic_annotation.genre_tags = ['unknown'];
+    expect((await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body)).status).toBe(400);
+    const other = maestBody(job);
+    other.tag_scores[metadata.classes[0]] = 0.9;
+    expect((await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(other)).status).toBe(400);
+    expect((await request(app).post('/api/v1/audio-analysis/results').set(auth()).send(body.result)).status).toBe(400);
+    expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
+  });
+  it('현재 택소노미 재적용은 원본·사람 라벨을 보존하고 중복 호출은 변경하지 않는다', async () => {
+    await seed(); const job = await jobs.claim(); const body = llmBody(job);
+    const first = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
+    const runId = first.body.latest_run_id;
+    const original = await db('music_audio_runs').where({ id: runId }).first();
+    const { validateMusicAnnotation } = (await import('../src/features/music-labeling/annotation.js')).default;
+    await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: first.body.id, audio_analysis_revision: 1 },
+      validateMusicAnnotation({ ...annotation, genre_tags: ['jazz'] }).value);
+    await db('music_audio_analyses').where({ id: first.body.id }).update({ maest_summary: JSON.stringify({ normalized: { taxonomy_version: 'old' } }) });
+    const input = { analysis_id: first.body.id, analysis_revision: 1, generation: job.generation };
+    const admin = { Authorization: `Bearer ${issueAdminToken()}` };
+    expect((await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).send(input)).status).toBe(401);
+    const updated = await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).set(admin).send(input);
+    expect(updated.status).toBe(200);
+    expect(updated.body.revision).toBe(2);
+    expect(updated.body.normalized.mood).toEqual(body.maest_run.normalized.mood);
+    expect((await db('music_audio_runs').where({ id: runId }).first()).payload).toEqual(original.payload);
+    expect((await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first()).genre_tags).toEqual(['jazz']);
+    expect((await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).set(admin).send(input)).status).toBe(409);
+    const again = await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).set(admin).send({ ...input, analysis_revision: 2 });
+    expect(again.body.unchanged).toBe(true);
+    expect((await request(app).post(`/api/v1/admin/audio-labels/${job.id}/requeue`).send({ generation: 1 })).status).toBe(401);
+  });
+  it('빠른 확인은 미확정 필드와 아티스트를 정답으로 승격하지 않는다', async () => {
+    await seed(); const job = await jobs.claim(); const body = maestBody(job);
+    delete body.tag_scores; // 원시 점수 중복 제출 없이 서버가 파생한다.
+    const saved = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
+    const reviewed = await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: saved.body.id, audio_analysis_revision: 1 }, null);
+    expect(reviewed.track_annotation.artist_confirmed).toBe(false);
+    expect(reviewed.track_annotation.reviewed_fields).toContain('genre_tags');
+    expect(reviewed.track_annotation.reviewed_fields).not.toContain('mood_tags');
+    expect(reviewed.track_annotation.reviewed_fields).not.toContain('vocal_type');
+  });
   it('MAEST 큰 원본은 인증 경로에서 저장하고 재분석해도 이전 이력을 보존한다', async () => {
     await seed(); const job = await jobs.claim();
     const body = maestBody(job, 50, 0.3123456789);
@@ -273,6 +346,8 @@ describe('자동 음향 분석 파이프라인', () => {
     const options = { artistKey: 'artist', platform: job.platform, trackKey: 'different-track' };
     expect((await service.fetchArtistLabels(options)).some((row) => row.id === item.track_annotation.id)).toBe(false);
     await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: saved.id, audio_analysis_revision: 1 }, null);
+    expect((await service.fetchArtistLabels(options)).some((row) => row.id === item.track_annotation.id)).toBe(false);
+    await labels.review(job.id, { annotation_revision: 2, audio_analysis_id: saved.id, audio_analysis_revision: 1, artist_confirmed: true }, null);
     expect((await service.fetchArtistLabels(options)).some((row) => row.id === item.track_annotation.id)).toBe(true);
     expect((await labels.list({ view: 'ready' })).decisions).toHaveLength(0);
   });

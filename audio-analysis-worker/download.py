@@ -13,6 +13,23 @@ class DownloadError(RuntimeError):
     pass
 
 
+def classify_error(error):
+    # 원문은 외부로 보내지 않고 일시 장애·영구 소스 오류·공통 환경 장애만 분류한다.
+    message = (getattr(error, 'stderr', b'') or b'')
+    if isinstance(message, bytes):
+        message = message.decode('utf-8', errors='replace')
+    message = message.lower()
+    if isinstance(error, FileNotFoundError) or any(v in message for v in (
+            'certificate_verify_failed', 'ffmpeg not found', 'ffprobe not found',
+            'ffprobe and ffmpeg not found', 'sign in to confirm', 'http error 429')):
+        return 'DOWNLOAD_INFRASTRUCTURE'
+    if any(v in message for v in ('video has been removed', 'video is private',
+                                 'private video', 'this track was not found', 'copyright claim')):
+        return 'SOURCE_UNAVAILABLE'
+    return 'DOWNLOAD_FAILED'
+
+
+
 def source_url(platform, track_key):
     if platform == 'youtube' and re.fullmatch(r'[A-Za-z0-9_-]{11}', track_key):
         return f'https://www.youtube.com/watch?v={track_key}'
@@ -41,7 +58,7 @@ def download_audio(platform, track_key, directory):
         subprocess.run(command, check=True, timeout=300, capture_output=True)
     except (subprocess.SubprocessError, OSError) as error:
         # 외부 출력은 URL 등이 포함될 수 있으므로 API에는 고정 코드만 보낸다.
-        raise DownloadError('DOWNLOAD_FAILED') from error
+        raise DownloadError(classify_error(error)) from error
     files = [p for p in directory.glob('audio.*') if p.suffix not in ('.part', '.ytdl') and p.is_file()]
     if len(files) != 1 or files[0].suffix != '.wav' or not 0 < files[0].stat().st_size <= MAX_BYTES:
         raise DownloadError('DOWNLOAD_FAILED')

@@ -74,7 +74,7 @@ def run(audio, job, output):
                 'audio_sample_rate': audio_sample_rate, 'maest_raw': raw,
                 'audio_llm_raw': audio_llm_raw, 'normalized': normalized}
     result = {'result': payload, 'automatic_annotation': make_annotation(features, normalized, job['artist_name']),
-              'tag_scores': dict(zip(raw['classes'], raw['mean'])), 'maest_run': run_data}
+              'maest_run': run_data}
     Path(output).write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
     return result
 

@@ -25,7 +25,7 @@ async function list({ view = 'unreviewed', offset = 0 }) {
     db('music_audio_jobs').count('* as count').first(),
     baseQuery().modify(reviewed).count('* as count').first(),
     query.select('job.id', 'job.platform', 'job.track_key as video_id', 'job.title',
-      'job.artist_name as channel_title', 'job.status as job_status', 'job.error_code', 'job.created_at',
+      'job.artist_name as channel_title', 'job.generation', 'job.available_at', 'job.attempts', 'job.status as job_status', 'job.error_code', 'job.created_at',
       db.raw('to_jsonb(annotation) as track_annotation'), db.raw('to_jsonb(analysis) as audio_analysis'))
       .orderBy('job.created_at', 'desc').orderBy('job.id', 'desc').offset(offset).limit(51),
   ]);
@@ -48,9 +48,18 @@ function review(jobId, input, annotation) {
     if ((current?.revision || 0) !== input.annotation_revision) throw conflict();
     if (!annotation && !current) throw Object.assign(new Error('자동 라벨이 아직 없습니다'), { status: 409 });
     const next = annotation || current;
+    const fields = ['genre_tags', 'tempo_class', 'rhythmic_character', 'mood_tags', 'vocal_type', 'instrumentation_type', 'track_version'];
+    const known = (field) => next[field] && next[field] !== 'unknown' && (!Array.isArray(next[field]) || next[field].length > 0 && !next[field].includes('unknown'));
+    const selected = input.reviewed_fields || (annotation
+      ? fields.filter((field) => JSON.stringify(next[field]) !== JSON.stringify(current?.[field]))
+      : ['genre_tags', 'tempo_class', 'rhythmic_character']);
+    const reviewedFields = [...new Set([...(current?.reviewed_fields || []), ...selected])].filter(known);
+    const sameArtist = next.artist_name === current?.artist_name;
+    const artistConfirmed = input.artist_confirmed ?? (sameArtist && current?.artist_confirmed || false);
     const row = {
       ...next, platform: job.platform, track_key: job.track_key, title: job.title,
       mood_tags: JSON.stringify(next.mood_tags), genre_tags: JSON.stringify(next.genre_tags),
+      artist_confirmed: artistConfirmed, reviewed_fields: JSON.stringify(reviewedFields),
       label_source: 'human', human_review_status: annotation ? 'corrected' : 'confirmed',
       revision: (current?.revision || 0) + 1, updated_at: trx.fn.now(),
     };

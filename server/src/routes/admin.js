@@ -422,6 +422,11 @@ router.get('/audio-labels', requireAdmin, async (req, res) => {
   res.json(await audioLabels.list({ view, offset }));
 });
 router.put('/audio-labels/:id/review', requireAdmin, async (req, res) => {
+  const fields = ['genre_tags', 'tempo_class', 'rhythmic_character', 'mood_tags', 'vocal_type', 'instrumentation_type', 'track_version'];
+  if ((req.body?.artist_confirmed !== undefined && typeof req.body.artist_confirmed !== 'boolean') ||
+      (req.body?.reviewed_fields !== undefined && (!Array.isArray(req.body.reviewed_fields) || req.body.reviewed_fields.length > fields.length || req.body.reviewed_fields.some((f) => !fields.includes(f))))) {
+    return res.status(400).json({ error: '검토 범위가 올바르지 않습니다' });
+  }
   if (!isUuid(req.params.id) || !Number.isSafeInteger(req.body?.annotation_revision) || req.body.annotation_revision < 0 ||
       (req.body.audio_analysis_id && (!isUuid(req.body.audio_analysis_id) || !Number.isSafeInteger(req.body.audio_analysis_revision)))) {
     return res.status(400).json({ error: '검토 대상 버전이 올바르지 않습니다' });
@@ -449,4 +454,17 @@ router.get('/audio-runs/:id', requireAdmin, async (req, res) => {
   const run = await db('music_audio_runs').where({ id: req.params.id }).select('id', 'platform', 'track_key', 'payload', 'created_at').first();
   if (!run) return res.status(404).json({ error: '분석을 찾을 수 없습니다' });
   res.json(run);
+});
+
+router.post('/audio-labels/:id/requeue', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id) || !Number.isSafeInteger(req.body?.generation)) return res.status(400).json({ error: '작업 버전이 필요합니다' });
+  try { res.json(await require('../features/audio-analysis/jobs').requeue(req.params.id, req.body.generation)); }
+  catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
+});
+router.post('/audio-labels/:id/renormalize', requireAdmin, async (req, res) => {
+  if (!isUuid(req.params.id) || !isUuid(req.body?.analysis_id) || !Number.isSafeInteger(req.body?.analysis_revision) || !Number.isSafeInteger(req.body?.generation)) {
+    return res.status(400).json({ error: '분석·작업 버전이 필요합니다' });
+  }
+  try { res.json(await require('../features/audio-analysis/renormalize').apply(req.params.id, req.body)); }
+  catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
 });

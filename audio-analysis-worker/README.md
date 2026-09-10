@@ -21,7 +21,7 @@
 3. 곡마다 **별도 프로세스**에서 Essentia 기본 특징, MAEST 519 스타일, Valence/Arousal을 추론한다. 세 모델이 같은 16kHz 배열을 나눠 쓴다.
 4. `ENABLE_AUDIO_LLM=true`면 곡에서 고르게 뽑은 구간을 오디오 입력 LLM에 보내 무드·악기·보컬을 자유 서술로 받는다([3단 Audio LLM](#3단-audio-llm)).
 5. 분석 원본·자동 라벨·작업 완료를 한 트랜잭션에 저장한다. 임시 음원은 성공·실패 모두 삭제한다. 사람이 수정한 라벨은 덮어쓰지 않는다.
-6. 중단된 작업은 20분 lease 만료 후 회수하며 최대 3회 처리한다. 완료 응답 유실은 같은 lease로 재전송한다.
+6. 중단된 작업은 lease 만료 후 회수한다. 결과는 로컬 outbox에 보존하고 같은 lease로 전송을 재개한다. 오류별 재시도 정책은 아래 장애 복구 절을 따른다.
 
 단계는 셋이고 각각 다른 것을 답한다.
 
@@ -51,7 +51,7 @@ curl -fL https://essentia.upf.edu/models/feature-extractors/maest/discogs-maest-
 # SHA-256: 92783feb21187443d058b4f16d7a76f47888d43fbdc7a28e8bcc8e024603bd20
 ```
 
-가중치가 이미 있으면 다시 받기 전에 해시부터 확인한다. 워커는 시작할 때 해시를 검증하고 다르면 기동하지 않는다.
+가중치가 이미 있으면 다시 받기 전에 해시부터 확인한다. 워커는 시작할 때 해시를 검증하고 다르면 새 작업을 받지 않는다.
 
 yt-dlp에는 JavaScript 런타임(예: Deno)이 필요하다([지원 런타임](https://github.com/yt-dlp/yt-dlp/wiki/EJS)). 배포판 패키지로 설치할 수 없으면 정적 빌드를 홈 아래에 둔다.
 
@@ -95,10 +95,10 @@ systemctl --user daemon-reload
 
 ### MAEST 추론과 원본
 
-- 모델은 `discogs-maest-30s-pw-519l-2`, 출력은 `PartitionedCall/Identity_13` sigmoid다. [공식 메타데이터](https://essentia.upf.edu/models/feature-extractors/maest/discogs-maest-30s-pw-519l-2.json)의 클래스 순서를 `maest-metadata.json`에 보존한다.
-- WAV mono 16kHz로 변환한 뒤 **실제 입력 파일**의 SHA-256을 계산한다. 추론 설정(patch 크기·hop·마지막 구간 처리)은 `maest.py`가 단일 기준이며 Essentia 버전과 함께 원본에 기록한다.
+- 모델은 `discogs-maest-30s-pw-519l-2`, 출력은 `PartitionedCall/Identity_13` sigmoid다. [공식 메타데이터](https://essentia.upf.edu/models/feature-extractors/maest/discogs-maest-30s-pw-519l-2.json)의 클래스 순서를 `server/src/constants/maest-metadata.json`에 보존한다.
+- WAV mono 16kHz로 변환한 뒤 **실제 입력 파일**의 SHA-256을 계산한다. 추론 설정(patch 크기·hop·마지막 구간 처리)은 `server/src/constants/audio-pipeline.json`이 단일 기준이며 Essentia 버전과 함께 원본에 기록한다.
 - 전체 구간의 519개 점수와 mean/max를 저장한다. 점수는 보정된 정확도가 아니고 곡의 기원 증명도 아니다. max는 특정 구간의 높은 반응을 보여준다.
-- `taxonomy.json`의 정적 매핑과 태그별 임계값으로 Lab 장르를 최대 2개 만든다. 기본 임계값은 **미보정 실험 기준**이다. `maest.normalize(raw, taxonomy)`로 재추론 없이 정규화만 다시 돌릴 수 있다. 지원되지 않거나 약한 장르는 `unknown`이다.
+- `server/src/constants/music-taxonomy.json`의 정적 매핑과 태그별 임계값으로 Lab 장르를 최대 2개 만든다. 기본 임계값은 **미보정 실험 기준**이다. `maest.normalize(raw, taxonomy)`로 재추론 없이 정규화만 다시 돌릴 수 있다. 지원되지 않거나 약한 장르는 `unknown`이다.
 - 무드는 Valence/Arousal에서만 만든다. 감정 모델을 쓸 수 없으면 `pipeline_mode=MAEST_ONLY`로 남고 무드는 null이다. 보컬·악기는 `unknown`이며 **장르에서 추측해 채우지 않는다.**
 - 입력 파일은 처리 후 삭제하므로 `audio_local_path`는 null이다. 재분석은 원본을 새 이력으로 추가하고 사람이 수정한 최종 라벨은 보존한다. 재다운로드 파일의 해시가 다르면 다른 입력으로 구분한다.
 - 길이·용량·시간 제한과 다운로드 간격은 `download.py`가 단일 기준이다. 로그인·지역제한·삭제·플랫폼 변경은 실패로 남기며 DRM·쿠키 우회는 하지 않는다.
@@ -233,3 +233,22 @@ python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 ```
 
 모델 예측기와 다운로더를 주입할 수 있어, 실제 모델이나 네트워크 없이 정규화·평균·빈 결과·범위 검증과 파일 상태 전이를 확인한다.
+
+## 결과 보존과 장애 복구
+
+- `AUDIO_WORKER_ROOT/outbox`에 결과 또는 실패 보고 JSON을 원자적으로 기록·fsync한다. 접근 권한은 파일 0600이며 bearer 토큰·음원은 넣지 않는다. lease 토큰은 복구에 필요하므로 이 디렉터리를 공개하거나 커밋하지 않는다.
+- 서버 저장 확인 전 네트워크/인증/스키마 오류가 나면 파일을 유지하고 새 claim을 멈춘다. 기본 휴지기 후 재전송하며 정상 저장되면 삭제한다. 오래된 서버에 resume API가 없는 404도 파일을 유지하므로 서버부터 배포한다.
+- resume으로 같은 lease의 만료 작업을 갱신한다. 이미 완료되었다면 완료 사실만 확인하고 전송함을 비운다. 다른 워커가 인계받거나 관리자가 재등록한 409 결과는 `outbox/superseded`에 남기고 새 작업에 자동 덮어쓰지 않는다. superseded는 자동 만료·삭제하지 않으므로 디스크 사용량을 확인한다.
+- 스키마 400은 JSON을 버리거나 새 토큰으로 바꾸지 않는다. 서버와 워커의 동일 공통 계약/택소노미 배포 여부를 확인한다. pending 파일의 원본을 보존한 상태에서 원인을 해결한다.
+- 일시 다운로드 오류는 초기 빠른 재시도 후 장기 간격으로 계속 복구 기회를 준다. 인증서·도구 누락·호출 제한 등 인프라 오류는 휴지 후 재시도한다. 영구 소스 오류는 failed로 남긴다. 분석 오류·반복 강제 종료는 횟수 제한 후 Lab 재시도 대상이다. 구체적인 코드·간격은 `server/src/constants/audio-pipeline.json`이 기준이다.
+- 인프라 오류 한 번 또는 연속 실패 세 번이면 워커가 새 곡 수집을 잠시 멈춘다. 시작 시 모델이 없더라도 전송함 복구는 시도하지만 모델 검증 전 새 작업은 받지 않는다.
+
+## 모델·택소노미 갱신과 검토 범위
+
+모델 계약은 `server/src/constants/audio-pipeline.json`, 클래스는 같은 폴더의 `maest-metadata.json`, 매핑은 `music-taxonomy.json`에서 관리한다. Python 워커만 복사하지 말고 저장소 전체를 갱신한다. 모델명·해시·출력 설정을 한쪽 코드에서 따로 바꾸지 않는다. Python/서버 정규화 결과의 일치와 실제 곡 시험을 확인한 뒤 배포한다.
+
+모델 가중치가 바뀌면 완료곡도 Lab 재시도·재분석으로 현재 모델을 실행할 수 있다. 택소노미만 바뀌면 버전을 올리고 배포한 뒤 ‘현재 장르 체계 적용’을 누른다. 이 작업은 저장된 원본 점수로 파생 라벨만 다시 만들고 음원 다운로드·MAEST 추론은 실행하지 않는다. 같은 결과 재적용은 변화가 없으며, 사람이 저장한 최종 라벨은 자동 갱신하지 않는다.
+
+‘이대로 확인’은 알려진 장르·템포·리듬의 검토다. 무드·보컬·악기 unknown과 업로더 채널명을 정답으로 승격하지 않는다. 실제 아티스트 확인은 별도 체크박스를 사용하며 확인 범위는 reviewed_fields에 기록한다. 기존 검토 기록의 확인 범위는 추정하지 않고 미확인으로 유지한다.
+
+추가 인수인계 시험: 서버 통신을 일시 중단했을 때 outbox에 결과가 남는지, 통신 복구·워커 재시작 후 재추론 없이 저장되는지 확인한다. Lab 재등록과 재정규화, 아티스트 확인 여부를 함께 시험하고 모델/택소노미 버전을 결과에 기록한다. 이 시험을 위해 운영 DB를 직접 수정할 필요는 없다.

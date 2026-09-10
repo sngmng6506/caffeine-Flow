@@ -281,6 +281,8 @@ server/src/db/migrations/
 owner/package.json
 ```
 
-자동 워커 설치·실행과 단계별 동작은 [워커 README](../audio-analysis-worker/README.md)를 따른다. 서버는 20260909100000_maest_runs 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다.
+자동 워커 설치·실행과 단계별 동작은 [워커 README](../audio-analysis-worker/README.md)를 따른다. 서버는 20260910090000_audio_recovery 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다.
 
 워커 설치·서비스 등록과 실패 코드별 진단은 [워커 README](../audio-analysis-worker/README.md#실패-진단)를 따른다.
+
+서버 마이그레이션을 먼저 배포한 뒤 미니PC 저장소 전체를 갱신한다. 결과 복구와 추가 시험은 [워커 README](../audio-analysis-worker/README.md#결과-보존과-장애-복구)를 따른다.

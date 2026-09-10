@@ -222,7 +222,7 @@ async function fetchLabelingQueue({ view, offset }) {
  */
 function fetchArtistLabels({ artistKey, platform, trackKey }) {
   return db('music_track_annotations')
-    .where({ artist_key: artistKey, label_source: 'human' })
+    .where({ artist_key: artistKey, label_source: 'human', artist_confirmed: true })
     .modify((query) => {
       if (platform && trackKey) {
         query.whereNot((builder) => builder.where({ platform, track_key: trackKey }));
@@ -276,6 +276,7 @@ function saveReview({
   annotation,
   audioAnalysisId,
   audioAnalysisRevision,
+  artistConfirmed = false,
 }) {
   return db.transaction(async (trx) => {
     if (audioAnalysisId) {
@@ -311,6 +312,7 @@ function saveReview({
       source_recommendation_id: recommendation.id,
       title: recommendation.title,
       ...annotation,
+      artist_confirmed: artistConfirmed,
       label_source: 'human',
       human_review_status: 'corrected',
       // pg 드라이버가 JS 배열을 PostgreSQL 배열 리터럴({"pop"})로 바꾸면
@@ -338,6 +340,7 @@ function saveReview({
         usage_scope: row.usage_scope,
         schema_version: row.schema_version,
         updated_at: row.updated_at,
+        artist_confirmed: artistConfirmed,
         label_source: 'human',
         human_review_status: 'corrected',
         revision: trx.raw('music_track_annotations.revision + 1'),

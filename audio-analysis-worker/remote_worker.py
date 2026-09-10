@@ -11,7 +11,8 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from download import download_audio, DownloadError
-from maest import verify_tag_model
+from maest import verify_tag_model, CONTRACT
+import outbox
 from worker import WorkerConfig, ensure_queue_dirs, acquire_lock, log
 
 
@@ -23,6 +24,13 @@ def api(config, path, body):
         return None if response.status == 204 else json.loads(response.read())
 
 
+def submit(config, job, endpoint, payload, call):
+    if config is None:
+        return call(config, endpoint, payload)  # 서버를 쓰지 않는 단독 테스트
+    path = outbox.save(config, job, endpoint, payload)
+    return outbox.deliver(path, config, call)
+
+
 def process(job, config, call=api, downloader=download_audio, runner=subprocess.run):
     # 실패·성공 어느 쪽에서도 임시 음원을 삭제한다. 원본을 결과 서버에 보내지 않는다.
     with tempfile.TemporaryDirectory(prefix='cf-audio-') as directory:
@@ -30,8 +38,9 @@ def process(job, config, call=api, downloader=download_audio, runner=subprocess.
         try:
             audio = downloader(job['platform'], job['track_key'], root)
         except DownloadError as error:
-            code = str(error) if str(error) == 'SOURCE_UNSUPPORTED' else 'DOWNLOAD_FAILED'
-            return call(config, f"/jobs/{job['id']}/fail", {'lease_token': job['lease_token'], 'error_code': code})
+            code = str(error)
+            result = submit(config, job, f"/jobs/{job['id']}/fail", {'lease_token': job['lease_token'], 'error_code': code}, call)
+            return {**(result or {}), 'error_code': code}
         job_file, output = root / 'job.json', root / 'result.json'
         # 인증 토큰은 모델 프로세스의 작업 파일·명령 인자에 쓰지 않는다.
         job_file.write_text(json.dumps({k: job[k] for k in ('platform', 'track_key', 'artist_name')}))
@@ -45,31 +54,16 @@ def process(job, config, call=api, downloader=download_audio, runner=subprocess.
             payload = json.loads(output.read_text())
         except (subprocess.SubprocessError, OSError, ValueError, RuntimeError) as error:
             code = 'MODEL_UNAVAILABLE' if str(error) == 'MODEL_UNAVAILABLE' else 'ANALYSIS_FAILED'
-            return call(config, f"/jobs/{job['id']}/fail", {'lease_token': job['lease_token'], 'error_code': code})
+            result = submit(config, job, f"/jobs/{job['id']}/fail", {'lease_token': job['lease_token'], 'error_code': code}, call)
+            return {**(result or {}), 'error_code': code}
         payload['lease_token'] = job['lease_token']
-        # 응답 유실은 같은 lease로 재전송한다. 서버가 완료 재전송을 멱등 처리한다.
-        for attempt in range(3):
-            try:
-                return call(config, f"/jobs/{job['id']}/complete", payload)
-            except HTTPError as error:
-                if error.code < 500:
-                    raise
-            except OSError:
-                pass
-            if attempt < 2:
-                time.sleep(2 ** attempt)
-        raise RuntimeError('RESULT_SUBMIT_FAILED')  # lease 만료 뒤 서버가 회수한다.
+        return submit(config, job, f"/jobs/{job['id']}/complete", payload, call)
 
 
 def main():
     config = WorkerConfig(os.environ).require()
     if config.dry_run:
         raise ValueError('서버 큐에서는 dry-run을 지원하지 않습니다. CLI --dry-run을 사용하세요.')
-    # 모델 미설치 상태에서 신청곡마다 재시도 횟수를 소진하지 않는다.
-    verify_tag_model(config.model_dir)
-    import essentia.standard as standard
-    if not hasattr(standard, 'TensorflowPredictMAEST'):
-        raise RuntimeError('requirements-tensorflow.txt 설치가 필요합니다')
     ensure_queue_dirs(config.root)
     lock = acquire_lock(config.root)
     running = True
@@ -79,16 +73,35 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     log('info', 'remote_worker_started')
+    models_ready = False
+    failures = 0
+    retry_after = 0
     try:
         while running:
+            if time.monotonic() < retry_after:
+                time.sleep(min(1, retry_after - time.monotonic()))
+                continue
             try:
+                outbox.drain(config, api)
+                if not models_ready:
+                    # 전송함 복구는 모델 설치 여부와 독립적이다. 검증 실패 중에는 새 작업을 받지 않는다.
+                    verify_tag_model(config.model_dir)
+                    import essentia.standard as standard
+                    if not hasattr(standard, 'TensorflowPredictMAEST'):
+                        raise RuntimeError('requirements-tensorflow.txt 설치가 필요합니다')
+                    models_ready = True
                 job = api(config, '/jobs/claim', {})
                 if job:
                     result = process(job, config)
-                    log('info', 'remote_job_finished', job_id=job['id'], status=result.get('status', 'completed'))
+                    log('info', 'remote_job_finished', job_id=job['id'], status=result.get('status', 'completed'), error_code=result.get('error_code'))
+                    failures = failures + 1 if result.get('error_code') else 0
+                    if failures >= 3 or result.get('error_code') in CONTRACT['retry']['infrastructure_codes']:
+                        retry_after = time.monotonic() + CONTRACT['retry']['cooldown_seconds']
+                        log('warning', 'remote_worker_cooldown', consecutive_failures=failures)
                     continue
             except Exception as error:
-                log('error', 'remote_worker_error', error_type=type(error).__name__)
+                log('error', 'remote_worker_error', error_type=type(error).__name__, http_status=getattr(error, 'code', None))
+                retry_after = time.monotonic() + CONTRACT['retry']['cooldown_seconds']
             time.sleep(config.poll_interval_ms / 1000)
     finally:
         lock.close()

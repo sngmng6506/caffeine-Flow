@@ -5,16 +5,18 @@ import numpy as np
 from emotion import EMOTION_MODEL_NAME, EmotionModelError, file_sha256
 from suggestions import build_suggestions
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parents[1] / 'server/src/constants'
+CONTRACT = json.loads((ROOT / 'audio-pipeline.json').read_text())
 METADATA = json.loads((ROOT / 'maest-metadata.json').read_text())
 CLASSES = METADATA['classes']
-MODEL_VERSION = 'discogs-maest-30s-pw-519l-2'
-MODEL_SHA256 = '92783feb21187443d058b4f16d7a76f47888d43fbdc7a28e8bcc8e024603bd20'
-SAMPLE_RATE = 16000
-PATCH_SIZE = 1876
-PATCH_HOP = 938
-FRAME_HOP = 256
-OUTPUT = 'PartitionedCall/Identity_13'
+MODEL_VERSION = CONTRACT['model_version']
+MODEL_SHA256 = CONTRACT['model_sha256']
+SETTINGS = CONTRACT['settings']
+SAMPLE_RATE = SETTINGS['sample_rate']
+PATCH_SIZE = SETTINGS['patch_size']
+PATCH_HOP = SETTINGS['patch_hop_size']
+FRAME_HOP = SETTINGS['frame_hop']
+OUTPUT = SETTINGS['output']
 
 
 def verify_tag_model(model_dir):
@@ -29,23 +31,21 @@ def summarize(frames, duration):
     if values.size == 0 or values.shape[-1] != len(CLASSES):
         raise EmotionModelError('MAEST 출력 차원이 올바르지 않습니다')
     values = values.reshape(-1, len(CLASSES))
-    if not 1 <= len(values) <= 64 or not np.isfinite(values).all() or np.any((values < 0) | (values > 1)):
+    if not 1 <= len(values) <= CONTRACT['max_segments'] or not np.isfinite(values).all() or np.any((values < 0) | (values > 1)):
         raise EmotionModelError('MAEST 출력 점수가 올바르지 않습니다')
     return {
         'classes': CLASSES, 'mean': values.mean(axis=0).tolist(), 'max': values.max(axis=0).tolist(),
         'segments': [{'start_sec': i * PATCH_HOP * FRAME_HOP / SAMPLE_RATE,
                       'end_sec': min(duration, (i * PATCH_HOP + PATCH_SIZE) * FRAME_HOP / SAMPLE_RATE),
                       'scores': row.tolist()} for i, row in enumerate(values)],
-        'settings': {'sample_rate': SAMPLE_RATE, 'patch_size': PATCH_SIZE, 'patch_hop_size': PATCH_HOP,
-                     'frame_hop': FRAME_HOP, 'last_patch_mode': 'repeat', 'resample_quality': 4,
-                     'output': OUTPUT, 'batch_size': 1},
+        'settings': dict(SETTINGS),
     }
 
 
 def load_audio(audio_path):
     """MAEST와 감정 모델이 함께 쓰는 16kHz 모노 배열. 같은 파일을 두 번 디코딩하지 않는다."""
     import essentia.standard as standard
-    return standard.MonoLoader(filename=str(audio_path), sampleRate=SAMPLE_RATE, resampleQuality=4)()
+    return standard.MonoLoader(filename=str(audio_path), sampleRate=SAMPLE_RATE, resampleQuality=SETTINGS['resample_quality'])()
 
 
 def predict(audio_path, model_dir, audio=None):
@@ -56,7 +56,7 @@ def predict(audio_path, model_dir, audio=None):
         if audio is None:
             audio = load_audio(audio_path)
         model = standard.TensorflowPredictMAEST(graphFilename=str(path), output=OUTPUT,
-                    patchSize=PATCH_SIZE, patchHopSize=PATCH_HOP, batchSize=1, lastPatchMode='repeat')
+                    patchSize=PATCH_SIZE, patchHopSize=PATCH_HOP, batchSize=SETTINGS['batch_size'], lastPatchMode=SETTINGS['last_patch_mode'])
         raw = summarize(model(audio), len(audio) / SAMPLE_RATE)
         raw['essentia_version'] = essentia.__version__
         return raw
@@ -74,7 +74,7 @@ def normalize_mood(features):
 
 
 def normalize(raw, taxonomy=None, features=None):
-    taxonomy = taxonomy or json.loads((ROOT / 'taxonomy.json').read_text())
+    taxonomy = taxonomy or json.loads((ROOT / 'music-taxonomy.json').read_text())
     candidates = {}
     for style, score in zip(raw['classes'], raw['mean']):
         label = taxonomy['style_overrides'].get(style) or taxonomy['parent_mapping'].get(style.split('---')[0])
