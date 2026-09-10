@@ -2,6 +2,9 @@
 import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 process.env.NODE_ENV = 'test';
+// 이 파일이 직접 세팅하지 않으면 다른 테스트 파일이 먼저 돌아 값을 남겨주기를
+// 기대하게 된다. 파일 순서가 바뀌면 워커 라우트가 통째로 503이 된다.
+process.env.AUDIO_ANALYSIS_WORKER_TOKEN ||= 'discovery-worker-token';
 const { app } = await import('../app.js');
 const db = (await import('../src/db/knex.js')).default;
 const { issueAdminToken } = await import('../src/utils/jwt.js');
