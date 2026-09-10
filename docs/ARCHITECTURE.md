@@ -76,7 +76,8 @@ sequenceDiagram
     G->>S: 서명 토큰으로 신청
     S->>S: 카페·서명·플랫폼·중복·한도 검증
     opt AI 필터 ON
-        S->>A: 매장 정책과 곡 메타데이터 전달
+        S->>S: 이 곡의 음향 분석 조회 (있으면)
+        S->>A: 매장 정책 + 곡 메타데이터 + 음향 분석
         A-->>S: accept / reject
     end
     S->>S: 신청곡과 판단 결과 저장
@@ -188,9 +189,14 @@ stateDiagram-v2
 
 - `music_audio_jobs`는 기존·신규 신청 모두 포함한다. 필터 OFF/거절도 대상이며 같은 곡은 한 건이다. Spotify는 unsupported로 남긴다.
 - `music_audio_runs`는 실행별 전체 구간 점수·평균·최댓값·입력 해시·모델/전처리/매핑 버전·자동 라벨의 추가 전용 원본이다. `music_audio_analyses`는 최신 검토용 특징·자동 라벨·MAEST 요약과 latest_run_id를 유지하며 재분석 시 revision이 증가한다.
-- `music_track_annotations`는 처음 자동 라벨을 보관한다. 사람 확인·수정 시 label_source=human으로 보호하고 confirmed/corrected를 구분한다. 재분석은 새 원본 이력과 최신 분석을 저장하며 사람 최종 라벨을 덮어쓰지 않는다.
+- `music_track_annotations`는 처음 자동 라벨을 보관한다. 사람이 `맞음`으로 판정하거나 직접 고치면 label_source=human으로 보호하고 confirmed/corrected를 구분한다. `틀림` 판정은 라벨을 보증하지 않으므로 automatic으로 남겨 재분석·재정규화가 계속 갱신하게 한다. 재분석은 새 원본 이력과 최신 분석을 저장하며 사람 최종 라벨을 덮어쓰지 않는다.
 - 워커는 결과를 디스크 outbox에 기록한 뒤 전송한다. 재시작 시 outbox를 먼저 복구하고 미인계 lease만 갱신한다. 오류별 지연·중단과 공통 장애 시 워커 휴지기로 무분별한 실패 소진을 막는다. 관리자 재큐잉은 generation으로 경쟁을 막으며 오래된 토큰을 폐기한다.
 - Lab의 곡 검토와 매장 정책 골드 판단은 별개다. 최종 라벨과 분석 revision을 비교해 보지 않은 결과가 검토 완료되지 않게 한다.
-- 원본 음원은 서버에 전송하지 않는다. 사람 라벨과 자동 라벨 모두 현재 라이브 LLM 입력·자동수락에는 연결하지 않는다.
+- 원본 음원은 서버에 전송하지 않는다.
+- 자동 분석은 실시간 음악 필터 프롬프트에 들어간다. 판단을 돕는 재료이지 판단의 전제가 아니다 — 대부분의 곡은 첫 신청 때 아직 분석되지 않았고, 분석이 없거나 조회에 실패하면 제목·아티스트만으로 판단한다. 자세한 내용은 [LLM_FILTER.md](LLM_FILTER.md). 사람 라벨은 아직 라이브 입력·자동수락에 연결하지 않는다.
 
-자동 분석 모델 메타데이터·설정·택소노미는 server/src/constants의 JSON을 서버와 Python이 공유한다. 정규화 서버 검증과 Lab 재정규화는 같은 함수를 사용한다. 곡 검토 완료는 모든 필드의 정답 확정을 뜻하지 않으며 reviewed_fields와 artist_confirmed로 확인 범위를 구분한다.
+자동 분석 모델 메타데이터·설정·택소노미는 server/src/constants의 JSON을 서버와 Python이 공유한다. 정규화 서버 검증과 Lab 재정규화는 같은 함수를 사용한다. 3단 Audio LLM의 실행 여부와 시스템 프롬프트는 `audio_pipeline_settings`가 단일 기준이며 워커는 claim 응답으로 받는다. 프롬프트 본문은 `audio_prompt_revisions`에 추가만 된다.
+
+곡 검토 완료는 모든 필드의 정답 확정을 뜻하지 않으며 reviewed_fields와 artist_confirmed로 확인 범위를 구분한다.
+
+최신곡 수집은 운영자가 Lab에서 요청하면 워커가 소스를 훑어 분석 큐를 채운다. 소스별 진도는 `music_source_cursors`가 단일 기준이며, 순위 소스는 offset이 끝에서 0으로 돌아가고 날짜 소스는 절대 날짜 구간을 쓴다.

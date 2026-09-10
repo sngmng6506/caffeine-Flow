@@ -146,7 +146,7 @@ human_reason_code    policy_match | policy_mismatch | unsafe_content | metadata_
 metadata_sufficient  boolean | null
 ```
 
-**곡 특성 라벨** — `music_track_annotations`에 `(platform, track_key)`당 한 건.
+**곡 특성 라벨** — `music_track_annotations`에 `(platform, track_key)`당 한 건. 값은 워커의 자동 분석이 채우며, 사람은 그것이 곡과 맞는지만 판정한다(택소노미를 직접 고르지 않는다).
 
 ```text
 artist_name · track_version · tempo_class · mood_tags(최대 2)
@@ -158,13 +158,15 @@ genre_tags(선택, 최대 2) · note(선택) · usage_scope · schema_version
 - 아티스트명은 운영자가 곡을 듣고 확인한다. 정규화 키는 같은 아티스트의 다른 곡 라벨을 찾는 용도로만 쓰며 자동 추정이나 라벨 복사는 하지 않는다. 참고 조회는 운영자가 요청할 때 최대 3건이다.
 - 재검수는 최신 값으로 upsert한다. 정책 검수는 추천곡 삭제 시 함께 삭제되고, 곡 특성은 출처 추천곡만 비워 재사용 가능한 라벨을 보존한다.
 - 사람 라벨은 `recommendations.filter_status`와 큐 `status`를 바꾸지 않는다. 음악 라벨링은 곡 버전과 메타데이터 충분성을 묻지 않고 기존 값은 보존하며 신규 값은 각각 `unknown`, `null`을 사용한다. `null`은 미확인을 뜻하며 메타데이터 부족으로 해석하지 않는다. AI 승인·거절 결과는 카페별 감사 화면에서 확인한다.
-- 동일한 `(platform, track_key)`의 기존 곡 라벨이 있으면 선택값을 자동 복원하고 저장 시각을 표시한다. 매장 정책 판단은 추천곡·매장별 값이므로 다른 신청에서 복사하지 않는다.
+- 매장 정책 판단은 추천곡·매장별 값이므로 다른 신청에서 복사하지 않는다.
 - 기존 정책 골드 큐는 정책 검수와 곡 라벨이 모두 있어야 완료이며 Playlist·플리 제목을 제외한다. 새 Lab의 곡 검토 큐는 이 조건을 사용하지 않는다.
 - 현재는 수집만 한다. `usage_scope=operational`이어도 자동수락, LLM 프롬프트, Exact 재사용, 동일 아티스트 검색에 쓰지 않으며 성능 지표도 자동 계산하지 않는다. 라이브 연결은 별도 평가와 계약 변경 후 진행한다.
 
 **자동 음향 분석과 곡 검토**
 
-신청곡 URL에서 자동 분석·라벨 저장을 수행하고 Lab에서 확인·수정한다. 흐름과 저장 경계는 [ARCHITECTURE.md#자동-음향-라벨링](ARCHITECTURE.md#자동-음향-라벨링)이 기준이다. 자동 원본과 사람 최종 라벨은 분리하며 라이브 LLM 판단에 사용하지 않는다.
+신청곡 URL에서 자동 분석·라벨 저장을 수행하고 Lab에서 확인한다. 흐름과 저장 경계는 [ARCHITECTURE.md#자동-음향-라벨링](ARCHITECTURE.md#자동-음향-라벨링), 화면과 판정 규칙은 [라벨링 랩 README](../music-labeling-lab/README.md)가 기준이다. 자동 원본과 사람 최종 라벨은 분리한다.
+
+**자동 분석은 위 `판단 흐름`대로 실시간 필터에 들어간다.** 사람 골드 라벨(`music_filter_reviews`)과 혼동하지 않는다 — 그쪽은 아직 수집만 한다.
 
 ## 구현 위치
 

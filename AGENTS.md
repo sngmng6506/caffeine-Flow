@@ -24,6 +24,7 @@
 | 음악 필터, 프롬프트, 모델 호출, 판단·오류 정책 | [docs/LLM_FILTER.md](docs/LLM_FILTER.md) |
 | 상태값, 라우터 순서, 플랫폼, 한도, KST, SQL raw, LLM 안전, 인증·웹 보안, 마이그레이션 | [docs/AI_CHANGE_GUARDRAILS.md](docs/AI_CHANGE_GUARDRAILS.md) |
 | 오디오 분석 워커, 자동 라벨링 작업 큐, MAEST 추론·정규화 | [audio-analysis-worker/README.md](audio-analysis-worker/README.md) |
+| 라벨링 화면, 사람 판정, 3단 프롬프트 편집, 최신곡 수집 버튼 | [music-labeling-lab/README.md](music-labeling-lab/README.md) |
 | 미구현 기능 검토·설계·우선순위 | [docs/ROADMAP.md](docs/ROADMAP.md) |
 | Markdown 문서 추가·이동·분리·재구성 | [docs/DOCUMENTATION_POLICY.md](docs/DOCUMENTATION_POLICY.md) |
 | 손님 화면의 색상·레이아웃·컴포넌트·모션 | [customer/DESIGN_GUIDE.md](customer/DESIGN_GUIDE.md) |

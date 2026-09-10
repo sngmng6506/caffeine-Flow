@@ -126,7 +126,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
 
 - 잘못된 UUID와 미존재 카페는 404다. 정지 카페는 손님 HTTP와 Socket.IO 접근이 차단된다.
-- 곡 라벨 검토는 `verdict`(`accurate`·`inaccurate`·`unclear`)만 보내는 경로를 지원한다. 택소노미를 고르지 않고 자동 서술이 곡과 맞는지만 답한다. `track_annotation`을 함께 보내면 기존처럼 수정으로 기록된다.
+- 곡 라벨 검토는 `verdict`(`accurate` 또는 `inaccurate`)만 보내는 경로를 지원한다. 택소노미를 고르지 않고 자동 서술이 곡과 맞는지만 답한다. `accurate`만 `label_source`를 `human`으로 승격하며 `inaccurate`는 `automatic`으로 남겨 재분석·재정규화 대상으로 둔다. `track_annotation`을 함께 보내면 기존처럼 수정으로 기록된다.
 - 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, audio_analysis_id?, audio_analysis_revision?, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 화면에 표시한 최신 자동 분석 ID를 함께 보내면 해당 곡·분석 한 건만 `reviewed`로 바뀐다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
 - 해당 카페의 AI 처리 이력만 검수할 수 있고, 사람 라벨은 신청곡 상태나 LLM 판단을 바꾸지 않는다.
 - 곡 라벨은 `(platform, track_key)`당 한 건으로 upsert한다.
@@ -181,7 +181,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/audio-analysis/discoveries/claim` | 워커 | 대기 중인 수집 요청 1건을 20분 lease로 획득. 없으면 204 |
 | POST | `/audio-analysis/discoveries/:id/complete` | 워커 | `lease_token`과 `tracks[]` 제출. 곡을 분석 큐에 등록하고 중복은 무시한다 |
 | POST | `/audio-analysis/discoveries/:id/fail` | 워커 | `lease_token`, `error_code` 제출. 최대 3회 재시도 |
-| GET | `/admin/audio-labels` | 🛡 | 모든 신청곡을 플랫폼·곡별 중복 제거해 조회. `view=ready|unreviewed|inaccurate|reviewed|all`, `offset`, 50건. `inaccurate`는 사람이 틀림·애매로 판정한 곡만. 작업 상태도 반환 |
+| GET | `/admin/audio-labels` | 🛡 | 모든 신청곡을 플랫폼·곡별 중복 제거해 조회. `view=ready|unreviewed|inaccurate|reviewed|all`, `offset`, 50건. `inaccurate`는 사람이 틀림으로 판정한 곡만(이미 저장된 옛 `unclear` 판정도 함께 보여준다). 작업 상태도 반환 |
 | GET | `/admin/audio-labels/:id/runs` | 🛡 | 해당 곡의 최근 원본 이력 ID·시각 최대 100건 |
 | GET | `/admin/audio-runs/:id` | 🛡 | 실행별 전체 원본 JSON. lease 토큰 제외, 수정 API 없음 |
 | POST | `/admin/audio-labels/:id/requeue` | 🛡 | generation을 비교해 실패 재시도·완료곡 재분석 등록. 처리 중은 409, Spotify는 400 |
@@ -204,7 +204,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 - 완료 응답 유실 시 같은 lease로 재전송하면 기존 결과를 반환한다. 만료 lease로 바로 완료하면 409다. resume은 같은 토큰을 유지하고 다른 워커가 인계받지 않은 작업만 재개한다. 교체되거나 관리자 재큐잉으로 폐기한 토큰은 409다. 완료되지 않은 lease는 만료 후 다음 claim에서 회수한다.
 - 실패 코드와 분류의 단일 기준은 `server/src/constants/audio-pipeline.json`이다. 인프라 오류는 짧은 대기, 일시 다운로드 오류는 초기 지수 지연 후 장기 재시도, 영구 소스 오류는 중단이다. 분석 실패·lease 소진은 횟수 제한 후 failed이며 관리자 재시도가 가능하다. 플랫폼 원문 오류·토큰·음원은 보내지 않는다.
 - 자동 라벨은 `evaluation`으로 저장하며 원본은 분석 행의 `automatic_annotation`, 최종 라벨은 `music_track_annotations`에 남긴다. 사람 확인·수정 후에는 자동 갱신이 최종 라벨을 덮어쓰지 않는다.
-- 검토 body: `{ annotation_revision, audio_analysis_id, audio_analysis_revision, track_annotation?, artist_confirmed?, reviewed_fields? }`. `track_annotation` 생략은 그대로 확인, 포함은 수정 저장이다. 화면에서 본 분석 ID·revision과 최종 라벨 revision을 잠금 안에서 비교하고 변경됐으면 409로 전체 롤백한다. 자동 라벨이 없으면 단순 확인은 409다.
+- 검토 body: `{ annotation_revision, audio_analysis_id, audio_analysis_revision, verdict?, track_annotation?, artist_confirmed?, reviewed_fields? }`. `track_annotation` 생략은 판정만 남기는 경로, 포함은 수정 저장이다. 화면에서 본 분석 ID·revision과 최종 라벨 revision을 잠금 안에서 비교하고 변경됐으면 409로 전체 롤백한다. 자동 라벨이 없으면 단순 확인은 409다.
 - 검토 완료는 최종 라벨의 `human_review_status`가 `confirmed|corrected`이고 연결된 분석이 없거나 `reviewed`일 때다. 매장 정책 골드 판단과 무관하다. 저장 후 서버 집계를 다시 조회한다.
 - 기존 정책 검수 API에서 `audio_analysis_id`를 보낼 경우에도 `audio_analysis_revision`이 필요하다. 분석 없이 정책 판단만 저장하는 기존 요청은 유지한다.
 
@@ -218,4 +218,4 @@ MAEST의 모델명·해시·설정·클래스 순서는 공통 계약과 정확�
 
 목록에는 generation·attempts·available_at이 포함된다. 재큐잉은 generation을 올리고 이전 lease를 폐기하며 최종 사람 라벨을 보존한다. 재정규화 결과가 이미 동일하면 unchanged=true로 revision을 올리지 않는다. 변경되면 최신 분석 revision을 올리고 검토를 다시 대기시키며, 자동 최종 라벨만 갱신한다. 기존 원본 이력은 변경하지 않는다.
 
-빠른 확인의 기본 reviewed_fields는 값이 알려진 장르·템포·리듬이다. 수정 저장은 값이 바뀐 필드를 확인 범위로 추가한다. unknown/빈 배열 필드는 정답 확인 범위에서 제외한다. artist_confirmed는 별도 명시적 boolean이며 이름 변경 시 생략하면 확인을 해제한다. 확인된 아티스트 참고 검색은 human 라벨 중 artist_confirmed=true만 사용한다. 마이그레이션 전 확인 범위는 추정하지 않는다.
+판정만 보내는 경로의 기본 reviewed_fields는 값이 알려진 장르·템포·리듬이며, `accurate`일 때만 누적한다 — `inaccurate`는 라벨을 보증하지 않으므로 확인 범위를 넓히지 않는다. 수정 저장은 값이 바뀐 필드를 확인 범위로 추가한다. unknown/빈 배열 필드는 정답 확인 범위에서 제외한다. artist_confirmed는 별도 명시적 boolean이며 이름 변경 시 생략하면 확인을 해제한다. 확인된 아티스트 참고 검색은 human 라벨 중 artist_confirmed=true만 사용한다. 마이그레이션 전 확인 범위는 추정하지 않는다.
