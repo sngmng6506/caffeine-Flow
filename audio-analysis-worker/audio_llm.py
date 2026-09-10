@@ -11,6 +11,8 @@ MAEST(1단)와 **독립적으로** 돈다. 이 모듈은 장르 결과도 택소
 명시적으로 켰을 때만 동작한다.
 """
 
+from prompt_renderer import render_prompt
+
 import base64
 import json
 import subprocess
@@ -47,12 +49,7 @@ SCHEMA = {
 
 # 택소노미를 주지 않는다. 선택지를 좁히면 학습 분포 밖 음악(국악, 트로트 등)의
 # 정보가 통째로 소실된다. 정규화는 나중에 사람이 보거나 별도 매핑이 한다.
-SYSTEM_PROMPT = (
-    '너는 음악을 듣고 묘사하는 사람이다. 주어진 오디오 구간들은 한 곡에서 고르게 뽑은 것이다.\n'
-    '들리는 것만 쓴다. 곡 제목·아티스트·장르를 추측하지 말고, 확실하지 않으면 그렇게 적는다.\n'
-    '분위기, 악기, 보컬, 구간별 변화를 한국어로 서술한다. 정해진 라벨 목록은 없으니 '
-    '가장 잘 맞는 표현을 자유롭게 쓴다.'
-)
+SYSTEM_PROMPT = render_prompt('audio-description.system.j2')
 
 
 class AudioLLMError(RuntimeError):
@@ -94,7 +91,7 @@ def extract_clip(audio_path, segment, ffmpeg='ffmpeg', runner=subprocess.run):
 
 def build_messages(clips):
     """오디오 구간만 담은 메시지. 장르·택소노미·임베딩은 넣지 않는다."""
-    content = [{'type': 'text', 'text': f'같은 곡에서 고르게 뽑은 {len(clips)}개 구간이다.'}]
+    content = [{'type': 'text', 'text': render_prompt('audio-description.user.j2', clip_count=len(clips))}]
     for clip in clips:
         content.append({
             'type': 'input_audio',

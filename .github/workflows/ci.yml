@@ -49,9 +49,9 @@ jobs:
         with:
           python-version: '3.12'
       # 테스트는 모델 예측기를 주입해 돌리므로 essentia와 모델 파일이 필요 없다.
-      # 무거운 TensorFlow 휠을 CI에 끌어오지 않기 위해 numpy만 설치한다.
+      # 무거운 TensorFlow 휠을 CI에 끌어오지 않기 위해 numpy와 프롬프트 엔진만 설치한다.
       - name: Install test deps
-        run: python -m pip install 'numpy>=1.26,<3'
+        run: python -m pip install 'numpy>=1.26,<3' 'Jinja2==3.1.6'
       - name: Unit tests
         run: python -m unittest discover -s audio-analysis-worker -p 'test_*.py' -v
 

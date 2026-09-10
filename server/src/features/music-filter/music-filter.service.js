@@ -7,12 +7,8 @@ const { logError, CAUSE } = require('../../observability');
 // context는 알림에 카페 범위를 넣기 위한 것이다. 필터 실험실처럼 카페가 없는
 // 호출도 있으므로 선택값으로 둔다.
 async function evaluateTrack({ cafePrompt, track, model: modelOverride, context = {} }) {
-  const messages = buildMusicFilterMessages({
-    cafePrompt,
-    track,
-  });
-
   try {
+    const messages = buildMusicFilterMessages({ cafePrompt, track });
     const { result, model } = await callMusicFilterLlm(messages, modelOverride);
     return { ...normalizeLlmDecision(result), model };
   } catch (error) {

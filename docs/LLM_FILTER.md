@@ -69,6 +69,17 @@ API key 누락 · 요청 timeout · 네트워크·HTTP 오류
 
 처리 결과는 `status=rejected`, `filter_status=error_rejected`, 손님 응답 503, 사장님 앱 `music_filter_error` 알림이다. 한 곡을 놓치는 비용보다 부적절한 곡이 자동 재생되는 비용이 크다는 판단이다.
 
+## 프롬프트 파일 관리
+
+[서비스의 prompts 폴더](../server/src/features/music-filter/prompts)에서 음악 심사와 손님용 안내의 system/user 본문을 관리한다. `prompt.renderer.js`가 Nunjucks로 렌더링하고, 기존 builder/service가 입력 정규화와 역할별 메시지 구성을 담당한다. 매장 정책은 DB의 기존 설정값을 변수로 전달하며 템플릿 파일로 만들지 않는다.
+
+- 템플릿은 저장소에 등록된 파일만 사용한다. 사용자 입력을 템플릿 소스로 실행하거나 렌더링 결과를 재해석하지 않는다.
+- 일반 텍스트이므로 HTML 자동 이스케이프는 끄고, 출력 변수 누락은 오류로 처리한다. 기존 메타데이터의 `unknown` 기본값은 유지한다.
+- 판단 로직·제한값·응답 JSON Schema는 코드가 단일 기준이다. 템플릿에는 문장 구성만 둔다.
+- 변경은 Git으로 추적한다. 기존 `filter_prompt_snapshot`은 매장 정책 스냅샷이며 전체 템플릿 버전 기록은 아니다.
+- `npm run test:unit --prefix server`로 프롬프트·상태·오류 계약을 확인한다. `prompt-templates.test.mjs`의 이전 메시지 fixture는 문구 변경이 의도된 경우에만 함께 갱신한다.
+- 템플릿은 배포 파일에 포함하고 수정 후 서버를 재시작한다.
+
 ## 프롬프트 안전
 
 프롬프트는 곡 메타데이터 안의 문장을 명령이 아닌 심사 대상 데이터로 취급하도록 지시한다.

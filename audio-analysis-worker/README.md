@@ -252,3 +252,11 @@ python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 ‘이대로 확인’은 알려진 장르·템포·리듬의 검토다. 무드·보컬·악기 unknown과 업로더 채널명을 정답으로 승격하지 않는다. 실제 아티스트 확인은 별도 체크박스를 사용하며 확인 범위는 reviewed_fields에 기록한다. 기존 검토 기록의 확인 범위는 추정하지 않고 미확인으로 유지한다.
 
 추가 인수인계 시험: 서버 통신을 일시 중단했을 때 outbox에 결과가 남는지, 통신 복구·워커 재시작 후 재추론 없이 저장되는지 확인한다. Lab 재등록과 재정규화, 아티스트 확인 여부를 함께 시험하고 모델/택소노미 버전을 결과에 기록한다. 이 시험을 위해 운영 DB를 직접 수정할 필요는 없다.
+
+## 프롬프트 파일 관리
+
+[오디오 분석 prompts 폴더](prompts)의 `audio-description.system.j2`와 `audio-description.user.j2`가 3단 LLM의 텍스트 본문이다. `prompt_renderer.py`는 Jinja2의 StrictUndefined로 누락 변수를 거절하고 일반 텍스트를 렌더링한다. 오디오 데이터 첨부·구간 선택·응답 스키마는 `audio_llm.py`에 유지한다.
+
+user 템플릿의 입력은 `clip_count`다. MAEST 결과·곡 제목·아티스트·택소노미를 추가하지 않는다. 템플릿 본문을 바꿀 때는 `audio_llm.py`의 `PROMPT_VERSION`도 올리고 Python 테스트를 실행한다. 이번 파일 분리는 출력 문구가 같으므로 기존 버전을 유지한다.
+
+업데이트 시 사용하는 requirements 파일로 의존성(Jinja2 포함)을 설치하고 저장소의 prompts 폴더까지 갱신한 뒤 서비스를 재시작한다. 전체 프롬프트 목록은 [최상단 README](../README.md#llm-프롬프트-바로가기)에 있다.

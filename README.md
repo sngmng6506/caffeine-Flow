@@ -58,6 +58,18 @@ music-labeling-lab/ 운영자 골드 라벨링 UI
 audio-analysis-worker/ 신청곡 다운로드·Essentia/MAEST 자동 라벨링
 ```
 
+## LLM 프롬프트 바로가기
+
+프롬프트는 사용하는 서비스의 `prompts/`에서 관리한다. 아래 링크에서 본문을 바로 수정할 수 있다.
+
+| 용도 | System | User | 조립·입력 처리 |
+| --- | --- | --- | --- |
+| 신청곡 음악 심사 | [system](server/src/features/music-filter/prompts/music-filter.system.njk) | [user](server/src/features/music-filter/prompts/music-filter.user.njk) | [builder](server/src/features/music-filter/prompt.builder.js) |
+| 손님용 신청곡 안내 | [system](server/src/features/music-filter/prompts/public-guide.system.njk) | [user](server/src/features/music-filter/prompts/public-guide.user.njk) | [service](server/src/features/music-filter/public-guide.service.js) |
+| 오디오 LLM 분석 | [system](audio-analysis-worker/prompts/audio-description.system.j2) | [user](audio-analysis-worker/prompts/audio-description.user.j2) | [audio_llm.py](audio-analysis-worker/audio_llm.py) |
+
+서버는 Nunjucks(`.njk`), Python 워커는 Jinja2(`.j2`)를 사용한다. 입력 규칙과 수정 시 검증 방법은 [음악 필터](docs/LLM_FILTER.md#프롬프트-파일-관리)와 [오디오 워커](audio-analysis-worker/README.md#프롬프트-파일-관리)를 따른다.
+
 ## 문서
 
 - 전체 문서 지도: [docs/README.md](docs/README.md)
