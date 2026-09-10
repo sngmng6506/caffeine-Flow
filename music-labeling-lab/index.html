@@ -11,7 +11,6 @@
   <body>
     <header class='masthead'>
       <h1>음악 라벨링</h1>
-      <p class='sub'>자동 분석이 곡과 맞는지 확인합니다</p>
       <nav>
         <a href='/admin'>운영자 콘솔</a>
         <a href='/filter-lab'>필터 테스트</a>
@@ -53,13 +52,11 @@
           <p class='idline'>
             <span id='position'>—</span>
             <span id='platform'></span>
-            <span id='checkedAt'></span>
+            <span id='jobStatus' class='job' role='status'></span>
           </p>
           <h2 id='trackTitle'></h2>
           <p class='credit'><span id='trackArtist'></span><span id='artistFlag'></span></p>
-          <p id='cafeName' class='scope'></p>
           <a id='trackLink' class='listen' target='_blank' rel='noopener noreferrer'>▶ 곡 듣기</a>
-          <p id='jobStatus' class='job-status' role='status'></p>
         </section>
 
         <div class='sheet'>
@@ -75,11 +72,7 @@
               <small id='existingLabelStatus'>아직 자동 라벨이 없습니다.</small>
             </div>
 
-            <p class='note'>
-              <b>판정은 라벨을 바꾸지 않습니다.</b> 자동 라벨은 이미 저장돼 있고, 여기서 남기는 것은
-              그 라벨이 곡과 맞았는지에 대한 기록뿐입니다. <b>맞음</b>만 사람 라벨로 승격하고,
-              <b>틀림</b>·<b>애매</b>는 자동 라벨로 남겨 다음 재분석이 다시 고칠 수 있게 합니다.
-            </p>
+            <p class='note'>판정은 자동 라벨을 바꾸지 않습니다. <b>맞음</b>만 사람 라벨로 승격합니다.</p>
           </div>
 
           <div id='audioAnalysis' class='col col-data' hidden>
@@ -101,6 +94,7 @@
             <button type='button' id='loadMaestRaw' class='disclose' hidden>구간별 원본 · 이력 보기</button>
             <pre id='maestRaw' hidden></pre>
             <p id='analysisProvenance' class='prov'></p>
+            <p id='checkedAt' class='prov'></p>
           </div>
         </div>
 
@@ -119,9 +113,10 @@
           <button type='button' id='verdictInaccurate'>틀림 <kbd>2</kbd></button>
           <button type='button' id='verdictUnclear'>애매 <kbd>3</kbd></button>
         </div>
+        <p id='barAlert' class='bar-alert' role='alert'></p>
         <div class='nav'>
-          <button type='button' id='previousItem' title='이전 곡 (←)'>←</button>
-          <button type='button' id='nextItem' title='다음 곡 (→)'>→</button>
+          <button type='button' id='previousItem' aria-label='이전 곡' title='이전 곡 (←)'>←</button>
+          <button type='button' id='nextItem' aria-label='다음 곡' title='다음 곡 (→)'>→</button>
         </div>
       </div>
     </div>

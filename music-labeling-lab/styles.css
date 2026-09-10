@@ -14,15 +14,22 @@
   --sheet-2: #f2f4f6;
   --ink: #191f28;
   --ink-2: #333d4b;
-  --ink-3: #6b7684;
+  --ink-3: #66707d;
   --ink-4: #aab2bd;
   --rule: #e5e8eb;
   --rule-hard: #d3d8de;
   --primary: #3182f6;
   --primary-strong: #1b64da;
   --primary-soft: #eaf2fe;
-  --ok: #00a878;
-  --warn: #f59f00;
+  /* 가이드의 Success #00a878 · Warning #f59f00은 면과 큰 글자를 위한 값이라
+     11px 글자로 쓰면 흰 바탕에서 3.06:1, 2.13:1로 4.5:1에 못 미친다. 같은 색상의
+     어두운 쪽을 쓴다 — 역할은 같고 대비만 맞춘다. ink-3도 같은 이유로 한 단계
+     어둡게 잡았다(#6b7684 → 4.19:1). 세 값 모두 흰색·바탕·보조면에서 4.5:1을 넘는다. */
+  --ok-text: #007e5a;
+  --warn-text: #9a6400;
+
+  --z-bar: 10;
+  --z-stamp: 20;
 
   --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
   --serif: 'Noto Serif KR', 'Noto Serif CJK KR', 'Nanum Myeongjo', AppleMyungjo, Batang, serif;
@@ -33,6 +40,8 @@
   font-family: var(--sans);
 }
 
+/* 고정 판정 막대가 키보드 포커스를 덮지 않게 한다(WCAG 2.4.11 Focus Not Obscured). */
+html { scroll-padding-bottom: 110px; }
 * { box-sizing: border-box; }
 body { margin: 0; padding-bottom: 96px; font-size: 15px; line-height: 1.5; }
 button, input, select, textarea { font: inherit; }
@@ -40,7 +49,7 @@ button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 kbd {
   margin-left: 6px; padding: 1px 5px; font-family: var(--mono); font-size: 11px;
-  color: var(--ink-4); border: 1px solid var(--rule-hard); border-radius: 6px;
+  color: var(--ink-3); border: 1px solid var(--rule-hard); border-radius: 4px;
 }
 
 /* ── 대장 표제 ─────────────────────────────────────────────── */
@@ -50,7 +59,6 @@ kbd {
   padding: 18px 0 12px; border-bottom: 1px solid var(--rule-hard);
 }
 .masthead h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
-.masthead .sub { margin: 0; color: var(--ink-2); font-size: 12.5px; }
 .masthead nav { display: flex; gap: 8px; }
 .masthead a {
   color: var(--ink-2); font-size: 12.5px; text-decoration: none;
@@ -82,21 +90,21 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
 
 /* ── 곡 표제 ───────────────────────────────────────────────── */
 .slug { padding: 22px 0 0; }
+/* 곡 식별자는 대문자로 바꾸지 않는다. YouTube ID는 대소문자를 구분해서
+   Q4_qJi_jrUg를 Q4_QJI_JRUG로 보여주면 복사한 값이 다른 곡을 가리킨다. */
 .idline {
   display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0;
-  font-family: var(--mono); font-size: 11.5px; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--ink-3);
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-3);
 }
+.idline .job { color: var(--warn-text); font-weight: 600; }
 .slug h2 { margin: 6px 0 0; font-size: 27px; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; }
 .credit { margin: 3px 0 0; color: var(--ink-2); font-size: 15px; }
-.scope { margin: 6px 0 0; color: var(--ink-3); font-size: 11.5px; }
 .listen {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 13px;
   padding: 7px 13px; color: #fff; background: var(--primary);
   border-radius: 6px; font-size: 13px; font-weight: 500; text-decoration: none;
 }
 .listen:hover { background: var(--primary-strong); }
-.job-status { margin: 10px 0 0; color: var(--ink-2); font-size: 12.5px; }
 /* 수집한 이름과 저장된 이름이 다르면 엉뚱한 곡을 분석한 것일 수 있다. */
 .mismatch {
   display: inline-block; margin-left: 8px; padding: 1px 7px;
@@ -113,13 +121,12 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
 .col-data { padding-left: 40px; border-left: 1px solid var(--rule); }
 .eyebrow {
   display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
-  font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em;
-  text-transform: uppercase; color: var(--ink-3);
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
 }
 .col-data .eyebrow:not(:first-child) { margin-top: 22px; }
 .analysis-status { font-weight: 600; letter-spacing: .04em; }
-.analysis-status--pending { color: var(--warn); }
-.analysis-status--reviewed { color: var(--ok); }
+.analysis-status--pending { color: var(--warn-text); }
+.analysis-status--reviewed { color: var(--ok-text); }
 
 /* 판정 대상인 서술만 명조로 조판한다. 화면에서 유일하게 "읽히는" 덩어리다. */
 .auto-description { margin: 0; }
@@ -143,10 +150,10 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
   margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--rule-hard);
 }
-.check { display: flex; align-items: center; gap: 9px; font-size: 14px; cursor: pointer; }
-.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--primary); }
+.check { display: flex; align-items: center; gap: 9px; min-height: 24px; font-size: 14px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
 .checks small { color: var(--ink-3); font-size: 11.5px; }
-.checks small.is-loaded { color: var(--ok); }
+.checks small.is-loaded { color: var(--ok-text); }
 .note {
   margin: 22px 0 0; padding: 13px 15px; background: var(--sheet-2);
   border-left: 3px solid var(--ink-3); color: var(--ink-2);
@@ -203,7 +210,7 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
 
 /* ── 판정 막대: 곡마다 누르는 표적이라 언제나 손 닿는 곳에 둔다(Fitts). ── */
 .verdict {
-  position: fixed; inset: auto 0 0 0; z-index: 5;
+  position: fixed; inset: auto 0 0 0; z-index: var(--z-bar);
   background: var(--sheet); border-top: 1px solid var(--rule-hard);
 }
 .verdict-inner {
@@ -223,6 +230,11 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
 .buttons button:hover:enabled { color: var(--primary); border-color: var(--primary); }
 .buttons button:hover:enabled kbd { color: var(--primary); border-color: var(--primary); }
 .buttons button:disabled { color: var(--ink-4); cursor: not-allowed; }
+.bar-alert {
+  flex: none; max-width: 260px; margin: 0;
+  color: var(--warn-text); font-size: 12.5px; line-height: 1.4;
+}
+.bar-alert:empty { display: none; }
 .nav { display: flex; flex: none; gap: 6px; }
 .nav button {
   padding: 12px 11px; color: var(--ink-2); background: none;
@@ -233,7 +245,7 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
 
 /* 저장됐다는 사실을 몸으로 알리는 유일한 강세(Nielsen #1). */
 .stamp {
-  position: fixed; left: 50%; top: 42%; z-index: 20;
+  position: fixed; left: 50%; top: 42%; z-index: var(--z-stamp);
   padding: 10px 26px; color: var(--primary); background: var(--primary-soft);
   border: 3px solid var(--primary); border-radius: 8px;
   font-size: 30px; font-weight: 700; letter-spacing: .14em;
@@ -247,7 +259,9 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
   100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .stamp.show { animation: none; }
+  /* 애니메이션만 없애면 opacity가 0에 머물러 아무 피드백도 남지 않는다.
+     최종 상태를 그대로 보여주고 JS가 치운다. */
+  .stamp.show { animation: none; opacity: 1; }
 }
 
 @media (max-width: 860px) {

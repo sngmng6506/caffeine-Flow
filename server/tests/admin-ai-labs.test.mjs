@@ -29,6 +29,7 @@ describe('관리자 AI 랩 정적 계약', () => {
   it('음악 라벨링은 자동 곡 큐에서 확인 또는 수정한다', () => {
     const app = read('music-labeling-lab/app.js');
     const html = read('music-labeling-lab/index.html');
+    const css = read('music-labeling-lab/styles.css');
     const adminRoute = read('server/src/routes/admin.js');
     const reviewService = read('server/src/features/music-labeling/review.service.js');
     const nullableMigration = read('server/src/db/migrations/20260828090000_nullable_music_filter_metadata_sufficient.js');
@@ -61,6 +62,14 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).toContain('<kbd>1</kbd>');
     expect(html).toContain('<kbd>2</kbd>');
     expect(html).toContain('<kbd>3</kbd>');
+    // 아이콘만 있는 버튼에는 이름이 있어야 한다.
+    expect(html).toContain("aria-label='이전 곡'");
+    expect(html).toContain("aria-label='다음 곡'");
+    // 저장 실패를 alert으로 막지 않고 누른 자리 옆에 띄운다.
+    expect(html).toContain("role='alert'");
+    expect(app).not.toContain('alert(error.message)');
+    // YouTube ID는 대소문자를 구분한다. 곡 식별자 줄을 대문자로 바꾸지 않는다.
+    expect(css).not.toContain('text-transform: uppercase');
     expect(html).not.toContain('보컬 유형');
     expect(html).not.toContain('주요 분위기');
     expect(html).not.toContain('라벨 사용 목적');

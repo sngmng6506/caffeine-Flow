@@ -215,7 +215,6 @@ function renderItem() {
   $('message').hidden = true;
   $('reviewCard').hidden = false;
   $('position').textContent = `${currentOffset + currentIndex + 1}번째 / 이번 묶음 ${items.length}건`;
-  $('cafeName').textContent = '전체 매장 신청곡 · 같은 곡은 한 번만 분석';
   $('trackTitle').textContent = item.title || '제목 없음';
   const artist = item.track_annotation?.artist_name || item.channel_title;
   $('trackArtist').textContent = artist || '아티스트 정보 없음';
@@ -224,14 +223,17 @@ function renderItem() {
   $('artistFlag').innerHTML = collected && artist && collected !== artist
     ? `<span class='mismatch'>수집 이름 · ${escapeHtml(collected)}</span>` : '';
   $('platform').textContent = `${item.platform || '플랫폼 미상'} · ${item.video_id || ''}`.trim();
-  $('checkedAt').textContent = formatDateTime(item.audio_analysis?.analyzed_at || item.created_at);
+  $('checkedAt').textContent = `등록 ${formatDateTime(item.created_at)}`;
   $('trackLink').href = url || '#';
   $('trackLink').hidden = !url;
 
+  showAlert('');
   resetForm(item);
   renderAudioAnalysis(item);
   const states = { queued: '분석 대기', processing: '분석 중', completed: '자동 라벨링 완료', failed: '분석 실패 · 재시도 한도 초과', unsupported: 'Spotify 자동 분석 미지원' };
-  $('jobStatus').textContent = `${states[item.job_status] || item.job_status}${item.error_code ? ` · ${item.error_code}` : ''}`;
+  const status = item.job_status === 'completed' && !item.error_code
+    ? '' : `${states[item.job_status] || item.job_status}${item.error_code ? ` · ${item.error_code}` : ''}`;
+  $('jobStatus').textContent = status;
   for (const id of ['verdictAccurate', 'verdictInaccurate', 'verdictUnclear']) {
     $(id).disabled = !item.track_annotation;
   }
@@ -264,12 +266,19 @@ const VERDICT_WORDS = Object.freeze({ accurate: '맞음', inaccurate: '틀림', 
 
 // 저장됐다는 사실을 알리는 유일한 피드백이다. 목록이 갱신되는 것만으로는
 // 눌렀는지 안 눌렀는지 알 수 없다(Nielsen #1 시스템 상태 가시성).
+function showAlert(text) {
+  $('barAlert').textContent = text || '';
+}
+
 function showStamp(verdict) {
   const stamp = $('verdictStamp');
   stamp.textContent = VERDICT_WORDS[verdict] || '저장';
   stamp.classList.remove('show');
   void stamp.offsetWidth;
   stamp.classList.add('show');
+  // 동작을 줄인 환경에서는 애니메이션이 없어 스스로 사라지지 않는다.
+  clearTimeout(showStamp.timer);
+  showStamp.timer = setTimeout(() => stamp.classList.remove('show'), 700);
 }
 
 // 서술이 곡과 맞는지만 답한다. 택소노미를 고르게 하면 판단이 어려워 아무거나 찍게
@@ -288,9 +297,10 @@ async function submitVerdict(verdict, buttonId) {
       audio_analysis_revision: item.audio_analysis?.revision || null,
     });
     if (!ok) throw new Error(data.error || '검토를 저장하지 못했습니다');
+    showAlert('');
     showStamp(verdict);
     await advanceAfterReview();
-  } catch (error) { alert(error.message); }
+  } catch (error) { showAlert(error.message); }
   finally { button.disabled = !items[currentIndex]?.track_annotation; }
 }
 
@@ -403,7 +413,8 @@ for (const [buttonId, action] of [['requeueAudio', 'requeue'], ['renormalizeAudi
         analysis_revision: item.audio_analysis?.revision,
       });
       if (!ok) throw new Error(data.error || '처리하지 못했습니다');
+      showAlert('');
       await loadPage(currentOffset);
-    } catch (error) { alert(error.message); renderItem(); }
+    } catch (error) { showAlert(error.message); renderItem(); }
   });
 }
