@@ -7,7 +7,7 @@ from urllib.error import HTTPError
 from unittest.mock import patch
 import outbox
 from remote_worker import process
-from download import classify_error
+from download import classify_error, error_hint
 import subprocess
 
 
@@ -91,6 +91,19 @@ class OutboxTest(unittest.TestCase):
             config.server_url = 'https://other.test'
             with self.assertRaisesRegex(RuntimeError, 'SERVER_MISMATCH'):
                 outbox.deliver(path, config, lambda *a: self.fail('must not send'))
+
+    def test_error_hint_picks_the_reason_line(self):
+        # DOWNLOAD_FAILED는 분류에 걸리지 않은 것을 모두 받는 통이라, 원문을 남기지
+        # 않으면 같은 곡이 반복해 실패해도 이유를 알 방법이 없다. 저널에만 남는다.
+        error = subprocess.CalledProcessError(1, [], stderr=(
+            b'[youtube] Extracting URL\n'
+            b'ERROR: [youtube] abc: Video unavailable\n'
+            b'  File "x.py", line 1\n'))
+        self.assertEqual(error_hint(error), 'ERROR: [youtube] abc: Video unavailable')
+        self.assertEqual(error_hint(subprocess.CalledProcessError(1, [], stderr=b'first\nlast\n')), 'last')
+        self.assertEqual(error_hint(FileNotFoundError()), 'FileNotFoundError')
+        self.assertEqual(len(error_hint(subprocess.CalledProcessError(
+            1, [], stderr=('ERROR: ' + 'x' * 900).encode()))), 300)
 
     def test_download_error_classes(self):
         self.assertEqual(classify_error(FileNotFoundError()), 'DOWNLOAD_INFRASTRUCTURE')

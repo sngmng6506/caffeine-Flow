@@ -19,6 +19,27 @@ class DownloadError(RuntimeError):
     pass
 
 
+# 저널에만 남길 진단 문구의 길이. 서버·Discord로는 나가지 않는다.
+DIAGNOSTIC_MAX = 300
+
+
+def error_hint(error):
+    """왜 실패했는지 한 줄로 요약한다. 저널에만 남는다.
+
+    DOWNLOAD_FAILED는 분류에 걸리지 않은 것을 모두 받는 통이라, 원문을 남기지
+    않으면 같은 곡이 반복해 실패해도 이유를 알 방법이 없다.
+    """
+    raw = getattr(error, 'stderr', b'') or b''
+    if isinstance(raw, bytes):
+        raw = raw.decode('utf-8', errors='replace')
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if not lines:
+        return type(error).__name__
+    # yt-dlp는 ERROR 줄에 이유를 적는다. 없으면 마지막 줄을 쓴다.
+    picked = next((line for line in lines if line.startswith('ERROR')), lines[-1])
+    return picked[:DIAGNOSTIC_MAX]
+
+
 def classify_error(error):
     # 원문은 외부로 보내지 않고 일시 장애·영구 소스 오류·공통 환경 장애만 분류한다.
     message = (getattr(error, 'stderr', b'') or b'')

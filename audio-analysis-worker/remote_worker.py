@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from discover import DiscoveryError, collect
-from download import download_audio, DownloadError
+from download import download_audio, DownloadError, error_hint
 from maest import verify_tag_model, CONTRACT
 import outbox
 from worker import WorkerConfig, ensure_queue_dirs, acquire_lock, log
@@ -40,6 +40,10 @@ def process(job, config, call=api, downloader=download_audio, runner=subprocess.
             audio = downloader(job['platform'], job['track_key'], root)
         except DownloadError as error:
             code = str(error)
+            # 분류 코드만으로는 같은 곡이 왜 계속 실패하는지 알 수 없다. 원인 줄은
+            # 저널에만 남기고 서버·Discord로 내보내지 않는다.
+            log('warning', 'download_failed', job_id=job['id'], error_code=code,
+                hint=error_hint(error.__cause__ or error))
             result = submit(config, job, f"/jobs/{job['id']}/fail", {'lease_token': job['lease_token'], 'error_code': code}, call)
             return {**(result or {}), 'error_code': code}
         job_file, output = root / 'job.json', root / 'result.json'
