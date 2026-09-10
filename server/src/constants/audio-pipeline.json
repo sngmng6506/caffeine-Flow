@@ -12,6 +12,10 @@
     "batch_size": 1
   },
   "max_segments": 64,
+  "emotion_models": {
+    "embedding": "msd-musicnn-1",
+    "regression": "deam-msd-musicnn-2"
+  },
   "retry": {
     "infrastructure_codes": [
       "DOWNLOAD_INFRASTRUCTURE",

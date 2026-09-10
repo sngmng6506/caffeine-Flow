@@ -6,8 +6,8 @@ const { normalize } = require('./normalization');
 const MODEL = contract.model_version;
 // 감정값을 채운 실행은 임베딩·회귀 모델을 함께 기록한다. 순서까지 고정해 원본만 보고
 // 어떤 모델이 돌았는지 알 수 있게 한다.
-const EMBEDDING_MODEL = 'msd-musicnn-1';
-const EMOTION_MODEL = 'deam-msd-musicnn-2';
+const EMBEDDING_MODEL = contract.emotion_models.embedding;
+const EMOTION_MODEL = contract.emotion_models.regression;
 const MAEST_ONLY_SOURCES = [MODEL];
 const EMOTION_SOURCES = [MODEL, EMBEDDING_MODEL, EMOTION_MODEL];
 const MODES = ['MAEST_ONLY', 'MAEST_EMOTION', 'FULL'];

@@ -1,4 +1,4 @@
-"""deam-msd-musicnn으로 Valence/Arousal을 추정한다.
+"""회귀 헤드로 Valence/Arousal을 추정한다.
 
 수동 CLI 경로에서만 쓰며 자동 MAEST 큐는 호출하지 않는다. 모델을 쓸 수 없으면
 분위기를 추측하지 않고 `None`을 돌려준다.
@@ -8,17 +8,23 @@ SHA-256은 EXPECTED_SHA256에 적어 두어, 받아 둔 파일이 공식 배포�
 """
 
 import hashlib
+import json
 import math
 from pathlib import Path
 
+# 모델 이름은 서버 검증과 같은 값이어야 한다. 양쪽에 따로 적지 않고 한 파일을 읽는다.
+_CONTRACT = json.loads(
+    (Path(__file__).resolve().parents[1] / 'server/src/constants/audio-pipeline.json').read_text()
+)
+
 # 모델 카드가 규정한 입력 샘플레이트. 44.1kHz로 넣으면 조용히 엉뚱한 값이 나온다.
 EMOTION_SAMPLE_RATE = 16000
-EMBEDDING_MODEL_FILE = "msd-musicnn-1.pb"
-EMOTION_MODEL_FILE = "deam-msd-musicnn-2.pb"
-EMOTION_MODEL_NAME = "deam-msd-musicnn-2"
-EMBEDDING_MODEL_NAME = "msd-musicnn-1"
+EMOTION_MODEL_NAME = _CONTRACT["emotion_models"]["regression"]
+EMBEDDING_MODEL_NAME = _CONTRACT["emotion_models"]["embedding"]
+EMBEDDING_MODEL_FILE = f"{EMBEDDING_MODEL_NAME}.pb"
+EMOTION_MODEL_FILE = f"{EMOTION_MODEL_NAME}.pb"
 
-# msd-musicnn-1.json / deam-msd-musicnn-2.json의 schema에서 읽은 노드 이름이다.
+# 각 모델의 공식 메타데이터 JSON schema에서 읽은 노드 이름이다.
 EMBEDDING_OUTPUT_NODE = "model/dense/BiasAdd"
 EMOTION_INPUT_NODE = "model/Placeholder"
 EMOTION_OUTPUT_NODE = "model/Identity"
