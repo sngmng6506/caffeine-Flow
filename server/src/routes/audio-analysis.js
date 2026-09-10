@@ -96,7 +96,7 @@ router.post('/discoveries/:id/complete', requireAudioAnalysisWorker, async (req,
   if (!tracks) return res.status(400).json({ error: '수집한 곡 목록이 올바르지 않습니다' });
   try {
     res.json(await discovery.complete(req.params.id, req.body.lease_token, tracks,
-      { offset: req.body.offset, scanned: req.body.scanned, window: req.body.window }));
+      { offset: req.body.offset, scanned: req.body.scanned, window: req.body.window, page_schema_version: req.body.page_schema_version }));
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
     throw error;

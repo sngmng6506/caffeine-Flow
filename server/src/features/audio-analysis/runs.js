@@ -70,7 +70,7 @@ function validateRun(input, result) {
   const invalid = () => ({ error: 'MAEST 원본·입력 정보가 올바르지 않습니다' });
   if (result.model_name !== 'essentia-maest' || !result.model_version.split('+').includes(MODEL)) return invalid();
   const mode = input?.pipeline_mode;
-  const withEmotion = mode === 'MAEST_EMOTION' || mode === 'FULL';
+  const withEmotion = mode === 'MAEST_EMOTION' || (mode === 'FULL' && input?.normalized?.mood != null);
   const expectedSources = withEmotion ? EMOTION_SOURCES : MAEST_ONLY_SOURCES;
   if (!input || input.schema_version !== 1 || !MODES.includes(mode) ||
       input.maest_model_version !== MODEL || input.model_sha256 !== contract.model_sha256 || !hash(input.audio_sha256) ||

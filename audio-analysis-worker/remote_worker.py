@@ -89,7 +89,7 @@ def run_discovery(config, collector=collect):
     result = api(config, f"/discoveries/{request['id']}/complete",
                  {'lease_token': request['lease_token'], 'tracks': tracks,
                   'offset': request.get('offset', 0), 'scanned': scanned,
-                  'window': request.get('window')})
+                  'window': request.get('window'), 'page_schema_version': 1})
     log('info', 'discovery_finished', discovery_id=request['id'], source=request['source'],
         offset=request.get('offset', 0), scanned=scanned, found=len(tracks),
         added=(result or {}).get('enqueued_count'))

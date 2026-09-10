@@ -57,11 +57,11 @@ def fetch_apple_chart(limit, country=APPLE_COUNTRY, opener=urllib.request.urlope
             for item in feed.get('results', []) if item.get('name')]
 
 
-def fetch_musicbrainz_kr(window, opener=urllib.request.urlopen):
+def fetch_musicbrainz_kr(window, opener=urllib.request.urlopen, offset=0, limit=100):
     """한국 발매 곡을 날짜 구간으로 가져온다. 곡 길이도 함께 준다."""
     params = urllib.parse.urlencode({
         'query': f"country:KR AND firstreleasedate:[{window['from']} TO {window['to']}]",
-        'fmt': 'json', 'limit': 100,
+        'fmt': 'json', 'limit': limit, 'offset': offset,
     })
     request = urllib.request.Request(f'{MUSICBRAINZ_URL}?{params}',
                                      headers={'User-Agent': USER_AGENT})
@@ -84,7 +84,7 @@ def fetch_musicbrainz_kr(window, opener=urllib.request.urlopen):
         length = item.get('length')
         rows.append({'artist': artist, 'title': title,
                      'expected_sec': (length // 1000) if length else None})
-    return rows
+    return {'rows': rows, 'scanned': len(payload.get('recordings', []))}
 
 
 def _yt_dlp(args, runner=subprocess.run, timeout=SEARCH_TIMEOUT):
@@ -171,7 +171,8 @@ def collect(source, query, limit, offset=0, window=None,
         if not window:
             # 서버가 백필 하한에 닿았다고 판단하면 창을 주지 않는다.
             return [], 0
-        rows = fetch_musicbrainz_kr(window, opener=opener)[:limit]
+        page = fetch_musicbrainz_kr(window, opener=opener, offset=offset, limit=limit)
+        rows = page['rows']
         tracks = []
         for item in rows:
             video_id = find_youtube_id(item['artist'], item['title'], runner, item['expected_sec'])
@@ -179,8 +180,9 @@ def collect(source, query, limit, offset=0, window=None,
                 tracks.append({'platform': 'youtube', 'track_key': video_id,
                                'title': item['title'][:500],
                                'artist_name': (item['artist'] or 'unknown')[:200]})
-        # 날짜 창은 순위처럼 이어 붙이지 않는다. 창을 다 본 것이므로 limit을 채운 것으로 본다.
-        return tracks, limit
+        # 제외·매칭 실패도 원본 페이지 위치에는 포함한다. 같은 영상은 한 번만 제출한다.
+        tracks = list({track['track_key']: track for track in tracks}.values())
+        return tracks, page['scanned']
     if source == 'soundcloud':
         candidates = search_soundcloud(query, offset + limit, runner)
     elif source == 'apple_kr':

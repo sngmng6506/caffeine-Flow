@@ -103,3 +103,27 @@ describe('최신곡 수집 요청', () => {
     expect(failed.body.error_code).toBe('SOURCE_FETCH_FAILED');
   });
 });
+
+it('날짜 창의 페이지를 소진한 뒤에만 날짜 진도를 옮긴다', async () => {
+  const claim = () => request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
+  const finish = (job, scanned, extra = {}) => request(app)
+    .post(`/api/v1/audio-analysis/discoveries/${job.id}/complete`).set(worker()).send({
+      lease_token: job.lease_token, tracks: [], offset: job.offset, window: job.window,
+      page_schema_version: 1, scanned, ...extra });
+  await ask({ source: 'musicbrainz_kr', limit: 20 });
+  const first = (await claim()).body;
+  expect(first.offset).toBe(0);
+  expect((await finish(first, 20, { page_schema_version: 0 })).status).toBe(400);
+  expect((await finish(first, 20)).status).toBe(200);
+  let cursor = await db('music_source_cursors').where({ source: 'musicbrainz_kr' }).first();
+  expect(cursor.covered_to).toBeNull(); expect(cursor.next_offset).toBe(20);
+  expect(cursor.pending_window).toEqual(first.window);
+  await ask({ source: 'musicbrainz_kr', limit: 20 }); const second = (await claim()).body;
+  expect(second.window).toEqual(first.window); expect(second.offset).toBe(20);
+  expect((await finish(second, 10, { offset: 0 })).status).toBe(400);
+  expect((await finish(second, 10)).status).toBe(200);
+  cursor = await db('music_source_cursors').where({ source: 'musicbrainz_kr' }).first();
+  expect(cursor.pending_window).toBeNull(); expect(cursor.next_offset).toBe(0);
+  const dates = await db('music_source_cursors').select(db.raw('covered_to::text as covered_to')).where({ source: 'musicbrainz_kr' }).first();
+  expect(dates.covered_to).toBe(first.window.to);
+});

@@ -313,7 +313,7 @@ function saveReview({
       title: recommendation.title,
       ...annotation,
       artist_confirmed: artistConfirmed,
-      label_source: 'human',
+      label_source: 'human', human_edited: true,
       human_review_status: 'corrected',
       // pg 드라이버가 JS 배열을 PostgreSQL 배열 리터럴({"pop"})로 바꾸면
       // jsonb 컬럼에서 22P02가 발생한다. JSON 문자열로 타입을 명확히 한다.
@@ -341,7 +341,7 @@ function saveReview({
         schema_version: row.schema_version,
         updated_at: row.updated_at,
         artist_confirmed: artistConfirmed,
-        label_source: 'human',
+        label_source: 'human', human_edited: true,
         human_review_status: 'corrected',
         revision: trx.raw('music_track_annotations.revision + 1'),
       })

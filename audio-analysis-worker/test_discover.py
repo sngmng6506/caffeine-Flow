@@ -145,7 +145,7 @@ MB = {'recordings': [
 class MusicBrainzTest(unittest.TestCase):
     def rows(self):
         from discover import fetch_musicbrainz_kr
-        return fetch_musicbrainz_kr({'from': '2026-09-03', 'to': '2026-09-10'}, opener_for(MB))
+        return fetch_musicbrainz_kr({'from': '2026-09-03', 'to': '2026-09-10'}, opener_for(MB))['rows']
 
     def test_drops_instrumentals_and_duplicates(self):
         rows = self.rows()
@@ -191,16 +191,31 @@ class DurationVerificationTest(unittest.TestCase):
 
 class MusicBrainzCollectTest(unittest.TestCase):
     def test_uses_the_given_window(self):
-        with patch.object(discover, 'fetch_musicbrainz_kr', return_value=[
-                {'artist': 'A', 'title': 'One', 'expected_sec': 200}]) as fetch, \
+        with patch.object(discover, 'fetch_musicbrainz_kr', return_value={'rows': [
+                {'artist': 'A', 'title': 'One', 'expected_sec': 200}], 'scanned': 1}) as fetch, \
              patch.object(discover, 'find_youtube_id', return_value='aaaaaaaaaaa'):
             tracks, scanned = collect('musicbrainz_kr', None, 10,
                                       window={'from': '2026-09-03', 'to': '2026-09-10'})
 
         self.assertEqual(fetch.call_args[0][0], {'from': '2026-09-03', 'to': '2026-09-10'})
         self.assertEqual(len(tracks), 1)
-        self.assertEqual(scanned, 10, '날짜 창은 다 본 것으로 보고한다')
+        self.assertEqual(scanned, 1, '원본 페이지에서 실제로 읽은 개수를 보고한다')
 
     def test_no_window_means_backfill_is_finished(self):
         # 서버가 백필 하한에 닿으면 창을 주지 않는다.
         self.assertEqual(collect('musicbrainz_kr', None, 10, window=None), ([], 0))
+
+
+class MusicBrainzPaginationTest(unittest.TestCase):
+    def test_page_offset_and_raw_count_include_filtered_rows(self):
+        import urllib.parse
+        from discover import fetch_musicbrainz_kr
+        seen = []
+        def opener(request, **kwargs):
+            seen.append(urllib.parse.parse_qs(urllib.parse.urlparse(request.full_url).query))
+            return opener_for(MB)(request, **kwargs)
+        page = fetch_musicbrainz_kr({'from': '2026-09-01', 'to': '2026-09-08'}, opener, offset=20, limit=20)
+        self.assertEqual(seen[0]['offset'], ['20'])
+        self.assertEqual(seen[0]['limit'], ['20'])
+        self.assertEqual(page['scanned'], len(MB['recordings']))
+        self.assertLess(len(page['rows']), page['scanned'])

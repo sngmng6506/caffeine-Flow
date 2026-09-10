@@ -177,6 +177,10 @@ function renderSummary() {
   $('unreviewedCount').textContent = summary.unreviewed.toLocaleString('ko-KR');
 }
 
+function canReviewDescription(item) {
+  return Boolean(item?.track_annotation && item?.audio_analysis?.maest_summary?.audio_llm?.description?.trim());
+}
+
 // 3단 자유 서술을 보여준다. 사람이 읽고 곡과 맞는지 판단할 유일한 근거다.
 function renderAutoDescription(item) {
   const target = $('autoDescription');
@@ -288,7 +292,7 @@ function renderItem() {
     ? '' : `${states[item.job_status] || item.job_status}${item.error_code ? ` · ${item.error_code}` : ''}`;
   $('jobStatus').textContent = status;
   for (const id of ['verdictAccurate', 'verdictInaccurate']) {
-    $(id).disabled = !item.track_annotation;
+    $(id).disabled = !canReviewDescription(item);
   }
   $('verdictAccurate').textContent = complete ? '확인됨' : '맞음';
   $('previousItem').disabled = currentIndex === 0 && currentOffset === 0;
@@ -339,7 +343,7 @@ function showStamp(verdict) {
 // 되고, 그렇게 만든 골드 라벨은 없느니만 못하다.
 async function submitVerdict(verdict, buttonId) {
   const item = items[currentIndex];
-  if (!item?.track_annotation) return;
+  if (!canReviewDescription(item)) return;
   const button = $(buttonId);
   button.disabled = true;
   try {
@@ -355,7 +359,7 @@ async function submitVerdict(verdict, buttonId) {
     showStamp(verdict);
     await advanceAfterReview();
   } catch (error) { showAlert(error.message); }
-  finally { button.disabled = !items[currentIndex]?.track_annotation; }
+  finally { button.disabled = !canReviewDescription(items[currentIndex]); }
 }
 
 // 저장한 곡을 목록에서 걷어내고 다음 곡으로 넘어간다. 검토 대기 화면은 방금 저장한

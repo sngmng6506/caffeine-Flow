@@ -1,3 +1,4 @@
+const { isDeepStrictEqual } = require('node:util');
 const db = require('../../db/knex');
 const crypto = require('node:crypto');
 const jobs = require('./jobs');
@@ -36,12 +37,15 @@ async function request(input) {
 
 function claim() {
   return db.transaction(async (trx) => {
+    // 같은 소스의 페이지를 두 워커가 동시에 처리하지 않도록 claim을 직렬화한다.
+    await trx.raw("SELECT pg_advisory_xact_lock(hashtext('audio-discovery-claim'))");
     await trx('music_source_discoveries').where({ status: 'processing' })
       .where('lease_until', '<', trx.fn.now()).update({
         status: trx.raw("CASE WHEN attempts >= ? THEN 'failed' ELSE 'queued' END", [DISCOVERY_MAX_ATTEMPTS]),
         lease_until: null, error_code: 'LEASE_EXPIRED', updated_at: trx.fn.now(),
       });
     const row = await trx('music_source_discoveries').where({ status: 'queued' })
+      .whereNotIn('source', trx('music_source_discoveries').select('source').where({ status: 'processing' }))
       .orderBy('created_at').forUpdate().skipLocked().first();
     if (!row) return null;
     const [claimed] = await trx('music_source_discoveries').where({ id: row.id }).update({
@@ -51,10 +55,14 @@ function claim() {
     }).returning('*');
     // 어디서부터 가져올지 알려준다. 같은 구간을 반복해서 훑지 않기 위해서다.
     const cursor = await trx('music_source_cursors')
+      .select('*', trx.raw('covered_from::text as covered_from, covered_to::text as covered_to'))
       .where({ source: claimed.source, query_key: claimed.query || '' }).first();
     if (window.isDateWindowSource(claimed.source)) {
-      // 날짜 소스는 순위 offset이 의미 없다. 훑을 구간을 직접 계산해 준다.
-      return { ...claimed, window: window.nextWindow(cursor, new Date()) };
+      // 미완료 날짜 구간과 원본 페이지 위치를 함께 이어받는다.
+      const pageWindow = cursor?.pending_window || window.nextWindow(cursor, new Date());
+      const offset = cursor?.pending_window ? cursor.next_offset : 0;
+      await trx('music_source_discoveries').where({ id: row.id }).update({ claimed_window: pageWindow ? JSON.stringify(pageWindow) : null, claimed_offset: offset });
+      return { ...claimed, window: pageWindow, offset, page_schema_version: 1 };
     }
     return { ...claimed, offset: cursor ? cursor.next_offset : 0 };
   });
@@ -70,6 +78,12 @@ async function locked(trx, id, token) {
 function complete(id, token, tracks, meta = {}) {
   return db.transaction(async (trx) => {
     const request = await locked(trx, id, token);
+    if (window.isDateWindowSource(request.source) && (meta.page_schema_version !== 1 ||
+        !Number.isSafeInteger(meta.scanned) || meta.scanned < 0 || meta.scanned > request.requested_limit ||
+        meta.offset !== request.claimed_offset || !isDeepStrictEqual(meta.window ?? null, request.claimed_window) ||
+        tracks.length > meta.scanned)) {
+      throw Object.assign(new Error('수집 페이지가 claim 정보와 다릅니다. 워커 버전을 확인해주세요.'), { status: 400 });
+    }
     let added = 0;
     for (const track of tracks) {
       const inserted = await jobs.enqueue({
@@ -82,11 +96,17 @@ function complete(id, token, tracks, meta = {}) {
     // 다음 요청은 이번에 훑은 구간 다음부터 본다. 소스가 바닥나면 처음으로 돌아가
     // 그 사이 바뀐 차트를 다시 본다. offset은 워커가 실제로 사용한 값을 신뢰한다.
     const key = { source: request.source, query_key: request.query || '' };
-    const cursor = await trx('music_source_cursors').where(key).first();
+    const cursor = await trx('music_source_cursors')
+      .select('*', trx.raw('covered_from::text as covered_from, covered_to::text as covered_to'))
+      .where(key).first();
     let next;
     if (window.isDateWindowSource(request.source)) {
       // 창을 못 받았으면 백필 하한에 닿은 것이라 커서를 그대로 둔다.
-      next = meta.window ? window.advance(cursor, meta.window) : null;
+      if (request.claimed_window) {
+        next = meta.scanned < request.requested_limit
+          ? { ...window.advance(cursor, request.claimed_window), pending_window: null, next_offset: 0 }
+          : { pending_window: JSON.stringify(request.claimed_window), next_offset: request.claimed_offset + meta.scanned };
+      } else next = null;
     } else {
       const positive = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : null);
       const usedOffset = positive(meta.offset) ?? 0;

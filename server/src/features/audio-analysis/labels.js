@@ -50,6 +50,9 @@ function review(jobId, input, annotation) {
       analysis = await trx('music_audio_analyses').where({ id: job.analysis_id }).forUpdate().first();
       if (analysis.revision !== input.audio_analysis_revision) throw conflict();
     }
+    if (input.verdict !== undefined && !analysis?.maest_summary?.audio_llm?.description?.trim()) {
+      throw Object.assign(new Error('판정할 Audio LLM 서술이 없습니다'), { status: 409 });
+    }
     const current = await trx('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).forUpdate().first();
     if ((current?.revision || 0) !== input.annotation_revision) throw conflict();
     if (!annotation && !current) throw Object.assign(new Error('자동 라벨이 아직 없습니다'), { status: 409 });
@@ -68,12 +71,14 @@ function review(jobId, input, annotation) {
     // 재분석과 정규화가 그 곡을 건너뛰어(jobs.js, renormalize.js), 틀렸다고 표시한 곡이
     // 영영 갱신되지 않는다.
     const affirmed = status === 'confirmed' || status === 'corrected';
+    const humanEdited = Boolean(annotation || current?.human_edited);
     const row = {
       ...next, platform: job.platform, track_key: job.track_key, title: job.title,
       mood_tags: JSON.stringify(next.mood_tags), genre_tags: JSON.stringify(next.genre_tags),
       artist_confirmed: artistConfirmed,
-      reviewed_fields: JSON.stringify(affirmed ? reviewedFields : (current?.reviewed_fields || [])),
-      label_source: affirmed ? 'human' : (current?.label_source || 'automatic'),
+      human_edited: humanEdited,
+      reviewed_fields: JSON.stringify(affirmed ? reviewedFields : humanEdited ? (current?.reviewed_fields || []) : []),
+      label_source: affirmed || humanEdited ? 'human' : 'automatic',
       human_review_status: status,
       revision: (current?.revision || 0) + 1, updated_at: trx.fn.now(),
     };
@@ -82,7 +87,8 @@ function review(jobId, input, annotation) {
     const [saved] = await trx('music_track_annotations').insert(row)
       .onConflict(['platform', 'track_key']).merge(row).returning('*');
     if (analysis) await trx('music_audio_analyses').where({ id: analysis.id })
-      .update({ review_status: 'reviewed', reviewed_at: trx.fn.now() });
+      .update({ review_status: 'reviewed', reviewed_at: trx.fn.now(),
+        ...(input.verdict !== undefined ? { human_verdict: input.verdict } : {}) });
     return { track_annotation: saved };
   });
 }

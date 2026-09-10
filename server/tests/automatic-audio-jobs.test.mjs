@@ -328,7 +328,8 @@ describe('자동 음향 분석 파이프라인', () => {
     // 승격하면 label_source가 'automatic'이 아니게 되어 재분석과 정규화가 이 곡을
     // 건너뛴다. 틀렸다고 표시한 곡이 영영 갱신되지 않는 상태가 된다.
     await seed(); const job = await jobs.claim();
-    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
+    const body = llmBody(job);
+    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
     const key = { platform: job.platform, track_key: job.track_key };
     const before = await db('music_track_annotations').where(key).first();
 
@@ -344,7 +345,8 @@ describe('자동 음향 분석 파이프라인', () => {
   });
   it('맞다고 판정한 라벨은 사람 라벨로 승격한다', async () => {
     await seed(); const job = await jobs.claim();
-    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
+    const body = llmBody(job);
+    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
     await labels.review(job.id, { verdict: 'confirmed', annotation_revision: 1,
       audio_analysis_id: saved.id, audio_analysis_revision: 1 }, null);
     const after = await db('music_track_annotations')
@@ -407,5 +409,57 @@ describe('자동 음향 분석 파이프라인', () => {
   it('익명은 작업을 가져오거나 검토할 수 없다', async () => {
     expect((await request(app).post('/api/v1/audio-analysis/jobs/claim').send({})).status).toBe(401);
     expect((await request(app).get('/api/v1/admin/audio-labels')).status).toBe(401);
+  });
+});
+
+describe('분석 판정 회귀', () => {
+  async function analyzed(withEmotion = true) {
+    await seed(); const job = await jobs.claim(); const body = llmBody(job);
+    if (!withEmotion) {
+      delete body.result.features.valence; delete body.result.features.arousal;
+      body.maest_run.normalized.mood = null; body.automatic_annotation.mood_tags = ['unknown'];
+      body.maest_run.sources_used = [contract.model_version, body.maest_run.audio_llm_raw.model_id];
+    }
+    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    return { job, body, saved };
+  }
+  it('감정 모델 없이도 Audio LLM 결과를 저장한다', async () => {
+    const { saved } = await analyzed(false);
+    expect(saved.maest_summary.audio_llm.description).toBeTruthy();
+  });
+  it('맞음 확인을 철회하면 심사에서 제외하고 재분석 후 새 결과를 사용한다', async () => {
+    const { findForTrack } = (await import('../src/features/music-filter/track-analysis.js')).default;
+    const { job, saved } = await analyzed();
+    const input = { audio_analysis_id: saved.id, audio_analysis_revision: 1, annotation_revision: 1 };
+    await labels.review(job.id, { ...input, verdict: 'confirmed' }, null);
+    await labels.review(job.id, { ...input, annotation_revision: 2, verdict: 'inaccurate' }, null);
+    let current = await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first();
+    expect(current.label_source).toBe('automatic'); expect(current.reviewed_fields).toEqual([]);
+    expect(await findForTrack(job.platform, job.track_key)).toBeNull();
+    await jobs.requeue(job.id, job.generation); const next = await jobs.claim(); const body = llmBody(next);
+    await jobs.complete(next.id, next.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    expect(await findForTrack(job.platform, job.track_key)).not.toBeNull();
+    current = await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first();
+    expect(current.human_review_status).toBe('unreviewed');
+  });
+  it('직접 수정한 라벨은 서술 확인을 철회해도 보호한다', async () => {
+    const { job, saved } = await analyzed();
+    const input = { audio_analysis_id: saved.id, audio_analysis_revision: 1, annotation_revision: 1 };
+    const { validateMusicAnnotation } = (await import('../src/features/music-labeling/annotation.js')).default;
+    await labels.review(job.id, input, validateMusicAnnotation({ ...annotation, genre_tags: ['jazz'] }).value);
+    await labels.review(job.id, { ...input, annotation_revision: 2, verdict: 'confirmed' }, null);
+    await labels.review(job.id, { ...input, annotation_revision: 3, verdict: 'inaccurate' }, null);
+    const current = await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first();
+    expect(current.human_edited).toBe(true); expect(current.label_source).toBe('human');
+    expect(current.genre_tags).toEqual(['jazz']);
+  });
+  it('서술 없는 분석의 판정은 API에서도 거절한다', async () => {
+    await seed(); const job = await jobs.claim(); const body = maestBody(job);
+    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    const response = await request(app).put(`/api/v1/admin/audio-labels/${job.id}/review`)
+      .set({ Authorization: `Bearer ${issueAdminToken()}` }).send({ verdict: 'accurate', annotation_revision: 1,
+        audio_analysis_id: saved.id, audio_analysis_revision: 1 });
+    expect(response.status).toBe(409);
+    expect((await db('music_audio_analyses').where({ id: saved.id }).first()).human_verdict).toBeNull();
   });
 });
