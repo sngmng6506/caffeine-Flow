@@ -5,36 +5,13 @@ const TOKEN_KEY = 'cf_admin_token';
 const PAGE_SIZE = 50;
 const $ = (id) => document.getElementById(id);
 
-const LABELS = Object.freeze({
-  tempo_class: {
-    very_slow: '매우 느림', slow: '느림', moderate: '보통', fast: '빠름',
-    very_fast: '매우 빠름', unknown: '판단하기 어려움',
-  },
-  mood_tags: {
-    peaceful: '평온·차분', joyful: '밝음·즐거움', tender: '따뜻함·부드러움',
-    nostalgic: '몽환·향수', sad: '슬픔·우울', uplifting: '웅장·고양',
-    tense: '긴장·어두움', aggressive: '공격적·강렬', quirky: '독특·장난스러움',
-    unknown: '판단하기 어려움',
-  },
-  instrumentation_type: {
-    acoustic: '어쿠스틱 중심', electronic: '전자음 중심', hybrid: '혼합',
-    unknown: '판단하기 어려움',
-  },
-  rhythmic_character: {
-    minimal: '리듬이 거의 없음', steady: '안정적인 리듬', danceable: '춤추기 좋은 리듬',
-    heavy_beat: '강한 비트 중심', irregular: '불규칙·실험적', unknown: '판단하기 어려움',
-  },
-  vocal_type: {
-    none: '목소리 없음', singing: '노래 위주', rap_spoken: '랩·말하기 위주',
-    unknown: '판단하기 어려움',
-  },
-  genre_tags: {
-    pop: '팝', ballad: '발라드', hiphop_rap: '힙합·랩', rnb_soul: 'R&B·소울',
-    rock_metal: '록·메탈', electronic_dance: '전자음악·댄스', jazz: '재즈',
-    classical: '클래식', acoustic_folk: '어쿠스틱·포크', ambient_lofi: '앰비언트·로파이',
-    ost_instrumental: 'OST·연주', world_latin_reggae: '월드·라틴·레게',
-    other: '기타', unknown: '잘 모르겠음',
-  },
+// 자동 장르를 한국어로 보여줄 때만 쓴다. 사람이 고르는 선택지는 없다.
+const GENRE_LABELS = Object.freeze({
+  pop: '팝', ballad: '발라드', hiphop_rap: '힙합·랩', rnb_soul: 'R&B·소울',
+  rock_metal: '록·메탈', electronic_dance: '전자음악·댄스', jazz: '재즈',
+  classical: '클래식', acoustic_folk: '어쿠스틱·포크', ambient_lofi: '앰비언트·로파이',
+  ost_instrumental: 'OST·연주', world_latin_reggae: '월드·라틴·레게',
+  other: '기타', unknown: '잘 모르겠음',
 });
 
 const RIGHTS_LABELS = Object.freeze({
@@ -66,7 +43,7 @@ async function api(method, path, body) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await response.text();
-  let data = {};
+  let data;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
   if (response.status === 401 || response.status === 403) {
     sessionStorage.removeItem(TOKEN_KEY);
@@ -153,7 +130,8 @@ function renderSummary() {
 function renderAutoDescription(item) {
   const target = $('autoDescription');
   const llm = item.audio_analysis?.maest_summary?.audio_llm;
-  const genres = item.track_annotation?.genre_tags?.filter((tag) => tag !== 'unknown') || [];
+  const genres = (item.track_annotation?.genre_tags || [])
+    .filter((tag) => tag !== 'unknown').map((tag) => GENRE_LABELS[tag] || tag);
   const head = genres.length ? `<p class='auto-genre'>자동 장르 · ${escapeHtml(genres.join(', '))}</p>` : '';
   if (!llm?.description) {
     target.innerHTML = `${head}<p class='auto-empty'>자동 서술이 없습니다. AI 음악 서술이 꺼져 있었거나 분석이 실패한 곡입니다.</p>`;
@@ -168,18 +146,14 @@ function renderAutoDescription(item) {
 }
 
 function resetForm(item) {
-  const form = $('reviewForm');
-  form.reset();
   const annotation = item.track_annotation;
-  $('artistName').value = annotation?.artist_name || item.channel_title || '';
+  $('checkArtist').textContent = annotation?.artist_name || item.channel_title || '아티스트 정보 없음';
   $('artistConfirmed').checked = annotation?.artist_confirmed === true;
   const labelOrigin = annotation?.label_source === 'automatic' ? '자동 라벨' : annotation?.human_review_status === 'corrected' ? '사람 수정 라벨' : '사람 확인 라벨';
   $('existingLabelStatus').textContent = annotation
-    ? `기존 곡 라벨 불러옴 · ${labelOrigin} · ${formatDateTime(annotation.updated_at)}`
-    : '실제 아티스트를 확인해주세요.';
+    ? `${labelOrigin} · ${formatDateTime(annotation.updated_at)}`
+    : '아직 자동 라벨이 없습니다.';
   $('existingLabelStatus').classList.toggle('is-loaded', Boolean(annotation));
-  $('artistReferences').hidden = true;
-  $('artistReferences').innerHTML = '';
 
   renderAutoDescription(item);
 }
@@ -200,20 +174,8 @@ function renderAudioAnalysis(item) {
     <table><thead><tr><th>스타일</th><th>평균</th><th>최댓값</th></tr></thead><tbody>
     ${maest.top_mean.map((v) => `<tr><td>${escapeHtml(v.label)}</td><td>${formatMetric(v.mean, 3)}</td><td>${formatMetric(v.max, 3)}</td></tr>`).join('')}
     </tbody></table><p>구간 최댓값 상위: ${maest.top_max.slice(0, 5).map((v) => `${escapeHtml(v.label)} ${formatMetric(v.max, 3)}`).join(' · ')}</p>
-    <p>무드·보컬·악기: 이번 모델의 분석 대상 아님. 확인 버튼은 미확정 항목도 그대로 저장합니다.</p>` : '';
+    <p>무드·보컬·악기는 이 모델의 분석 대상이 아닙니다.</p>` : '';
   const features = analysis.features || {};
-  const suggestion = analysis.automatic_annotation || analysis.suggested_annotation || {};
-  const suggestions = [
-    suggestion.tempo_class ? LABELS.tempo_class[suggestion.tempo_class] : null,
-    suggestion.rhythmic_character
-      ? LABELS.rhythmic_character[suggestion.rhythmic_character]
-      : null,
-    ...(suggestion.mood_tags || []).map((tag) => LABELS.mood_tags[tag] || tag),
-    LABELS.instrumentation_type[suggestion.instrumentation_type],
-    LABELS.vocal_type[suggestion.vocal_type],
-    ...(suggestion.genre_tags || []).map((tag) => LABELS.genre_tags[tag] || tag),
-  ].filter(Boolean);
-
   $('analysisStatus').textContent = analysis.review_status === 'reviewed' ? '검수 완료' : '검수 필요';
   $('analysisStatus').className = `analysis-status analysis-status--${analysis.review_status}`;
   $('analysisBpm').textContent = formatMetric(features.bpm, 1);
@@ -226,9 +188,6 @@ function renderAudioAnalysis(item) {
   $('analysisValence').textContent = formatMetric(features.valence, 2);
   $('analysisArousal').textContent = formatMetric(features.arousal, 2);
   $('analysisCentroid').textContent = formatMetric(features.spectral_centroid_hz, 0, ' Hz');
-  $('analysisSuggestion').textContent = suggestions.length
-    ? suggestions.join(' · ')
-    : '자동 추천 없음 — 직접 듣고 선택';
   $('analysisProvenance').textContent = [
     `${analysis.model_name} ${analysis.model_version}`,
     RIGHTS_LABELS[analysis.rights_basis] || analysis.rights_basis,
@@ -272,7 +231,7 @@ function renderItem() {
   for (const id of ['verdictAccurate', 'verdictInaccurate', 'verdictUnclear']) {
     $(id).disabled = !item.track_annotation;
   }
-  $('verdictAccurate').textContent = complete ? '확인됨 · 다음' : '맞음 · 다음';
+  $('verdictAccurate').textContent = complete ? '확인됨' : '맞음';
   $('previousItem').disabled = currentIndex === 0 && currentOffset === 0;
   $('nextItem').disabled = currentIndex >= items.length - 1 && !hasMore;
 }
@@ -297,57 +256,6 @@ async function loadPage(offset = 0) {
   renderItem();
 }
 
-function annotationSummary(annotation) {
-  const moods = (annotation.mood_tags || []).map((value) => LABELS.mood_tags[value] || value).join(', ');
-  const genres = (annotation.genre_tags || []).map((value) => LABELS.genre_tags[value] || value).join(', ');
-  return [
-    LABELS.tempo_class[annotation.tempo_class], moods,
-    LABELS.instrumentation_type[annotation.instrumentation_type],
-    LABELS.rhythmic_character[annotation.rhythmic_character],
-    LABELS.vocal_type[annotation.vocal_type], genres,
-  ].filter(Boolean).join(' · ');
-}
-
-async function loadArtistReferences() {
-  const item = items[currentIndex];
-  const artist = $('artistName').value.trim();
-  if (!item || !artist) {
-    alert('확인한 아티스트명을 먼저 입력해주세요.');
-    return;
-  }
-
-  const targetId = item.id;
-  const button = $('findArtistLabels');
-  const container = $('artistReferences');
-  button.disabled = true;
-  button.textContent = '찾는 중…';
-  try {
-    const params = new URLSearchParams({ artist, platform: item.platform, track_key: item.video_id });
-    const { ok, data } = await api('GET', `/admin/music-filter-artist-labels?${params}`);
-    if (items[currentIndex]?.id !== targetId) return;
-    container.hidden = false;
-    if (!ok) {
-      container.innerHTML = `<p>${escapeHtml(data.error || '같은 아티스트 라벨을 불러오지 못했습니다.')}</p>`;
-      return;
-    }
-    if (!data.labels?.length) {
-      container.innerHTML = '<p>저장된 다른 곡 라벨이 없습니다.</p>';
-      return;
-    }
-    container.innerHTML = `
-      <h4>같은 아티스트의 다른 곡 참고 <small>현재 곡의 확정 정보는 아닙니다</small></h4>
-      ${data.labels.map((label) => `
-        <article>
-          <b>${escapeHtml(label.title)}</b>
-          <p>${escapeHtml(annotationSummary(label))}</p>
-          ${label.note ? `<small>${escapeHtml(label.note)}</small>` : ''}
-        </article>`).join('')}`;
-  } finally {
-    button.disabled = false;
-    button.textContent = '같은 아티스트 참고';
-  }
-}
-
 // 서술이 곡과 맞는지만 답한다. 택소노미를 고르게 하면 판단이 어려워 아무거나 찍게
 // 되고, 그렇게 만든 골드 라벨은 없느니만 못하다.
 async function submitVerdict(verdict, buttonId) {
@@ -369,33 +277,23 @@ async function submitVerdict(verdict, buttonId) {
   finally { button.disabled = !items[currentIndex]?.track_annotation; }
 }
 
+// 저장한 곡을 목록에서 걷어내고 다음 곡으로 넘어간다. 검토 대기 화면은 방금 저장한
+// 곡이 조건에서 빠지므로 앞에서부터 다시 읽는다.
+async function advanceAfterReview() {
+  const index = currentIndex;
+  const queueView = ['unreviewed', 'ready'].includes($('viewFilter').value);
+  await loadPage(queueView ? 0 : currentOffset);
+  if (!queueView) {
+    currentIndex = Math.min(index + 1, Math.max(0, items.length - 1));
+    renderItem();
+  }
+}
+
 $('verdictAccurate').addEventListener('click', () => submitVerdict('accurate', 'verdictAccurate'));
 $('verdictInaccurate').addEventListener('click', () => submitVerdict('inaccurate', 'verdictInaccurate'));
 $('verdictUnclear').addEventListener('click', () => submitVerdict('unclear', 'verdictUnclear'));
 $('refreshQueue').addEventListener('click', () => loadPage(0));
 
-document.querySelectorAll('[data-max-choices]').forEach((group) => {
-  group.addEventListener('change', (event) => {
-    const changed = event.target.closest('input[type=checkbox]');
-    if (!changed) return;
-    const inputs = [...group.querySelectorAll('input[type=checkbox]')];
-    if (changed.checked && changed.value === 'unknown') {
-      inputs.forEach((input) => { if (input !== changed) input.checked = false; });
-      return;
-    }
-    if (changed.checked) {
-      const unknown = inputs.find((input) => input.value === 'unknown');
-      if (unknown) unknown.checked = false;
-    }
-    const checked = inputs.filter((input) => input.checked);
-    if (checked.length > Number(group.dataset.maxChoices)) {
-      changed.checked = false;
-      alert(`최대 ${group.dataset.maxChoices}개까지 선택할 수 있습니다.`);
-    }
-  });
-});
-
-$('findArtistLabels').addEventListener('click', loadArtistReferences);
 $('previousItem').addEventListener('click', () => {
   if (currentIndex > 0) {
     currentIndex -= 1;
@@ -450,7 +348,6 @@ $('loadMaestRaw').addEventListener('click', async () => {
   }
 });
 
-$('artistName').addEventListener('input', () => { $('artistConfirmed').checked = false; });
 for (const [buttonId, action] of [['requeueAudio', 'requeue'], ['renormalizeAudio', 'renormalize']]) {
   $(buttonId).addEventListener('click', async () => {
     const item = items[currentIndex];

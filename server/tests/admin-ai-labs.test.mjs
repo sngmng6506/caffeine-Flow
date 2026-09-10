@@ -34,11 +34,9 @@ describe('관리자 AI 랩 정적 계약', () => {
     const nullableMigration = read('server/src/db/migrations/20260828090000_nullable_music_filter_metadata_sufficient.js');
     expect(app).toContain(`/admin/audio-labels?view=`);
     expect(app).toContain('/admin/audio-labels/${item.id}/review');
-    expect(app).toContain('/admin/music-filter-artist-labels?');
     expect(app).toContain('track_annotation');
     expect(app).toContain('audio_analysis');
     expect(app).toContain('renderAudioAnalysis');
-    expect(app).toContain('기존 곡 라벨 불러옴');
     expect(app).toContain('audio_analysis_revision');
     expect(app).toContain('annotation_revision');
     expect(app).toContain(`sessionStorage.getItem(TOKEN_KEY)`);
@@ -50,13 +48,19 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(app).toContain(`submitVerdict('unclear'`);
     expect(app).not.toContain('setRadio');
     expect(app).not.toContain('applyAnalysisSuggestion');
+    // 저장 뒤 다음 곡으로 넘기는 경로. 없으면 판정이 저장돼도 화면이 멈춘다.
+    expect(app).toContain('async function advanceAfterReview');
+    // 택소노미를 한 줄로 되살려 보여주던 자리
+    expect(app).not.toContain('추천 라벨');
+    expect(html).not.toContain('추천 라벨');
+    // 제출할 것이 없는 form은 텍스트 입력에서 Enter가 페이지를 새로 고친다.
+    expect(html).not.toContain('<form');
     expect(html).not.toContain('보컬 유형');
     expect(html).not.toContain('주요 분위기');
     expect(html).not.toContain('라벨 사용 목적');
     expect(html).not.toContain('노래와 랩이 섞임');
     expect(html).not.toContain('라벨 확신도');
     expect(html).toContain('Essentia 자동 분석');
-    expect(html).toContain('자동 라벨은 이미 저장되어 있습니다');
     expect(html).not.toContain('콘텐츠 주의 요소');
     expect(html).not.toContain('선택 기준 도움말');
     expect(html).not.toContain('곡 버전');

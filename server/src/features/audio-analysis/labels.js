@@ -56,12 +56,19 @@ function review(jobId, input, annotation) {
     const reviewedFields = [...new Set([...(current?.reviewed_fields || []), ...selected])].filter(known);
     const sameArtist = next.artist_name === current?.artist_name;
     const artistConfirmed = input.artist_confirmed ?? (sameArtist && current?.artist_confirmed || false);
+    const status = annotation ? 'corrected' : (input.verdict || 'confirmed');
+    // 사람이 맞다고 했을 때만 사람 라벨로 승격한다. 틀렸다·애매하다는 판단은 라벨을
+    // 보증하지 않으므로 자동 라벨로 남겨야 한다. label_source가 'automatic'이 아니면
+    // 재분석과 정규화가 그 곡을 건너뛰어(jobs.js, renormalize.js), 틀렸다고 표시한 곡이
+    // 영영 갱신되지 않는다.
+    const affirmed = status === 'confirmed' || status === 'corrected';
     const row = {
       ...next, platform: job.platform, track_key: job.track_key, title: job.title,
       mood_tags: JSON.stringify(next.mood_tags), genre_tags: JSON.stringify(next.genre_tags),
-      artist_confirmed: artistConfirmed, reviewed_fields: JSON.stringify(reviewedFields),
-      label_source: 'human',
-      human_review_status: annotation ? 'corrected' : (input.verdict || 'confirmed'),
+      artist_confirmed: artistConfirmed,
+      reviewed_fields: JSON.stringify(affirmed ? reviewedFields : (current?.reviewed_fields || [])),
+      label_source: affirmed ? 'human' : (current?.label_source || 'automatic'),
+      human_review_status: status,
       revision: (current?.revision || 0) + 1, updated_at: trx.fn.now(),
     };
     delete row.id;

@@ -13,7 +13,7 @@
       <div>
         <p class='eyebrow'>Caffeine Flow</p>
         <h1>음악 라벨링</h1>
-        <p>곡을 듣고 한국어 선택지를 고른 뒤 매장 정책과 맞는지 판단합니다.</p>
+        <p>곡을 듣고 자동 분석이 그 곡과 맞는지 확인합니다.</p>
       </div>
       <nav>
         <a href='/admin'>운영자 콘솔</a>
@@ -54,7 +54,6 @@
 
       <p id='message' class='message'>라벨링 목록을 불러오는 중…</p>
       <article id='reviewCard' class='review-card' hidden>
-        <div><button id='requeueAudio' type='button'>재시도·재분석</button> <button id='renormalizeAudio' type='button'>현재 장르 체계 적용</button></div>
         <div class='track-head'>
           <div>
             <span id='cafeName' class='cafe-name'></span>
@@ -74,11 +73,10 @@
           <div class='audio-analysis-head'>
             <div>
               <span class='analysis-eyebrow'>Essentia 자동 분석</span>
-              <h3>음향 특징과 추천값</h3>
+              <h3>음향 특징</h3>
             </div>
             <span id='analysisStatus' class='analysis-status'></span>
           </div>
-          <p class='analysis-notice'>자동 라벨은 이미 저장되어 있습니다. 맞으면 그대로 확인하고, 다른 부분만 수정해주세요.</p>
           <dl class='analysis-metrics'>
             <div><dt>Valence</dt><dd id='analysisValence'>—</dd></div>
             <div><dt>Arousal</dt><dd id='analysisArousal'>—</dd></div>
@@ -89,49 +87,44 @@
             <div><dt>다이내믹</dt><dd id='analysisDynamic'>—</dd></div>
             <div><dt>스펙트럼 중심</dt><dd id='analysisCentroid'>—</dd></div>
           </dl>
-          <div class='analysis-suggestion'>
-            <span>추천 라벨</span>
-            <p id='analysisSuggestion'>—</p>
-          </div>
           <div id='maestSummary'></div>
           <button type='button' id='loadMaestRaw' hidden>구간별 원본·이력 보기</button>
           <pre id='maestRaw' hidden></pre>
           <p id='analysisProvenance' class='analysis-provenance'></p>
         </section>
 
-        <form id='reviewForm'>
+        <div class='review-form'>
           <section class='form-section artist-section'>
             <div class='section-title'>
-              <div><span>1</span><h3>곡 확인</h3></div>
-              <small id='existingLabelStatus'>실제 아티스트를 확인해주세요.</small>
+              <div><span>1</span><h3>이 아티스트가 맞습니까?</h3></div>
+              <small id='existingLabelStatus'>아직 자동 라벨이 없습니다.</small>
             </div>
-            <label class='text-field'>확인한 아티스트명
-              <div class='artist-input-row'>
-                <input id='artistName' name='artist_name' maxlength='200' required />
-                <label><input id='artistConfirmed' type='checkbox' /> 실제 아티스트명 확인</label>
-                <button type='button' id='findArtistLabels' class='secondary-button'>같은 아티스트 참고</button>
-              </div>
-            </label>
-            <div id='artistReferences' class='artist-references' hidden></div>
+            <p id='checkArtist' class='check-artist'>—</p>
+            <label class='check-line'><input id='artistConfirmed' type='checkbox' /> 아티스트가 맞습니다</label>
           </section>
 
           <section class='form-section verdict-section'>
             <div class='section-title'>
               <div><span>2</span><h3>자동 분석이 이 곡과 맞습니까?</h3></div>
-              <small>선택지를 고르지 않아도 됩니다</small>
+              <small>듣고 느낀 대로 고르면 됩니다</small>
             </div>
             <div id='autoDescription' class='auto-description'>자동 서술이 아직 없습니다.</div>
             <div class='verdict-buttons'>
-              <button type='button' id='verdictAccurate' class='save-button'>맞음 · 다음</button>
-              <button type='button' id='verdictInaccurate' class='secondary-button'>틀림</button>
-              <button type='button' id='verdictUnclear' class='secondary-button'>애매</button>
+              <button type='button' id='verdictAccurate' class='verdict-button'>맞음</button>
+              <button type='button' id='verdictInaccurate' class='verdict-button'>틀림</button>
+              <button type='button' id='verdictUnclear' class='verdict-button'>애매</button>
             </div>
           </section>
-        </form>
+        </div>
 
         <div class='navigation'>
           <button type='button' id='previousItem'>이전</button>
           <button type='button' id='nextItem'>다음</button>
+        </div>
+
+        <div class='card-actions'>
+          <button id='requeueAudio' type='button'>재시도·재분석</button>
+          <button id='renormalizeAudio' type='button'>현재 장르 체계 적용</button>
         </div>
       </article>
     </main>

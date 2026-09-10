@@ -324,6 +324,34 @@ describe('자동 음향 분석 파이프라인', () => {
       .rejects.toMatchObject({ status: 409 });
     expect((await db('music_audio_analyses').where({ id: saved.id }).first()).review_status).toBe('pending');
   });
+  it('틀렸다고 판정한 라벨은 사람 라벨로 승격하지 않는다', async () => {
+    // 승격하면 label_source가 'automatic'이 아니게 되어 재분석과 정규화가 이 곡을
+    // 건너뛴다. 틀렸다고 표시한 곡이 영영 갱신되지 않는 상태가 된다.
+    await seed(); const job = await jobs.claim();
+    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
+    const key = { platform: job.platform, track_key: job.track_key };
+    const before = await db('music_track_annotations').where(key).first();
+
+    await labels.review(job.id, { verdict: 'inaccurate', annotation_revision: 1,
+      audio_analysis_id: saved.id, audio_analysis_revision: 1 }, null);
+
+    const after = await db('music_track_annotations').where(key).first();
+    expect(after.human_review_status).toBe('inaccurate');
+    expect(after.label_source).toBe('automatic');
+    expect(after.reviewed_fields).toEqual(before.reviewed_fields);
+    // 판정은 끝났으므로 검토 대기에서는 빠진다.
+    expect((await labels.list({ view: 'ready' })).decisions).toHaveLength(0);
+  });
+  it('맞다고 판정한 라벨은 사람 라벨로 승격한다', async () => {
+    await seed(); const job = await jobs.claim();
+    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
+    await labels.review(job.id, { verdict: 'confirmed', annotation_revision: 1,
+      audio_analysis_id: saved.id, audio_analysis_revision: 1 }, null);
+    const after = await db('music_track_annotations')
+      .where({ platform: job.platform, track_key: job.track_key }).first();
+    expect(after.human_review_status).toBe('confirmed');
+    expect(after.label_source).toBe('human');
+  });
   it('사람이 수정한 라벨은 재분석해도 보존한다', async () => {
     await seed(); const job = await jobs.claim();
     const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
