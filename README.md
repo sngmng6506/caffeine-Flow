@@ -56,6 +56,7 @@ owner/electron/   데스크톱 재생 엔진
 admin/            플랫폼 운영자 정적 콘솔
 music-labeling-lab/ 운영자 골드 라벨링 UI
 audio-analysis-worker/ 신청곡 다운로드·Essentia/MAEST 자동 라벨링
+audio-analysis-worker/experiments/ 모델·파라미터 선택 근거가 된 측정 기록
 ```
 
 ## LLM 프롬프트 바로가기

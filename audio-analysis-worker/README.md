@@ -33,6 +33,8 @@
 
 1단과 3단은 서로의 결과를 보지 않는다. 두 결과가 갈리는 곡이 곧 어려운 곡이라는 신호다.
 
+모델과 파라미터를 고른 근거는 [experiments/](experiments/)에 있다. 기준 문서가 아니라 특정 시점의 측정이므로 현재 동작은 이 README를 따른다.
+
 API 계약은 [docs/API.md](../docs/API.md), 데이터 흐름은 [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)를 따른다.
 
 ### 설치
