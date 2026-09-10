@@ -39,6 +39,9 @@
 
 ## 재현
 
+> 측정 당시 3단 스위치는 워커 환경변수 `ENABLE_AUDIO_LLM`이었다. 이후 서버 설정으로 옮겨져
+> Lab 토글이 정한다. 아래 명령은 그대로 재현되지 않는다 — 기록은 손대지 않고 남긴다.
+
 ```bash
 export AUDIO_MODEL_DIR="$HOME/caffeine-audio/models"
 export ENABLE_AUDIO_LLM=true OPENROUTER_API_KEY=...

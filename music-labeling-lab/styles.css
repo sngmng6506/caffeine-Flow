@@ -164,3 +164,14 @@ legend { margin-bottom: 8px; color: #4a5568; font-size: 12px; font-weight: 700; 
 #maestRaw { max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
 #maestSummary table { width: 100%; border-collapse: collapse; font-size: 12px; }
 #maestSummary th, #maestSummary td { padding: 5px; text-align: left; border-bottom: 1px solid #e2e7ef; }
+
+/* 툴바의 체크박스형 스위치. 기존 select 라벨과 같은 줄에 정렬한다. */
+.toolbar .toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.toolbar .toggle input {
+  margin: 0;
+}

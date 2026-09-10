@@ -66,9 +66,8 @@ class WorkerConfig:
             env.get("POLL_INTERVAL_MS"), DEFAULT_POLL_INTERVAL_MS
         )
         self.discord_webhook_url = env.get("DISCORD_AUDIO_WEBHOOK_URL", "").strip()
-        # 3단 Audio LLM. 외부 유료 API를 호출하고 오디오 구간이 밖으로 나가므로
-        # 기본은 꺼짐이다. 모델은 운영자가 고른다.
-        self.enable_audio_llm = read_flag(env, "ENABLE_AUDIO_LLM")
+        # 3단 Audio LLM. 실행 여부는 서버 설정이 정하고 워커는 claim 응답으로 받는다.
+        # 여기에는 호출에 필요한 값만 둔다. 키가 없으면 3단을 건너뛴다.
         self.audio_llm = {
             "model": env.get("AUDIO_LLM_MODEL", "").strip() or AUDIO_LLM_DEFAULT_MODEL,
             "base_url": env.get("OPENROUTER_BASE_URL", "").strip() or AUDIO_LLM_DEFAULT_BASE_URL,
@@ -84,9 +83,6 @@ class WorkerConfig:
     def require(self):
         if not self.server_url:
             raise ValueError("CAFFEINE_FLOW_SERVER_URL이 필요합니다")
-        # 켜 놓고 키가 없으면 곡마다 실패한다. 시작할 때 알린다.
-        if self.enable_audio_llm and not self.audio_llm["api_key"]:
-            raise ValueError("ENABLE_AUDIO_LLM에는 OPENROUTER_API_KEY가 필요합니다")
         if not self.token and not self.dry_run:
             raise ValueError("AUDIO_ANALYSIS_WORKER_TOKEN이 필요합니다")
         return self

@@ -183,9 +183,12 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/admin/audio-labels/:id/requeue` | 🛡 | generation을 비교해 실패 재시도·완료곡 재분석 등록. 처리 중은 409, Spotify는 400 |
 | POST | `/admin/audio-labels/:id/renormalize` | 🛡 | generation, analysis_id, analysis_revision을 비교해 원본에 현재 택소노미 적용. 원본·사람 라벨 보존 |
 | PUT | `/admin/audio-labels/:id/review` | 🛡 | 작업 ID에 해당하는 곡의 라벨 확인·수정. 매장 정책 판단 불필요 |
+| GET | `/admin/audio-settings` | 🛡 | 3단 Audio LLM 스위치 조회 |
+| PUT | `/admin/audio-settings` | 🛡 | 스위치 변경. body는 `{ audio_llm_enabled: boolean }` |
 
 - 곡별 최신 분석의 `maest_summary`에는 상위 10개(mean·max)와 소비 프롬프트용 `prompt_styles`가 들어간다. `prompt_styles`는 1위 점수의 0.5배 이상인 스타일 최대 5개이며 `prompt_style_calibrated`는 항상 false다.
 
+- 3단 Audio LLM 실행 여부는 서버 설정이 정한다. `/jobs/claim` 응답에 `audio_llm_enabled`가 실려 오며 워커는 이 값을 따른다. 워커에 키가 없으면 켜져 있어도 건너뛴다.
 - 신규 신청과 작업 등록은 같은 트랜잭션이며 기존 신청은 마이그레이션에서 등록한다. AI 필터 OFF·거절 곡도 포함한다. Spotify는 `unsupported`로 등록하며 claim하지 않는다.
 - 완료 응답 유실 시 같은 lease로 재전송하면 기존 결과를 반환한다. 만료 lease로 바로 완료하면 409다. resume은 같은 토큰을 유지하고 다른 워커가 인계받지 않은 작업만 재개한다. 교체되거나 관리자 재큐잉으로 폐기한 토큰은 409다. 완료되지 않은 lease는 만료 후 다음 claim에서 회수한다.
 - 실패 코드와 분류의 단일 기준은 `server/src/constants/audio-pipeline.json`이다. 인프라 오류는 짧은 대기, 일시 다운로드 오류는 초기 지수 지연 후 장기 재시도, 영구 소스 오류는 중단이다. 분석 실패·lease 소진은 횟수 제한 후 failed이며 관리자 재시도가 가능하다. 플랫폼 원문 오류·토큰·음원은 보내지 않는다.

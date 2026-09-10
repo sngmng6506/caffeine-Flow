@@ -54,7 +54,7 @@ def run(audio, job, output):
 
     # 3단은 1단 결과를 보지 않는다. 장르·택소노미를 넘길 통로 자체를 두지 않았다.
     audio_llm_raw = None
-    if os.environ.get('ENABLE_AUDIO_LLM', '').strip().lower() == 'true':
+    if job.get('audio_llm_enabled', True) and os.environ.get('OPENROUTER_API_KEY', '').strip():
         try:
             audio_llm_raw = describe(audio, audio_duration, audio_sha256, audio_llm_config())
             sources_used.append(audio_llm_raw['model_id'])

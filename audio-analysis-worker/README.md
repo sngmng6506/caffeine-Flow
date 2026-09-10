@@ -19,7 +19,7 @@
 1. 서버가 신청 저장 트랜잭션에서 작업을 등록한다. 동일 플랫폼·곡은 한 번만 분석한다.
 2. 미니PC가 `/audio-analysis/jobs/claim`으로 작업을 가져와 YouTube·SoundCloud 오디오를 임시 다운로드한다. Spotify는 서버가 unsupported로 처리한다.
 3. 곡마다 **별도 프로세스**에서 Essentia 기본 특징, MAEST 519 스타일, Valence/Arousal을 추론한다. 세 모델이 같은 16kHz 배열을 나눠 쓴다.
-4. `ENABLE_AUDIO_LLM=true`면 곡에서 고르게 뽑은 구간을 오디오 입력 LLM에 보내 무드·악기·보컬을 자유 서술로 받는다([3단 Audio LLM](#3단-audio-llm)).
+4. 서버 설정이 켜져 있으면 곡에서 고르게 뽑은 구간을 오디오 입력 LLM에 보내 무드·악기·보컬을 자유 서술로 받는다([3단 Audio LLM](#3단-audio-llm)).
 5. 분석 원본·자동 라벨·작업 완료를 한 트랜잭션에 저장한다. 임시 음원은 성공·실패 모두 삭제한다. 사람이 수정한 라벨은 덮어쓰지 않는다.
 6. 중단된 작업은 lease 만료 후 회수한다. 결과는 로컬 outbox에 보존하고 같은 lease로 전송을 재개한다. 오류별 재시도 정책은 아래 장애 복구 절을 따른다.
 
@@ -141,7 +141,7 @@ HTTP 응답에서는 401·503이 토큰 설정, 404가 서버 배포 버전, 413
 
 ### 3단 Audio LLM
 
-오디오를 직접 듣는 LLM에게 무드·악기·보컬·구간 변화를 **자유 서술**로 받는다. 기본은 꺼짐이며 `ENABLE_AUDIO_LLM=true`와 `OPENROUTER_API_KEY`가 함께 있어야 동작한다. 모델은 `AUDIO_LLM_MODEL`로 고른다.
+오디오를 직접 듣는 LLM에게 무드·악기·보컬·구간 변화를 **자유 서술**로 받는다. 실행 여부는 **서버 설정**이 정하고(기본 켜짐) 운영자가 Lab 툴바의 `AI 음악 서술` 토글로 끄고 켠다. 워커는 claim 응답으로 그 값을 받으므로 재시작이 필요 없다. `OPENROUTER_API_KEY`가 없으면 켜져 있어도 건너뛴다. 모델은 `AUDIO_LLM_MODEL`로 고른다.
 
 동작 계약 — 이 세 가지가 이 단계의 존재 이유다.
 
@@ -221,8 +221,7 @@ manifest 필드와 허용 확장자·크기 제한, 경로 검증 규칙은 `man
 | `ENABLE_VALENCE_AROUSAL` | `true` | 수동 CLI 감정 모델 스위치. 자동 큐는 모델이 있으면 항상 돌린다 |
 | `AUDIO_WORKER_DRY_RUN` | `false` | 자동 워커는 `true`면 **기동을 거절한다**. 수동 큐에서는 제출을 생략한다 |
 | `DISCORD_AUDIO_WEBHOOK_URL` | — | 수동 큐 실패 알림. 자동 워커는 작업 상태와 journald로 진단한다 |
-| `ENABLE_AUDIO_LLM` | `false` | 3단 Audio LLM 스위치. 켜면 `OPENROUTER_API_KEY`가 필요하다 |
-| `OPENROUTER_API_KEY` | — | 3단 인증. 없이 켜면 워커가 기동하지 않는다 |
+| `OPENROUTER_API_KEY` | — | 3단 인증. 없으면 서버가 켜 두어도 3단을 건너뛴다 |
 | `AUDIO_LLM_MODEL` | `google/gemini-2.5-pro` | 사용할 오디오 입력 모델 |
 | `AUDIO_LLM_SEGMENTS` | `4` | 곡에서 고르게 뽑을 구간 수 |
 | `AUDIO_LLM_CLIP_SEC` | `30` | 구간 길이(초) |

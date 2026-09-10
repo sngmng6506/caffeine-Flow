@@ -75,6 +75,29 @@ async function api(method, path, body) {
   return { ok: response.ok, status: response.status, data };
 }
 
+// 3단 Audio LLM 스위치. 서버에 저장되므로 워커를 다시 띄우지 않아도 다음 곡부터
+// 반영된다. 실패하면 화면 값을 서버 값으로 되돌려 실제 상태와 어긋나지 않게 한다.
+async function loadAudioSettings() {
+  const toggle = document.getElementById('audioLlmEnabled');
+  const { ok, data } = await api('GET', '/admin/audio-settings');
+  if (!ok) return;
+  toggle.checked = data.audio_llm_enabled;
+  toggle.disabled = false;
+}
+
+async function saveAudioSettings(event) {
+  const toggle = event.target;
+  const wanted = toggle.checked;
+  toggle.disabled = true;
+  const { ok, data } = await api('PUT', '/admin/audio-settings', { audio_llm_enabled: wanted });
+  toggle.checked = ok ? data.audio_llm_enabled : !wanted;
+  toggle.disabled = false;
+  $('message').hidden = false;
+  $('message').textContent = ok
+    ? `AI 음악 서술을 ${data.audio_llm_enabled ? '켰습니다' : '껐습니다'}. 다음 분석부터 적용됩니다.`
+    : (data.error || 'AI 음악 서술 설정을 바꾸지 못했습니다.');
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -452,10 +475,13 @@ $('nextItem').addEventListener('click', () => {
 
 $('viewFilter').addEventListener('change', () => loadPage(0));
 
+$('audioLlmEnabled').addEventListener('change', saveAudioSettings);
+
 if (!currentToken()) {
   window.location.replace('/admin');
 } else {
   loadPage();
+  loadAudioSettings();
 }
 
 $('loadMaestRaw').addEventListener('click', async () => {

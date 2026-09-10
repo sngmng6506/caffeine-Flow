@@ -152,3 +152,41 @@ class PipelineModeTest(unittest.TestCase):
         self.assertEqual(pipeline_mode(mood, llm), 'FULL')
         # 감정 모델이 없어도 3단이 돌면 FULL이다. sources_used가 실제 목록을 남긴다.
         self.assertEqual(pipeline_mode(None, llm), 'FULL')
+
+    def test_audio_llm_follows_the_server_setting(self):
+        # 3단 실행 여부는 서버가 정한다. 워커 환경변수로 되돌리면 운영자가 Lab에서
+        # 끄지 못하게 된다.
+        import tempfile, wave, os
+        from pathlib import Path
+        import remote_analyze
+        raw = summarize(np.zeros((1, 519)), 20)
+        raw['essentia_version'] = 'test'
+        features = {'duration_seconds': 20, 'sample_rate': 16000}
+        calls = []
+
+        def build(job_extra, key='k'):
+            calls.clear()
+            with tempfile.TemporaryDirectory() as directory:
+                audio = Path(directory) / 'input.wav'
+                with wave.open(str(audio), 'wb') as output:
+                    output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
+                    output.writeframes(b'\0\0' * 16000 * 20)
+                with patch.dict(os.environ, {'OPENROUTER_API_KEY': key}), \
+                     patch.object(remote_analyze, 'analyze_audio', return_value=(features, 'test')), \
+                     patch.object(remote_analyze, 'predict', return_value=raw), \
+                     patch.object(remote_analyze, 'describe',
+                                  side_effect=lambda *a, **k: calls.append(a) or {
+                                      'model_id': 'm', 'description': 'x'}):
+                    job = {'platform': 'youtube', 'track_key': 'abcdefghijk',
+                           'artist_name': 'unknown', **job_extra}
+                    return remote_analyze.run(audio, job, Path(directory) / 'result.json')
+
+        self.assertIsNotNone(build({'audio_llm_enabled': True})['maest_run']['audio_llm_raw'])
+        self.assertEqual(len(calls), 1)
+
+        self.assertIsNone(build({'audio_llm_enabled': False})['maest_run']['audio_llm_raw'])
+        self.assertEqual(calls, [], '서버가 껐으면 호출하지 않는다')
+
+        # 키가 없으면 서버가 켜 두어도 건너뛴다. 기동을 막지는 않는다.
+        self.assertIsNone(build({'audio_llm_enabled': True}, key='')['maest_run']['audio_llm_raw'])
+        self.assertEqual(calls, [])

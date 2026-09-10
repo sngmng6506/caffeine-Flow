@@ -34,7 +34,9 @@ function claim() {
       lease_until: trx.raw("now() + (? * interval '1 minute')", [JOB_LEASE_MINUTES]),
       updated_at: trx.fn.now(),
     }).returning('*');
-    return job;
+    // 3단 실행 여부는 서버가 정한다. 워커가 따로 조회하지 않도록 함께 실어 보낸다.
+    const settings = await trx('audio_pipeline_settings').where({ id: 1 }).first();
+    return { ...job, audio_llm_enabled: settings ? settings.audio_llm_enabled : true };
   });
 }
 

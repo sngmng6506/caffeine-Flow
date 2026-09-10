@@ -440,6 +440,18 @@ router.put('/audio-labels/:id/review', requireAdmin, async (req, res) => {
     throw error;
   }
 });
+// GET /api/v1/admin/audio-settings, PUT — 3단 Audio LLM 스위치
+// 운영자가 Lab에서 끄고 켠다. 워커는 claim 응답으로 현재 값을 받는다.
+router.get('/audio-settings', requireAdmin, async (_req, res) => {
+  res.json(await require('../features/audio-analysis/settings').get());
+});
+router.put('/audio-settings', requireAdmin, async (req, res) => {
+  if (typeof req.body?.audio_llm_enabled !== 'boolean') {
+    return res.status(400).json({ error: 'audio_llm_enabled는 true 또는 false여야 합니다' });
+  }
+  res.json(await require('../features/audio-analysis/settings').update(req.body));
+});
+
 module.exports = router;
 module.exports.CAFE_STATUS = CAFE_STATUS;
 
