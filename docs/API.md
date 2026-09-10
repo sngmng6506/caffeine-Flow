@@ -126,6 +126,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
 
 - 잘못된 UUID와 미존재 카페는 404다. 정지 카페는 손님 HTTP와 Socket.IO 접근이 차단된다.
+- 곡 라벨 검토는 `verdict`(`accurate`·`inaccurate`·`unclear`)만 보내는 경로를 지원한다. 택소노미를 고르지 않고 자동 서술이 곡과 맞는지만 답한다. `track_annotation`을 함께 보내면 기존처럼 수정으로 기록된다.
 - 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, audio_analysis_id?, audio_analysis_revision?, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 화면에 표시한 최신 자동 분석 ID를 함께 보내면 해당 곡·분석 한 건만 `reviewed`로 바뀐다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
 - 해당 카페의 AI 처리 이력만 검수할 수 있고, 사람 라벨은 신청곡 상태나 LLM 판단을 바꾸지 않는다.
 - 곡 라벨은 `(platform, track_key)`당 한 건으로 upsert한다.

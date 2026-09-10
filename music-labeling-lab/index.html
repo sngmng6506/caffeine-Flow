@@ -92,7 +92,6 @@
           <div class='analysis-suggestion'>
             <span>추천 라벨</span>
             <p id='analysisSuggestion'>—</p>
-            <button type='button' id='applyAnalysisSuggestion' class='secondary-button'>추천값을 선택지에 적용</button>
           </div>
           <div id='maestSummary'></div>
           <button type='button' id='loadMaestRaw' hidden>구간별 원본·이력 보기</button>
@@ -116,115 +115,20 @@
             <div id='artistReferences' class='artist-references' hidden></div>
           </section>
 
-          <section class='form-section'>
+          <section class='form-section verdict-section'>
             <div class='section-title'>
-              <div><span>2</span><h3>빠르기와 분위기</h3></div>
-              <small>분위기는 최대 2개</small>
+              <div><span>2</span><h3>자동 분석이 이 곡과 맞습니까?</h3></div>
+              <small>선택지를 고르지 않아도 됩니다</small>
             </div>
-            <fieldset>
-              <legend>체감 템포</legend>
-              <div class='choice-grid compact'>
-                <label><input type='radio' name='tempo_class' value='very_slow' required /><span>매우 느림</span></label>
-                <label><input type='radio' name='tempo_class' value='slow' /><span>느림</span></label>
-                <label><input type='radio' name='tempo_class' value='moderate' /><span>보통</span></label>
-                <label><input type='radio' name='tempo_class' value='fast' /><span>빠름</span></label>
-                <label><input type='radio' name='tempo_class' value='very_fast' /><span>매우 빠름</span></label>
-                <label><input type='radio' name='tempo_class' value='unknown' /><span>판단하기 어려움</span></label>
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>주요 분위기</legend>
-              <div class='choice-grid mood-grid' data-max-choices='2'>
-                <label><input type='checkbox' name='mood_tags' value='peaceful' /><span>평온·차분</span></label>
-                <label><input type='checkbox' name='mood_tags' value='joyful' /><span>밝음·즐거움</span></label>
-                <label><input type='checkbox' name='mood_tags' value='tender' /><span>따뜻함·부드러움</span></label>
-                <label><input type='checkbox' name='mood_tags' value='nostalgic' /><span>몽환·향수</span></label>
-                <label><input type='checkbox' name='mood_tags' value='sad' /><span>슬픔·우울</span></label>
-                <label><input type='checkbox' name='mood_tags' value='uplifting' /><span>웅장·고양</span></label>
-                <label><input type='checkbox' name='mood_tags' value='tense' /><span>긴장·어두움</span></label>
-                <label><input type='checkbox' name='mood_tags' value='aggressive' /><span>공격적·강렬</span></label>
-                <label><input type='checkbox' name='mood_tags' value='quirky' /><span>독특·장난스러움</span></label>
-                <label><input type='checkbox' name='mood_tags' value='unknown' /><span>판단하기 어려움</span></label>
-              </div>
-            </fieldset>
-          </section>
-
-          <section class='form-section'>
-            <div class='section-title'><div><span>3</span><h3>소리 특징</h3></div></div>
-            <fieldset>
-              <legend>사운드 구성</legend>
-              <div class='choice-grid compact'>
-                <label><input type='radio' name='instrumentation_type' value='acoustic' required /><span>어쿠스틱 중심</span></label>
-                <label><input type='radio' name='instrumentation_type' value='electronic' /><span>전자음 중심</span></label>
-                <label><input type='radio' name='instrumentation_type' value='hybrid' /><span>어쿠스틱·전자음 혼합</span></label>
-                <label><input type='radio' name='instrumentation_type' value='unknown' /><span>판단하기 어려움</span></label>
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>리듬 특징</legend>
-              <div class='choice-grid'>
-                <label><input type='radio' name='rhythmic_character' value='minimal' required /><span>리듬이 거의 드러나지 않음</span></label>
-                <label><input type='radio' name='rhythmic_character' value='steady' /><span>안정적인 리듬</span></label>
-                <label><input type='radio' name='rhythmic_character' value='danceable' /><span>춤추기 좋은 리듬</span></label>
-                <label><input type='radio' name='rhythmic_character' value='heavy_beat' /><span>강한 비트 중심</span></label>
-                <label><input type='radio' name='rhythmic_character' value='irregular' /><span>불규칙하거나 실험적</span></label>
-                <label><input type='radio' name='rhythmic_character' value='unknown' /><span>판단하기 어려움</span></label>
-              </div>
-            </fieldset>
-            <fieldset>
-              <legend>보컬 유형</legend>
-              <div class='choice-grid compact'>
-                <label><input type='radio' name='vocal_type' value='none' required /><span>목소리 없음</span></label>
-                <label><input type='radio' name='vocal_type' value='singing' /><span>노래 위주</span></label>
-                <label><input type='radio' name='vocal_type' value='rap_spoken' /><span>랩·말하기 위주</span></label>
-                <label><input type='radio' name='vocal_type' value='unknown' /><span>판단하기 어려움</span></label>
-              </div>
-            </fieldset>
-          </section>
-
-          <section class='form-section'>
-            <div class='section-title'>
-              <div><span>4</span><h3>장르와 메모</h3></div>
-              <small>장르는 선택사항·최대 2개</small>
+            <div id='autoDescription' class='auto-description'>자동 서술이 아직 없습니다.</div>
+            <div class='verdict-buttons'>
+              <button type='button' id='verdictAccurate' class='save-button'>맞음 · 다음</button>
+              <button type='button' id='verdictInaccurate' class='secondary-button'>틀림</button>
+              <button type='button' id='verdictUnclear' class='secondary-button'>애매</button>
             </div>
-            <fieldset>
-              <legend>장르</legend>
-              <div class='choice-grid genre-grid' data-max-choices='2'>
-                <label><input type='checkbox' name='genre_tags' value='pop' /><span>팝</span></label>
-                <label><input type='checkbox' name='genre_tags' value='ballad' /><span>발라드</span></label>
-                <label><input type='checkbox' name='genre_tags' value='hiphop_rap' /><span>힙합·랩</span></label>
-                <label><input type='checkbox' name='genre_tags' value='rnb_soul' /><span>R&amp;B·소울</span></label>
-                <label><input type='checkbox' name='genre_tags' value='rock_metal' /><span>록·메탈</span></label>
-                <label><input type='checkbox' name='genre_tags' value='electronic_dance' /><span>전자음악·댄스</span></label>
-                <label><input type='checkbox' name='genre_tags' value='jazz' /><span>재즈</span></label>
-                <label><input type='checkbox' name='genre_tags' value='classical' /><span>클래식</span></label>
-                <label><input type='checkbox' name='genre_tags' value='acoustic_folk' /><span>어쿠스틱·포크</span></label>
-                <label><input type='checkbox' name='genre_tags' value='ambient_lofi' /><span>앰비언트·로파이</span></label>
-                <label><input type='checkbox' name='genre_tags' value='ost_instrumental' /><span>OST·연주</span></label>
-                <label><input type='checkbox' name='genre_tags' value='world_latin_reggae' /><span>월드·라틴·레게</span></label>
-                <label><input type='checkbox' name='genre_tags' value='other' /><span>기타</span></label>
-                <label><input type='checkbox' name='genre_tags' value='unknown' /><span>잘 모르겠음</span></label>
-              </div>
-            </fieldset>
-            <label class='text-field'>추가 메모 <small>선택지로 설명하기 어려운 특징만 작성</small>
-              <textarea name='note' rows='2' maxlength='500' placeholder='예: 후반부부터 비트와 전자음이 강해짐'></textarea>
-            </label>
           </section>
-
-          <section class='form-section decision-section'>
-            <fieldset>
-              <legend>라벨 사용 목적</legend>
-              <div class='choice-grid compact'>
-                <label><input type='radio' name='usage_scope' value='operational' required /><span>실서비스 참고용</span></label>
-                <label><input type='radio' name='usage_scope' value='evaluation' checked /><span>성능 평가용</span></label>
-              </div>
-            </fieldset>
-          </section>
-
-          <button type='submit' id='saveReview' class='save-button'>수정 저장 · 다음</button>
         </form>
 
-        <button type='button' id='confirmReview' class='save-button'>이대로 확인 · 다음</button>
         <div class='navigation'>
           <button type='button' id='previousItem'>이전</button>
           <button type='button' id='nextItem'>다음</button>

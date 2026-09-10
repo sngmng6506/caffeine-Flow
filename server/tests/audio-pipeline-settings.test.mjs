@@ -26,6 +26,24 @@ afterAll(async () => {
   await db.destroy();
 });
 
+describe('자동 분석 판정', () => {
+  it('알 수 없는 판정은 거절한다', async () => {
+    const response = await request(app).put('/api/v1/admin/audio-labels/00000000-0000-0000-0000-000000000000/review')
+      .set(admin()).send({ verdict: 'maybe', annotation_revision: 0 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/판정/);
+  });
+
+  it('판정 없이 보내는 기존 경로도 그대로 받는다', async () => {
+    // 택소노미를 고르지 않고 확인만 하는 경로가 깨지면 안 된다.
+    const response = await request(app).put('/api/v1/admin/audio-labels/00000000-0000-0000-0000-000000000000/review')
+      .set(admin()).send({ annotation_revision: 0 });
+
+    expect(response.status).toBe(404, '판정 검증이 아니라 곡을 못 찾아 실패해야 한다');
+  });
+});
+
 describe('3단 Audio LLM 스위치', () => {
   it('기본값은 켜짐이다', async () => {
     const response = await request(app).get('/api/v1/admin/audio-settings').set(admin());

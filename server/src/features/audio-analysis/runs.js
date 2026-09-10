@@ -145,7 +145,14 @@ function summary(run) {
   return { model_version: run.maest_model_version, segment_count: raw.segments.length,
     top_mean: top('mean'), top_max: top('max'), normalized: run.normalized, audio_sha256: run.audio_sha256,
     // 보정되지 않은 상대 점수다. 소비처는 이 사실을 프롬프트에 함께 밝힌다.
-    prompt_styles: selectPromptStyles(raw), prompt_style_calibrated: false };
+    prompt_styles: selectPromptStyles(raw), prompt_style_calibrated: false,
+    // 사람이 검토할 때 읽을 자유 서술. 없으면 null이다.
+    audio_llm: run.audio_llm_raw ? {
+      model_id: run.audio_llm_raw.model_id,
+      description: run.audio_llm_raw.description,
+      mood: run.audio_llm_raw.mood, instruments: run.audio_llm_raw.instruments,
+      vocal: run.audio_llm_raw.vocal, structure: run.audio_llm_raw.structure,
+    } : null };
 }
 
 async function history(jobId) {

@@ -175,3 +175,13 @@ legend { margin-bottom: 8px; color: #4a5568; font-size: 12px; font-weight: 700; 
 .toolbar .toggle input {
   margin: 0;
 }
+
+/* 자동 서술 카드. 사람이 읽고 곡과 맞는지 판단하는 유일한 근거라 본문을 크게 둔다. */
+.auto-description { background: #f7f8fb; border-radius: 8px; padding: 14px 16px; margin: 10px 0 16px; line-height: 1.6; }
+.auto-description .auto-text { margin: 0 0 10px; font-size: 15px; color: #1f2430; }
+.auto-description p { margin: 4px 0; font-size: 13px; color: #4a5165; }
+.auto-description b { color: #677188; font-weight: 600; margin-right: 6px; }
+.auto-genre { margin: 0 0 8px !important; font-size: 12px !important; color: #677188 !important; }
+.auto-empty { color: #8b93a7 !important; }
+.verdict-buttons { display: flex; gap: 8px; align-items: center; }
+.verdict-buttons .save-button { flex: 1; }

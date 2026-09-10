@@ -433,8 +433,14 @@ router.put('/audio-labels/:id/review', requireAdmin, async (req, res) => {
   }
   const annotation = req.body.track_annotation === undefined ? { value: null } : validateMusicAnnotation(req.body.track_annotation);
   if (annotation.error) return res.status(400).json({ error: annotation.error });
+  // 택소노미를 고르는 대신 서술이 곡과 맞는지만 답하는 경로다.
+  const { REVIEW_VERDICTS } = require('../constants/music-labeling');
+  if (req.body.verdict !== undefined && !REVIEW_VERDICTS[req.body.verdict]) {
+    return res.status(400).json({ error: '검토 판정이 올바르지 않습니다' });
+  }
+  const verdict = req.body.verdict ? REVIEW_VERDICTS[req.body.verdict] : undefined;
   try {
-    res.json(await audioLabels.review(req.params.id, req.body, annotation.value));
+    res.json(await audioLabels.review(req.params.id, { ...req.body, verdict }, annotation.value));
   } catch (error) {
     if (error.status) return res.status(error.status).json({ error: error.message });
     throw error;

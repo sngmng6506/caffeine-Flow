@@ -60,7 +60,8 @@ function review(jobId, input, annotation) {
       ...next, platform: job.platform, track_key: job.track_key, title: job.title,
       mood_tags: JSON.stringify(next.mood_tags), genre_tags: JSON.stringify(next.genre_tags),
       artist_confirmed: artistConfirmed, reviewed_fields: JSON.stringify(reviewedFields),
-      label_source: 'human', human_review_status: annotation ? 'corrected' : 'confirmed',
+      label_source: 'human',
+      human_review_status: annotation ? 'corrected' : (input.verdict || 'confirmed'),
       revision: (current?.revision || 0) + 1, updated_at: trx.fn.now(),
     };
     delete row.id;

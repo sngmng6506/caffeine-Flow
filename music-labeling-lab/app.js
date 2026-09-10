@@ -140,26 +140,31 @@ function trackUrl(item) {
   return /^https?:\/\//.test(item.video_id || '') ? item.video_id : '';
 }
 
-function setRadio(name, value) {
-  document.querySelectorAll(`input[type=radio][name=${name}]`).forEach((input) => {
-    input.checked = input.value === value;
-  });
-}
 
-function setChecks(name, values = []) {
-  document.querySelectorAll(`input[type=checkbox][name=${name}]`).forEach((input) => {
-    input.checked = values.includes(input.value);
-  });
-}
 
-function selectedValues(form, name) {
-  return new FormData(form).getAll(name);
-}
 
 function renderSummary() {
   $('totalCount').textContent = summary.total.toLocaleString('ko-KR');
   $('reviewedCount').textContent = summary.reviewed.toLocaleString('ko-KR');
   $('unreviewedCount').textContent = summary.unreviewed.toLocaleString('ko-KR');
+}
+
+// 3단 자유 서술을 보여준다. 사람이 읽고 곡과 맞는지 판단할 유일한 근거다.
+function renderAutoDescription(item) {
+  const target = $('autoDescription');
+  const llm = item.audio_analysis?.maest_summary?.audio_llm;
+  const genres = item.track_annotation?.genre_tags?.filter((tag) => tag !== 'unknown') || [];
+  const head = genres.length ? `<p class='auto-genre'>자동 장르 · ${escapeHtml(genres.join(', '))}</p>` : '';
+  if (!llm?.description) {
+    target.innerHTML = `${head}<p class='auto-empty'>자동 서술이 없습니다. AI 음악 서술이 꺼져 있었거나 분석이 실패한 곡입니다.</p>`;
+    return;
+  }
+  const line = (label, values) => (values?.length
+    ? `<p><b>${label}</b> ${escapeHtml(values.join(', '))}</p>` : '');
+  target.innerHTML = head
+    + `<p class='auto-text'>${escapeHtml(llm.description)}</p>`
+    + line('분위기', llm.mood) + line('악기', llm.instruments)
+    + line('보컬', llm.vocal) + line('구성', llm.structure);
 }
 
 function resetForm(item) {
@@ -176,18 +181,7 @@ function resetForm(item) {
   $('artistReferences').hidden = true;
   $('artistReferences').innerHTML = '';
 
-  if (annotation) {
-    setRadio('tempo_class', annotation.tempo_class);
-    setChecks('mood_tags', annotation.mood_tags || []);
-    setRadio('instrumentation_type', annotation.instrumentation_type);
-    setRadio('rhythmic_character', annotation.rhythmic_character);
-    setRadio('vocal_type', annotation.vocal_type);
-    setChecks('genre_tags', annotation.genre_tags || []);
-    form.elements.note.value = annotation.note || '';
-    setRadio('usage_scope', annotation.usage_scope);
-  }
-
-  setRadio('human_decision', item.human_decision);
+  renderAutoDescription(item);
 }
 
 function renderAudioAnalysis(item) {
@@ -235,7 +229,6 @@ function renderAudioAnalysis(item) {
   $('analysisSuggestion').textContent = suggestions.length
     ? suggestions.join(' · ')
     : '자동 추천 없음 — 직접 듣고 선택';
-  $('applyAnalysisSuggestion').disabled = suggestions.length === 0;
   $('analysisProvenance').textContent = [
     `${analysis.model_name} ${analysis.model_version}`,
     RIGHTS_LABELS[analysis.rights_basis] || analysis.rights_basis,
@@ -276,9 +269,10 @@ function renderItem() {
   renderAudioAnalysis(item);
   const states = { queued: '분석 대기', processing: '분석 중', completed: '자동 라벨링 완료', failed: '분석 실패 · 재시도 한도 초과', unsupported: 'Spotify 자동 분석 미지원' };
   $('jobStatus').textContent = `${states[item.job_status] || item.job_status}${item.error_code ? ` · ${item.error_code}` : ''}`;
-  $('confirmReview').disabled = !item.track_annotation;
-  $('confirmReview').textContent = complete ? '확인됨 · 다음' : '이대로 확인 · 다음';
-  $('saveReview').textContent = '수정 저장 · 다음';
+  for (const id of ['verdictAccurate', 'verdictInaccurate', 'verdictUnclear']) {
+    $(id).disabled = !item.track_annotation;
+  }
+  $('verdictAccurate').textContent = complete ? '확인됨 · 다음' : '맞음 · 다음';
   $('previousItem').disabled = currentIndex === 0 && currentOffset === 0;
   $('nextItem').disabled = currentIndex >= items.length - 1 && !hasMore;
 }
@@ -354,76 +348,16 @@ async function loadArtistReferences() {
   }
 }
 
-$('reviewForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const item = items[currentIndex];
-  if (!item) return;
-  const formElement = event.currentTarget;
-  const moodTags = selectedValues(formElement, 'mood_tags');
-  const genreTags = selectedValues(formElement, 'genre_tags');
-  if (moodTags.length < 1 || moodTags.length > 2) {
-    alert('주요 분위기를 1~2개 선택해주세요.');
-    return;
-  }
-  if (genreTags.length > 2) {
-    alert('장르는 최대 2개까지 선택할 수 있습니다.');
-    return;
-  }
-
-  const form = new FormData(formElement);
-  const button = $('saveReview');
-  button.disabled = true;
-  button.textContent = '저장 중…';
-  try {
-    const { ok, data } = await api(
-      'PUT',
-      `/admin/audio-labels/${item.id}/review`,
-      {
-        artist_confirmed: $('artistConfirmed').checked,
-        annotation_revision: item.track_annotation?.revision || 0,
-        audio_analysis_id: item.audio_analysis?.id || null,
-        audio_analysis_revision: item.audio_analysis?.revision || null,
-        track_annotation: {
-          artist_name: form.get('artist_name'),
-          track_version: item.track_annotation?.track_version || 'unknown',
-          tempo_class: form.get('tempo_class'),
-          mood_tags: moodTags,
-          instrumentation_type: form.get('instrumentation_type'),
-          rhythmic_character: form.get('rhythmic_character'),
-          vocal_type: form.get('vocal_type'),
-          genre_tags: genreTags,
-          note: form.get('note')?.trim() || null,
-          usage_scope: form.get('usage_scope'),
-        },
-      },
-    );
-    if (!ok) throw new Error(data.error || '라벨을 저장하지 못했습니다.');
-
-    await advanceAfterReview();
-  } catch (error) {
-    alert(error.message);
-    button.textContent = '수정 저장 · 다음';
-  } finally {
-    button.disabled = false;
-  }
-});
-
-async function advanceAfterReview() {
-  const index = currentIndex;
-  await loadPage(['unreviewed', 'ready'].includes($('viewFilter').value) ? 0 : currentOffset);
-  if (!['unreviewed', 'ready'].includes($('viewFilter').value)) {
-    currentIndex = Math.min(index + 1, Math.max(0, items.length - 1));
-    renderItem();
-  }
-}
-$('confirmReview').addEventListener('click', async () => {
+// 서술이 곡과 맞는지만 답한다. 택소노미를 고르게 하면 판단이 어려워 아무거나 찍게
+// 되고, 그렇게 만든 골드 라벨은 없느니만 못하다.
+async function submitVerdict(verdict, buttonId) {
   const item = items[currentIndex];
   if (!item?.track_annotation) return;
-  if ($('artistName').value !== item.track_annotation.artist_name) { alert('아티스트명을 변경했다면 수정 저장을 사용해주세요.'); return; }
-  const button = $('confirmReview');
+  const button = $(buttonId);
   button.disabled = true;
   try {
     const { ok, data } = await api('PUT', `/admin/audio-labels/${item.id}/review`, {
+      verdict,
       artist_confirmed: $('artistConfirmed').checked,
       annotation_revision: item.track_annotation.revision,
       audio_analysis_id: item.audio_analysis?.id || null,
@@ -433,7 +367,11 @@ $('confirmReview').addEventListener('click', async () => {
     await advanceAfterReview();
   } catch (error) { alert(error.message); }
   finally { button.disabled = !items[currentIndex]?.track_annotation; }
-});
+}
+
+$('verdictAccurate').addEventListener('click', () => submitVerdict('accurate', 'verdictAccurate'));
+$('verdictInaccurate').addEventListener('click', () => submitVerdict('inaccurate', 'verdictInaccurate'));
+$('verdictUnclear').addEventListener('click', () => submitVerdict('unclear', 'verdictUnclear'));
 $('refreshQueue').addEventListener('click', () => loadPage(0));
 
 document.querySelectorAll('[data-max-choices]').forEach((group) => {
@@ -458,19 +396,6 @@ document.querySelectorAll('[data-max-choices]').forEach((group) => {
 });
 
 $('findArtistLabels').addEventListener('click', loadArtistReferences);
-$('applyAnalysisSuggestion').addEventListener('click', () => {
-  const analysis = items[currentIndex]?.audio_analysis;
-  const suggestion = analysis?.automatic_annotation || analysis?.suggested_annotation;
-  if (!suggestion) return;
-  if (suggestion.tempo_class) setRadio('tempo_class', suggestion.tempo_class);
-  if (suggestion.rhythmic_character) {
-    setRadio('rhythmic_character', suggestion.rhythmic_character);
-  }
-  if (suggestion.mood_tags?.length) setChecks('mood_tags', suggestion.mood_tags);
-  if (suggestion.instrumentation_type) setRadio('instrumentation_type', suggestion.instrumentation_type);
-  if (suggestion.vocal_type) setRadio('vocal_type', suggestion.vocal_type);
-  if (suggestion.genre_tags) setChecks('genre_tags', suggestion.genre_tags);
-});
 $('previousItem').addEventListener('click', () => {
   if (currentIndex > 0) {
     currentIndex -= 1;

@@ -38,14 +38,21 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(app).toContain('track_annotation');
     expect(app).toContain('audio_analysis');
     expect(app).toContain('renderAudioAnalysis');
-    expect(app).toContain('applyAnalysisSuggestion');
     expect(app).toContain('기존 곡 라벨 불러옴');
     expect(app).toContain('audio_analysis_revision');
     expect(app).toContain('annotation_revision');
-    expect(app).toContain(`setRadio('tempo_class', annotation.tempo_class)`);
     expect(app).toContain(`sessionStorage.getItem(TOKEN_KEY)`);
-    expect(html).toContain('보컬 유형');
-    expect(html).toContain('랩·말하기 위주');
+    // 사람은 택소노미를 고르지 않고 자동 서술이 곡과 맞는지만 답한다.
+    expect(app).toContain('renderAutoDescription');
+    expect(app).toContain('maest_summary?.audio_llm');
+    expect(app).toContain(`submitVerdict('accurate'`);
+    expect(app).toContain(`submitVerdict('inaccurate'`);
+    expect(app).toContain(`submitVerdict('unclear'`);
+    expect(app).not.toContain('setRadio');
+    expect(app).not.toContain('applyAnalysisSuggestion');
+    expect(html).not.toContain('보컬 유형');
+    expect(html).not.toContain('주요 분위기');
+    expect(html).not.toContain('라벨 사용 목적');
     expect(html).not.toContain('노래와 랩이 섞임');
     expect(html).not.toContain('라벨 확신도');
     expect(html).toContain('Essentia 자동 분석');
@@ -54,7 +61,9 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).not.toContain('선택 기준 도움말');
     expect(html).not.toContain('곡 버전');
     expect(html).not.toContain('기본 메타데이터만으로 판단 가능했나요?');
-    expect(html).toContain("id='confirmReview'");
+    expect(html).toContain("id='autoDescription'");
+    expect(html).toContain("id='verdictAccurate'");
+    expect(html).not.toContain("id='confirmReview'");
     expect(html).not.toContain("name='human_decision'");
     expect(html).toContain(`id='existingLabelStatus'`);
     expect(html).toContain('<h1>음악 라벨링</h1>');
