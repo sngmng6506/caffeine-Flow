@@ -147,7 +147,6 @@ function renderAutoDescription(item) {
 
 function resetForm(item) {
   const annotation = item.track_annotation;
-  $('checkArtist').textContent = annotation?.artist_name || item.channel_title || '아티스트 정보 없음';
   $('artistConfirmed').checked = annotation?.artist_confirmed === true;
   const labelOrigin = annotation?.label_source === 'automatic' ? '자동 라벨' : annotation?.human_review_status === 'corrected' ? '사람 수정 라벨' : '사람 확인 라벨';
   $('existingLabelStatus').textContent = annotation
@@ -215,11 +214,16 @@ function renderItem() {
   const url = trackUrl(item);
   $('message').hidden = true;
   $('reviewCard').hidden = false;
-  $('position').textContent = `${currentOffset + currentIndex + 1}번째 · 현재 묶음 ${items.length}건`;
+  $('position').textContent = `${currentOffset + currentIndex + 1}번째 / 이번 묶음 ${items.length}건`;
   $('cafeName').textContent = '전체 매장 신청곡 · 같은 곡은 한 번만 분석';
   $('trackTitle').textContent = item.title || '제목 없음';
-  $('trackArtist').textContent = item.channel_title || '아티스트 정보 없음';
-  $('platform').textContent = item.platform || '기록 없음';
+  const artist = item.track_annotation?.artist_name || item.channel_title;
+  $('trackArtist').textContent = artist || '아티스트 정보 없음';
+  // 수집한 이름과 저장된 이름이 다르면 다른 곡을 분석했을 수 있다.
+  const collected = item.channel_title;
+  $('artistFlag').innerHTML = collected && artist && collected !== artist
+    ? `<span class='mismatch'>수집 이름 · ${escapeHtml(collected)}</span>` : '';
+  $('platform').textContent = `${item.platform || '플랫폼 미상'} · ${item.video_id || ''}`.trim();
   $('checkedAt').textContent = formatDateTime(item.audio_analysis?.analyzed_at || item.created_at);
   $('trackLink').href = url || '#';
   $('trackLink').hidden = !url;
@@ -256,6 +260,18 @@ async function loadPage(offset = 0) {
   renderItem();
 }
 
+const VERDICT_WORDS = Object.freeze({ accurate: '맞음', inaccurate: '틀림', unclear: '애매' });
+
+// 저장됐다는 사실을 알리는 유일한 피드백이다. 목록이 갱신되는 것만으로는
+// 눌렀는지 안 눌렀는지 알 수 없다(Nielsen #1 시스템 상태 가시성).
+function showStamp(verdict) {
+  const stamp = $('verdictStamp');
+  stamp.textContent = VERDICT_WORDS[verdict] || '저장';
+  stamp.classList.remove('show');
+  void stamp.offsetWidth;
+  stamp.classList.add('show');
+}
+
 // 서술이 곡과 맞는지만 답한다. 택소노미를 고르게 하면 판단이 어려워 아무거나 찍게
 // 되고, 그렇게 만든 골드 라벨은 없느니만 못하다.
 async function submitVerdict(verdict, buttonId) {
@@ -272,6 +288,7 @@ async function submitVerdict(verdict, buttonId) {
       audio_analysis_revision: item.audio_analysis?.revision || null,
     });
     if (!ok) throw new Error(data.error || '검토를 저장하지 못했습니다');
+    showStamp(verdict);
     await advanceAfterReview();
   } catch (error) { alert(error.message); }
   finally { button.disabled = !items[currentIndex]?.track_annotation; }
@@ -315,6 +332,33 @@ $('nextItem').addEventListener('click', () => {
 });
 
 $('viewFilter').addEventListener('change', () => loadPage(0));
+
+// 반복 작업이라 손이 마우스와 키보드를 오가지 않게 한다. 글자를 입력하는 중이거나
+// 목록·버튼에 포커스가 있을 때는 가로채지 않는다.
+const SHORTCUTS = Object.freeze({
+  1: () => submitVerdict('accurate', 'verdictAccurate'),
+  2: () => submitVerdict('inaccurate', 'verdictInaccurate'),
+  3: () => submitVerdict('unclear', 'verdictUnclear'),
+  ArrowLeft: () => $('previousItem').click(),
+  ArrowRight: () => $('nextItem').click(),
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  const tag = event.target?.tagName?.toLowerCase();
+  if (tag === 'input' || tag === 'select' || tag === 'textarea' || event.target?.isContentEditable) return;
+  if (event.key === 'a' || event.key === 'A') {
+    $('artistConfirmed').checked = !$('artistConfirmed').checked;
+    event.preventDefault();
+    return;
+  }
+  const run = SHORTCUTS[event.key];
+  if (!run || $('reviewCard').hidden) return;
+  // 판정 버튼이 꺼져 있으면(자동 라벨 없음) 단축키도 같이 막는다.
+  if (['1', '2', '3'].includes(event.key) && $('verdictAccurate').disabled) return;
+  event.preventDefault();
+  run();
+});
 
 $('audioLlmEnabled').addEventListener('change', saveAudioSettings);
 $('collectApple').addEventListener('click', requestCollection);

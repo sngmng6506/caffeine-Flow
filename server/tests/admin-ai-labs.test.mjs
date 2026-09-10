@@ -55,12 +55,19 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).not.toContain('추천 라벨');
     // 제출할 것이 없는 form은 텍스트 입력에서 Enter가 페이지를 새로 고친다.
     expect(html).not.toContain('<form');
+    // 곡마다 세 번 클릭하는 작업이라 키보드 가속기를 계약으로 고정한다.
+    expect(app).toContain("SHORTCUTS");
+    expect(app).toContain("submitVerdict('accurate', 'verdictAccurate')");
+    expect(html).toContain('<kbd>1</kbd>');
+    expect(html).toContain('<kbd>2</kbd>');
+    expect(html).toContain('<kbd>3</kbd>');
     expect(html).not.toContain('보컬 유형');
     expect(html).not.toContain('주요 분위기');
     expect(html).not.toContain('라벨 사용 목적');
     expect(html).not.toContain('노래와 랩이 섞임');
     expect(html).not.toContain('라벨 확신도');
-    expect(html).toContain('Essentia 자동 분석');
+    expect(html).toContain(`id='audioAnalysis'`);
+    expect(html).toContain('1단 · MAEST');
     expect(html).not.toContain('콘텐츠 주의 요소');
     expect(html).not.toContain('선택 기준 도움말');
     expect(html).not.toContain('곡 버전');

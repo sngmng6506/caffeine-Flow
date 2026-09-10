@@ -9,26 +9,20 @@
     <link rel='stylesheet' href='./styles.css' />
   </head>
   <body>
-    <header class='lab-header'>
-      <div>
-        <p class='eyebrow'>Caffeine Flow</p>
-        <h1>음악 라벨링</h1>
-        <p>곡을 듣고 자동 분석이 그 곡과 맞는지 확인합니다.</p>
-      </div>
+    <header class='masthead'>
+      <h1>음악 라벨링</h1>
+      <p class='sub'>자동 분석이 곡과 맞는지 확인합니다</p>
       <nav>
         <a href='/admin'>운영자 콘솔</a>
         <a href='/filter-lab'>필터 테스트</a>
       </nav>
+      <span class='counter' aria-label='라벨링 현황'>
+        전체 <b id='totalCount'>—</b> · 검토 <b id='reviewedCount'>—</b> · 남음 <b id='unreviewedCount'>—</b>
+      </span>
     </header>
 
     <main>
-      <section class='summary' aria-label='라벨링 현황'>
-        <div><span>전체</span><b id='totalCount'>—</b></div>
-        <div><span>완료</span><b id='reviewedCount'>—</b></div>
-        <div><span>남음</span><b id='unreviewedCount'>—</b></div>
-      </section>
-
-      <section class='toolbar'>
+      <div class='strip'>
         <label>보기
           <select id='viewFilter'>
             <option value='ready'>검토할 자동 라벨</option>
@@ -37,7 +31,6 @@
             <option value='all'>전체</option>
           </select>
         </label>
-        <button type='button' id='refreshQueue'>새로고침</button>
         <label class='toggle'>
           <input type='checkbox' id='audioLlmEnabled' disabled>
           AI 음악 서술
@@ -49,77 +42,66 @@
           </select>
         </label>
         <button type='button' id='collectApple'>최신곡 수집</button>
-        <span id='position'>—</span>
-      </section>
+        <span class='spacer'></span>
+        <button type='button' id='refreshQueue'>새로고침</button>
+      </div>
 
       <p id='message' class='message'>라벨링 목록을 불러오는 중…</p>
-      <article id='reviewCard' class='review-card' hidden>
-        <div class='track-head'>
-          <div>
-            <span id='cafeName' class='cafe-name'></span>
-            <h2 id='trackTitle'></h2>
-            <p id='trackArtist'></p>
-          </div>
-          <a id='trackLink' target='_blank' rel='noopener noreferrer'>곡 듣기</a>
-        </div>
 
-        <dl class='track-meta'>
-          <div><dt>플랫폼</dt><dd id='platform'></dd></div>
-          <div><dt>판단 시각</dt><dd id='checkedAt'></dd></div>
-        </dl>
-
-        <p id='jobStatus' role='status'></p>
-        <section id='audioAnalysis' class='audio-analysis' hidden>
-          <div class='audio-analysis-head'>
-            <div>
-              <span class='analysis-eyebrow'>Essentia 자동 분석</span>
-              <h3>음향 특징</h3>
-            </div>
-            <span id='analysisStatus' class='analysis-status'></span>
-          </div>
-          <dl class='analysis-metrics'>
-            <div><dt>Valence</dt><dd id='analysisValence'>—</dd></div>
-            <div><dt>Arousal</dt><dd id='analysisArousal'>—</dd></div>
-            <div><dt>BPM</dt><dd id='analysisBpm'>—</dd></div>
-            <div><dt>조성</dt><dd id='analysisKey'>—</dd></div>
-            <div><dt>댄서빌리티</dt><dd id='analysisDanceability'>—</dd></div>
-            <div><dt>평균 음량</dt><dd id='analysisLoudness'>—</dd></div>
-            <div><dt>다이내믹</dt><dd id='analysisDynamic'>—</dd></div>
-            <div><dt>스펙트럼 중심</dt><dd id='analysisCentroid'>—</dd></div>
-          </dl>
-          <div id='maestSummary'></div>
-          <button type='button' id='loadMaestRaw' hidden>구간별 원본·이력 보기</button>
-          <pre id='maestRaw' hidden></pre>
-          <p id='analysisProvenance' class='analysis-provenance'></p>
+      <article id='reviewCard' hidden>
+        <section class='slug'>
+          <p class='idline'>
+            <span id='position'>—</span>
+            <span id='platform'></span>
+            <span id='checkedAt'></span>
+          </p>
+          <h2 id='trackTitle'></h2>
+          <p class='credit'><span id='trackArtist'></span><span id='artistFlag'></span></p>
+          <p id='cafeName' class='scope'></p>
+          <a id='trackLink' class='listen' target='_blank' rel='noopener noreferrer'>▶ 곡 듣기</a>
+          <p id='jobStatus' class='job-status' role='status'></p>
         </section>
 
-        <div class='review-form'>
-          <section class='form-section artist-section'>
-            <div class='section-title'>
-              <div><span>1</span><h3>이 아티스트가 맞습니까?</h3></div>
+        <div class='sheet'>
+          <div class='col col-prose'>
+            <p class='eyebrow'>3단 · 자유 서술</p>
+            <div id='autoDescription' class='auto-description'>자동 서술이 아직 없습니다.</div>
+
+            <div class='checks'>
+              <label class='check'>
+                <input type='checkbox' id='artistConfirmed' />
+                <span>아티스트가 맞습니다<kbd>A</kbd></span>
+              </label>
               <small id='existingLabelStatus'>아직 자동 라벨이 없습니다.</small>
             </div>
-            <p id='checkArtist' class='check-artist'>—</p>
-            <label class='check-line'><input id='artistConfirmed' type='checkbox' /> 아티스트가 맞습니다</label>
-          </section>
 
-          <section class='form-section verdict-section'>
-            <div class='section-title'>
-              <div><span>2</span><h3>자동 분석이 이 곡과 맞습니까?</h3></div>
-              <small>듣고 느낀 대로 고르면 됩니다</small>
-            </div>
-            <div id='autoDescription' class='auto-description'>자동 서술이 아직 없습니다.</div>
-            <div class='verdict-buttons'>
-              <button type='button' id='verdictAccurate' class='verdict-button'>맞음</button>
-              <button type='button' id='verdictInaccurate' class='verdict-button'>틀림</button>
-              <button type='button' id='verdictUnclear' class='verdict-button'>애매</button>
-            </div>
-          </section>
-        </div>
+            <p class='note'>
+              <b>판정은 라벨을 바꾸지 않습니다.</b> 자동 라벨은 이미 저장돼 있고, 여기서 남기는 것은
+              그 라벨이 곡과 맞았는지에 대한 기록뿐입니다. <b>맞음</b>만 사람 라벨로 승격하고,
+              <b>틀림</b>·<b>애매</b>는 자동 라벨로 남겨 다음 재분석이 다시 고칠 수 있게 합니다.
+            </p>
+          </div>
 
-        <div class='navigation'>
-          <button type='button' id='previousItem'>이전</button>
-          <button type='button' id='nextItem'>다음</button>
+          <div id='audioAnalysis' class='col col-data' hidden>
+            <p class='eyebrow'>1단 · MAEST <span id='analysisStatus' class='analysis-status'></span></p>
+            <div id='maestSummary'></div>
+
+            <p class='eyebrow'>음향 계측</p>
+            <dl class='rows'>
+              <div><dt>BPM</dt><dd id='analysisBpm'>—</dd></div>
+              <div><dt>조성</dt><dd id='analysisKey'>—</dd></div>
+              <div><dt>Valence</dt><dd id='analysisValence'>—</dd></div>
+              <div><dt>Arousal</dt><dd id='analysisArousal'>—</dd></div>
+              <div><dt>댄서빌리티</dt><dd id='analysisDanceability'>—</dd></div>
+              <div><dt>평균 음량</dt><dd id='analysisLoudness'>—</dd></div>
+              <div><dt>다이내믹</dt><dd id='analysisDynamic'>—</dd></div>
+              <div><dt>스펙트럼 중심</dt><dd id='analysisCentroid'>—</dd></div>
+            </dl>
+
+            <button type='button' id='loadMaestRaw' class='disclose' hidden>구간별 원본 · 이력 보기</button>
+            <pre id='maestRaw' hidden></pre>
+            <p id='analysisProvenance' class='prov'></p>
+          </div>
         </div>
 
         <div class='card-actions'>
@@ -128,6 +110,23 @@
         </div>
       </article>
     </main>
+
+    <div class='verdict'>
+      <div class='verdict-inner'>
+        <p class='ask'><b>이 서술이 맞습니까?</b>곡을 듣고 판단하세요</p>
+        <div class='buttons'>
+          <button type='button' id='verdictAccurate'>맞음 <kbd>1</kbd></button>
+          <button type='button' id='verdictInaccurate'>틀림 <kbd>2</kbd></button>
+          <button type='button' id='verdictUnclear'>애매 <kbd>3</kbd></button>
+        </div>
+        <div class='nav'>
+          <button type='button' id='previousItem' title='이전 곡 (←)'>←</button>
+          <button type='button' id='nextItem' title='다음 곡 (→)'>→</button>
+        </div>
+      </div>
+    </div>
+
+    <div id='verdictStamp' class='stamp' aria-hidden='true'></div>
 
     <script src='./app.js'></script>
   </body>
