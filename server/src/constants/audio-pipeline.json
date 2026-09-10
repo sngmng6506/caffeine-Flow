@@ -12,6 +12,10 @@
     "batch_size": 1
   },
   "max_segments": 64,
+  "audio_duration_sec": {
+    "min": 10,
+    "max": 600
+  },
   "emotion_models": {
     "embedding": "msd-musicnn-1",
     "regression": "deam-msd-musicnn-2"

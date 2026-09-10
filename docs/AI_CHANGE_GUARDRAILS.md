@@ -84,6 +84,7 @@ server/src/routes/audio-analysis.js
 server/src/features/audio-analysis/runs.js
 ```
 
+- 길이 한도를 벗어난 소스는 다운로드 전에 `SOURCE_UNSUPPORTED`로 영구 실패시킨다. `DOWNLOAD_FAILED`는 재시도가 끝나지 않는 코드라, 영원히 성공할 수 없는 소스에 쓰면 6시간마다 반복된다.
 - 자동 워커는 사용자가 지정한 YouTube·SoundCloud 신청곡 URL을 임시 다운로드한다. `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않는다. 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
 - 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. MAEST 원본은 별도 music_audio_runs에 lease당 한 번 추가한다. 재분석·검토에서 원본을 수정·삭제하지 않으며 DB trigger로도 차단한다.

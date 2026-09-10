@@ -154,7 +154,8 @@ describe('자동 음향 분석 파이프라인', () => {
   });
   it('MAEST 큰 원본은 인증 경로에서 저장하고 재분석해도 이전 이력을 보존한다', async () => {
     await seed(); const job = await jobs.claim();
-    const body = maestBody(job, 50, 0.3123456789);
+    // 계약의 길이 한도(600초) 안에서 최대 구간 수. 64KB 본문 경로를 그대로 지난다.
+    const body = maestBody(job, 39, 0.3123456789);
     expect(JSON.stringify(body).length).toBeGreaterThan(65536);
     const send = (j, b) => request(app).post(`/api/v1/audio-analysis/jobs/${j.id}/complete`).set(auth()).send(b);
     const first = await send(job, body);

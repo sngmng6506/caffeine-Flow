@@ -40,9 +40,16 @@ describe('오디오 파이프라인 계약', () => {
     // hop을 줄이면 구간 수가 늘어 15분 곡만 400으로 거절된다. 짧은 곡으로
     // 시험하면 드러나지 않으므로 여기서 산술로 확인한다.
     const { patch_hop_size: hop, frame_hop: frame, sample_rate: rate } = contract.settings;
-    const longestTrackSec = 900;
+    expect(Math.ceil(contract.audio_duration_sec.max / ((hop * frame) / rate)))
+      .toBeLessThanOrEqual(contract.max_segments);
+  });
 
-    expect(Math.ceil(longestTrackSec / ((hop * frame) / rate))).toBeLessThanOrEqual(contract.max_segments);
+  it('가장 긴 곡의 구간 수를 계약의 길이 한도로 계산한다', () => {
+    // max_segments는 audio_duration_sec.max에서 나오는 값이라 함께 움직여야 한다.
+    const { patch_hop_size: hop, frame_hop: frame, sample_rate: rate } = contract.settings;
+
+    expect(Math.ceil(contract.audio_duration_sec.max / ((hop * frame) / rate)))
+      .toBeLessThanOrEqual(contract.max_segments);
   });
 
   it('재시도 분류에 같은 오류 코드가 두 번 들어가지 않는다', () => {

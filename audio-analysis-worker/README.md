@@ -103,7 +103,8 @@ systemctl --user daemon-reload
 - `server/src/constants/music-taxonomy.json`의 정적 매핑과 태그별 임계값으로 Lab 장르를 최대 2개 만든다. 기본 임계값은 **미보정 실험 기준**이다. `maest.normalize(raw, taxonomy)`로 재추론 없이 정규화만 다시 돌릴 수 있다. 지원되지 않거나 약한 장르는 `unknown`이다.
 - 무드는 Valence/Arousal에서만 만든다. 감정 모델을 쓸 수 없으면 `pipeline_mode=MAEST_ONLY`로 남고 무드는 null이다. 보컬·악기는 `unknown`이며 **장르에서 추측해 채우지 않는다.**
 - 입력 파일은 처리 후 삭제하므로 `audio_local_path`는 null이다. 재분석은 원본을 새 이력으로 추가하고 사람이 수정한 최종 라벨은 보존한다. 재다운로드 파일의 해시가 다르면 다른 입력으로 구분한다.
-- 길이·용량·시간 제한과 다운로드 간격은 `download.py`가 단일 기준이다. 로그인·지역제한·삭제·플랫폼 변경은 실패로 남기며 DRM·쿠키 우회는 하지 않는다.
+- 길이 한도는 계약(`audio_duration_sec`)이 단일 기준이다. 오디오를 받기 전에 길이만 먼저 확인해, 한도를 벗어나면 `SOURCE_UNSUPPORTED`로 **영구 실패** 처리한다. 받아 본 뒤 실패로 두면 서버가 일시 장애로 보고 6시간마다 다시 시도한다.
+- 용량·시간 제한과 다운로드 간격은 `download.py`가 단일 기준이다. 로그인·지역제한·삭제·플랫폼 변경은 실패로 남기며 DRM·쿠키 우회는 하지 않는다.
 
 ### 실제 곡 테스트 (서버 쓰기 없음)
 

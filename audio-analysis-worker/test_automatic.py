@@ -56,3 +56,45 @@ class AutomaticTest(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+
+class DurationGateTest(unittest.TestCase):
+    """10분을 넘는 곡은 받기 전에 영구 실패로 보낸다.
+
+    받아 본 뒤 DOWNLOAD_FAILED로 처리하면 서버가 일시 장애로 보고 6시간마다
+    영원히 다시 시도한다(temporary_codes).
+    """
+
+    def probe(self, stdout):
+        from download import probe_duration
+        return probe_duration('https://www.youtube.com/watch?v=abcdefghijk',
+                              runner=lambda *a, **k: SimpleNamespace(stdout=stdout.encode()))
+
+    def test_normal_length_passes(self):
+        self.assertEqual(self.probe('186.0|False'), 186.0)
+
+    def test_playlist_length_is_permanently_rejected(self):
+        # 실측: 148분짜리 "케이팝 노동요" 플레이리스트가 큐에 있었다.
+        with self.assertRaisesRegex(DownloadError, '^SOURCE_UNSUPPORTED$'):
+            self.probe('8907|False')
+
+    def test_too_short_is_rejected(self):
+        with self.assertRaisesRegex(DownloadError, '^SOURCE_UNSUPPORTED$'):
+            self.probe('5|False')
+
+    def test_live_stream_is_rejected(self):
+        with self.assertRaisesRegex(DownloadError, '^SOURCE_UNSUPPORTED$'):
+            self.probe('300|True')
+
+    def test_unknown_duration_is_not_blocked_here(self):
+        # 길이를 못 읽는 소스가 있다. 막지 않고 받아 보되 match-filter가 다시 본다.
+        self.assertIsNone(self.probe('NA|False'))
+
+    def test_limit_comes_from_the_shared_contract(self):
+        import json
+        from pathlib import Path
+        import download
+        contract = json.loads((Path(download.__file__).resolve().parents[1]
+                               / 'server/src/constants/audio-pipeline.json').read_text())
+        self.assertEqual(download.MAX_DURATION, contract['audio_duration_sec']['max'])
+        self.assertEqual(download.MIN_DURATION, contract['audio_duration_sec']['min'])

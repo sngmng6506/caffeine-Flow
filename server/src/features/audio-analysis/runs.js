@@ -69,7 +69,8 @@ function validateRun(input, result) {
       input.maest_model_version !== MODEL || input.model_sha256 !== contract.model_sha256 || !hash(input.audio_sha256) ||
       input.audio_local_path !== null ||
       !finite(input.audio_duration_sec) || Math.abs(input.audio_duration_sec - result.features.duration_seconds) > 0.001 || input.audio_sample_rate !== 16000 ||
-      input.audio_duration_sec < 10 || input.audio_duration_sec > 900 ||
+      input.audio_duration_sec < contract.audio_duration_sec.min ||
+      input.audio_duration_sec > contract.audio_duration_sec.max ||
       input.audio_source_url !== result.source_reference || !Array.isArray(input.sources_used) ||
       input.sources_used.length !== expectedSources.length + (mode === 'FULL' ? 1 : 0) ||
       expectedSources.some((v, i) => input.sources_used[i] !== v) ||
