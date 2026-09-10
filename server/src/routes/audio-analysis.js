@@ -62,4 +62,57 @@ router.post('/jobs/:id/resume', requireAudioAnalysisWorker, async (req, res) => 
   try { res.json(await jobs.resume(req.params.id, req.body.lease_token)); }
   catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
 });
+const discovery = require('../features/audio-analysis/discovery');
+const TRACK_KEY_MAX = 2000;
+
+function validTracks(input) {
+  if (!Array.isArray(input) || input.length > 200) return null;
+  const seen = new Set();
+  for (const track of input) {
+    if (!track || typeof track !== 'object') return null;
+    if (!['youtube', 'soundcloud'].includes(track.platform)) return null;
+    if (typeof track.track_key !== 'string' || !track.track_key || track.track_key.length > TRACK_KEY_MAX) return null;
+    if (typeof track.title !== 'string' || !track.title || track.title.length > 500) return null;
+    if (track.artist_name !== undefined && typeof track.artist_name !== 'string') return null;
+    const key = `${track.platform}:${track.track_key}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+  }
+  return input;
+}
+
+// POST /api/v1/audio-analysis/discoveries/claim
+router.post('/discoveries/claim', requireAudioAnalysisWorker, async (_req, res) => {
+  const row = await discovery.claim();
+  if (!row) return res.status(204).end();
+  res.json(row);
+});
+
+router.post('/discoveries/:id/complete', requireAudioAnalysisWorker, async (req, res) => {
+  if (!isUuid(req.params.id) || typeof req.body?.lease_token !== 'string') {
+    return res.status(400).json({ error: '수집 결과가 올바르지 않습니다' });
+  }
+  const tracks = validTracks(req.body.tracks);
+  if (!tracks) return res.status(400).json({ error: '수집한 곡 목록이 올바르지 않습니다' });
+  try {
+    res.json(await discovery.complete(req.params.id, req.body.lease_token, tracks));
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    throw error;
+  }
+});
+
+router.post('/discoveries/:id/fail', requireAudioAnalysisWorker, async (req, res) => {
+  if (!isUuid(req.params.id) || typeof req.body?.lease_token !== 'string'
+      || typeof req.body?.error_code !== 'string') {
+    return res.status(400).json({ error: '수집 실패 보고가 올바르지 않습니다' });
+  }
+  try {
+    res.json(await discovery.fail(req.params.id, req.body.lease_token, req.body.error_code.slice(0, 80)));
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
+    throw error;
+  }
+});
+
 module.exports = router;

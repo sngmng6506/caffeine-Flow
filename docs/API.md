@@ -177,17 +177,23 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/audio-analysis/jobs/claim` | 워커 | 대기 작업 1건을 20분 lease로 획득. 없으면 204 |
 | POST | `/audio-analysis/jobs/:id/complete` | 워커 | `lease_token`, `result`, `automatic_annotation`, `tag_scores`, `maest_run` 제출. 분석·자동 라벨·작업 완료를 한 트랜잭션에 저장 |
 | POST | `/audio-analysis/jobs/:id/fail` | 워커 | `lease_token`, `error_code` 제출. 오류 분류에 따라 지연 재시도 또는 중단 |
+| POST | `/audio-analysis/discoveries/claim` | 워커 | 대기 중인 수집 요청 1건을 20분 lease로 획득. 없으면 204 |
+| POST | `/audio-analysis/discoveries/:id/complete` | 워커 | `lease_token`과 `tracks[]` 제출. 곡을 분석 큐에 등록하고 중복은 무시한다 |
+| POST | `/audio-analysis/discoveries/:id/fail` | 워커 | `lease_token`, `error_code` 제출. 최대 3회 재시도 |
 | GET | `/admin/audio-labels` | 🛡 | 모든 신청곡을 플랫폼·곡별 중복 제거해 조회. `view=ready|unreviewed|reviewed|all`, `offset`, 50건. 작업 상태도 반환 |
 | GET | `/admin/audio-labels/:id/runs` | 🛡 | 해당 곡의 최근 원본 이력 ID·시각 최대 100건 |
 | GET | `/admin/audio-runs/:id` | 🛡 | 실행별 전체 원본 JSON. lease 토큰 제외, 수정 API 없음 |
 | POST | `/admin/audio-labels/:id/requeue` | 🛡 | generation을 비교해 실패 재시도·완료곡 재분석 등록. 처리 중은 409, Spotify는 400 |
 | POST | `/admin/audio-labels/:id/renormalize` | 🛡 | generation, analysis_id, analysis_revision을 비교해 원본에 현재 택소노미 적용. 원본·사람 라벨 보존 |
 | PUT | `/admin/audio-labels/:id/review` | 🛡 | 작업 ID에 해당하는 곡의 라벨 확인·수정. 매장 정책 판단 불필요 |
+| GET | `/admin/audio-discoveries` | 🛡 | 최근 최신곡 수집 요청 목록 |
+| POST | `/admin/audio-discoveries` | 🛡 | 수집 요청. body는 `{ source, query?, limit? }`. 같은 소스가 대기 중이면 기존 요청을 200으로 돌려준다 |
 | GET | `/admin/audio-settings` | 🛡 | 3단 Audio LLM 스위치 조회 |
 | PUT | `/admin/audio-settings` | 🛡 | 스위치 변경. body는 `{ audio_llm_enabled: boolean }` |
 
 - 곡별 최신 분석의 `maest_summary`에는 상위 10개(mean·max)와 소비 프롬프트용 `prompt_styles`가 들어간다. `prompt_styles`는 1위 점수의 0.5배 이상인 스타일 최대 5개이며 `prompt_style_calibrated`는 항상 false다.
 
+- 최신곡 수집은 곡 목록 조회와 플랫폼 검색을 워커가 한다. 서버에 yt-dlp가 없고 Railway 공용 IP에서 검색을 반복하면 막힐 수 있다. 어디까지 수집했는지는 따로 기록하지 않는다 — 중복은 `(platform, track_key)` unique가 무시하며, 커서를 두면 차트에 뒤늦게 오른 곡을 놓친다.
 - 길이가 계약 범위(`audio_duration_sec`) 밖이면 워커가 다운로드 전에 `SOURCE_UNSUPPORTED`로 실패시키며 재시도하지 않는다.
 - 3단 Audio LLM 실행 여부는 서버 설정이 정한다. `/jobs/claim` 응답에 `audio_llm_enabled`가 실려 오며 워커는 이 값을 따른다. 워커에 키가 없으면 켜져 있어도 건너뛴다.
 - 신규 신청과 작업 등록은 같은 트랜잭션이며 기존 신청은 마이그레이션에서 등록한다. AI 필터 OFF·거절 곡도 포함한다. Spotify는 `unsupported`로 등록하며 claim하지 않는다.

@@ -93,7 +93,10 @@ class OutboxTest(unittest.TestCase):
             handlers = {}
             claims = []
             def sleep(seconds): clock[0] += seconds
-            def call(_config, _path, _payload):
+            def call(_config, path, _payload):
+                # 수집 요청 조회는 이 시험의 대상이 아니다. job claim만 센다.
+                if not path.endswith('/jobs/claim'):
+                    return None
                 claims.append(clock[0])
                 if len(claims) == 2:
                     handlers[signal.SIGTERM](None, None)

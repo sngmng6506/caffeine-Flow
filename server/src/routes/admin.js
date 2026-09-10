@@ -452,6 +452,16 @@ router.put('/audio-settings', requireAdmin, async (req, res) => {
   res.json(await require('../features/audio-analysis/settings').update(req.body));
 });
 
+// GET·POST /api/v1/admin/audio-discoveries — 최신곡 수집 요청
+router.get('/audio-discoveries', requireAdmin, async (_req, res) => {
+  res.json({ discoveries: await require('../features/audio-analysis/discovery').recent() });
+});
+router.post('/audio-discoveries', requireAdmin, async (req, res) => {
+  const result = await require('../features/audio-analysis/discovery').request(req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.status(result.already ? 200 : 201).json({ discovery: result.value, already: Boolean(result.already) });
+});
+
 module.exports = router;
 module.exports.CAFE_STATUS = CAFE_STATUS;
 

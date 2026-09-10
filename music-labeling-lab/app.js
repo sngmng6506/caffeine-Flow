@@ -98,6 +98,23 @@ async function saveAudioSettings(event) {
     : (data.error || 'AI 음악 서술 설정을 바꾸지 못했습니다.');
 }
 
+// 최신곡 수집 요청. 워커가 뒤에서 차트를 훑어 분석 큐를 채운다. 같은 소스의 요청이
+// 이미 대기 중이면 서버가 그것을 그대로 돌려주므로 중복으로 쌓이지 않는다.
+async function requestCollection() {
+  const button = $('collectApple');
+  button.disabled = true;
+  const { ok, data } = await api('POST', '/admin/audio-discoveries', { source: 'apple_kr', limit: 20 });
+  button.disabled = false;
+  $('message').hidden = false;
+  if (!ok) {
+    $('message').textContent = data.error || '최신곡 수집을 요청하지 못했습니다.';
+    return;
+  }
+  $('message').textContent = data.already
+    ? '이미 수집이 대기 중입니다. 끝나면 목록에 새 곡이 나타납니다.'
+    : '최신곡 수집을 요청했습니다. 워커가 처리하는 동안 다른 작업을 계속해도 됩니다.';
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -476,6 +493,7 @@ $('nextItem').addEventListener('click', () => {
 $('viewFilter').addEventListener('change', () => loadPage(0));
 
 $('audioLlmEnabled').addEventListener('change', saveAudioSettings);
+$('collectApple').addEventListener('click', requestCollection);
 
 if (!currentToken()) {
   window.location.replace('/admin');

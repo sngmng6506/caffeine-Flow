@@ -98,3 +98,60 @@ class DurationGateTest(unittest.TestCase):
                                / 'server/src/constants/audio-pipeline.json').read_text())
         self.assertEqual(download.MAX_DURATION, contract['audio_duration_sec']['max'])
         self.assertEqual(download.MIN_DURATION, contract['audio_duration_sec']['min'])
+
+
+class DiscoveryLoopTest(unittest.TestCase):
+    """수집은 분석 큐가 빈 뒤에만 돈다. 신청곡 처리가 항상 먼저다."""
+
+    def test_skipped_while_analysis_jobs_remain(self):
+        import remote_worker
+        calls = []
+
+        def api(_config, endpoint, _body):
+            calls.append(endpoint)
+            return {'id': 'job', 'platform': 'youtube', 'track_key': 'abcdefghijk',
+                    'artist_name': 'a', 'lease_token': 'lease'} if endpoint.endswith('/jobs/claim') else None
+
+        with patch.object(remote_worker, 'api', side_effect=api):
+            claimed = remote_worker.api(None, '/jobs/claim', {})
+        self.assertIsNotNone(claimed)
+        self.assertNotIn('/discoveries/claim', calls)
+
+    def test_collects_and_reports_when_queue_is_empty(self):
+        import remote_worker
+        posted = {}
+
+        def api(_config, endpoint, body):
+            if endpoint.endswith('/discoveries/claim'):
+                return {'id': 'd1', 'source': 'apple_kr', 'query': None,
+                        'requested_limit': 5, 'lease_token': 'lease'}
+            posted[endpoint] = body
+            return {'status': 'done'}
+
+        with patch.object(remote_worker, 'api', side_effect=api):
+            handled = remote_worker.run_discovery(None, collector=lambda *a: [
+                {'platform': 'youtube', 'track_key': 'abcdefghijk', 'title': 'x', 'artist_name': 'y'}])
+
+        self.assertTrue(handled)
+        self.assertIn('/discoveries/d1/complete', posted)
+        self.assertEqual(posted['/discoveries/d1/complete']['tracks'][0]['track_key'], 'abcdefghijk')
+
+    def test_collection_failure_is_reported_not_raised(self):
+        import remote_worker
+        from discover import DiscoveryError
+        posted = {}
+
+        def api(_config, endpoint, body):
+            if endpoint.endswith('/discoveries/claim'):
+                return {'id': 'd1', 'source': 'apple_kr', 'query': None,
+                        'requested_limit': 5, 'lease_token': 'lease'}
+            posted[endpoint] = body
+            return {}
+
+        def broken(*_a):
+            raise DiscoveryError('SOURCE_FETCH_FAILED')
+
+        with patch.object(remote_worker, 'api', side_effect=api):
+            self.assertTrue(remote_worker.run_discovery(None, collector=broken))
+
+        self.assertEqual(posted['/discoveries/d1/fail']['error_code'], 'SOURCE_FETCH_FAILED')

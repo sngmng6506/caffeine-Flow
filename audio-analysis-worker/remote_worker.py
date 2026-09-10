@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+from discover import DiscoveryError, collect
 from download import download_audio, DownloadError
 from maest import verify_tag_model, CONTRACT
 import outbox
@@ -65,6 +66,26 @@ def process(job, config, call=api, downloader=download_audio, runner=subprocess.
         return submit(config, job, f"/jobs/{job['id']}/complete", payload, call)
 
 
+def run_discovery(config, collector=collect):
+    """수집 요청이 있으면 하나 처리한다. 처리했으면 True."""
+    request = api(config, '/discoveries/claim', {})
+    if not request:
+        return False
+    log('info', 'discovery_claimed', discovery_id=request['id'], source=request['source'])
+    try:
+        tracks = collector(request['source'], request.get('query'), request['requested_limit'])
+    except DiscoveryError as error:
+        api(config, f"/discoveries/{request['id']}/fail",
+            {'lease_token': request['lease_token'], 'error_code': str(error)})
+        log('warning', 'discovery_failed', discovery_id=request['id'], error_code=str(error))
+        return True
+    result = api(config, f"/discoveries/{request['id']}/complete",
+                 {'lease_token': request['lease_token'], 'tracks': tracks})
+    log('info', 'discovery_finished', discovery_id=request['id'],
+        source=request['source'], found=len(tracks))
+    return True
+
+
 def main():
     config = WorkerConfig(os.environ).require()
     if config.dry_run:
@@ -95,7 +116,10 @@ def main():
                     if not hasattr(standard, 'TensorflowPredictMAEST'):
                         raise RuntimeError('requirements-tensorflow.txt 설치가 필요합니다')
                     models_ready = True
+                # 분석 큐가 비었을 때만 수집을 본다. 신청곡 처리가 항상 먼저다.
                 job = api(config, '/jobs/claim', {})
+                if not job and running and run_discovery(config):
+                    continue
                 if job:
                     result = process(job, config)
                     log('info', 'remote_job_finished', job_id=job['id'], status=result.get('status', 'completed'), error_code=result.get('error_code'))
