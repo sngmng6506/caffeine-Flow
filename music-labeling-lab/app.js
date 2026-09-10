@@ -120,6 +120,11 @@ function trackUrl(item) {
 
 
 
+// 판정하면 그 곡이 조건에서 빠지는 보기. 앞에서부터 다시 읽어야 한다.
+function isQueueView() {
+  return ['unreviewed', 'ready', 'inaccurate'].includes($('viewFilter').value);
+}
+
 function renderSummary() {
   $('totalCount').textContent = summary.total.toLocaleString('ko-KR');
   $('reviewedCount').textContent = summary.reviewed.toLocaleString('ko-KR');
@@ -203,8 +208,10 @@ function renderItem() {
   if (!item) {
     $('reviewCard').hidden = true;
     $('message').hidden = false;
-    $('message').textContent = ['unreviewed', 'ready'].includes($('viewFilter').value)
-      ? '현재 검토할 항목이 없습니다. 새로고침으로 분석 진행 상태를 확인하세요.'
+    $('message').textContent = isQueueView()
+      ? ($('viewFilter').value === 'inaccurate'
+        ? '틀림·애매로 판정한 곡이 없습니다.'
+        : '현재 검토할 항목이 없습니다. 새로고침으로 분석 진행 상태를 확인하세요.')
       : '표시할 곡이 없습니다.';
     $('position').textContent = '0건';
     return;
@@ -308,7 +315,7 @@ async function submitVerdict(verdict, buttonId) {
 // 곡이 조건에서 빠지므로 앞에서부터 다시 읽는다.
 async function advanceAfterReview() {
   const index = currentIndex;
-  const queueView = ['unreviewed', 'ready'].includes($('viewFilter').value);
+  const queueView = isQueueView();
   await loadPage(queueView ? 0 : currentOffset);
   if (!queueView) {
     currentIndex = Math.min(index + 1, Math.max(0, items.length - 1));
@@ -337,7 +344,7 @@ $('nextItem').addEventListener('click', () => {
     renderItem();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } else if (hasMore) {
-    loadPage(['unreviewed', 'ready'].includes($('viewFilter').value) ? 0 : nextOffset);
+    loadPage(isQueueView() ? 0 : nextOffset);
   }
 });
 

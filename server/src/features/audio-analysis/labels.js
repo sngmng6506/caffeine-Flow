@@ -12,6 +12,11 @@ function reviewed(query) {
   query.whereNotNull('annotation.id').whereNot('annotation.human_review_status', 'unreviewed')
     .where((q) => q.whereNull('analysis.id').orWhere('analysis.review_status', 'reviewed'));
 }
+// 사람이 자동 라벨을 보증하지 않은 것들. 라벨은 automatic으로 남아 있어 모델이나
+// 택소노미가 바뀌면 재분석·재정규화 대상이 된다.
+function rejected(query) {
+  query.whereNotNull('annotation.id').whereIn('annotation.human_review_status', ['inaccurate', 'unclear']);
+}
 function unreviewed(query) {
   query.where((q) => q.whereNull('annotation.id').orWhere('annotation.human_review_status', 'unreviewed')
     .orWhere('analysis.review_status', 'pending'));
@@ -21,6 +26,7 @@ async function list({ view = 'unreviewed', offset = 0 }) {
   if (view === 'reviewed') query.modify(reviewed);
   if (view === 'unreviewed') query.modify(unreviewed);
   if (view === 'ready') query.modify(unreviewed).where('job.status', 'completed').whereNotNull('annotation.id');
+  if (view === 'inaccurate') query.modify(rejected);
   const [total, done, rows] = await Promise.all([
     db('music_audio_jobs').count('* as count').first(),
     baseQuery().modify(reviewed).count('* as count').first(),

@@ -27,6 +27,17 @@ afterAll(async () => {
 });
 
 describe('자동 분석 판정', () => {
+  it('틀림·애매 보기를 조회 조건으로 받는다', async () => {
+    const response = await request(app).get('/api/v1/admin/audio-labels?view=inaccurate').set(admin());
+    expect(response.status).toBe(200);
+    expect(Array.isArray(response.body.decisions)).toBe(true);
+  });
+
+  it('알 수 없는 보기는 거절한다', async () => {
+    const response = await request(app).get('/api/v1/admin/audio-labels?view=wrong').set(admin());
+    expect(response.status).toBe(400);
+  });
+
   it('알 수 없는 판정은 거절한다', async () => {
     const response = await request(app).put('/api/v1/admin/audio-labels/00000000-0000-0000-0000-000000000000/review')
       .set(admin()).send({ verdict: 'maybe', annotation_revision: 0 });

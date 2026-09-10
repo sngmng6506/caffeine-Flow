@@ -416,7 +416,7 @@ const audioLabels = require('../features/audio-analysis/labels');
 router.get('/audio-labels', requireAdmin, async (req, res) => {
   const view = req.query.view || 'unreviewed';
   const offset = Number(req.query.offset || 0);
-  if (!['all', 'reviewed', 'unreviewed', 'ready'].includes(view) || !Number.isSafeInteger(offset) || offset < 0) {
+  if (!['all', 'reviewed', 'unreviewed', 'ready', 'inaccurate'].includes(view) || !Number.isSafeInteger(offset) || offset < 0) {
     return res.status(400).json({ error: '목록 조건이 올바르지 않습니다' });
   }
   res.json(await audioLabels.list({ view, offset }));
