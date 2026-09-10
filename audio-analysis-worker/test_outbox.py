@@ -58,12 +58,30 @@ class OutboxTest(unittest.TestCase):
             self.assertEqual(outbox.deliver(path, config, replaced)['status'], 'superseded')
             self.assertTrue((path.parent / 'superseded' / path.name).exists())
 
-    def test_rejected_payload_stays_and_blocks_new_work(self):
+    def test_permanently_rejected_payload_is_set_aside_not_retried_forever(self):
+        # 전송함은 매 반복 맨 앞에서 돈다. 다시 보내도 결과가 같은 항목을 계속 재시도하면
+        # 워커 전체가 그 자리에서 멈춘다. 실제로 그렇게 멈춘 적이 있다.
+        for code in (400, 404, 422):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as root:
+                config = self.config(root)
+                path = outbox.save(config, {'id': 'job'}, '/jobs/job/complete', {'lease_token': 'token'})
+                def bad(*a, code=code): raise HTTPError('', code, 'schema', {}, None)
+                quarantined = outbox.drain(config, bad)
+                self.assertEqual([entry['status'] for entry in quarantined], ['rejected'])
+                self.assertEqual(quarantined[0]['http_status'], code)
+                # 지우지 않는다. 왜 거절됐는지 나중에 봐야 한다.
+                self.assertFalse(path.exists())
+                self.assertTrue((path.parent / 'rejected' / path.name).exists())
+                # 다음 반복은 막히지 않는다.
+                self.assertEqual(outbox.drain(config, bad), [])
+
+    def test_temporary_failure_still_stops_the_loop(self):
+        # 서버가 잠깐 죽은 것은 재시도로 빠져나올 수 있다. 이건 치우면 안 된다.
         with tempfile.TemporaryDirectory() as root:
             config = self.config(root)
             path = outbox.save(config, {'id': 'job'}, '/jobs/job/complete', {'lease_token': 'token'})
-            def bad(*a): raise HTTPError('', 400, 'schema', {}, None)
-            with self.assertRaises(HTTPError): outbox.drain(config, bad)
+            def down(*a): raise HTTPError('', 503, 'unavailable', {}, None)
+            with self.assertRaises(HTTPError): outbox.drain(config, down)
             self.assertTrue(path.exists())
 
     def test_different_server_cannot_receive_saved_result(self):

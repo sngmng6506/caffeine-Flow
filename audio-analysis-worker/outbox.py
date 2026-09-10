@@ -5,6 +5,11 @@ import uuid
 from pathlib import Path
 from urllib.error import HTTPError
 
+# 서버가 페이로드 자체를 거절했거나 작업이 사라진 경우다. 같은 내용을 다시 보내도
+# 결과가 달라지지 않으므로 재시도로는 빠져나올 수 없다. 전송함은 매 반복 맨 앞에서
+# 도는 자리라, 이런 항목 하나가 워커 전체를 영원히 멈춰 세운다.
+PERMANENT_CODES = frozenset((400, 404, 422))
+
 
 def sync_dir(path):
     descriptor = os.open(str(path), os.O_RDONLY)
@@ -40,18 +45,33 @@ def deliver(path, config, call):
     except HTTPError as error:
         if error.code == 409:
             # 인계·관리자 재실행으로 폐기된 lease는 새 작업에 덮어쓰지 않고 원본을 남긴다.
-            directory = path.parent / 'superseded'
-            directory.mkdir(exist_ok=True, mode=0o700)
-            os.replace(path, directory / path.name)
-            sync_dir(directory)
-            sync_dir(path.parent)
-            return {'status': 'superseded'}
+            return _quarantine(path, 'superseded')
+        if error.code in PERMANENT_CODES:
+            # 지우지 않고 옮긴다. 왜 거절됐는지 나중에 봐야 한다.
+            return _quarantine(path, 'rejected', code=error.code)
         raise
     path.unlink()
     sync_dir(path.parent)
     return response
 
 
+def _quarantine(path, folder, code=None):
+    directory = path.parent / folder
+    directory.mkdir(exist_ok=True, mode=0o700)
+    os.replace(path, directory / path.name)
+    sync_dir(directory)
+    sync_dir(path.parent)
+    return {'status': folder, **({'http_status': code} if code else {})}
+
+
 def drain(config, call):
+    """보낼 것을 순서대로 보내고, 격리한 항목을 돌려준다.
+
+    호출한 쪽이 격리를 로그로 남겨야 한다. 조용히 치우면 결과가 사라진 줄도 모른다.
+    """
+    quarantined = []
     for path in sorted((Path(config.root) / 'outbox').glob('*.json')):
-        deliver(path, config, call)
+        result = deliver(path, config, call)
+        if result.get('status') in ('rejected', 'superseded'):
+            quarantined.append({'file': path.name, **result})
+    return quarantined

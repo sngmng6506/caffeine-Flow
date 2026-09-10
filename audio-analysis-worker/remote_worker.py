@@ -114,7 +114,10 @@ def main():
                 time.sleep(min(1, retry_after - time.monotonic()))
                 continue
             try:
-                outbox.drain(config, api)
+                for entry in outbox.drain(config, api):
+                    # 재시도로는 빠져나올 수 없어 옆으로 치운 결과다. 조용히 넘기면
+                    # 그 곡이 왜 다시 분석되는지 알 수 없다.
+                    log('warning', 'outbox_quarantined', **entry)
                 if not models_ready:
                     # 전송함 복구는 모델 설치 여부와 독립적이다. 검증 실패 중에는 새 작업을 받지 않는다.
                     verify_tag_model(config.model_dir)

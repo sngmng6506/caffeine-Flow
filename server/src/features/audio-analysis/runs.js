@@ -59,6 +59,13 @@ function validMood(mood, full, features) {
     && mood.tags.every((v) => MOOD_TAGS.includes(v) && v !== 'unknown');
 }
 
+// 워커가 재는 두 길이의 허용 오차다. audio_duration_sec은 16kHz wav 헤더에서,
+// features.duration_seconds는 Essentia가 44.1kHz로 다시 읽어 계산한다. 리샘플러가
+// 꼬리에 몇 샘플을 더하거나 빼므로 밀리초 단위로 어긋나는 것이 정상이다 —
+// 실측에서 2.93ms 차이로 정상 결과가 거절됐다. 파일이 바뀐 것을 잡자는 검사이지
+// 두 디코더를 같은 샘플로 맞추자는 검사가 아니다. 구간 끝 검사와 같은 값을 쓴다.
+const DURATION_TOLERANCE_SEC = 0.1;
+
 function validateRun(input, result) {
   const invalid = () => ({ error: 'MAEST 원본·입력 정보가 올바르지 않습니다' });
   if (result.model_name !== 'essentia-maest' || !result.model_version.split('+').includes(MODEL)) return invalid();
@@ -68,7 +75,7 @@ function validateRun(input, result) {
   if (!input || input.schema_version !== 1 || !MODES.includes(mode) ||
       input.maest_model_version !== MODEL || input.model_sha256 !== contract.model_sha256 || !hash(input.audio_sha256) ||
       input.audio_local_path !== null ||
-      !finite(input.audio_duration_sec) || Math.abs(input.audio_duration_sec - result.features.duration_seconds) > 0.001 || input.audio_sample_rate !== 16000 ||
+      !finite(input.audio_duration_sec) || Math.abs(input.audio_duration_sec - result.features.duration_seconds) > DURATION_TOLERANCE_SEC || input.audio_sample_rate !== 16000 ||
       input.audio_duration_sec < contract.audio_duration_sec.min ||
       input.audio_duration_sec > contract.audio_duration_sec.max ||
       input.audio_source_url !== result.source_reference || !Array.isArray(input.sources_used) ||

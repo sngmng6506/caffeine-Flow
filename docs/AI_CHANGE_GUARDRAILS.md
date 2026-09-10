@@ -88,6 +88,7 @@ server/src/features/audio-analysis/runs.js
 - 길이 한도를 벗어난 소스는 다운로드 전에 `SOURCE_UNSUPPORTED`로 영구 실패시킨다. `DOWNLOAD_FAILED`는 재시도가 끝나지 않는 코드라, 영원히 성공할 수 없는 소스에 쓰면 6시간마다 반복된다.
 - 자동 워커는 사용자가 지정한 YouTube·SoundCloud 신청곡 URL을 임시 다운로드한다. `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않는다. 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
 - 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
+- 워커가 보고하는 두 길이는 서로 다른 샘플레이트로 잰 값이다(`audio_duration_sec`은 16kHz wav 헤더, `features.duration_seconds`는 Essentia가 44.1kHz로 재계산). 밀리초 단위 차이는 리샘플러 때문에 정상이며 `runs.DURATION_TOLERANCE_SEC`가 단일 기준이다. 두 디코더를 같은 샘플로 맞추라는 검사가 아니라 파일이 바뀐 것을 잡자는 검사다.
 - 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. MAEST 원본은 별도 music_audio_runs에 lease당 한 번 추가한다. 재분석·검토에서 원본을 수정·삭제하지 않으며 DB trigger로도 차단한다.
 - 신청 저장과 작업 등록은 한 트랜잭션이며 플랫폼·곡별 unique로 중복을 막는다. `/admin/audio-labels`의 Lab 큐는 `/admin/music-filter-reviews`의 정책 골드 큐와 완료 정의를 혼용하지 않는다.
 - 자동 라벨은 즉시 DB에 저장한다. 자동 원본과 최종 라벨을 분리하고 사람이 확인·수정한 최종 라벨은 자동 분석으로 덮어쓰지 않는다. 분석 revision과 최종 라벨 revision이 화면과 같을 때만 검토한다.
@@ -304,6 +305,6 @@ customer/src/votedSongs.js
 
 ## Audio Recovery Contract
 
-- 전송 결과는 서버 확인 전 outbox에서 삭제하지 않는다. lease 인계 충돌은 superseded에 보존하며 새 작업의 토큰으로 바꿔 제출하지 않는다. 서버 주소가 달라진 outbox는 전송하지 않는다.
+- 전송 결과는 서버 확인 전 outbox에서 삭제하지 않는다. lease 인계 충돌(409)은 superseded, 서버가 페이로드를 거절했거나 작업이 사라진 경우(400·404·422)는 rejected 폴더로 옮겨 보존하고 로그에 남긴다 — 다시 보내도 결과가 같은 항목을 계속 재시도하면 전송함이 매 반복 맨 앞에서 도는 자리라 워커 전체가 멈춘다. 일시적 실패(5xx 등)는 치우지 않고 재시도한다. 새 작업의 토큰으로 바꿔 제출하지 않으며, 서버 주소가 달라진 outbox는 전송하지 않는다.
 - 관리자 재큐잉·재정규화는 인증과 작업/분석 버전을 확인하고 사람 라벨 및 원본 이력을 보존한다.
 - 공통 모델 계약과 원본 점수에서 서버가 정규화 라벨을 확인한다. 중복 필드 불일치를 허용하거나 수동 제출 API로 MAEST 검증을 우회하지 않는다.

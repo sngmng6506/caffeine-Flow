@@ -352,6 +352,28 @@ describe('자동 음향 분석 파이프라인', () => {
     expect(after.human_review_status).toBe('confirmed');
     expect(after.label_source).toBe('human');
   });
+  it('두 디코더가 잰 길이가 몇 밀리초 어긋나도 결과를 받는다', async () => {
+    // audio_duration_sec은 16kHz wav 헤더에서, features.duration_seconds는 Essentia가
+    // 44.1kHz로 다시 읽어 계산한다. 실측 2.93ms 차이로 정상 결과가 거절된 적이 있다.
+    await seed(); const job = await jobs.claim(); const body = maestBody(job);
+    body.maest_run.audio_duration_sec = body.result.features.duration_seconds + 0.003;
+
+    const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
+      .set(auth()).send(body);
+
+    expect(response.status).toBe(200);
+  });
+
+  it('길이가 통째로 다르면 여전히 거절한다', async () => {
+    await seed(); const job = await jobs.claim(); const body = maestBody(job);
+    body.maest_run.audio_duration_sec = body.result.features.duration_seconds + 5;
+
+    const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
+      .set(auth()).send(body);
+
+    expect(response.status).toBe(400);
+  });
+
   it('사람이 수정한 라벨은 재분석해도 보존한다', async () => {
     await seed(); const job = await jobs.claim();
     const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
