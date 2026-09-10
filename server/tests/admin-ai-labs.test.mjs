@@ -46,7 +46,13 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(app).toContain('maest_summary?.audio_llm');
     expect(app).toContain(`submitVerdict('accurate'`);
     expect(app).toContain(`submitVerdict('inaccurate'`);
-    expect(app).toContain(`submitVerdict('unclear'`);
+    // 판정은 둘이다. 애매를 두면 판단을 미루는 칸이 되어 어느 쪽으로도 쓰지 못한다.
+    expect(app).not.toContain('unclear');
+    expect(html).not.toContain('애매');
+    // 틀림 보기에서 프롬프트를 고치고 그 곡들만 다시 돌린다.
+    expect(html).toContain(`id='promptBody'`);
+    expect(app).toContain('/admin/audio-labels/requeue-rejected');
+    expect(app).toContain('audio_llm_prompt');
     expect(app).not.toContain('setRadio');
     expect(app).not.toContain('applyAnalysisSuggestion');
     // 저장 뒤 다음 곡으로 넘기는 경로. 없으면 판정이 저장돼도 화면이 멈춘다.
@@ -61,7 +67,6 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(app).toContain("submitVerdict('accurate', 'verdictAccurate')");
     expect(html).toContain('<kbd>1</kbd>');
     expect(html).toContain('<kbd>2</kbd>');
-    expect(html).toContain('<kbd>3</kbd>');
     // 아이콘만 있는 버튼에는 이름이 있어야 한다.
     expect(html).toContain("aria-label='이전 곡'");
     expect(html).toContain("aria-label='다음 곡'");

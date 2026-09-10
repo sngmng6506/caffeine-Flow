@@ -26,7 +26,7 @@
           <select id='viewFilter'>
             <option value='ready'>검토할 자동 라벨</option>
             <option value='unreviewed'>미검토 전체 · 대기/실패 포함</option>
-            <option value='inaccurate'>틀림·애매 판정</option>
+            <option value='inaccurate'>틀림 판정</option>
             <option value='reviewed'>완료</option>
             <option value='all'>전체</option>
           </select>
@@ -45,6 +45,26 @@
         <span class='spacer'></span>
         <button type='button' id='refreshQueue'>새로고침</button>
       </div>
+
+      <section id='promptPanel' class='prompt-panel' hidden>
+        <div class='prompt-head'>
+          <div>
+            <h2>3단 프롬프트</h2>
+            <p>서술이 계속 빗나가면 여기서 문장을 고치고, 아래에서 틀림으로 표시한 곡만 다시 돌립니다.</p>
+          </div>
+          <span id='promptVersion' class='prompt-version'></span>
+        </div>
+        <label class='prompt-field' for='promptBody'>모델에게 주는 지시</label>
+        <textarea id='promptBody' rows='7' maxlength='4000'
+          placeholder='비워두면 워커의 기본 문장을 씁니다.'></textarea>
+        <div class='prompt-actions'>
+          <button type='button' id='savePrompt'>프롬프트 저장</button>
+          <button type='button' id='resetPrompt'>기본 문장으로</button>
+          <span class='spacer'></span>
+          <button type='button' id='requeueRejected'>틀림 곡 전부 재분석</button>
+        </div>
+        <p id='promptMessage' class='prompt-message' role='status'></p>
+      </section>
 
       <p id='message' class='message'>라벨링 목록을 불러오는 중…</p>
 
@@ -112,7 +132,6 @@
         <div class='buttons'>
           <button type='button' id='verdictAccurate'>맞음 <kbd>1</kbd></button>
           <button type='button' id='verdictInaccurate'>틀림 <kbd>2</kbd></button>
-          <button type='button' id='verdictUnclear'>애매 <kbd>3</kbd></button>
         </div>
         <p id='barAlert' class='bar-alert' role='alert'></p>
         <div class='nav'>

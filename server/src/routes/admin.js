@@ -452,10 +452,17 @@ router.get('/audio-settings', requireAdmin, async (_req, res) => {
   res.json(await require('../features/audio-analysis/settings').get());
 });
 router.put('/audio-settings', requireAdmin, async (req, res) => {
-  if (typeof req.body?.audio_llm_enabled !== 'boolean') {
-    return res.status(400).json({ error: 'audio_llm_enabled는 true 또는 false여야 합니다' });
-  }
-  res.json(await require('../features/audio-analysis/settings').update(req.body));
+  const result = await require('../features/audio-analysis/settings').update(req.body || {});
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json(result.value);
+});
+// 프롬프트를 고친 뒤 옛 서술이 어떤 문장으로 만들어졌는지 되짚는다. 이력은 추가만 된다.
+// 틀림으로 표시한 곡을 한 번에 재분석 큐에 넣는다. 프롬프트를 고친 뒤 쓰는 경로다.
+router.post('/audio-labels/requeue-rejected', requireAdmin, async (_req, res) => {
+  res.json(await require('../features/audio-analysis/jobs').requeueRejected());
+});
+router.get('/audio-prompt-revisions', requireAdmin, async (_req, res) => {
+  res.json({ revisions: await require('../features/audio-analysis/settings').revisions() });
 });
 
 // GET·POST /api/v1/admin/audio-discoveries — 최신곡 수집 요청

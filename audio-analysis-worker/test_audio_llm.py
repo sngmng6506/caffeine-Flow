@@ -140,3 +140,54 @@ class UsageTest(unittest.TestCase):
 
         self.assertNotIn('usage', raw)
         self.assertNotIn('generation_id', raw)
+
+
+class ResolvePromptTest(unittest.TestCase):
+    """운영자가 Lab에서 고친 프롬프트를 쓰되, 어떤 문장이었는지 남긴다."""
+
+    def test_없으면_기본_템플릿과_기본_버전(self):
+        for override in (None, '', '   ', 42):
+            with self.subTest(override=override):
+                prompt, version = audio_llm.resolve_prompt(override)
+                self.assertEqual(prompt, audio_llm.SYSTEM_PROMPT)
+                self.assertEqual(version, audio_llm.PROMPT_VERSION)
+
+    def test_고친_문장은_해시로_버전을_만든다(self):
+        prompt, version = audio_llm.resolve_prompt('  들리는 것만 쓴다.  ')
+        self.assertEqual(prompt, '들리는 것만 쓴다.')
+        self.assertTrue(version.startswith('custom-'))
+        self.assertEqual(len(version), len('custom-') + 12)
+        # 같은 문장은 같은 버전이어야 옛 서술을 되짚을 수 있다.
+        self.assertEqual(version, audio_llm.resolve_prompt('들리는 것만 쓴다.')[1])
+        self.assertNotEqual(version, audio_llm.resolve_prompt('다른 문장이다.')[1])
+
+    def test_시스템_메시지에_고친_문장이_들어간다(self):
+        messages = audio_llm.build_messages([b'clip'], '매장 배경음으로 맞는지도 적는다.')
+        self.assertEqual(messages[0]['content'], '매장 배경음으로 맞는지도 적는다.')
+        # 1단 결과를 넣을 통로는 여전히 없다.
+        self.assertEqual(messages[1]['content'][1]['type'], 'input_audio')
+
+    def test_describe가_고친_버전을_결과에_남긴다(self):
+        clip = SimpleNamespace(stdout=b'RIFFdata')
+        seen = {}
+
+        def call(messages, config, opener=None):
+            seen['system'] = messages[0]['content']
+            return response()
+
+        with patch.object(audio_llm, 'call_openrouter', side_effect=call):
+            raw = describe('/tmp/a.wav', 200, 'a' * 64,
+                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k',
+                            'prompt': '고친 문장이다.'},
+                           runner=lambda *a, **k: clip)
+
+        self.assertEqual(seen['system'], '고친 문장이다.')
+        self.assertEqual(raw['prompt_version'], audio_llm.resolve_prompt('고친 문장이다.')[1])
+
+    def test_프롬프트가_없으면_기본_버전을_남긴다(self):
+        clip = SimpleNamespace(stdout=b'RIFFdata')
+        with patch.object(audio_llm, 'call_openrouter', return_value=response()):
+            raw = describe('/tmp/a.wav', 200, 'a' * 64,
+                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           runner=lambda *a, **k: clip)
+        self.assertEqual(raw['prompt_version'], audio_llm.PROMPT_VERSION)

@@ -34,10 +34,12 @@ const LABEL_USAGE_SCOPES = Object.freeze(['operational', 'evaluation']);
 // 자동 분석에 대한 사람 판정. 택소노미를 고르는 대신 서술이 곡과 맞는지만 답한다.
 // 고르기 어려운 선택지는 사람이 아무거나 찍게 만들고, 그렇게 만든 골드 라벨은
 // 없느니만 못하다.
+// 판정은 둘이다. '애매'를 두면 판단을 미루는 칸이 되어 어느 쪽으로도 쓰지 못하는
+// 라벨만 쌓인다. 틀렸으면 틀렸다고 표시하고 프롬프트를 고쳐 다시 돌린다.
+// 'unclear'는 이미 저장된 옛 판정을 읽기 위해 남겨두며 새로 만들지 않는다.
 const REVIEW_VERDICTS = Object.freeze({
-  accurate: 'confirmed',   // 서술이 곡과 맞는다
-  inaccurate: 'inaccurate', // 틀렸다 — 분석이나 매칭을 다시 봐야 한다
-  unclear: 'unclear',      // 판단하기 어렵다
+  accurate: 'confirmed',    // 서술이 곡과 맞는다
+  inaccurate: 'inaccurate', // 틀렸다 — 프롬프트나 매칭을 다시 봐야 한다
 });
 const MUSIC_LABEL_SCHEMA_VERSION = 1;
 const MAX_MOOD_TAGS = 2;

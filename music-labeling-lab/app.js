@@ -55,18 +55,21 @@ async function api(method, path, body) {
 // 3단 Audio LLM 스위치. 서버에 저장되므로 워커를 다시 띄우지 않아도 다음 곡부터
 // 반영된다. 실패하면 화면 값을 서버 값으로 되돌려 실제 상태와 어긋나지 않게 한다.
 async function loadAudioSettings() {
-  const toggle = document.getElementById('audioLlmEnabled');
+  const toggle = $('audioLlmEnabled');
   const { ok, data } = await api('GET', '/admin/audio-settings');
   if (!ok) return;
   toggle.checked = data.audio_llm_enabled;
   toggle.disabled = false;
+  $('promptBody').value = data.audio_llm_prompt || '';
+  $('promptVersion').textContent = data.audio_llm_prompt_version || '';
 }
 
 async function saveAudioSettings(event) {
   const toggle = event.target;
   const wanted = toggle.checked;
   toggle.disabled = true;
-  const { ok, data } = await api('PUT', '/admin/audio-settings', { audio_llm_enabled: wanted });
+  const { ok, data } = await api('PUT', '/admin/audio-settings',
+    { audio_llm_enabled: wanted, audio_llm_prompt: $('promptBody').value });
   toggle.checked = ok ? data.audio_llm_enabled : !wanted;
   toggle.disabled = false;
   $('message').hidden = false;
@@ -91,6 +94,43 @@ async function requestCollection() {
   $('message').textContent = data.already
     ? '이미 수집이 대기 중입니다. 끝나면 목록에 새 곡이 나타납니다.'
     : '최신곡 수집을 요청했습니다. 다음 구간부터 가져오며, 끝나면 새로 등록된 곡 수가 목록에 반영됩니다.';
+}
+
+function promptNote(text) {
+  $('promptMessage').textContent = text || '';
+}
+
+// 프롬프트를 고쳐도 이미 저장된 서술은 그대로다. 다음 분석부터 적용된다.
+async function savePrompt() {
+  const button = $('savePrompt');
+  button.disabled = true;
+  const { ok, data } = await api('PUT', '/admin/audio-settings', {
+    audio_llm_enabled: $('audioLlmEnabled').checked,
+    audio_llm_prompt: $('promptBody').value,
+  });
+  button.disabled = false;
+  if (!ok) { promptNote(data.error || '프롬프트를 저장하지 못했습니다.'); return; }
+  $('promptBody').value = data.audio_llm_prompt || '';
+  $('promptVersion').textContent = data.audio_llm_prompt_version || '';
+  promptNote(`저장했습니다. 다음 분석부터 적용됩니다 · ${data.audio_llm_prompt_version}`);
+}
+
+function resetPrompt() {
+  $('promptBody').value = '';
+  promptNote('비웠습니다. 저장하면 워커의 기본 문장으로 돌아갑니다.');
+}
+
+// 틀림으로 표시한 곡만 다시 큐에 넣는다. 프롬프트를 고친 뒤 쓰는 경로다.
+async function requeueRejected() {
+  const button = $('requeueRejected');
+  button.disabled = true;
+  const { ok, data } = await api('POST', '/admin/audio-labels/requeue-rejected');
+  button.disabled = false;
+  if (!ok) { promptNote(data.error || '재분석을 요청하지 못했습니다.'); return; }
+  promptNote(data.requeued
+    ? `${data.requeued}곡을 재분석 큐에 넣었습니다. 워커가 순서대로 처리합니다.`
+    : '재분석할 곡이 없습니다.');
+  await loadPage(0);
 }
 
 function escapeHtml(value) {
@@ -241,7 +281,7 @@ function renderItem() {
   const status = item.job_status === 'completed' && !item.error_code
     ? '' : `${states[item.job_status] || item.job_status}${item.error_code ? ` · ${item.error_code}` : ''}`;
   $('jobStatus').textContent = status;
-  for (const id of ['verdictAccurate', 'verdictInaccurate', 'verdictUnclear']) {
+  for (const id of ['verdictAccurate', 'verdictInaccurate']) {
     $(id).disabled = !item.track_annotation;
   }
   $('verdictAccurate').textContent = complete ? '확인됨' : '맞음';
@@ -250,6 +290,7 @@ function renderItem() {
 }
 
 async function loadPage(offset = 0) {
+  $('promptPanel').hidden = $('viewFilter').value !== 'inaccurate';
   $('reviewCard').hidden = true;
   $('message').hidden = false;
   $('message').textContent = '라벨링 목록을 불러오는 중…';
@@ -269,7 +310,7 @@ async function loadPage(offset = 0) {
   renderItem();
 }
 
-const VERDICT_WORDS = Object.freeze({ accurate: '맞음', inaccurate: '틀림', unclear: '애매' });
+const VERDICT_WORDS = Object.freeze({ accurate: '맞음', inaccurate: '틀림' });
 
 // 저장됐다는 사실을 알리는 유일한 피드백이다. 목록이 갱신되는 것만으로는
 // 눌렀는지 안 눌렀는지 알 수 없다(Nielsen #1 시스템 상태 가시성).
@@ -325,7 +366,6 @@ async function advanceAfterReview() {
 
 $('verdictAccurate').addEventListener('click', () => submitVerdict('accurate', 'verdictAccurate'));
 $('verdictInaccurate').addEventListener('click', () => submitVerdict('inaccurate', 'verdictInaccurate'));
-$('verdictUnclear').addEventListener('click', () => submitVerdict('unclear', 'verdictUnclear'));
 $('refreshQueue').addEventListener('click', () => loadPage(0));
 
 $('previousItem').addEventListener('click', () => {
@@ -355,7 +395,6 @@ $('viewFilter').addEventListener('change', () => loadPage(0));
 const SHORTCUTS = Object.freeze({
   1: () => submitVerdict('accurate', 'verdictAccurate'),
   2: () => submitVerdict('inaccurate', 'verdictInaccurate'),
-  3: () => submitVerdict('unclear', 'verdictUnclear'),
   ArrowLeft: () => $('previousItem').click(),
   ArrowRight: () => $('nextItem').click(),
 });
@@ -372,13 +411,16 @@ document.addEventListener('keydown', (event) => {
   const run = SHORTCUTS[event.key];
   if (!run || $('reviewCard').hidden) return;
   // 판정 버튼이 꺼져 있으면(자동 라벨 없음) 단축키도 같이 막는다.
-  if (['1', '2', '3'].includes(event.key) && $('verdictAccurate').disabled) return;
+  if (['1', '2'].includes(event.key) && $('verdictAccurate').disabled) return;
   event.preventDefault();
   run();
 });
 
 $('audioLlmEnabled').addEventListener('change', saveAudioSettings);
 $('collectApple').addEventListener('click', requestCollection);
+$('savePrompt').addEventListener('click', savePrompt);
+$('resetPrompt').addEventListener('click', resetPrompt);
+$('requeueRejected').addEventListener('click', requeueRejected);
 
 if (!currentToken()) {
   window.location.replace('/admin');

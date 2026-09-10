@@ -24,10 +24,16 @@ def pipeline_mode(mood, audio_llm_raw):
     return 'MAEST_EMOTION' if mood is not None else 'MAEST_ONLY'
 
 
-def audio_llm_config():
-    """3단 설정만 환경에서 읽는다. 토큰은 부모가 이미 걷어낸 뒤다."""
+def audio_llm_config(prompt=None):
+    """3단 설정만 환경에서 읽는다. 토큰은 부모가 이미 걷어낸 뒤다.
+
+    프롬프트는 환경이 아니라 서버가 준다. 워커 파일로 되돌리면 운영자가 Lab에서
+    고치지 못하게 된다.
+    """
     from worker import WorkerConfig
-    return WorkerConfig(os.environ).audio_llm
+    config = dict(WorkerConfig(os.environ).audio_llm)
+    config['prompt'] = prompt
+    return config
 
 
 def run(audio, job, output):
@@ -56,7 +62,8 @@ def run(audio, job, output):
     audio_llm_raw = None
     if job.get('audio_llm_enabled', True) and os.environ.get('OPENROUTER_API_KEY', '').strip():
         try:
-            audio_llm_raw = describe(audio, audio_duration, audio_sha256, audio_llm_config())
+            audio_llm_raw = describe(audio, audio_duration, audio_sha256,
+                                     audio_llm_config(job.get('audio_llm_prompt')))
             sources_used.append(audio_llm_raw['model_id'])
         except AudioLLMError:
             # 3단이 실패해도 1단 결과는 그대로 저장한다.

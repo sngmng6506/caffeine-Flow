@@ -27,7 +27,41 @@ afterAll(async () => {
 });
 
 describe('자동 분석 판정', () => {
-  it('틀림·애매 보기를 조회 조건으로 받는다', async () => {
+  it('프롬프트를 고치면 버전이 바뀌고 이력에 남는다', async () => {
+    const body = '들리는 것만 쓴다. 매장 배경음으로 맞는지도 한 줄 덧붙인다.';
+    const saved = await request(app).put('/api/v1/admin/audio-settings')
+      .set(admin()).send({ audio_llm_enabled: true, audio_llm_prompt: `  ${body}  ` });
+
+    expect(saved.status).toBe(200);
+    expect(saved.body.audio_llm_prompt).toBe(body, '앞뒤 공백은 지운다');
+    expect(saved.body.audio_llm_prompt_version).toMatch(/^custom-[0-9a-f]{12}$/);
+    // 워커가 claim 응답으로 같은 문장을 받아야 한다.
+    expect((await db('audio_prompt_revisions').where({ body }).first())).toBeTruthy();
+
+    // 비우면 워커 기본 문장으로 돌아간다. 이력은 남는다.
+    const cleared = await request(app).put('/api/v1/admin/audio-settings')
+      .set(admin()).send({ audio_llm_enabled: true, audio_llm_prompt: '' });
+    expect(cleared.body.audio_llm_prompt).toBeNull();
+    expect(cleared.body.audio_llm_prompt_version).toBe('audio-llm-1');
+    expect((await db('audio_prompt_revisions').where({ body }).first())).toBeTruthy();
+  });
+
+  it('프롬프트 이력은 고치거나 지울 수 없다', async () => {
+    const body = `불변 확인 ${Date.now()}`;
+    await request(app).put('/api/v1/admin/audio-settings')
+      .set(admin()).send({ audio_llm_enabled: true, audio_llm_prompt: body });
+    await expect(db('audio_prompt_revisions').where({ body }).update({ body: '바꾼다' })).rejects.toThrow();
+    await expect(db('audio_prompt_revisions').where({ body }).del()).rejects.toThrow();
+  });
+
+  it('지나치게 긴 프롬프트는 거절한다', async () => {
+    const response = await request(app).put('/api/v1/admin/audio-settings')
+      .set(admin()).send({ audio_llm_enabled: true, audio_llm_prompt: 'ㄱ'.repeat(4001) });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/4000/);
+  });
+
+  it('틀림 보기를 조회 조건으로 받는다', async () => {
     const response = await request(app).get('/api/v1/admin/audio-labels?view=inaccurate').set(admin());
     expect(response.status).toBe(200);
     expect(Array.isArray(response.body.decisions)).toBe(true);

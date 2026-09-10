@@ -39,7 +39,10 @@ function claim() {
     }).returning('*');
     // 3단 실행 여부는 서버가 정한다. 워커가 따로 조회하지 않도록 함께 실어 보낸다.
     const settings = await trx('audio_pipeline_settings').where({ id: 1 }).first();
-    return { ...job, audio_llm_enabled: settings ? settings.audio_llm_enabled : true };
+    // 3단 실행 여부와 프롬프트는 서버가 단일 기준이다. 워커 환경변수로 되돌리지 않는다.
+    return { ...job,
+      audio_llm_enabled: settings ? settings.audio_llm_enabled : true,
+      audio_llm_prompt: settings?.audio_llm_prompt || null };
   });
 }
 
@@ -136,4 +139,28 @@ function requeue(id, generation) {
     return saved;
   });
 }
-module.exports = { enqueue, claim, complete, fail, resume, requeue };
+// 틀림으로 표시한 곡을 한 번에 다시 큐에 넣는다. 프롬프트를 고친 뒤 그 곡들만
+// 다시 돌리는 것이 이 기능의 목적이라, 대상은 사람이 틀렸다고 표시한 것으로 한정한다.
+// 처리 중인 곡과 자동 분석을 지원하지 않는 플랫폼은 건너뛴다.
+function requeueRejected() {
+  return db.transaction(async (trx) => {
+    const rows = await trx({ job: 'music_audio_jobs' })
+      .join({ annotation: 'music_track_annotations' }, function () {
+        this.on('annotation.platform', 'job.platform').andOn('annotation.track_key', 'job.track_key');
+      })
+      .whereIn('annotation.human_review_status', ['inaccurate', 'unclear'])
+      .whereNot('job.status', 'processing')
+      .whereIn('job.platform', ['youtube', 'soundcloud'])
+      .forUpdate().of('job')
+      .select('job.id', 'job.generation');
+    if (!rows.length) return { requeued: 0 };
+    await trx('music_audio_jobs').whereIn('id', rows.map((row) => row.id)).update({
+      status: 'queued', attempts: 0, generation: trx.raw('generation + 1'),
+      lease_token: null, lease_until: null, error_code: null,
+      available_at: trx.fn.now(), updated_at: trx.fn.now(),
+    });
+    return { requeued: rows.length };
+  });
+}
+
+module.exports = { enqueue, claim, complete, fail, resume, requeue, requeueRejected };

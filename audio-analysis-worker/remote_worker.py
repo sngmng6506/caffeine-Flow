@@ -44,11 +44,12 @@ def process(job, config, call=api, downloader=download_audio, runner=subprocess.
             return {**(result or {}), 'error_code': code}
         job_file, output = root / 'job.json', root / 'result.json'
         # 인증 토큰은 모델 프로세스의 작업 파일·명령 인자에 쓰지 않는다.
-        # 3단 실행 여부는 서버가 정한다. 워커 환경변수로 두면 미니PC에 접속해
+        # 3단 실행 여부와 프롬프트는 서버가 정한다. 워커 파일로 두면 미니PC에 접속해
         # 고치고 재시작해야 한다. claim 응답에 실려 오는 값을 그대로 넘긴다.
         job_file.write_text(json.dumps({
             **{k: job[k] for k in ('platform', 'track_key', 'artist_name')},
             'audio_llm_enabled': job.get('audio_llm_enabled', True),
+            'audio_llm_prompt': job.get('audio_llm_prompt'),
         }))
         try:
             completed = runner([sys.executable, str(Path(__file__).with_name('remote_analyze.py')),

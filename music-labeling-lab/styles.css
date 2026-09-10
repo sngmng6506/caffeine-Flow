@@ -272,3 +272,34 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
   .auto-description .auto-text { font-size: 16px; }
   .auto-description p:not(.auto-text):not(.auto-genre):not(.auto-empty) { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* ── 3단 프롬프트: 틀림 보기에서만 연다 ─────────────────────── */
+.prompt-panel {
+  margin-top: 18px; padding: 18px 20px; background: var(--sheet);
+  border: 1px solid var(--rule-hard); border-radius: 8px;
+}
+.prompt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.prompt-head h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.prompt-head p { margin: 4px 0 0; max-width: 52em; color: var(--ink-2); font-size: 12.5px; }
+.prompt-version {
+  flex: none; font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+}
+.prompt-field { display: block; margin: 14px 0 6px; color: var(--ink-2); font-size: 12px; }
+#promptBody {
+  width: 100%; padding: 11px 12px; color: var(--ink); background: var(--sheet);
+  border: 1px solid var(--rule-hard); border-radius: 6px;
+  font-family: var(--serif); font-size: 14.5px; line-height: 1.7; resize: vertical;
+}
+#promptBody:focus { border-color: var(--primary); outline: 0; box-shadow: 0 0 0 3px var(--primary-soft); }
+.prompt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.prompt-actions .spacer { margin-left: auto; }
+.prompt-actions button {
+  padding: 8px 13px; color: var(--ink); background: var(--sheet-2);
+  border: 1px solid var(--rule-hard); border-radius: 6px; font-size: 13px; font-weight: 500;
+}
+.prompt-actions button:hover:enabled { color: var(--primary); border-color: var(--primary); }
+.prompt-actions button:disabled { color: var(--ink-4); cursor: not-allowed; }
+#savePrompt { color: #fff; background: var(--primary); border-color: var(--primary); }
+#savePrompt:hover:enabled { color: #fff; background: var(--primary-strong); border-color: var(--primary-strong); }
+.prompt-message { margin: 10px 0 0; color: var(--ink-2); font-size: 12.5px; }
+.prompt-message:empty { display: none; }

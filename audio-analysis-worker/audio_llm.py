@@ -14,6 +14,7 @@ MAEST(1단)와 **독립적으로** 돈다. 이 모듈은 장르 결과도 택소
 from prompt_renderer import render_prompt
 
 import base64
+import hashlib
 import json
 import subprocess
 import urllib.error
@@ -50,6 +51,19 @@ SCHEMA = {
 # 택소노미를 주지 않는다. 선택지를 좁히면 학습 분포 밖 음악(국악, 트로트 등)의
 # 정보가 통째로 소실된다. 정규화는 나중에 사람이 보거나 별도 매핑이 한다.
 SYSTEM_PROMPT = render_prompt('audio-description.system.j2')
+
+
+def resolve_prompt(override):
+    """운영자가 Lab에서 고친 프롬프트가 있으면 그것을 쓴다.
+
+    어떤 문장으로 만든 서술인지 남겨야 하므로 버전 문자열을 함께 돌려준다.
+    본문 자체는 서버 이력에 있으니 결과에는 해시만 넣는다.
+    """
+    text = override.strip() if isinstance(override, str) else ''
+    if not text:
+        return SYSTEM_PROMPT, PROMPT_VERSION
+    digest = hashlib.sha256(text.encode('utf-8')).hexdigest()[:12]
+    return text, f'custom-{digest}'
 
 
 class AudioLLMError(RuntimeError):
@@ -89,7 +103,7 @@ def extract_clip(audio_path, segment, ffmpeg='ffmpeg', runner=subprocess.run):
     return completed.stdout
 
 
-def build_messages(clips):
+def build_messages(clips, system_prompt=None):
     """오디오 구간만 담은 메시지. 장르·택소노미·임베딩은 넣지 않는다."""
     content = [{'type': 'text', 'text': render_prompt('audio-description.user.j2', clip_count=len(clips))}]
     for clip in clips:
@@ -97,7 +111,8 @@ def build_messages(clips):
             'type': 'input_audio',
             'input_audio': {'data': base64.b64encode(clip).decode('ascii'), 'format': 'wav'},
         })
-    return [{'role': 'system', 'content': SYSTEM_PROMPT}, {'role': 'user', 'content': content}]
+    return [{'role': 'system', 'content': system_prompt or SYSTEM_PROMPT},
+            {'role': 'user', 'content': content}]
 
 
 def _clean_text(value, limit=MAX_TEXT):
@@ -181,13 +196,14 @@ def describe(audio_path, duration_sec, audio_sha256, config,
         raise AudioLLMError('샘플 구간을 만들 수 없습니다')
     clips = [extract_clip(audio_path, segment, config.get('ffmpeg', 'ffmpeg'), runner)
              for segment in segments]
-    data = call_openrouter(build_messages(clips), config, opener)
+    system_prompt, prompt_version = resolve_prompt(config.get('prompt'))
+    data = call_openrouter(build_messages(clips, system_prompt), config, opener)
     parsed = parse_response(data)
     usage = read_usage(data)
     generation_id = data.get('id') if isinstance(data.get('id'), str) else None
     return {
         'model_id': config['model'],
-        'prompt_version': PROMPT_VERSION,
+        'prompt_version': prompt_version,
         'segments': segments,
         'clip_sample_rate': CLIP_SAMPLE_RATE,
         'input_sha256': audio_sha256,
