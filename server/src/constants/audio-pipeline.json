@@ -34,5 +34,6 @@
     ],
     "cooldown_seconds": 300,
     "long_retry_minutes": 360
-  }
+  },
+  "estimated_seconds_per_track": 120
 }

@@ -33,9 +33,11 @@ async function list({ view = 'unreviewed', offset = 0 }) {
       .whereRaw(REVIEWABLE_SQL);
   }
   if (view === 'inaccurate') query.modify(rejected);
-  const [total, done, rows] = await Promise.all([
+  const [total, done, queue, rows] = await Promise.all([
     db('music_audio_jobs').count('* as count').first(),
     baseQuery().modify(reviewed).count('* as count').first(),
+    // 워커가 얼마나 남겨두고 있는지. 수집 버튼을 누른 뒤 기다리는 동안 본다.
+    db('music_audio_jobs').select('status').count('* as count').groupBy('status'),
     query.select('job.id', 'job.platform', 'job.track_key as video_id', 'job.title',
       'job.artist_name as channel_title', 'job.generation', 'job.available_at', 'job.attempts', 'job.status as job_status', 'job.error_code', 'job.created_at',
       db.raw('to_jsonb(annotation) as track_annotation'), db.raw('to_jsonb(analysis) as audio_analysis'))
@@ -47,7 +49,8 @@ async function list({ view = 'unreviewed', offset = 0 }) {
   const decisions = rows.slice(0, 50).map((row) => ({ ...row, review_reasons: reasons(row) }));
   return { decisions, offset, has_more: rows.length > 50,
     next_offset: rows.length > 50 ? offset + 50 : null,
-    summary: { total: Number(total.count), reviewed: Number(done.count), unreviewed: Number(total.count) - Number(done.count) } };
+    summary: { total: Number(total.count), reviewed: Number(done.count), unreviewed: Number(total.count) - Number(done.count),
+      queue: Object.fromEntries(queue.map((row) => [row.status, Number(row.count)])) } };
 }
 
 function review(jobId, input, annotation) {

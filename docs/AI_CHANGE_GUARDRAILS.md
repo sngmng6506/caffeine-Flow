@@ -84,6 +84,7 @@ server/src/routes/audio-analysis.js
 server/src/features/audio-analysis/runs.js
 ```
 
+- 수집 소스는 `apple_global`(국가 순회)·`musicbrainz_kr`(날짜 창)·`soundcloud_trending`(장르 순회) 셋이다. Apple은 국가 코드가 필수라 전 세계 통합 차트가 없고, SoundCloud는 지역 필터가 API에서 사라져 한국 한정이 불가능하다 — 실측은 docs/ROADMAP.md에 있다. 순위 소스에서 한 구간(한 나라·한 장르)이 바닥나도 `scanned`를 요청량보다 작게 보고하지 않는다. 서버가 커서를 0으로 되감아 첫 구간만 반복하게 된다.
 - 최신곡 수집은 워커가 곡 목록과 플랫폼 검색을 맡는다. 서버에서 검색하지 않는다. 소스별 진도는 `music_source_cursors`가 단일 기준이다. 순위 소스는 offset이 끝에서 0으로 돌아가고, 날짜 소스는 절대 날짜(`covered_from`·`covered_to`)를 쓴다 — 상대적인 며칠 전으로 잡으면 누르지 않은 기간의 곡이 빠진다. 곡 중복은 `(platform, track_key)` unique로 무시하고 기존 작업 상태를 건드리지 않는다.
 - 길이 한도를 벗어난 소스는 다운로드 전에 `SOURCE_UNSUPPORTED`로 영구 실패시킨다. `DOWNLOAD_FAILED`는 재시도가 끝나지 않는 코드라, 영원히 성공할 수 없는 소스에 쓰면 6시간마다 반복된다.
 - 자동 워커는 사용자가 지정한 YouTube·SoundCloud 신청곡 URL을 임시 다운로드한다. `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않는다. 로컬 CLI의 명시적 권리 근거는 별도 유지한다.

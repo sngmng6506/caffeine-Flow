@@ -9,7 +9,7 @@ const day = (value) => new Date(`${value}T00:00:00Z`);
 describe('수집 날짜 창', () => {
   it('날짜로 진도를 잡는 소스만 구분한다', () => {
     expect(isDateWindowSource('musicbrainz_kr')).toBe(true);
-    expect(isDateWindowSource('apple_kr')).toBe(false);
+    expect(isDateWindowSource('apple_global')).toBe(false);
   });
 
   it('처음에는 최근 7일을 본다', () => {

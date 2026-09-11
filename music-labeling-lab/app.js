@@ -93,6 +93,7 @@ async function requestCollection() {
   $('message').textContent = data.already
     ? '이미 수집이 대기 중입니다. 끝나면 목록에 새 곡이 나타납니다.'
     : '최신곡 수집을 요청했습니다. 다음 구간부터 가져오며, 끝나면 새로 등록된 곡 수가 목록에 반영됩니다.';
+  await refreshQueue();
 }
 
 function promptNote(text) {
@@ -169,6 +170,41 @@ function trackUrl(item) {
 // 판정하면 그 곡이 조건에서 빠지는 보기. 앞에서부터 다시 읽어야 한다.
 function isQueueView() {
   return ['unreviewed', 'ready', 'suspicious', 'inaccurate'].includes($('viewFilter').value);
+}
+
+// 곡당 예상 시간. 실측(MAEST 79초 + 감정 6초 + 3단 약 30초)에서 온 값이며
+// 서버 계약이 단일 기준이다. 큐가 길수록 오차가 누적되므로 어림수로만 보여준다.
+const SECONDS_PER_TRACK = 120;
+
+function formatEta(seconds) {
+  if (seconds < 60) return '1분 미만';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `약 ${minutes}분`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `약 ${hours}시간 ${rest}분` : `약 ${hours}시간`;
+}
+
+// 수집 버튼을 누르면 워커가 뒤에서 도는데, 그동안 화면이 아무 말도 하지 않았다.
+function renderQueue() {
+  const panel = $('queueProgress');
+  const counts = summary.queue || {};
+  const waiting = (counts.queued || 0) + (counts.processing || 0);
+  const finished = (counts.completed || 0) + (counts.failed || 0) + (counts.unsupported || 0);
+  const known = waiting + finished;
+  panel.hidden = waiting === 0;
+  if (!waiting) return;
+
+  const percent = known ? Math.round((finished / known) * 100) : 0;
+  $('queueFill').style.width = `${percent}%`;
+  $('queueLabel').textContent = counts.processing ? '분석 중' : '분석 대기';
+  $('queueEta').textContent = `${waiting}곡 남음 · ${formatEta(waiting * SECONDS_PER_TRACK)}`;
+  $('queueDetail').textContent = [
+    counts.processing ? `진행 ${counts.processing}` : null,
+    counts.queued ? `대기 ${counts.queued}` : null,
+    counts.completed ? `완료 ${counts.completed}` : null,
+    counts.failed ? `실패 ${counts.failed}` : null,
+  ].filter(Boolean).join(' · ');
 }
 
 function renderSummary() {
@@ -252,6 +288,7 @@ function renderAudioAnalysis(item) {
 
 function renderItem() {
   renderSummary();
+  renderQueue();
   const item = items[currentIndex];
   $('requeueAudio').disabled = !item || ['processing', 'queued', 'unsupported'].includes(item.job_status);
   if (!item) {
@@ -307,6 +344,32 @@ function renderItem() {
   $('nextItem').disabled = currentIndex >= items.length - 1 && !hasMore;
 }
 
+let queueTimer = null;
+
+async function refreshQueue() {
+  const { ok, data } = await api('GET', `/admin/audio-labels?view=${$('viewFilter').value}&offset=${currentOffset}`);
+  if (!ok) return;
+  // 목록은 건드리지 않는다. 검토 중인 곡이 바뀌면 판정하던 것을 잃는다.
+  summary = data.summary || summary;
+  renderSummary();
+  renderQueue();
+  scheduleQueueRefresh();
+}
+
+// 남은 곡이 있을 때만, 화면이 보일 때만 돈다. 곡당 2분이라 20초면 충분히 촘촘하다.
+function scheduleQueueRefresh() {
+  clearTimeout(queueTimer);
+  const counts = summary.queue || {};
+  if (!(counts.queued || 0) && !(counts.processing || 0)) return;
+  if (document.hidden) return;
+  queueTimer = setTimeout(refreshQueue, 20000);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearTimeout(queueTimer);
+  else scheduleQueueRefresh();
+});
+
 async function loadPage(offset = 0) {
   $('promptPanel').hidden = $('viewFilter').value !== 'inaccurate';
   $('reviewCard').hidden = true;
@@ -326,6 +389,7 @@ async function loadPage(offset = 0) {
   hasMore = Boolean(data.has_more);
   nextOffset = data.next_offset;
   renderItem();
+  scheduleQueueRefresh();
 }
 
 const VERDICT_WORDS = Object.freeze({ accurate: '맞음', inaccurate: '틀림' });

@@ -67,32 +67,50 @@ class CollectTest(unittest.TestCase):
         chart = [{'artist': str(i), 'title': str(i), 'released_at': None} for i in range(10)]
         with patch.object(discover, 'fetch_apple_chart', return_value=chart), \
              patch.object(discover, 'find_youtube_id', side_effect=lambda a, t, r: f'id{a}'.ljust(11, 'x')):
-            first, scanned_first = collect('apple_kr', None, 3, offset=0)
-            second, scanned_second = collect('apple_kr', None, 3, offset=3)
+            first, scanned_first = collect('apple_global', None, 3, offset=0)
+            second, scanned_second = collect('apple_global', None, 3, offset=3)
 
         self.assertEqual([t['title'] for t in first], ['0', '1', '2'])
         self.assertEqual([t['title'] for t in second], ['3', '4', '5'], '다음 요청은 다음 구간을 본다')
         self.assertEqual((scanned_first, scanned_second), (3, 3))
 
-    def test_scanned_shrinks_at_the_end_of_the_source(self):
-        # scanned < limit이면 서버가 다음 요청을 처음부터 다시 시작한다.
+    def test_one_country_running_out_does_not_rewind_the_cursor(self):
+        # scanned < limit이면 서버가 커서를 0으로 되감는다. 한 나라가 끝난 것은
+        # 소스가 바닥난 것이 아니므로 되감기면 영영 첫 나라만 본다.
         chart = [{'artist': str(i), 'title': str(i), 'released_at': None} for i in range(5)]
         with patch.object(discover, 'fetch_apple_chart', return_value=chart), \
              patch.object(discover, 'find_youtube_id', return_value='aaaaaaaaaaa'):
-            _, scanned = collect('apple_kr', None, 10, offset=3)
+            _, scanned = collect('apple_global', None, 10, offset=3)
 
-        self.assertEqual(scanned, 2)
+        self.assertEqual(scanned, 10, '요청한 만큼 훑은 것으로 보고해 다음 나라로 넘어간다')
+
+    def test_offset_rotates_through_countries(self):
+        seen = []
+
+        def fake_chart(limit, country=discover.APPLE_COUNTRY, opener=None):
+            seen.append(country)
+            return [{'artist': country, 'title': country, 'released_at': None}]
+
+        with patch.object(discover, 'fetch_apple_chart', side_effect=fake_chart), \
+             patch.object(discover, 'find_youtube_id', return_value='aaaaaaaaaaa'):
+            for offset in (0, discover.APPLE_FEED_MAX, discover.APPLE_FEED_MAX * 2):
+                collect('apple_global', None, 5, offset=offset)
+            # 국가 수를 넘어가면 처음으로 돈다.
+            collect('apple_global', None, 5, offset=discover.APPLE_FEED_MAX * len(discover.APPLE_COUNTRIES))
+
+        self.assertEqual(seen[:3], list(discover.APPLE_COUNTRIES[:3]))
+        self.assertEqual(seen[3], discover.APPLE_COUNTRIES[0], '한 바퀴 돌면 처음 나라로')
 
     def test_apple_source_resolves_each_track(self):
         with patch.object(discover, 'fetch_apple_chart', return_value=[
                 {'artist': 'A', 'title': 'One', 'released_at': '2026-09-01'},
                 {'artist': 'B', 'title': 'Two', 'released_at': '2026-09-02'}]), \
              patch.object(discover, 'find_youtube_id', side_effect=['aaaaaaaaaaa', None]):
-            tracks, scanned = collect('apple_kr', None, 10)
+            tracks, scanned = collect('apple_global', None, 10)
 
         # 매칭에 실패한 곡은 조용히 빠진다. 큐에 넣을 수 없으니 실패로 볼 이유가 없다.
         self.assertEqual(len(tracks), 1)
-        self.assertEqual(scanned, 2, '훑은 개수는 매칭 성공 여부와 별개다')
+        self.assertEqual(scanned, 10, '훑은 개수는 매칭 성공 여부와 별개다')
         self.assertEqual(tracks[0], {'platform': 'youtube', 'track_key': 'aaaaaaaaaaa',
                                      'title': 'One', 'artist_name': 'A'})
 
@@ -100,7 +118,38 @@ class CollectTest(unittest.TestCase):
         with patch.object(discover, 'fetch_apple_chart', return_value=[
                 {'artist': str(i), 'title': str(i), 'released_at': None} for i in range(10)]), \
              patch.object(discover, 'find_youtube_id', return_value='aaaaaaaaaaa'):
-            self.assertEqual(len(collect('apple_kr', None, 3)[0]), 3)
+            self.assertEqual(len(collect('apple_global', None, 3)[0]), 3)
+
+    def test_soundcloud_walks_one_genre_per_request(self):
+        genres = [{'title': 'Trap', 'track_ids': list(range(100, 150))},
+                  {'title': 'Pop', 'track_ids': list(range(200, 250))}]
+        rows = lambda ids: [{'permalink_url': f'https://soundcloud.com/u/t{i}', 'title': f'곡{i}',
+                             'duration': 200000, 'user': {'username': 'uploader'}} for i in ids]
+        with patch.object(discover, '_soundcloud_client_id', return_value='cid'), \
+             patch.object(discover, 'fetch_soundcloud_genres', return_value=genres), \
+             patch.object(discover, 'fetch_soundcloud_tracks', side_effect=lambda ids, *a: rows(ids)):
+            first, scanned = collect('soundcloud_trending', None, 5, offset=0)
+            second, _ = collect('soundcloud_trending', None, 5, offset=discover.SOUNDCLOUD_BUCKET)
+
+        self.assertEqual(scanned, 5)
+        self.assertEqual({t['platform'] for t in first}, {'soundcloud'})
+        # 다음 요청은 다른 장르를 본다.
+        self.assertEqual(set(t['track_key'] for t in first) & set(t['track_key'] for t in second), set())
+        self.assertTrue(first[0]['track_key'].startswith('https://soundcloud.com/'))
+
+    def test_soundcloud_drops_mixes_by_length(self):
+        genres = [{'title': 'Trap', 'track_ids': [1, 2]}]
+        rows = [{'permalink_url': 'https://soundcloud.com/u/ok', 'title': '곡', 'duration': 200000,
+                 'user': {'username': 'u'}},
+                {'permalink_url': 'https://soundcloud.com/u/mix', 'title': 'DJ 셋', 'duration': 3600000,
+                 'user': {'username': 'u'}}]
+        with patch.object(discover, '_soundcloud_client_id', return_value='cid'), \
+             patch.object(discover, 'fetch_soundcloud_genres', return_value=genres), \
+             patch.object(discover, 'fetch_soundcloud_tracks', return_value=rows):
+            tracks, scanned = collect('soundcloud_trending', None, 5, offset=0)
+
+        self.assertEqual([t['title'] for t in tracks], ['곡'], '한도를 넘는 믹스는 뺀다')
+        self.assertEqual(scanned, 2, '훑은 개수에는 뺀 곡도 포함한다')
 
     def test_unknown_source_is_rejected(self):
         with self.assertRaisesRegex(DiscoveryError, '^SOURCE_UNSUPPORTED$'):

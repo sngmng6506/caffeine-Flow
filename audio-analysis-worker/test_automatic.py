@@ -123,7 +123,7 @@ class DiscoveryLoopTest(unittest.TestCase):
 
         def api(_config, endpoint, body):
             if endpoint.endswith('/discoveries/claim'):
-                return {'id': 'd1', 'source': 'apple_kr', 'query': None,
+                return {'id': 'd1', 'source': 'apple_global', 'query': None,
                         'requested_limit': 5, 'lease_token': 'lease'}
             posted[endpoint] = body
             return {'status': 'done'}
@@ -144,7 +144,7 @@ class DiscoveryLoopTest(unittest.TestCase):
 
         def api(_config, endpoint, body):
             if endpoint.endswith('/discoveries/claim'):
-                return {'id': 'd1', 'source': 'apple_kr', 'query': None,
+                return {'id': 'd1', 'source': 'apple_global', 'query': None,
                         'requested_limit': 5, 'lease_token': 'lease'}
             posted[endpoint] = body
             return {}
