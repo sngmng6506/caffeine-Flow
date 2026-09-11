@@ -35,8 +35,21 @@ describe('최신곡 수집 요청', () => {
     expect((await ask({ source: 'spotify' })).status).toBe(400);
     expect((await ask({ source: 'apple_kr', limit: 0 })).status).toBe(400);
     expect((await ask({ source: 'apple_kr', limit: 999 })).status).toBe(400);
-    // SoundCloud는 키워드 검색이라 검색어 없이는 만들 수 없다.
-    expect((await ask({ source: 'soundcloud' })).status).toBe(400);
+  });
+
+  it('모든 소스가 검색어 없이 인기·발매 순서를 훑는다', async () => {
+    // 검색어로 장르를 좁히면 거절해야 할 곡이 표본에서 빠진다.
+    const created = await ask({ source: 'soundcloud' });
+
+    expect(created.status).toBe(201);
+    expect(created.body.discovery.query).toBeNull();
+  });
+
+  it('검색어를 보내도 저장하지 않는다', async () => {
+    const created = await ask({ source: 'musicbrainz_kr', query: 'lo-fi' });
+
+    expect(created.status).toBe(201);
+    expect(created.body.discovery.query).toBeNull();
   });
 
   it('같은 소스의 대기 요청이 있으면 새로 쌓지 않는다', async () => {

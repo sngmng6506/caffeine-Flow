@@ -4,11 +4,25 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import discover
-from discover import DiscoveryError, collect, fetch_apple_chart, find_youtube_id, search_soundcloud
+from discover import (
+    DiscoveryError, collect, fetch_apple_chart, fetch_soundcloud_chart, find_youtube_id,
+)
 
 
 def runner_for(payload):
     return lambda *a, **k: SimpleNamespace(stdout=json.dumps(payload).encode())
+
+
+def runner_sequence(payloads):
+    """호출마다 다른 응답을 준다. 차트 조회 뒤 곡별 조회가 이어지는 흐름에 필요하다."""
+    remaining = list(payloads)
+
+    def run(*a, **k):
+        payload = remaining.pop(0) if remaining else {}
+        if isinstance(payload, Exception):
+            raise payload
+        return SimpleNamespace(stdout=json.dumps(payload).encode())
+    return run
 
 
 def opener_for(payload):
@@ -62,27 +76,64 @@ class YouTubeMatchTest(unittest.TestCase):
         self.assertIsNone(find_youtube_id('a', 'b', runner_for({'entries': []})))
 
 
-class SoundCloudTest(unittest.TestCase):
-    def entries(self):
-        return {'entries': [
-            {'url': 'https://soundcloud.com/a/mix', 'duration': 3510, 'view_count': 90000,
-             'title': 'DJ Mix', 'uploader': 'dj'},
-            {'url': 'https://soundcloud.com/b/quiet', 'duration': 200, 'view_count': 30,
-             'title': 'Quiet', 'uploader': 'b'},
-            {'url': 'https://soundcloud.com/c/hit', 'duration': 210, 'view_count': 3410,
-             'title': 'Hit', 'uploader': 'c'},
-        ]}
+class SoundcloudChartTest(unittest.TestCase):
+    CHART = {'entries': [
+        {'url': 'https://soundcloud.com/a/mix'},
+        {'url': 'https://soundcloud.com/b/hit'},
+        {'url': 'https://soundcloud.com/c/quiet'},
+    ]}
 
-    def test_drops_long_mixes_and_sorts_by_plays(self):
-        tracks = search_soundcloud('indie pop', 5, runner_for(self.entries()))
+    def test_keeps_chart_order_and_drops_long_mixes(self):
+        """순서가 곧 순위다. 재생 수로 다시 정렬하면 차트 순위를 버리는 것이다."""
+        tracks, scanned = fetch_soundcloud_chart(3, runner=runner_sequence([
+            self.CHART,
+            {'title': '긴 믹스', 'duration': 3510, 'uploader': 'A',
+             'webpage_url': 'https://soundcloud.com/a/mix'},
+            {'title': '히트곡', 'duration': 210, 'uploader': 'B',
+             'webpage_url': 'https://soundcloud.com/b/hit'},
+            {'title': '조용한 곡', 'duration': 200, 'uploader': 'C',
+             'webpage_url': 'https://soundcloud.com/c/quiet'},
+        ]))
 
-        self.assertEqual([t['title'] for t in tracks], ['Hit', 'Quiet'], '믹스는 길이로 걸러진다')
+        self.assertEqual([track['title'] for track in tracks], ['히트곡', '조용한 곡'])
         self.assertEqual(tracks[0]['platform'], 'soundcloud')
-        self.assertNotIn('plays', tracks[0], '내부 정렬값은 서버로 보내지 않는다')
+        self.assertEqual(tracks[0]['track_key'], 'https://soundcloud.com/b/hit')
+        # 걸러낸 곡도 훑은 개수에는 들어가야 다음 요청이 같은 구간을 다시 보지 않는다.
+        self.assertEqual(scanned, 3)
 
-    def test_honours_the_requested_limit(self):
-        self.assertEqual(len(search_soundcloud('indie pop', 1, runner_for(self.entries()))), 1)
+    def test_offset_and_limit_cut_before_per_track_lookups(self):
+        calls = []
 
+        def run(*a, **k):
+            calls.append(a[0])
+            payload = self.CHART if len(calls) == 1 else {
+                'title': '곡', 'duration': 200, 'uploader': 'X',
+                'webpage_url': 'https://soundcloud.com/b/hit'}
+            return SimpleNamespace(stdout=json.dumps(payload).encode())
+
+        tracks, scanned = fetch_soundcloud_chart(1, offset=1, runner=run)
+
+        self.assertEqual(scanned, 1)
+        self.assertEqual(len(tracks), 1)
+        # 차트 한 번 + 구간 안의 곡 한 번. 전체 차트를 곡별로 조회하면 낭비다.
+        self.assertEqual(len(calls), 2)
+
+    def test_a_broken_track_does_not_lose_the_batch(self):
+        tracks, scanned = fetch_soundcloud_chart(3, runner=runner_sequence([
+            self.CHART,
+            OSError('삭제된 곡'),
+            {'title': '히트곡', 'duration': 210, 'uploader': 'B',
+             'webpage_url': 'https://soundcloud.com/b/hit'},
+            {'title': '', 'duration': 200, 'uploader': 'C'},
+        ]))
+
+        self.assertEqual([track['title'] for track in tracks], ['히트곡'])
+        self.assertEqual(scanned, 3)
+
+    def test_empty_chart_is_not_an_error(self):
+        tracks, scanned = fetch_soundcloud_chart(5, runner=runner_sequence([{'entries': []}]))
+
+        self.assertEqual((tracks, scanned), ([], 0))
 
 class CollectTest(unittest.TestCase):
     def test_offset_moves_the_window(self):

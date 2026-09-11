@@ -15,13 +15,13 @@ function validateRequest({ source, query, limit }) {
       && (typeof query !== 'string' || query.length > 200)) {
     return { error: '검색어가 올바르지 않습니다' };
   }
-  // SoundCloud는 키워드 검색이라 검색어가 있어야 하고, 차트는 검색어를 쓰지 않는다.
-  if (source === 'soundcloud' && !query?.trim()) return { error: 'SoundCloud 수집에는 검색어가 필요합니다' };
+  // 모든 소스가 인기·발매 순서를 그대로 훑는다. 검색어로 장르를 좁히면 거절해야 할
+  // 곡이 표본에서 빠져 필터가 거절을 배우지 못한다.
   const count = limit === undefined ? 20 : limit;
   if (!Number.isSafeInteger(count) || count < 1 || count > DISCOVERY_MAX_LIMIT) {
     return { error: `수집 개수는 1에서 ${DISCOVERY_MAX_LIMIT} 사이여야 합니다` };
   }
-  return { value: { source, query: source === 'soundcloud' ? query.trim() : null, requested_limit: count } };
+  return { value: { source, query: null, requested_limit: count } };
 }
 
 async function request(input) {

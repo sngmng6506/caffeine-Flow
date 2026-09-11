@@ -189,7 +189,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/admin/audio-labels/:id/renormalize` | 🛡 | generation, analysis_id, analysis_revision을 비교해 원본에 현재 택소노미 적용. 원본·사람 라벨 보존. 라벨링 Lab에 버튼은 없고 API로만 호출한다 |
 | PUT | `/admin/audio-labels/:id/review` | 🛡 | 작업 ID에 해당하는 곡의 라벨 확인·수정. 매장 정책 판단 불필요 |
 | GET | `/admin/audio-discoveries` | 🛡 | 최근 최신곡 수집 요청 목록 |
-| POST | `/admin/audio-discoveries` | 🛡 | 수집 요청. body는 `{ source, query?, limit? }`. 같은 소스가 대기 중이면 기존 요청을 200으로 돌려준다 |
+| POST | `/admin/audio-discoveries` | 🛡 | 수집 요청. body는 `{ source, limit? }`. 모든 소스가 인기·발매 순서를 그대로 훑으므로 검색어를 받지 않는다(보내도 무시하고 `query`는 항상 null). 같은 소스가 대기 중이면 기존 요청을 200으로 돌려준다 |
 | GET | `/admin/audio-settings` | 🛡 | 3단 Audio LLM 스위치와 프롬프트 조회. `audio_llm_prompt_version`은 기본 `audio-llm-1` 또는 `custom-<sha256 앞 12자>` |
 | PUT | `/admin/audio-settings` | 🛡 | 스위치·프롬프트 변경. body는 `{ audio_llm_enabled: boolean, audio_llm_prompt?: string }`. 필드를 생략하면 저장된 프롬프트를 유지하고, 빈 문자열·null이면 워커 기본 문장으로 되돌림. 4000자 제한 |
 | GET | `/admin/audio-prompt-revisions` | 🛡 | 3단 프롬프트 수정 이력 최근 20건. 추가만 되며 수정·삭제는 DB trigger가 막음 |
