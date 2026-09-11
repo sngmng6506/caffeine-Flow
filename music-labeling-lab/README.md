@@ -58,11 +58,10 @@ MAEST 결과·임베딩·택소노미를 프롬프트에 넣지 않는다. 두 �
 | --- | --- | --- |
 | Apple Music 인기곡 (한국) | Apple Marketing RSS의 한국 '가장 많이 재생된 곡' | YouTube |
 | MusicBrainz 한국 발매 | MusicBrainz recording 조회(`country:KR` + 발매일 구간) | YouTube |
-| SoundCloud 인기 차트 (한국) | SoundCloud 한국 인기 차트 | SoundCloud |
 
-앞의 두 소스는 곡 목록만 가져오고 실제 음원은 YouTube에서 찾아 받는다(`find_youtube_id`). SoundCloud만 그 플랫폼의 음원을 그대로 분석한다.
+두 소스 모두 곡 목록만 가져오고 실제 음원은 YouTube에서 찾아 받는다(`find_youtube_id`).
 
-세 소스 모두 장르나 검색어로 좁히지 않는다. 필터가 거절을 배우려면 거절해야 할 곡도 표본에 있어야 한다.
+장르나 검색어로 좁히지 않는다. 필터가 거절을 배우려면 거절해야 할 곡도 표본에 있어야 한다.
 
 ## 규칙
 

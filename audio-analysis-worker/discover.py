@@ -26,11 +26,6 @@ MUSICBRAINZ_URL = 'https://musicbrainz.org/ws/2/recording'
 # 주므로 Apple 소스에는 없는 검증을 할 수 있다.
 DURATION_TOLERANCE_SEC = 20
 APPLE_COUNTRY = 'kr'
-# SoundCloud 인기 차트. 장르를 좁히지 않는 이유는 목적이 "카페에 어울리는 곡 모으기"가
-# 아니라 "필터가 판단할 곡 모으기"이기 때문이다. 장르를 골라 긁으면 거절해야 할 곡이
-# 표본에서 빠져 필터가 거절을 배우지 못한다.
-SOUNDCLOUD_CHART = 'https://soundcloud.com/discover/sets/charts-top:all-music:{country}'
-SOUNDCLOUD_COUNTRY = 'kr'
 USER_AGENT = 'caffeine-flow-audio-worker/1.0'
 FETCH_TIMEOUT = 30
 SEARCH_TIMEOUT = 120
@@ -133,52 +128,6 @@ def find_youtube_id(artist, title, runner=subprocess.run, expected_sec=None):
     return None
 
 
-def fetch_soundcloud_track(url, runner=subprocess.run):
-    """차트 항목 하나의 메타데이터. 쓸 수 없는 곡이면 None.
-
-    한 곡이 지워졌거나 지역 차단이어도 그 배치 전체를 버리지 않는다 — Apple 소스에서
-    YouTube 매칭이 실패한 곡을 건너뛰는 것과 같은 처리다.
-    """
-    try:
-        info = _yt_dlp([url], runner)
-    except DiscoveryError:
-        return None
-    title = (info.get('title') or '').strip()
-    duration = info.get('duration')
-    if not title or duration is None:
-        return None
-    if not MIN_DURATION <= duration <= MAX_DURATION:
-        return None
-    return {'platform': 'soundcloud',
-            'track_key': info.get('webpage_url') or url,
-            'title': title[:500],
-            'artist_name': (info.get('uploader') or info.get('channel') or 'unknown')[:200]}
-
-
-def fetch_soundcloud_chart(limit, offset=0, runner=subprocess.run, country=SOUNDCLOUD_COUNTRY):
-    """SoundCloud 인기 차트를 순위 순서 그대로 가져온다.
-
-    차트는 set이라 flat 조회가 URL과 ID만 준다 — 검색과 달리 제목·길이가 없다.
-    작업 행에 제목이 필요하므로 구간 안의 곡만 하나씩 더 조회한다. 전체 차트를 곡별로
-    조회하면 낭비라 자르는 것을 먼저 한다.
-
-    순서가 곧 순위이므로 다시 정렬하지 않는다.
-    """
-    entries = _yt_dlp([SOUNDCLOUD_CHART.format(country=country)], runner,
-                      timeout=SEARCH_TIMEOUT * 2).get('entries') or []
-    window = entries[max(0, int(offset)):max(0, int(offset)) + int(limit)]
-    tracks = []
-    for entry in window:
-        url = entry.get('url') or entry.get('webpage_url')
-        if not url:
-            continue
-        track = fetch_soundcloud_track(url, runner)
-        if track:
-            tracks.append(track)
-    # 걸러낸 곡도 원본 차트 위치에는 포함한다. 그래야 다음 요청이 같은 구간을 다시 보지 않는다.
-    return tracks, len(window)
-
-
 # Apple 차트가 한 번에 주는 최대 곡 수. 그 이상은 서버가 500을 준다.
 APPLE_FEED_MAX = 100
 
@@ -208,8 +157,6 @@ def collect(source, query, limit, offset=0, window=None,
         # 제외·매칭 실패도 원본 페이지 위치에는 포함한다. 같은 영상은 한 번만 제출한다.
         tracks = list({track['track_key']: track for track in tracks}.values())
         return tracks, page['scanned']
-    if source == 'soundcloud':
-        return fetch_soundcloud_chart(limit, offset=offset, runner=runner)
     if source == 'apple_kr':
         chart = fetch_apple_chart(APPLE_FEED_MAX, opener=opener)
         candidates = chart[offset:offset + limit]

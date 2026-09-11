@@ -1,5 +1,7 @@
 // 수집 소스. 워커가 이 값을 보고 어디서 곡 목록을 가져올지 정한다.
-const DISCOVERY_SOURCES = Object.freeze(['apple_kr', 'soundcloud', 'musicbrainz_kr']);
+// SoundCloud는 빠져 있다 — 인기 차트 경로가 404라 순위로 긁을 방법이 없고, 검색은
+// 장르를 좁혀 거절 표본을 잃는다. 경위는 docs/ROADMAP.md에 있다.
+const DISCOVERY_SOURCES = Object.freeze(['apple_kr', 'musicbrainz_kr']);
 // 날짜 창으로 진도를 잡는 소스. 순위 offset이 의미 없다.
 const DATE_WINDOW_SOURCES = Object.freeze(['musicbrainz_kr']);
 const DISCOVERY_WINDOW_DAYS = 7;

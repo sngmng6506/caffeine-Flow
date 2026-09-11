@@ -37,12 +37,10 @@ describe('최신곡 수집 요청', () => {
     expect((await ask({ source: 'apple_kr', limit: 999 })).status).toBe(400);
   });
 
-  it('모든 소스가 검색어 없이 인기·발매 순서를 훑는다', async () => {
-    // 검색어로 장르를 좁히면 거절해야 할 곡이 표본에서 빠진다.
-    const created = await ask({ source: 'soundcloud' });
-
-    expect(created.status).toBe(201);
-    expect(created.body.discovery.query).toBeNull();
+  it('수집 소스가 아닌 플랫폼은 거절한다', async () => {
+    // SoundCloud는 인기 차트 경로가 404라 순위로 긁을 수 없어 소스에서 빠져 있다.
+    // 옛 클라이언트가 보내면 조용히 실패하지 않고 400으로 끝난다.
+    expect((await ask({ source: 'soundcloud' })).status).toBe(400);
   });
 
   it('검색어를 보내도 저장하지 않는다', async () => {
@@ -119,7 +117,7 @@ describe('최신곡 수집 요청', () => {
 
 // 순위 소스(Apple·SoundCloud)는 날짜가 아니라 offset으로 진도를 잡는다. 소스를 끝까지
 // 보면 0으로 돌아가 그 사이 바뀐 차트를 다시 본다.
-it.each(['apple_kr', 'soundcloud'])('%s는 요청마다 다음 구간을 보고 끝나면 처음으로 돌아간다', async (source) => {
+it.each(['apple_kr'])('%s는 요청마다 다음 구간을 보고 끝나면 처음으로 돌아간다', async (source) => {
   const claim = () => request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
   const finish = (job, scanned) => request(app)
     .post(`/api/v1/audio-analysis/discoveries/${job.id}/complete`).set(worker())
