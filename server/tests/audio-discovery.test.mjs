@@ -117,6 +117,39 @@ describe('최신곡 수집 요청', () => {
   });
 });
 
+// 순위 소스(Apple·SoundCloud)는 날짜가 아니라 offset으로 진도를 잡는다. 소스를 끝까지
+// 보면 0으로 돌아가 그 사이 바뀐 차트를 다시 본다.
+it.each(['apple_kr', 'soundcloud'])('%s는 요청마다 다음 구간을 보고 끝나면 처음으로 돌아간다', async (source) => {
+  const claim = () => request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
+  const finish = (job, scanned) => request(app)
+    .post(`/api/v1/audio-analysis/discoveries/${job.id}/complete`).set(worker())
+    .send({ lease_token: job.lease_token, tracks: [], offset: job.offset, scanned });
+  const cursorOf = async () => (await db('music_source_cursors').where({ source }).first())?.next_offset;
+
+  await ask({ source, limit: 20 });
+  const first = (await claim()).body;
+  expect(first.offset).toBe(0);
+  // 요청한 만큼 다 훑었으면 아직 소스가 남았다는 뜻이다.
+  expect((await finish(first, 20)).status).toBe(200);
+  expect(await cursorOf()).toBe(20);
+
+  await ask({ source, limit: 20 });
+  const second = (await claim()).body;
+  expect(second.offset).toBe(20);
+  expect((await finish(second, 20)).status).toBe(200);
+  expect(await cursorOf()).toBe(40);
+
+  // 요청보다 적게 훑었으면 소스 끝이다. 다음 요청은 처음부터 본다.
+  await ask({ source, limit: 20 });
+  const third = (await claim()).body;
+  expect(third.offset).toBe(40);
+  expect((await finish(third, 7)).status).toBe(200);
+  expect(await cursorOf()).toBe(0);
+
+  await ask({ source, limit: 20 });
+  expect((await claim()).body.offset).toBe(0);
+});
+
 it('날짜 창의 페이지를 소진한 뒤에만 날짜 진도를 옮긴다', async () => {
   const claim = () => request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
   const finish = (job, scanned, extra = {}) => request(app)

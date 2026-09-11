@@ -130,6 +130,24 @@ class SoundcloudChartTest(unittest.TestCase):
         self.assertEqual([track['title'] for track in tracks], ['히트곡'])
         self.assertEqual(scanned, 3)
 
+    def test_partial_window_signals_the_end_of_the_chart(self):
+        """요청보다 적게 훑으면 서버가 커서를 0으로 되돌린다. 그 신호가 scanned다."""
+        tracks, scanned = fetch_soundcloud_chart(5, offset=1, runner=runner_sequence([
+            self.CHART,
+            {'title': '히트곡', 'duration': 210, 'uploader': 'B',
+             'webpage_url': 'https://soundcloud.com/b/hit'},
+            {'title': '조용한 곡', 'duration': 200, 'uploader': 'C',
+             'webpage_url': 'https://soundcloud.com/c/quiet'},
+        ]))
+
+        self.assertEqual(len(tracks), 2)
+        self.assertLess(scanned, 5)
+
+    def test_offset_past_the_end_scans_nothing(self):
+        tracks, scanned = fetch_soundcloud_chart(5, offset=99, runner=runner_sequence([self.CHART]))
+
+        self.assertEqual((tracks, scanned), ([], 0))
+
     def test_empty_chart_is_not_an_error(self):
         tracks, scanned = fetch_soundcloud_chart(5, runner=runner_sequence([{'entries': []}]))
 
