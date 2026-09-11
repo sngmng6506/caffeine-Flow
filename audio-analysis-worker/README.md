@@ -133,11 +133,10 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 | --- | --- | --- |
 | `apple_kr` | Apple 인기곡 차트의 아티스트·곡명을 YouTube에서 찾아 등록 | YouTube |
 | `musicbrainz_kr` | 한국 발매 곡을 날짜 구간으로 조회해 YouTube에서 찾아 등록 | YouTube |
-| `soundcloud` | 검색어로 찾아 길이로 거른 뒤 재생 수 상위 N개 등록 | SoundCloud |
 
-`apple_kr`·`musicbrainz_kr`은 검색어를 쓰지 않는다. 인기·발매 순서를 그대로 훑어야 거절해야 할 곡도 표본에 남는다.
+**어느 소스도 장르나 검색어로 좁히지 않는다.** 수집의 목적은 카페에 어울리는 곡을 모으는 것이 아니라 필터가 판단할 곡을 모으는 것이다. 장르를 골라 긁으면 거절해야 할 곡이 표본에서 빠져 필터가 거절을 배우지 못한다.
 
-`soundcloud`만 검색어를 받는다. 인기 차트 경로가 404이기도 하지만(경위는 [ROADMAP](../docs/ROADMAP.md)), 애초에 차트에는 대중적인 곡이 올라와 인디가 거의 안 잡힌다. 매장이 선 지역의 신(scene)을 겨냥하는 것이 목적이라면 검색이 맞고, 그 안에도 펑크·노이즈처럼 거절해야 할 곡이 충분히 섞인다. 커서 기본키가 `(source, query_key)`라 **검색어마다 진도가 따로 남는다** — 여러 검색어를 번갈아 눌러도 각자 다음 구간부터 본다.
+SoundCloud는 수집 소스가 아니다. 순위로 긁을 경로가 없기 때문이며 경위는 [ROADMAP](../docs/ROADMAP.md)에 있다. SoundCloud 음원은 손님이 신청한 링크로만 분석 큐에 들어온다.
 
 `musicbrainz_kr`은 곡(recording) 단위로 조회한다. 릴리스(앨범) 단위로 검색하면 YouTube에서 풀앨범 업로드가 잡힌다. MusicBrainz가 주는 곡 길이로 매칭 결과를 검증해 동명이인과 앨범 전체를 거른다.
 

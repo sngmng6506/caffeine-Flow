@@ -128,36 +128,6 @@ def find_youtube_id(artist, title, runner=subprocess.run, expected_sec=None):
     return None
 
 
-def search_soundcloud(query, limit, runner=subprocess.run):
-    """SoundCloud 검색 결과를 재생 수 기준으로 추린다.
-
-    차트가 아니라 검색인 이유는 목적이 지역 신(scene)에 맞추는 것이기 때문이다.
-    인기 차트는 대중적인 곡이 올라와 인디가 거의 안 잡힌다. 검색어로 신을 좁히면
-    손님이 실제로 신청할 곡에 가까워지고, 그 안에도 펑크·노이즈처럼 거절해야 할
-    곡이 충분히 섞여 있다.
-
-    믹스·DJ 셋이 많이 섞이므로 길이로 먼저 걸러낸 뒤 인기순으로 자른다.
-    """
-    # 인기순 정렬을 검색이 지원하지 않아 넉넉히 받아 후처리한다.
-    entries = _yt_dlp([f'scsearch{max(1, min(int(limit) * 4, 100))}:{query}'], runner,
-                      timeout=SEARCH_TIMEOUT * 2).get('entries') or []
-    usable = []
-    for entry in entries:
-        url, duration = entry.get('url'), entry.get('duration')
-        if not url or duration is None:
-            continue
-        if not MIN_DURATION <= duration <= MAX_DURATION:
-            continue
-        usable.append({
-            'platform': 'soundcloud', 'track_key': url,
-            'title': (entry.get('title') or '')[:500],
-            'artist_name': (entry.get('uploader') or entry.get('channel') or 'unknown')[:200],
-            'plays': entry.get('view_count') or 0,
-        })
-    usable.sort(key=lambda track: -track['plays'])
-    return [{k: v for k, v in track.items() if k != 'plays'} for track in usable[:int(limit)]]
-
-
 # Apple 차트가 한 번에 주는 최대 곡 수. 그 이상은 서버가 500을 준다.
 APPLE_FEED_MAX = 100
 
@@ -187,12 +157,6 @@ def collect(source, query, limit, offset=0, window=None,
         # 제외·매칭 실패도 원본 페이지 위치에는 포함한다. 같은 영상은 한 번만 제출한다.
         tracks = list({track['track_key']: track for track in tracks}.values())
         return tracks, page['scanned']
-    if source == 'soundcloud':
-        # 재생 수 상위 (offset+limit)개를 받아 이번 구간만 잘라 쓴다. 검색이 주는
-        # 결과에 한계가 있어 깊이 들어가면 구간이 짧아지고, 그것이 소스 끝 신호가 된다.
-        candidates = search_soundcloud(query, offset + limit, runner)
-        window = candidates[offset:offset + limit]
-        return window, len(window)
     if source == 'apple_kr':
         chart = fetch_apple_chart(APPLE_FEED_MAX, opener=opener)
         candidates = chart[offset:offset + limit]
