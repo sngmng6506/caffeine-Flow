@@ -302,7 +302,8 @@ function renderItem() {
   for (const id of ['verdictAccurate', 'verdictInaccurate']) {
     $(id).disabled = !canReviewDescription(item);
   }
-  $('verdictAccurate').textContent = complete ? '확인됨' : '맞음';
+  // 버튼 전체를 덮으면 <kbd>1</kbd> 단축키 표시가 함께 지워진다.
+  $('verdictAccurate').querySelector('[data-verdict-label]').textContent = complete ? '확인됨' : '맞음';
   $('previousItem').disabled = currentIndex === 0 && currentOffset === 0;
   $('nextItem').disabled = currentIndex >= items.length - 1 && !hasMore;
 }
