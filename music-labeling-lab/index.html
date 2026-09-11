@@ -40,7 +40,12 @@
           <select id='collectSource'>
             <option value='apple_kr'>Apple Music 인기곡 (한국)</option>
             <option value='musicbrainz_kr'>MusicBrainz 한국 발매</option>
+            <option value='soundcloud'>SoundCloud 검색</option>
           </select>
+        </label>
+        <label id='collectQueryField' hidden>검색어
+          <input id='collectQuery' maxlength='200' value='korean indie'
+                 placeholder='예: korean indie, 홍대, krindie' />
         </label>
         <button type='button' id='collectApple'>최신곡 수집</button>
         <span class='spacer'></span>

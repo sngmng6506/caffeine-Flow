@@ -77,13 +77,22 @@ async function saveAudioSettings(event) {
     : (data.error || 'AI 음악 서술 설정을 바꾸지 못했습니다.');
 }
 
+// 검색어를 받는 소스. 서버 상수(QUERY_SOURCES)와 같은 목록이다.
+const QUERY_SOURCES = ['soundcloud'];
+
+function syncCollectQuery() {
+  $('collectQueryField').hidden = !QUERY_SOURCES.includes($('collectSource').value);
+}
+
 // 최신곡 수집 요청. 워커가 뒤에서 차트를 훑어 분석 큐를 채운다. 같은 소스의 요청이
 // 이미 대기 중이면 서버가 그것을 그대로 돌려주므로 중복으로 쌓이지 않는다.
 async function requestCollection() {
   const button = $('collectApple');
   button.disabled = true;
+  const source = $('collectSource').value;
+  const query = $('collectQuery').value.trim();
   const { ok, data } = await api('POST', '/admin/audio-discoveries',
-    { source: $('collectSource').value, limit: 20 });
+    { source, limit: 20, ...(query ? { query } : {}) });
   button.disabled = false;
   $('message').hidden = false;
   if (!ok) {
@@ -436,6 +445,8 @@ document.addEventListener('keydown', (event) => {
 
 $('audioLlmEnabled').addEventListener('change', saveAudioSettings);
 $('collectApple').addEventListener('click', requestCollection);
+$('collectSource').addEventListener('change', syncCollectQuery);
+syncCollectQuery();
 $('savePrompt').addEventListener('click', savePrompt);
 $('resetPrompt').addEventListener('click', resetPrompt);
 $('requeueRejected').addEventListener('click', requeueRejected);

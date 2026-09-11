@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import discover
-from discover import DiscoveryError, collect, fetch_apple_chart, find_youtube_id
+from discover import DiscoveryError, collect, fetch_apple_chart, find_youtube_id, search_soundcloud
 
 
 def runner_for(payload):
@@ -60,6 +60,45 @@ class YouTubeMatchTest(unittest.TestCase):
 
     def test_no_match_returns_none(self):
         self.assertIsNone(find_youtube_id('a', 'b', runner_for({'entries': []})))
+
+
+class SoundcloudSearchTest(unittest.TestCase):
+    """차트가 아니라 검색을 쓰는 이유는 지역 신을 겨냥하기 때문이다. 인기 차트에는
+    인디가 거의 안 잡힌다."""
+
+    def entries(self):
+        return {'entries': [
+            {'url': 'https://soundcloud.com/a/mix', 'duration': 3510, 'view_count': 90000,
+             'title': '3시간 DJ 믹스', 'uploader': 'A'},
+            {'url': 'https://soundcloud.com/b/quiet', 'duration': 200, 'view_count': 30,
+             'title': '조용한 곡', 'uploader': 'B'},
+            {'url': 'https://soundcloud.com/c/hit', 'duration': 210, 'view_count': 3410,
+             'title': '히트곡', 'uploader': 'C'},
+        ]}
+
+    def test_drops_long_mixes_and_sorts_by_plays(self):
+        tracks = search_soundcloud('korean indie', 5, runner_for(self.entries()))
+
+        self.assertEqual([track['title'] for track in tracks], ['히트곡', '조용한 곡'])
+        self.assertEqual(tracks[0]['platform'], 'soundcloud')
+        self.assertEqual(tracks[0]['track_key'], 'https://soundcloud.com/c/hit')
+
+    def test_honours_the_requested_limit(self):
+        self.assertEqual(len(search_soundcloud('korean indie', 1, runner_for(self.entries()))), 1)
+
+    def test_offset_moves_the_window(self):
+        first, scanned = collect('soundcloud', 'korean indie', 1, 0, runner=runner_for(self.entries()))
+        second, _ = collect('soundcloud', 'korean indie', 1, 1, runner=runner_for(self.entries()))
+
+        self.assertEqual(scanned, 1)
+        self.assertNotEqual(first[0]['track_key'], second[0]['track_key'])
+
+    def test_scanned_shrinks_at_the_end_of_the_source(self):
+        """검색이 주는 결과에 한계가 있어 깊이 들어가면 구간이 짧아진다. 그게 끝 신호다."""
+        window, scanned = collect('soundcloud', 'korean indie', 5, 1, runner=runner_for(self.entries()))
+
+        self.assertEqual(len(window), 1)
+        self.assertLess(scanned, 5)
 
 
 class CollectTest(unittest.TestCase):

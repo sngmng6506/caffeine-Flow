@@ -81,10 +81,11 @@ main { width: min(1120px, calc(100% - 40px)); margin: 0 auto 48px; }
 }
 .strip label { display: inline-flex; align-items: center; gap: 6px; }
 .strip .spacer { margin-left: auto; }
-.strip select, .strip button {
+.strip select, .strip button, .strip input[type=text], .strip #collectQuery {
   padding: 4px 7px; color: var(--ink); background: var(--sheet);
   border: 1px solid var(--rule-hard); border-radius: 6px;
 }
+.strip #collectQuery { width: 180px; }
 .strip .toggle input { margin: 0; accent-color: var(--primary); }
 .message { padding: 70px 20px; color: var(--ink-2); text-align: center; }
 

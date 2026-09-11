@@ -37,17 +37,30 @@ describe('최신곡 수집 요청', () => {
     expect((await ask({ source: 'apple_kr', limit: 999 })).status).toBe(400);
   });
 
-  it('수집 소스가 아닌 플랫폼은 거절한다', async () => {
-    // SoundCloud는 인기 차트 경로가 404라 순위로 긁을 수 없어 소스에서 빠져 있다.
-    // 옛 클라이언트가 보내면 조용히 실패하지 않고 400으로 끝난다.
+  it('검색 소스는 검색어가 있어야 하고 순위 소스는 받지 않는다', async () => {
     expect((await ask({ source: 'soundcloud' })).status).toBe(400);
+    expect((await ask({ source: 'soundcloud', query: '   ' })).status).toBe(400);
+
+    const searched = await ask({ source: 'soundcloud', query: '  korean indie  ' });
+    expect(searched.status).toBe(201);
+    expect(searched.body.discovery.query).toBe('korean indie');
+
+    // 순위 소스에 검색어를 보내도 저장하지 않는다.
+    const ranked = await ask({ source: 'apple_kr', query: 'lo-fi' });
+    expect(ranked.status).toBe(201);
+    expect(ranked.body.discovery.query).toBeNull();
   });
 
-  it('검색어를 보내도 저장하지 않는다', async () => {
-    const created = await ask({ source: 'musicbrainz_kr', query: 'lo-fi' });
+  it('같은 소스라도 검색어가 다르면 진도가 따로 남는다', async () => {
+    // 커서 기본키가 (source, query_key)다. 검색어를 바꿔 가며 훑을 수 있어야 한다.
+    await db('music_source_cursors').insert([
+      { source: 'soundcloud', query_key: 'korean indie', next_offset: 40 },
+      { source: 'soundcloud', query_key: '홍대', next_offset: 0 },
+    ]);
+    await ask({ source: 'soundcloud', query: 'korean indie' });
+    const claimed = await request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
 
-    expect(created.status).toBe(201);
-    expect(created.body.discovery.query).toBeNull();
+    expect(claimed.body.offset).toBe(40);
   });
 
   it('같은 소스의 대기 요청이 있으면 새로 쌓지 않는다', async () => {

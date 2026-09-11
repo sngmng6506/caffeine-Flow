@@ -4,7 +4,8 @@ const crypto = require('node:crypto');
 const jobs = require('./jobs');
 const window = require('./discovery-window');
 const {
-  DISCOVERY_SOURCES, DISCOVERY_MAX_LIMIT, DISCOVERY_LEASE_MINUTES, DISCOVERY_MAX_ATTEMPTS,
+  DISCOVERY_SOURCES, QUERY_SOURCES, DISCOVERY_MAX_LIMIT, DISCOVERY_LEASE_MINUTES,
+  DISCOVERY_MAX_ATTEMPTS,
 } = require('../../constants/audio-discovery');
 
 const conflict = () => Object.assign(new Error('수집 요청이 이미 바뀌었습니다'), { status: 409 });
@@ -15,13 +16,14 @@ function validateRequest({ source, query, limit }) {
       && (typeof query !== 'string' || query.length > 200)) {
     return { error: '검색어가 올바르지 않습니다' };
   }
-  // 모든 소스가 인기·발매 순서를 그대로 훑는다. 검색어로 장르를 좁히면 거절해야 할
-  // 곡이 표본에서 빠져 필터가 거절을 배우지 못한다.
+  // 검색 소스는 검색어가 있어야 한다. 순위·발매 소스는 검색어를 쓰지 않는다.
+  const needsQuery = QUERY_SOURCES.includes(source);
+  if (needsQuery && !query?.trim()) return { error: '이 소스에는 검색어가 필요합니다' };
   const count = limit === undefined ? 20 : limit;
   if (!Number.isSafeInteger(count) || count < 1 || count > DISCOVERY_MAX_LIMIT) {
     return { error: `수집 개수는 1에서 ${DISCOVERY_MAX_LIMIT} 사이여야 합니다` };
   }
-  return { value: { source, query: null, requested_limit: count } };
+  return { value: { source, query: needsQuery ? query.trim() : null, requested_limit: count } };
 }
 
 async function request(input) {
