@@ -186,7 +186,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/admin/audio-runs/:id` | 🛡 | 실행별 전체 원본 JSON. lease 토큰 제외, 수정 API 없음 |
 | POST | `/admin/audio-labels/:id/requeue` | 🛡 | generation을 비교해 실패 재시도·완료곡 재분석 등록. 처리 중은 409, Spotify는 400 |
 | POST | `/admin/audio-labels/requeue-rejected` | 🛡 | 사람이 틀림으로 표시한 곡을 한 번에 재분석 큐에 등록. 처리 중과 자동 분석 미지원 플랫폼은 건너뜀. `{dry_run:true}`면 큐를 건드리지 않고 대상 건수만 반환. `{eligible, requeued}` 반환 |
-| POST | `/admin/audio-labels/:id/renormalize` | 🛡 | generation, analysis_id, analysis_revision을 비교해 원본에 현재 택소노미 적용. 원본·사람 라벨 보존 |
+| POST | `/admin/audio-labels/:id/renormalize` | 🛡 | generation, analysis_id, analysis_revision을 비교해 원본에 현재 택소노미 적용. 원본·사람 라벨 보존. 라벨링 Lab에 버튼은 없고 API로만 호출한다 |
 | PUT | `/admin/audio-labels/:id/review` | 🛡 | 작업 ID에 해당하는 곡의 라벨 확인·수정. 매장 정책 판단 불필요 |
 | GET | `/admin/audio-discoveries` | 🛡 | 최근 최신곡 수집 요청 목록 |
 | POST | `/admin/audio-discoveries` | 🛡 | 수집 요청. body는 `{ source, query?, limit? }`. 같은 소스가 대기 중이면 기존 요청을 200으로 돌려준다 |

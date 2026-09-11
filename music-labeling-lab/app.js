@@ -254,7 +254,6 @@ function renderItem() {
   renderSummary();
   const item = items[currentIndex];
   $('requeueAudio').disabled = !item || ['processing', 'queued', 'unsupported'].includes(item.job_status);
-  $('renormalizeAudio').disabled = !item || item.job_status !== 'completed' || !item.audio_analysis?.latest_run_id;
   if (!item) {
     $('reviewCard').hidden = true;
     $('message').hidden = false;
@@ -470,19 +469,17 @@ $('loadMaestRaw').addEventListener('click', async () => {
   }
 });
 
-for (const [buttonId, action] of [['requeueAudio', 'requeue'], ['renormalizeAudio', 'renormalize']]) {
-  $(buttonId).addEventListener('click', async () => {
-    const item = items[currentIndex];
-    if (!item) return;
-    $(buttonId).disabled = true;
-    try {
-      const { ok, data } = await api('POST', `/admin/audio-labels/${item.id}/${action}`, {
-        generation: item.generation, analysis_id: item.audio_analysis?.id,
-        analysis_revision: item.audio_analysis?.revision,
-      });
-      if (!ok) throw new Error(data.error || '처리하지 못했습니다');
-      showAlert('');
-      await loadPage(currentOffset);
-    } catch (error) { showAlert(error.message); renderItem(); }
-  });
-}
+$('requeueAudio').addEventListener('click', async () => {
+  const item = items[currentIndex];
+  if (!item) return;
+  $('requeueAudio').disabled = true;
+  try {
+    const { ok, data } = await api('POST', `/admin/audio-labels/${item.id}/requeue`, {
+      generation: item.generation, analysis_id: item.audio_analysis?.id,
+      analysis_revision: item.audio_analysis?.revision,
+    });
+    if (!ok) throw new Error(data.error || '처리하지 못했습니다');
+    showAlert('');
+    await loadPage(currentOffset);
+  } catch (error) { showAlert(error.message); renderItem(); }
+});
