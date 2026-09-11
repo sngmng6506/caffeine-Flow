@@ -1,4 +1,5 @@
 const db = require('../../db/knex');
+const { SUSPICION_SQL, REVIEWABLE_SQL, reasons } = require('./suspicion');
 const conflict = () => Object.assign(new Error('새 분석 또는 수정이 있습니다. 목록을 새로 불러와주세요.'), { status: 409 });
 
 function baseQuery() {
@@ -26,6 +27,11 @@ async function list({ view = 'unreviewed', offset = 0 }) {
   if (view === 'reviewed') query.modify(reviewed);
   if (view === 'unreviewed') query.modify(unreviewed);
   if (view === 'ready') query.modify(unreviewed).where('job.status', 'completed').whereNotNull('annotation.id');
+  // 판정 가능한 곡만 모아 틀렸을 법한 순서로 본다. 범위는 'ready'와 같고 순서만 다르다.
+  if (view === 'suspicious') {
+    query.modify(unreviewed).where('job.status', 'completed').whereNotNull('annotation.id')
+      .whereRaw(REVIEWABLE_SQL);
+  }
   if (view === 'inaccurate') query.modify(rejected);
   const [total, done, rows] = await Promise.all([
     db('music_audio_jobs').count('* as count').first(),
@@ -33,9 +39,13 @@ async function list({ view = 'unreviewed', offset = 0 }) {
     query.select('job.id', 'job.platform', 'job.track_key as video_id', 'job.title',
       'job.artist_name as channel_title', 'job.generation', 'job.available_at', 'job.attempts', 'job.status as job_status', 'job.error_code', 'job.created_at',
       db.raw('to_jsonb(annotation) as track_annotation'), db.raw('to_jsonb(analysis) as audio_analysis'))
+      // 의심 점수는 페이지 안에서만 정렬하면 뒤 페이지의 진짜 의심 곡이 영영 안 보인다.
+      .modify((q) => { if (view === 'suspicious') q.orderByRaw(`${SUSPICION_SQL} DESC`); })
       .orderBy('job.created_at', 'desc').orderBy('job.id', 'desc').offset(offset).limit(51),
   ]);
-  return { decisions: rows.slice(0, 50), offset, has_more: rows.length > 50,
+  // 왜 위로 왔는지를 행마다 붙인다. 순서와 같은 규칙에서 나온다.
+  const decisions = rows.slice(0, 50).map((row) => ({ ...row, review_reasons: reasons(row) }));
+  return { decisions, offset, has_more: rows.length > 50,
     next_offset: rows.length > 50 ? offset + 50 : null,
     summary: { total: Number(total.count), reviewed: Number(done.count), unreviewed: Number(total.count) - Number(done.count) } };
 }

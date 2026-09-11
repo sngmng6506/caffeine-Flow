@@ -11,6 +11,7 @@ export default defineConfig({
       'tests/audio-analysis.test.mjs',
       'tests/audio-prompt-styles.test.mjs',
       'tests/audio-query-build.test.mjs',
+      'tests/audio-suspicion.test.mjs',
       'tests/audio-worker-constants.test.mjs',
       'tests/discovery-window.test.mjs',
       'tests/api-docs.test.mjs',

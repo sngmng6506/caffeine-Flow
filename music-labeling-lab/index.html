@@ -24,6 +24,7 @@
       <div class='strip'>
         <label>보기
           <select id='viewFilter'>
+            <option value='suspicious'>의심스러운 순</option>
             <option value='ready'>검토할 자동 라벨</option>
             <option value='unreviewed'>미검토 전체 · 대기/실패 포함</option>
             <option value='inaccurate'>틀림 판정</option>
@@ -77,6 +78,7 @@
           </p>
           <h2 id='trackTitle'></h2>
           <p class='credit'><span id='trackArtist'></span><span id='artistFlag'></span></p>
+          <p id='reviewReasons' class='reasons' hidden></p>
           <a id='trackLink' class='listen' target='_blank' rel='noopener noreferrer'>▶ 곡 듣기</a>
         </section>
 

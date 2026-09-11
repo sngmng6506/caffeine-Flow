@@ -168,7 +168,7 @@ function trackUrl(item) {
 
 // 판정하면 그 곡이 조건에서 빠지는 보기. 앞에서부터 다시 읽어야 한다.
 function isQueueView() {
-  return ['unreviewed', 'ready', 'inaccurate'].includes($('viewFilter').value);
+  return ['unreviewed', 'ready', 'suspicious', 'inaccurate'].includes($('viewFilter').value);
 }
 
 function renderSummary() {
@@ -258,10 +258,13 @@ function renderItem() {
   if (!item) {
     $('reviewCard').hidden = true;
     $('message').hidden = false;
+    const emptyByView = {
+      inaccurate: '틀림·애매로 판정한 곡이 없습니다.',
+      suspicious: '판정할 서술이 있는 미검토 곡이 없습니다.',
+    };
     $('message').textContent = isQueueView()
-      ? ($('viewFilter').value === 'inaccurate'
-        ? '틀림·애매로 판정한 곡이 없습니다.'
-        : '현재 검토할 항목이 없습니다. 새로고침으로 분석 진행 상태를 확인하세요.')
+      ? (emptyByView[$('viewFilter').value]
+        || '현재 검토할 항목이 없습니다. 새로고침으로 분석 진행 상태를 확인하세요.')
       : '표시할 곡이 없습니다.';
     $('position').textContent = '0건';
     return;
@@ -279,6 +282,11 @@ function renderItem() {
   const collected = item.channel_title;
   $('artistFlag').innerHTML = collected && artist && collected !== artist
     ? `<span class='mismatch'>수집 이름 · ${escapeHtml(collected)}</span>` : '';
+  // 왜 이 곡이 위로 왔는지. 정렬과 같은 규칙에서 서버가 만들어 보낸 것을 그대로 쓴다.
+  const why = item.review_reasons || [];
+  $('reviewReasons').hidden = why.length === 0;
+  $('reviewReasons').innerHTML = why
+    .map((reason) => `<span class='reason'>${escapeHtml(reason.text)}</span>`).join('');
   $('platform').textContent = `${item.platform || '플랫폼 미상'} · ${item.video_id || ''}`.trim();
   $('checkedAt').textContent = `등록 ${formatDateTime(item.created_at)}`;
   $('trackLink').href = url || '#';

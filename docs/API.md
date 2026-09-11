@@ -181,7 +181,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/audio-analysis/discoveries/claim` | 워커 | 대기 중인 수집 요청 1건을 20분 lease로 획득. 없으면 204 |
 | POST | `/audio-analysis/discoveries/:id/complete` | 워커 | `lease_token`과 `tracks[]` 제출. 곡을 분석 큐에 등록하고 중복은 무시한다 |
 | POST | `/audio-analysis/discoveries/:id/fail` | 워커 | `lease_token`, `error_code` 제출. 최대 3회 재시도 |
-| GET | `/admin/audio-labels` | 🛡 | 모든 신청곡을 플랫폼·곡별 중복 제거해 조회. `view=ready|unreviewed|inaccurate|reviewed|all`, `offset`, 50건. `inaccurate`는 사람이 틀림으로 판정한 곡만(이미 저장된 옛 `unclear` 판정도 함께 보여준다). 작업 상태도 반환 |
+| GET | `/admin/audio-labels` | 🛡 | 모든 신청곡을 플랫폼·곡별 중복 제거해 조회. `view=suspicious|ready|unreviewed|inaccurate|reviewed|all`, `offset`, 50건. `inaccurate`는 사람이 틀림으로 판정한 곡만(이미 저장된 옛 `unclear` 판정도 함께 보여준다). `suspicious`는 `ready` 범위에서 서술이 있는 곡만 서술이 틀렸을 법한 순으로 정렬한다. 작업 상태와 정렬 사유(`review_reasons`)도 반환 |
 | GET | `/admin/audio-labels/:id/runs` | 🛡 | 해당 곡의 최근 원본 이력 ID·시각 최대 100건 |
 | GET | `/admin/audio-runs/:id` | 🛡 | 실행별 전체 원본 JSON. lease 토큰 제외, 수정 API 없음 |
 | POST | `/admin/audio-labels/:id/requeue` | 🛡 | generation을 비교해 실패 재시도·완료곡 재분석 등록. 처리 중은 409, Spotify는 400 |
