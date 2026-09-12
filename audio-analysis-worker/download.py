@@ -23,6 +23,23 @@ class DownloadError(RuntimeError):
 DIAGNOSTIC_MAX = 300
 
 
+# 다시 받아도 결과가 같은 실패. 재시도 코드(DOWNLOAD_FAILED)로 두면 서버가 계속
+# queued로 되돌려 6시간마다 같은 곡을 다시 받는다. 그런 곡이 몇 개만 쌓여도 워커가
+# 연속 실패로 휴지에 들어가 멀쩡한 곡이 밀린다 — 2026-09-12에
+# 'This video is unavailable' 9곡이 큐를 막았다.
+SOURCE_GONE = (
+    'video has been removed', 'removed by the uploader',
+    'video is private', 'private video',
+    'video is unavailable', 'video unavailable', 'no longer available',
+    'has been terminated',
+    'this track was not found', 'copyright claim',
+    # 지역 차단은 이 미니PC에서 몇 번을 받아도 같은 결과다. yt-dlp가 여러 문장으로
+    # 알리므로("...has not made this video available in your country",
+    # "...has blocked it in your country") 공통 조각으로 잡는다.
+    'in your country',
+)
+
+
 def error_hint(error):
     """왜 실패했는지 한 줄로 요약한다. 저널에만 남는다.
 
@@ -50,8 +67,7 @@ def classify_error(error):
             'certificate_verify_failed', 'ffmpeg not found', 'ffprobe not found',
             'ffprobe and ffmpeg not found', 'sign in to confirm', 'http error 429')):
         return 'DOWNLOAD_INFRASTRUCTURE'
-    if any(v in message for v in ('video has been removed', 'video is private',
-                                 'private video', 'this track was not found', 'copyright claim')):
+    if any(v in message for v in SOURCE_GONE):
         return 'SOURCE_UNAVAILABLE'
     return 'DOWNLOAD_FAILED'
 

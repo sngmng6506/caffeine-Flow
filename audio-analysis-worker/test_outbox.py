@@ -8,6 +8,11 @@ from unittest.mock import patch
 import outbox
 from remote_worker import process
 from download import classify_error, error_hint
+
+
+def remote_worker_cooldown_seconds():
+    import remote_worker
+    return remote_worker.CONTRACT['retry']['cooldown_seconds']
 import subprocess
 
 
@@ -110,6 +115,76 @@ class OutboxTest(unittest.TestCase):
         self.assertEqual(classify_error(subprocess.CalledProcessError(1, [], stderr=b'HTTP Error 429')), 'DOWNLOAD_INFRASTRUCTURE')
         self.assertEqual(classify_error(subprocess.CalledProcessError(1, [], stderr=b'Private video')), 'SOURCE_UNAVAILABLE')
         self.assertEqual(classify_error(subprocess.TimeoutExpired([], 30)), 'DOWNLOAD_FAILED')
+
+    def test_gone_sources_are_permanent_not_retried(self):
+        """다시 받아도 같은 결과인 실패를 재시도 코드로 두면 6시간마다 되돌아와 큐를 막는다."""
+        for message in (b'ERROR: [youtube] abc: This video is unavailable',
+                        b'ERROR: [youtube] abc: Video unavailable',
+                        b'This video is no longer available',
+                        b'removed by the uploader',
+                        b'account associated with this video has been terminated',
+                        b'uploader has not made this video available in your country'):
+            with self.subTest(message=message):
+                self.assertEqual(
+                    classify_error(subprocess.CalledProcessError(1, [], stderr=message)),
+                    'SOURCE_UNAVAILABLE')
+
+    def _run_worker(self, error_code, claim_limit=6):
+        """워커 루프를 claim_limit번 돌리고 각 claim 시각을 돌려준다."""
+        import sys
+        import signal
+        import remote_worker
+        with tempfile.TemporaryDirectory() as root:
+            config = self.config(root)
+            config.dry_run = False
+            config.model_dir = root
+            config.poll_interval_ms = 1000
+            clock = [0]
+            handlers = {}
+            claims = []
+
+            def sleep(seconds): clock[0] += seconds
+
+            def call(_config, path, _payload):
+                if not path.endswith('/jobs/claim'):
+                    return None
+                claims.append(clock[0])
+                if len(claims) == claim_limit:
+                    handlers[signal.SIGTERM](None, None)
+                    return None
+                return {'id': 'job'}
+
+            fake = SimpleNamespace(TensorflowPredictMAEST=True)
+            with patch.object(remote_worker, 'WorkerConfig', return_value=SimpleNamespace(require=lambda: config)), \
+                 patch.object(remote_worker, 'verify_tag_model'), \
+                 patch.object(remote_worker, 'acquire_lock', return_value=SimpleNamespace(close=lambda: None)), \
+                 patch.object(remote_worker.signal, 'signal', side_effect=lambda sig, handler: handlers.update({sig: handler})), \
+                 patch.object(remote_worker.time, 'monotonic', side_effect=lambda: clock[0]), \
+                 patch.object(remote_worker.time, 'sleep', side_effect=sleep), \
+                 patch.object(remote_worker, 'api', side_effect=call), \
+                 patch.object(remote_worker, 'process', return_value={'status': 'failed', 'error_code': error_code}), \
+                 patch.object(remote_worker, 'log'), \
+                 patch.dict(sys.modules, {'essentia': SimpleNamespace(standard=fake), 'essentia.standard': fake}):
+                remote_worker.main()
+            return claims
+
+    def test_permanent_failures_do_not_pause_the_queue(self):
+        """영구 실패는 기다린다고 나아지지 않는다. 연속 실패로 세면 그런 곡 몇 개가
+        워커를 내내 휴지 상태로 만들어 멀쩡한 곡이 밀린다."""
+        claims = self._run_worker('SOURCE_UNAVAILABLE')
+
+        cooldown = remote_worker_cooldown_seconds()
+        gaps = [b - a for a, b in zip(claims, claims[1:])]
+        self.assertTrue(gaps, '루프가 여러 번 돌아야 간격을 잴 수 있다')
+        self.assertTrue(all(gap < cooldown for gap in gaps), f'휴지 없이 이어져야 한다: {gaps}')
+
+    def test_repeated_temporary_failures_still_pause(self):
+        """다시 해 보면 될 수도 있는 실패는 몰아치면 쉬어야 한다."""
+        claims = self._run_worker('DOWNLOAD_FAILED')
+
+        cooldown = remote_worker_cooldown_seconds()
+        gaps = [b - a for a, b in zip(claims, claims[1:])]
+        self.assertTrue(any(gap >= cooldown for gap in gaps), f'3연속 실패 뒤에는 쉬어야 한다: {gaps}')
 
     def test_worker_pauses_claims_during_shared_failure(self):
         import sys

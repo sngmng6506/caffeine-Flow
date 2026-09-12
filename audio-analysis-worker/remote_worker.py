@@ -136,8 +136,15 @@ def main():
                 if job:
                     result = process(job, config)
                     log('info', 'remote_job_finished', job_id=job['id'], status=result.get('status', 'completed'), error_code=result.get('error_code'))
-                    failures = failures + 1 if result.get('error_code') else 0
-                    if failures >= 3 or result.get('error_code') in CONTRACT['retry']['infrastructure_codes']:
+                    code = result.get('error_code')
+                    # 쉬는 것은 다시 해 보면 될 수도 있는 실패에만 의미가 있다. 영구 실패는
+                    # 기다린다고 나아지지 않고, 그런 곡이 몇 개만 있어도 연속 실패로 세면
+                    # 워커가 내내 휴지 상태가 되어 멀쩡한 곡이 밀린다.
+                    if not code:
+                        failures = 0
+                    elif code not in CONTRACT['retry']['permanent_codes']:
+                        failures += 1
+                    if failures >= 3 or code in CONTRACT['retry']['infrastructure_codes']:
                         retry_after = time.monotonic() + CONTRACT['retry']['cooldown_seconds']
                         log('warning', 'remote_worker_cooldown', consecutive_failures=failures)
                     continue
