@@ -33,6 +33,12 @@ jobs:
       - name: Lint
         run: npm run lint
         working-directory: server
+      # 운영자 화면은 브라우저에서 돌아 server 설정의 기준 경로 밖이다.
+      # 린트 대상이 아니던 시절 `advanceAfterReview` 미정의가 배포까지 갔다.
+      - name: Install lab lint deps
+        run: npm ci
+      - name: Lint operator labs
+        run: npm run lint:labs
       - name: Unit + integration tests
         run: npm test
         working-directory: server

@@ -21,7 +21,7 @@ async function api(method, path, body) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await res.text();
-  let data = {};
+  let data;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
   return { ok: res.ok, status: res.status, data };
 }

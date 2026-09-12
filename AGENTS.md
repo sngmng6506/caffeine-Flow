@@ -63,6 +63,7 @@
 ## 검증 명령
 
 ```bash
+npm run lint:labs                    # 운영자 화면(브라우저) — 루트에서 실행
 npm run lint --prefix server
 npm run test:unit --prefix server
 npm test --prefix server
