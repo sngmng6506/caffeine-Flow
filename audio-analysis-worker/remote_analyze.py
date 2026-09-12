@@ -72,8 +72,13 @@ def run(audio, job, output, models=None, report=None):
         except AudioLLMError:
             return None
 
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = None
+    # `with ThreadPoolExecutor(...)`를 쓰지 않는다. 블록을 빠져나갈 때 wait=True로
+    # 스레드를 join하므로, CPU 분석이 터져도 3단이 끝날 때까지(ffmpeg 구간 추출
+    # 4회 + API 대기) 예외가 부모에게 가지 못한다. 그 합이 자식 제한 600초를 넘어
+    # 실제 원인이 시간 초과로 덮인다.
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = None
+    try:
         if job.get('audio_llm_enabled', True) and os.environ.get('OPENROUTER_API_KEY', '').strip():
             future = executor.submit(describe_independently)
         with measure(report, 'decode_16000'):
@@ -85,6 +90,12 @@ def run(audio, job, output, models=None, report=None):
             raw = predict(audio, model_dir, audio=shared, **kwargs)
         with measure(report, 'audio_llm_wait'):
             audio_llm_raw = future.result() if future is not None else None
+    except BaseException:
+        # 아직 시작하지 않은 호출은 취소하고, 이미 나간 호출은 기다리지 않고 던진다.
+        # 남은 스레드는 부모가 이 자식을 폐기하면서 함께 정리한다.
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise
+    executor.shutdown(wait=True)
     normalized = normalize(raw, features=features)
     sources_used = [MODEL_VERSION]
     if normalized['mood'] is not None:
