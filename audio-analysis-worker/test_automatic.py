@@ -10,6 +10,24 @@ from emotion import estimate_valence_arousal
 
 
 class AutomaticTest(unittest.TestCase):
+    def test_persistent_analysis_submits_without_local_metrics(self):
+        paths, calls = [], []
+        def download(_platform, _key, directory):
+            audio = directory / 'audio.wav'
+            audio.write_bytes(b'audio')
+            paths.append(audio)
+            return audio
+        def analyze(audio, job, output):
+            self.assertNotIn('lease_token', job)
+            output.write_text(json.dumps({'result': {}, 'maest_run': {}}))
+        result = process({'id': 'job', 'platform': 'youtube', 'track_key': 'abcdefghijk',
+                          'artist_name': 'artist', 'lease_token': 'lease'}, None,
+                         downloader=download, analyzer=SimpleNamespace(analyze=analyze),
+                         call=lambda _, path, body: calls.append((path, body)) or {'status': 'completed'})
+        self.assertEqual(result['status'], 'completed')
+        self.assertEqual(set(calls[0][1]), {'result', 'maest_run', 'lease_token'})
+        self.assertFalse(paths[0].exists())
+
     def test_platform_urls_only(self):
         self.assertIn('youtube.com', source_url('youtube', 'abcdefghijk'))
         self.assertEqual(source_url('soundcloud', 'https://soundcloud.com/artist/track?x=1'), 'https://soundcloud.com/artist/track')

@@ -48,15 +48,19 @@ def load_audio(audio_path):
     return standard.MonoLoader(filename=str(audio_path), sampleRate=SAMPLE_RATE, resampleQuality=SETTINGS['resample_quality'])()
 
 
-def predict(audio_path, model_dir, audio=None):
+def load_predictor(model_dir):
     path = verify_tag_model(model_dir)
+    import essentia.standard as standard
+    return standard.TensorflowPredictMAEST(graphFilename=str(path), output=OUTPUT,
+                patchSize=PATCH_SIZE, patchHopSize=PATCH_HOP, batchSize=SETTINGS['batch_size'], lastPatchMode=SETTINGS['last_patch_mode'])
+
+
+def predict(audio_path, model_dir, audio=None, predictor=None):
     try:
         import essentia
-        import essentia.standard as standard
         if audio is None:
             audio = load_audio(audio_path)
-        model = standard.TensorflowPredictMAEST(graphFilename=str(path), output=OUTPUT,
-                    patchSize=PATCH_SIZE, patchHopSize=PATCH_HOP, batchSize=SETTINGS['batch_size'], lastPatchMode=SETTINGS['last_patch_mode'])
+        model = predictor if predictor is not None else load_predictor(model_dir)
         raw = summarize(model(audio), len(audio) / SAMPLE_RATE)
         raw['essentia_version'] = essentia.__version__
         return raw

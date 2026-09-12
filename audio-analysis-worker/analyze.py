@@ -11,6 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import numpy as np
+from timing import measure
 
 from emotion import (
     EMOTION_MODEL_NAME,
@@ -49,7 +50,7 @@ def mean_spectral_centroid(audio, sample_rate, standard):
     return float(np.mean(values)) if values else None
 
 
-def analyze_audio(path, emotion_predictor=None, audio_16k=None):
+def analyze_audio(path, emotion_predictor=None, audio_16k=None, report=None):
     try:
         import essentia
         import essentia.standard as standard
@@ -59,17 +60,24 @@ def analyze_audio(path, emotion_predictor=None, audio_16k=None):
             "python -m pip install -r requirements.txt를 실행하세요."
         ) from error
 
-    audio = standard.MonoLoader(filename=str(path), sampleRate=SAMPLE_RATE)()
+    with measure(report, 'decode_44100'):
+        audio = standard.MonoLoader(filename=str(path), sampleRate=SAMPLE_RATE)()
     duration = len(audio) / SAMPLE_RATE
     if duration < 10:
         raise ValueError("분석 음원은 10초 이상이어야 합니다.")
 
-    bpm, _beats, beat_confidence, _estimates, _intervals = standard.RhythmExtractor2013(
-        method="multifeature"
-    )(audio)
-    key, scale, key_strength = standard.KeyExtractor(profileType="edma")(audio)
-    danceability, _dfa = standard.Danceability()(audio)
-    dynamic_complexity, loudness = standard.DynamicComplexity()(audio)
+    with measure(report, 'rhythm'):
+        bpm, _beats, beat_confidence, _estimates, _intervals = standard.RhythmExtractor2013(
+            method="multifeature"
+        )(audio)
+    with measure(report, 'key'):
+        key, scale, key_strength = standard.KeyExtractor(profileType="edma")(audio)
+    with measure(report, 'danceability'):
+        danceability, _dfa = standard.Danceability()(audio)
+    with measure(report, 'dynamics'):
+        dynamic_complexity, loudness = standard.DynamicComplexity()(audio)
+    with measure(report, 'spectral_centroid'):
+        spectral_centroid = mean_spectral_centroid(audio, SAMPLE_RATE, standard)
 
     features = {
         "duration_seconds": finite_or_none(duration),
@@ -83,7 +91,7 @@ def analyze_audio(path, emotion_predictor=None, audio_16k=None):
         "loudness_db": finite_or_none(loudness),
         "dynamic_complexity": finite_or_none(dynamic_complexity),
         "spectral_centroid_hz": finite_or_none(
-            mean_spectral_centroid(audio, SAMPLE_RATE, standard)
+            spectral_centroid
         ),
         "energy": finite_or_none(float(np.mean(np.square(audio)))),
         # 감정값은 별도 라이선스의 회귀 모델을 명시적으로 켰을 때만 채운다.
@@ -99,7 +107,8 @@ def analyze_audio(path, emotion_predictor=None, audio_16k=None):
             audio_16k = standard.MonoLoader(
                 filename=str(path), sampleRate=EMOTION_SAMPLE_RATE
             )()
-        emotion = estimate_valence_arousal(audio_16k, emotion_predictor)
+        with measure(report, 'emotion'):
+            emotion = estimate_valence_arousal(audio_16k, emotion_predictor)
         if emotion:
             features["valence"] = emotion["valence"]
             features["arousal"] = emotion["arousal"]

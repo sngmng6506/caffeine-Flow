@@ -142,6 +142,41 @@ class MoodNormalizeTest(unittest.TestCase):
 
 
 class PipelineModeTest(unittest.TestCase):
+    def test_llm_overlaps_cpu_and_failure_preserves_maest(self):
+        import tempfile, wave, os, threading
+        from pathlib import Path
+        import remote_analyze
+        from audio_llm import AudioLLMError
+        started, cpu_done = threading.Event(), threading.Event()
+        raw = summarize(np.zeros((1, 519)), 20)
+        raw['essentia_version'] = 'test'
+
+        def describe(*args):
+            started.set()
+            if not cpu_done.wait(3):
+                raise AssertionError('CPU 분석과 겹쳐 실행되어야 한다')
+            raise AudioLLMError('unavailable')
+
+        def predict(*args, **kwargs):
+            self.assertTrue(started.wait(3))
+            cpu_done.set()
+            return raw
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / 'input.wav'
+            with wave.open(str(audio), 'wb') as output:
+                output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
+                output.writeframes(b'\0\0' * 16000 * 20)
+            with patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test'}), \
+                 patch.object(remote_analyze, 'load_emotion_predictor', side_effect=EmotionModelError()), \
+                 patch.object(remote_analyze, 'analyze_audio', return_value=({'duration_seconds': 20}, 'test')), \
+                 patch.object(remote_analyze, 'predict', side_effect=predict), \
+                 patch.object(remote_analyze, 'describe', side_effect=describe):
+                result = remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
+                    'artist_name': 'unknown'}, Path(directory) / 'result.json')
+            self.assertIsNone(result['maest_run']['audio_llm_raw'])
+            self.assertEqual(result['maest_run']['maest_raw'], raw)
+
     def test_mode_reflects_which_stages_ran(self):
         from remote_analyze import pipeline_mode
         mood = {'valence': 0.5, 'arousal': 0.5}

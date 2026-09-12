@@ -12,9 +12,11 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from discover import DiscoveryError, collect
 from download import download_audio, DownloadError, error_hint
-from maest import verify_tag_model, CONTRACT
+from maest import CONTRACT
 import outbox
 from worker import WorkerConfig, ensure_queue_dirs, acquire_lock, log
+from analysis_process import AnalysisProcess
+from timing import measure
 
 
 def api(config, path, body):
@@ -32,12 +34,13 @@ def submit(config, job, endpoint, payload, call):
     return outbox.deliver(path, config, call)
 
 
-def process(job, config, call=api, downloader=download_audio, runner=subprocess.run):
+def process(job, config, call=api, downloader=download_audio, runner=subprocess.run, analyzer=None):
     # 실패·성공 어느 쪽에서도 임시 음원을 삭제한다. 원본을 결과 서버에 보내지 않는다.
     with tempfile.TemporaryDirectory(prefix='cf-audio-') as directory:
         root = Path(directory)
         try:
-            audio = downloader(job['platform'], job['track_key'], root)
+            with measure(lambda fields: log('info', 'audio_stage_finished', job_id=job['id'], **fields), 'download'):
+                audio = downloader(job['platform'], job['track_key'], root)
         except DownloadError as error:
             code = str(error)
             # 분류 코드만으로는 같은 곡이 왜 계속 실패하는지 알 수 없다. 원인 줄은
@@ -56,19 +59,23 @@ def process(job, config, call=api, downloader=download_audio, runner=subprocess.
             'audio_llm_prompt': job.get('audio_llm_prompt'),
         }))
         try:
-            completed = runner([sys.executable, str(Path(__file__).with_name('remote_analyze.py')),
+            if analyzer is not None:
+                analyzer.analyze(audio, json.loads(job_file.read_text()), output)
+            else:
+                completed = runner([sys.executable, str(Path(__file__).with_name('remote_analyze.py')),
                                 str(audio), str(job_file), str(output)],
                                capture_output=True, timeout=600, check=False,
                                env={k: v for k, v in os.environ.items() if k not in ('AUDIO_ANALYSIS_WORKER_TOKEN', 'DISCORD_AUDIO_WEBHOOK_URL')})
-            if completed.returncode:
-                raise RuntimeError('MODEL_UNAVAILABLE' if completed.returncode == 3 else 'ANALYSIS_FAILED')
+                if completed.returncode:
+                    raise RuntimeError('MODEL_UNAVAILABLE' if completed.returncode == 3 else 'ANALYSIS_FAILED')
             payload = json.loads(output.read_text())
-        except (subprocess.SubprocessError, OSError, ValueError, RuntimeError) as error:
+        except (subprocess.SubprocessError, OSError, EOFError, ValueError, RuntimeError) as error:
             code = 'MODEL_UNAVAILABLE' if str(error) == 'MODEL_UNAVAILABLE' else 'ANALYSIS_FAILED'
             result = submit(config, job, f"/jobs/{job['id']}/fail", {'lease_token': job['lease_token'], 'error_code': code}, call)
             return {**(result or {}), 'error_code': code}
         payload['lease_token'] = job['lease_token']
-        return submit(config, job, f"/jobs/{job['id']}/complete", payload, call)
+        with measure(lambda fields: log('info', 'audio_stage_finished', job_id=job['id'], **fields), 'submit'):
+            return submit(config, job, f"/jobs/{job['id']}/complete", payload, call)
 
 
 def run_discovery(config, collector=collect):
@@ -109,7 +116,8 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     log('info', 'remote_worker_started')
-    models_ready = False
+    current_job = None
+    analyzer = AnalysisProcess(lambda fields: log('info', 'audio_stage_finished', job_id=current_job, **fields))
     failures = 0
     retry_after = 0
     try:
@@ -122,19 +130,21 @@ def main():
                     # 재시도로는 빠져나올 수 없어 옆으로 치운 결과다. 조용히 넘기면
                     # 그 곡이 왜 다시 분석되는지 알 수 없다.
                     log('warning', 'outbox_quarantined', **entry)
-                if not models_ready:
+                if analyzer.process is None or not analyzer.process.is_alive():
                     # 전송함 복구는 모델 설치 여부와 독립적이다. 검증 실패 중에는 새 작업을 받지 않는다.
-                    verify_tag_model(config.model_dir)
-                    import essentia.standard as standard
-                    if not hasattr(standard, 'TensorflowPredictMAEST'):
-                        raise RuntimeError('requirements-tensorflow.txt 설치가 필요합니다')
-                    models_ready = True
+                    analyzer.start()
                 # 분석 큐가 비었을 때만 수집을 본다. 신청곡 처리가 항상 먼저다.
                 job = api(config, '/jobs/claim', {})
                 if not job and running and run_discovery(config):
                     continue
                 if job:
-                    result = process(job, config)
+                    current_job = job['id']
+                    started = time.monotonic()
+                    try:
+                        result = process(job, config, analyzer=analyzer)
+                    finally:
+                        log('info', 'remote_job_elapsed', job_id=job['id'], elapsed_seconds=round(time.monotonic() - started, 4))
+                        current_job = None
                     log('info', 'remote_job_finished', job_id=job['id'], status=result.get('status', 'completed'), error_code=result.get('error_code'))
                     code = result.get('error_code')
                     # 쉬는 것은 다시 해 보면 될 수도 있는 실패에만 의미가 있다. 영구 실패는
@@ -153,6 +163,7 @@ def main():
                 retry_after = time.monotonic() + CONTRACT['retry']['cooldown_seconds']
             time.sleep(config.poll_interval_ms / 1000)
     finally:
+        analyzer.close()
         lock.close()
 
 

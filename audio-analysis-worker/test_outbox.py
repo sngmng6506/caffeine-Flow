@@ -156,7 +156,7 @@ class OutboxTest(unittest.TestCase):
 
             fake = SimpleNamespace(TensorflowPredictMAEST=True)
             with patch.object(remote_worker, 'WorkerConfig', return_value=SimpleNamespace(require=lambda: config)), \
-                 patch.object(remote_worker, 'verify_tag_model'), \
+                 patch.object(remote_worker, 'AnalysisProcess'), \
                  patch.object(remote_worker, 'acquire_lock', return_value=SimpleNamespace(close=lambda: None)), \
                  patch.object(remote_worker.signal, 'signal', side_effect=lambda sig, handler: handlers.update({sig: handler})), \
                  patch.object(remote_worker.time, 'monotonic', side_effect=lambda: clock[0]), \
@@ -210,7 +210,7 @@ class OutboxTest(unittest.TestCase):
                 return {'id': 'job'}
             fake = SimpleNamespace(TensorflowPredictMAEST=True)
             with patch.object(remote_worker, 'WorkerConfig', return_value=SimpleNamespace(require=lambda: config)), \
-                 patch.object(remote_worker, 'verify_tag_model'), \
+                 patch.object(remote_worker, 'AnalysisProcess'), \
                  patch.object(remote_worker, 'acquire_lock', return_value=SimpleNamespace(close=lambda: None)), \
                  patch.object(remote_worker.signal, 'signal', side_effect=lambda sig, handler: handlers.update({sig: handler})), \
                  patch.object(remote_worker.time, 'monotonic', side_effect=lambda: clock[0]), \
