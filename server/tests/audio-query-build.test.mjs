@@ -10,6 +10,7 @@ const runs = (await import('../src/features/audio-analysis/runs.js')).default;
 const normalization = (await import('../src/features/audio-analysis/normalization.js')).default;
 const contract = (await import('../src/constants/audio-pipeline.json', { with: { type: 'json' } })).default;
 const metadata = (await import('../src/constants/maest-metadata.json', { with: { type: 'json' } })).default;
+const { DISCOVERY_SOURCES: sources } = (await import('../src/constants/audio-discovery.js')).default;
 
 const knex = Knex({ client: 'pg' });
 const sql = () => jobs.rejectedJobsQuery(knex).toString();
@@ -88,5 +89,40 @@ describe('음향 분석 조회', () => {
     const source = readFileSync(new URL('../src/features/music-filter/track-analysis.js', import.meta.url), 'utf8');
     expect(source).toContain('.timeout(LOOKUP_TIMEOUT_MS)');
     expect(source).not.toContain('cancel: true');
+  });
+});
+
+// 소스 이름을 바꿀 때마다 쓰는 곳을 하나씩 빠뜨렸다. 통합 테스트와 Lab은 Postgres나
+// 브라우저가 있어야 돌아 로컬에서 건너뛰기 쉬운데, 이름이 안 맞으면 서버가 400을
+// 내고 그때서야 드러난다. 이름 대조는 DB 없이 할 수 있다.
+describe('수집 소스 이름', () => {
+  const read = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
+
+  it('Lab 드롭다운이 상수와 같은 값을 쓴다', () => {
+    const html = read('music-labeling-lab/index.html');
+    const picked = [...html.matchAll(/<option value='([a-z_]+)'>/g)].map((m) => m[1]);
+    const collect = picked.filter((v) => sources.includes(v) || v.includes('_'));
+    for (const source of sources) {
+      expect(collect, `${source}가 Lab에 없다`).toContain(source);
+    }
+  });
+
+  it('워커가 모든 소스를 처리한다', () => {
+    const worker = read('audio-analysis-worker/discover.py');
+    for (const source of sources) {
+      expect(worker, `discover.py가 ${source}를 모른다`).toContain(`'${source}'`);
+    }
+  });
+
+  it('통합 테스트가 상수에 없는 소스로 성공을 기대하지 않는다', () => {
+    // 이름을 바꾸면 validateRequest가 400을 내고, 그 실패는 Postgres가 있어야
+    // 드러난다. 400을 기대하는 줄은 일부러 잘못된 이름을 쓰므로 뺀다.
+    const integration = read('server/tests/audio-discovery.test.mjs');
+    const happy = integration.split('\n')
+      .filter((line) => !line.includes('toBe(400)'))
+      .flatMap((line) => [...line.matchAll(/source: '([a-z_]+)'/g)].map((m) => m[1]));
+    for (const source of new Set(happy)) {
+      expect(sources, `${source}는 DISCOVERY_SOURCES에 없다`).toContain(source);
+    }
   });
 });

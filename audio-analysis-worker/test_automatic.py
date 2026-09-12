@@ -49,10 +49,17 @@ class AutomaticTest(unittest.TestCase):
         self.assertTrue(calls[0][0].endswith('/fail'))
 
     def test_timeout_is_sanitized(self):
+        # runner를 주입한다. download.subprocess.run을 patch해도 기본 인자는 def
+        # 시점에 묶여 있어 probe_duration이 실제 yt-dlp를 부른다 — 테스트가 망을
+        # 타면 느리고, 바깥 세상이 바뀌면 코드와 무관하게 깨진다.
         import tempfile
-        with tempfile.TemporaryDirectory() as directory, patch('download.subprocess.run', side_effect=subprocess.TimeoutExpired('private-url', 300)):
+
+        def timing_out(*args, **kwargs):
+            raise subprocess.TimeoutExpired('private-url', 300)
+
+        with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(DownloadError, '^DOWNLOAD_FAILED$'):
-                download_audio('youtube', 'abcdefghijk', directory)
+                download_audio('youtube', 'abcdefghijk', directory, runner=timing_out)
 
 
 if __name__ == '__main__': unittest.main()

@@ -28,13 +28,13 @@ afterAll(async () => {
 describe('최신곡 수집 요청', () => {
   it('운영자 인증이 없으면 만들 수 없다', async () => {
     expect((await request(app).post('/api/v1/admin/audio-discoveries')
-      .send({ source: 'apple_kr' })).status).toBe(401);
+      .send({ source: 'apple_global' })).status).toBe(401);
   });
 
   it('알 수 없는 소스와 범위를 벗어난 개수는 거절한다', async () => {
     expect((await ask({ source: 'spotify' })).status).toBe(400);
-    expect((await ask({ source: 'apple_kr', limit: 0 })).status).toBe(400);
-    expect((await ask({ source: 'apple_kr', limit: 999 })).status).toBe(400);
+    expect((await ask({ source: 'apple_global', limit: 0 })).status).toBe(400);
+    expect((await ask({ source: 'apple_global', limit: 999 })).status).toBe(400);
   });
 
   it('수집 소스가 아닌 플랫폼은 거절한다', async () => {
@@ -51,10 +51,10 @@ describe('최신곡 수집 요청', () => {
   });
 
   it('같은 소스의 대기 요청이 있으면 새로 쌓지 않는다', async () => {
-    const first = await ask({ source: 'apple_kr', limit: 5 });
+    const first = await ask({ source: 'apple_global', limit: 5 });
     expect(first.status).toBe(201);
 
-    const second = await ask({ source: 'apple_kr', limit: 5 });
+    const second = await ask({ source: 'apple_global', limit: 5 });
 
     expect(second.status).toBe(200);
     expect(second.body.already).toBe(true);
@@ -62,7 +62,7 @@ describe('최신곡 수집 요청', () => {
   });
 
   it('워커가 가져가 곡을 제출하면 분석 큐에 들어간다', async () => {
-    await ask({ source: 'apple_kr', limit: 5 });
+    await ask({ source: 'apple_global', limit: 5 });
     const claimed = await request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
     expect(claimed.status).toBe(200);
     expect(claimed.body.status).toBe('processing');
@@ -90,7 +90,7 @@ describe('최신곡 수집 요청', () => {
   });
 
   it('잘못된 곡 목록과 만료된 lease는 거절한다', async () => {
-    await ask({ source: 'apple_kr', limit: 5 });
+    await ask({ source: 'apple_global', limit: 5 });
     const claimed = await request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
     const send = (body) => request(app)
       .post(`/api/v1/audio-analysis/discoveries/${claimed.body.id}/complete`).set(worker()).send(body);
@@ -102,7 +102,7 @@ describe('최신곡 수집 요청', () => {
   });
 
   it('실패를 보고하면 재시도로 돌아간다', async () => {
-    await ask({ source: 'apple_kr', limit: 5 });
+    await ask({ source: 'apple_global', limit: 5 });
     const claimed = await request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
 
     const failed = await request(app)
@@ -117,7 +117,7 @@ describe('최신곡 수집 요청', () => {
 
 // 순위 소스(Apple·SoundCloud)는 날짜가 아니라 offset으로 진도를 잡는다. 소스를 끝까지
 // 보면 0으로 돌아가 그 사이 바뀐 차트를 다시 본다.
-it.each(['apple_kr'])('%s는 요청마다 다음 구간을 보고 끝나면 처음으로 돌아간다', async (source) => {
+it.each(['apple_global'])('%s는 요청마다 다음 구간을 보고 끝나면 처음으로 돌아간다', async (source) => {
   const claim = () => request(app).post('/api/v1/audio-analysis/discoveries/claim').set(worker());
   const finish = (job, scanned) => request(app)
     .post(`/api/v1/audio-analysis/discoveries/${job.id}/complete`).set(worker())

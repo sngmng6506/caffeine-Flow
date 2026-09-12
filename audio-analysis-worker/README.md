@@ -131,12 +131,15 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 
 | 소스 | 가져오는 것 | 분석하는 음원 |
 | --- | --- | --- |
-| `apple_kr` | Apple 인기곡 차트의 아티스트·곡명을 YouTube에서 찾아 등록 | YouTube |
+| `apple_global` | Apple 인기곡 차트의 아티스트·곡명을 YouTube에서 찾아 등록. 나라를 돌아가며 본다(10개국 × 100곡) | YouTube |
 | `musicbrainz_kr` | 한국 발매 곡을 날짜 구간으로 조회해 YouTube에서 찾아 등록 | YouTube |
+| `soundcloud_trending` | 장르별 인기 플레이리스트를 돈다(20장르 × 50곡). 곡 URL이 곧 track_key라 검색을 거치지 않는다 | SoundCloud |
 
 **어느 소스도 장르나 검색어로 좁히지 않는다.** 수집의 목적은 카페에 어울리는 곡을 모으는 것이 아니라 필터가 판단할 곡을 모으는 것이다. 장르를 골라 긁으면 거절해야 할 곡이 표본에서 빠져 필터가 거절을 배우지 못한다.
 
-SoundCloud는 수집 소스가 아니다. 순위로 긁을 경로가 없기 때문이며 경위는 [ROADMAP](../docs/ROADMAP.md)에 있다. SoundCloud 음원은 손님이 신청한 링크로만 분석 큐에 들어온다.
+Apple 피드는 국가 코드가 필수라 전 세계 통합 차트가 없다(`global`·`ww` 모두 500). SoundCloud는 국가별 인기 차트 API가 죽었고 지역 필터도 사라져 한국으로 한정할 수 없다 — 대신 장르가 갈려 있어 장르 다양성을 채운다. 실측 경위는 [ROADMAP](../docs/ROADMAP.md)에 있다.
+
+한 구간(한 나라·한 장르)이 바닥나도 `scanned`를 요청량보다 작게 보고하지 않는다. 서버가 그것을 "소스를 끝까지 봤다"로 읽어 커서를 0으로 되감으면 영영 첫 구간만 본다.
 
 `musicbrainz_kr`은 곡(recording) 단위로 조회한다. 릴리스(앨범) 단위로 검색하면 YouTube에서 풀앨범 업로드가 잡힌다. MusicBrainz가 주는 곡 길이로 매칭 결과를 검증해 동명이인과 앨범 전체를 거른다.
 
