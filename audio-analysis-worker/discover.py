@@ -219,6 +219,11 @@ def collect_soundcloud(offset, limit, opener=urllib.request.urlopen):
     for row in fetch_soundcloud_tracks(wanted, client_id, opener):
         url = row.get('permalink_url')
         duration = round((row.get('duration') or 0) / 1000)
+        # Go+ 전용 트랙은 policy가 SNIP이고 30초 미리듣기만 준다. 받으려 하면
+        # yt-dlp가 "This video is DRM protected"를 낸다 — DRM 우회는 지원하지
+        # 않으므로 영원히 받을 수 없다. 큐에 넣지 않는 것이 유일한 해결이다.
+        if row.get('policy') != 'ALLOW':
+            continue
         # 믹스·DJ 셋을 길이로 거른다. 한도를 벗어난 곡을 큐에 넣으면 워커가 받아서
         # 곧바로 영구 실패시키는 낭비가 생긴다.
         if not url or not MIN_DURATION <= duration <= MAX_DURATION:

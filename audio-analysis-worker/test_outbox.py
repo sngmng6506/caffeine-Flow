@@ -110,6 +110,13 @@ class OutboxTest(unittest.TestCase):
         self.assertEqual(len(error_hint(subprocess.CalledProcessError(
             1, [], stderr=('ERROR: ' + 'x' * 900).encode()))), 300)
 
+    def test_drm_is_permanent(self):
+        # DRM 우회는 지원하지 않는다. 재시도로는 절대 성공하지 못하므로 일시 장애로
+        # 두면 워커가 그 곡을 영원히 다시 집어간다.
+        error = subprocess.CalledProcessError(
+            1, [], stderr=b'ERROR: [soundcloud] 123: This video is DRM protected')
+        self.assertEqual(classify_error(error), 'SOURCE_UNAVAILABLE')
+
     def test_download_error_classes(self):
         self.assertEqual(classify_error(FileNotFoundError()), 'DOWNLOAD_INFRASTRUCTURE')
         self.assertEqual(classify_error(subprocess.CalledProcessError(1, [], stderr=b'HTTP Error 429')), 'DOWNLOAD_INFRASTRUCTURE')

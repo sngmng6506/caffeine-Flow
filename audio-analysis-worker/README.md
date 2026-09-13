@@ -133,7 +133,7 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 | --- | --- | --- |
 | `apple_global` | Apple 인기곡 차트의 아티스트·곡명을 YouTube에서 찾아 등록. 나라를 돌아가며 본다(10개국 × 100곡) | YouTube |
 | `musicbrainz_kr` | 한국 발매 곡을 날짜 구간으로 조회해 YouTube에서 찾아 등록 | YouTube |
-| `soundcloud_trending` | 장르별 인기 플레이리스트를 돈다(20장르 × 50곡). 곡 URL이 곧 track_key라 검색을 거치지 않는다 | SoundCloud |
+| `soundcloud_trending` | 장르별 인기 플레이리스트를 돈다(20장르 × 50곡). 곡 URL이 곧 track_key라 검색을 거치지 않는다. `policy != ALLOW`(Go+ 전용)와 길이 한도 밖은 큐에 넣지 않는다 | SoundCloud |
 
 **어느 소스도 장르나 검색어로 좁히지 않는다.** 수집의 목적은 카페에 어울리는 곡을 모으는 것이 아니라 필터가 판단할 곡을 모으는 것이다. 장르를 골라 긁으면 거절해야 할 곡이 표본에서 빠져 필터가 거절을 배우지 못한다.
 

@@ -33,6 +33,8 @@ SOURCE_GONE = (
     'video is unavailable', 'video unavailable', 'no longer available',
     'has been terminated',
     'this track was not found', 'copyright claim',
+    # DRM 우회는 지원하지 않는다(가드레일). SoundCloud Go+ 전용 트랙이 여기 걸린다.
+    'drm protected',
     # 지역 차단은 이 미니PC에서 몇 번을 받아도 같은 결과다. yt-dlp가 여러 문장으로
     # 알리므로("...has not made this video available in your country",
     # "...has blocked it in your country") 공통 조각으로 잡는다.

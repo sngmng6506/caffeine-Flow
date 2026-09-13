@@ -124,7 +124,8 @@ class CollectTest(unittest.TestCase):
         genres = [{'title': 'Trap', 'track_ids': list(range(100, 150))},
                   {'title': 'Pop', 'track_ids': list(range(200, 250))}]
         rows = lambda ids: [{'permalink_url': f'https://soundcloud.com/u/t{i}', 'title': f'곡{i}',
-                             'duration': 200000, 'user': {'username': 'uploader'}} for i in ids]
+                             'duration': 200000, 'policy': 'ALLOW',
+                             'user': {'username': 'uploader'}} for i in ids]
         with patch.object(discover, '_soundcloud_client_id', return_value='cid'), \
              patch.object(discover, 'fetch_soundcloud_genres', return_value=genres), \
              patch.object(discover, 'fetch_soundcloud_tracks', side_effect=lambda ids, *a: rows(ids)):
@@ -137,12 +138,33 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(set(t['track_key'] for t in first) & set(t['track_key'] for t in second), set())
         self.assertTrue(first[0]['track_key'].startswith('https://soundcloud.com/'))
 
+    def test_soundcloud_drops_drm_tracks(self):
+        # Go+ 전용 트랙은 policy=SNIP이고 30초 미리듣기만 준다. 받으려 하면 yt-dlp가
+        # "This video is DRM protected"를 내고, DRM 우회는 지원하지 않으므로 영원히
+        # 받을 수 없다. 실제로 7곡이 28회 재시도되며 워커를 휴지에 묶어 놨다.
+        genres = [{'title': 'Trap', 'track_ids': [1, 2, 3]}]
+        rows = [
+            {'permalink_url': 'https://soundcloud.com/u/ok', 'title': '받을 수 있는 곡',
+             'duration': 200000, 'policy': 'ALLOW', 'user': {'username': 'u'}},
+            {'permalink_url': 'https://soundcloud.com/u/go', 'title': 'Go+ 전용',
+             'duration': 30000, 'policy': 'SNIP', 'user': {'username': 'u'}},
+            {'permalink_url': 'https://soundcloud.com/u/blocked', 'title': '차단',
+             'duration': 200000, 'policy': 'BLOCK', 'user': {'username': 'u'}},
+        ]
+        with patch.object(discover, '_soundcloud_client_id', return_value='cid'), \
+             patch.object(discover, 'fetch_soundcloud_genres', return_value=genres), \
+             patch.object(discover, 'fetch_soundcloud_tracks', return_value=rows):
+            tracks, scanned = collect('soundcloud_trending', None, 5, offset=0)
+
+        self.assertEqual([t['title'] for t in tracks], ['받을 수 있는 곡'])
+        self.assertEqual(scanned, 3, '훑은 개수에는 뺀 곡도 포함한다')
+
     def test_soundcloud_drops_mixes_by_length(self):
         genres = [{'title': 'Trap', 'track_ids': [1, 2]}]
         rows = [{'permalink_url': 'https://soundcloud.com/u/ok', 'title': '곡', 'duration': 200000,
-                 'user': {'username': 'u'}},
+                 'policy': 'ALLOW', 'user': {'username': 'u'}},
                 {'permalink_url': 'https://soundcloud.com/u/mix', 'title': 'DJ 셋', 'duration': 3600000,
-                 'user': {'username': 'u'}}]
+                 'policy': 'ALLOW', 'user': {'username': 'u'}}]
         with patch.object(discover, '_soundcloud_client_id', return_value='cid'), \
              patch.object(discover, 'fetch_soundcloud_genres', return_value=genres), \
              patch.object(discover, 'fetch_soundcloud_tracks', return_value=rows):
