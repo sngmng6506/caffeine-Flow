@@ -58,7 +58,8 @@ class PromptTest(unittest.TestCase):
         parts = messages[1]['content']
 
         self.assertEqual([p['type'] for p in parts], ['text', 'input_audio', 'input_audio'])
-        self.assertEqual(parts[1]['input_audio']['format'], 'wav')
+        # 무압축 wav는 4구간에 base64 4.9MB, mp3 24kbps는 0.46MB다. 품질은 같았다.
+        self.assertEqual(parts[1]['input_audio']['format'], 'mp3')
 
 
 class ParseResponseTest(unittest.TestCase):
@@ -87,6 +88,20 @@ class ParseResponseTest(unittest.TestCase):
 
         self.assertEqual(parsed['mood'][:2], ['a', 'b'])
         self.assertLessEqual(len(parsed['mood']), 12)
+
+
+class ExtractClipTest(unittest.TestCase):
+    def test_mp3로_뽑는다(self):
+        seen = {}
+
+        def runner(command, **kwargs):
+            seen['command'] = command
+            return SimpleNamespace(stdout=b'ID3data')
+
+        audio_llm.extract_clip('/tmp/a.wav', {'start_sec': 0, 'duration_sec': 30}, runner=runner)
+        self.assertIn('-f', seen['command'])
+        self.assertEqual(seen['command'][seen['command'].index('-f') + 1], 'mp3')
+        self.assertIn('24k', seen['command'], '비트레이트를 지정해야 크기가 예측된다')
 
 
 class DescribeTest(unittest.TestCase):

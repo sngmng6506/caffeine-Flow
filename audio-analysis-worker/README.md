@@ -186,7 +186,7 @@ HTTP 응답에서는 401·503이 토큰 설정, 404가 서버 배포 버전, 413
 - **임베딩 벡터를 텍스트로 넣지 않는다.** LLM에는 오디오 자체를 준다.
 - **택소노미를 주지 않는다.** 자유 서술로 받고 정규화는 나중에 한다.
 
-곡 전체를 고르게 나눠 `AUDIO_LLM_SEGMENTS`개 구간을 `AUDIO_LLM_CLIP_SEC`초씩 16kHz 모노 wav로 잘라 보낸다. 인트로만 듣지 않으며 마지막 구간은 곡 끝에 닿는다. 원본에는 모델 ID, 프롬프트 버전, 샘플 구간, 입력 파일 해시를 함께 남겨 재현할 수 있게 한다.
+곡 전체를 고르게 나눠 `AUDIO_LLM_SEGMENTS`개 구간을 `AUDIO_LLM_CLIP_SEC`초씩 16kHz 모노 **24kbps mp3**로 잘라 보낸다. 무압축 wav는 4구간에 base64 4.9MB인데 mp3는 0.46MB다 — 같은 곡으로 나란히 호출해 서술·악기·구간 구조가 모두 유지되는 것을 확인했다. 호출 시간은 3회 측정에서 wav 18.8~22.2초, mp3 17.1~22.1초로 각자의 편차가 차이보다 커 유의미한 속도 이득은 확인되지 않았다. 줄어드는 것은 업로드 대역이며 같은 회선을 CafeStudy ADB 워커가 함께 쓴다. 인트로만 듣지 않으며 마지막 구간은 곡 끝에 닿는다. 원본에는 모델 ID, 프롬프트 버전, 샘플 구간, 입력 파일 해시를 함께 남겨 재현할 수 있게 한다.
 
 프롬프트 버전은 기본 문장이면 `audio-llm-1`, 운영자가 고쳤으면 `custom-<sha256 앞 12자>`다. 서버(`settings.promptVersion`)와 워커(`audio_llm.resolve_prompt`)가 같은 규칙으로 만든다. 본문은 실행 결과에 넣지 않는다 — 곡마다 같은 문장이 복제되기 때문이다. 대신 `audio_prompt_revisions`에 추가만 되고 DB trigger가 수정·삭제를 막으므로, 옛 서술의 `prompt_version`으로 당시 문장을 되짚을 수 있다.
 
@@ -194,7 +194,7 @@ HTTP 응답에서는 401·503이 토큰 설정, 404가 서버 배포 버전, 413
 
 3단이 실패해도 1단 결과는 그대로 저장하고 `audio_llm_raw`만 null로 남는다.
 
-실측(3~4분 곡, `google/gemini-2.5-pro`, 4구간 × 30초): 곡당 **$0.023**, LLM 호출 지연 약 9초. 구간을 16kHz 모노로 자르면 요청 하나가 5MB 안팎이다. 비용을 줄이려면 `AUDIO_LLM_MODEL`을 `google/gemini-2.5-flash`로 바꾸거나 `AUDIO_LLM_SEGMENTS`·`AUDIO_LLM_CLIP_SEC`을 줄인다. 대량 재분석에는 `:batch` 변형이 절반 가격이다.
+실측(3~4분 곡, `google/gemini-2.5-pro`, 4구간 × 30초): 곡당 **$0.023**. 호출 지연은 워커가 쉴 때 약 20초, 큐가 도는 중 중앙값 90초로 변동이 크다 — 로컬 처리(ffmpeg 추출·base64)는 0.07초라 거의 전부 OpenRouter 왕복이다. 비용을 줄이려면 `AUDIO_LLM_MODEL`을 `google/gemini-2.5-flash`로 바꾸거나 `AUDIO_LLM_SEGMENTS`·`AUDIO_LLM_CLIP_SEC`을 줄인다. 대량 재분석에는 `:batch` 변형이 절반 가격이다.
 
 `pipeline_mode`는 실제로 돈 단계를 가리킨다.
 

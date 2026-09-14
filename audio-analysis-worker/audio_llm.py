@@ -27,8 +27,15 @@ DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 DEFAULT_SEGMENTS = 4
 DEFAULT_CLIP_SEC = 30
 DEFAULT_TIMEOUT_SEC = 180
-# 구간을 16kHz 모노 wav로 잘라 보낸다. 곡 전체를 보내면 요금과 지연이 함께 커진다.
+# 구간만 잘라 보낸다. 곡 전체를 보내면 요금과 지연이 함께 커진다.
 CLIP_SAMPLE_RATE = 16000
+# 16kHz 모노 무압축 wav는 30초에 938KB, 4구간이면 base64로 4.9MB다. 24kbps mp3로
+# 같은 구간이 0.46MB가 된다 — 열 배다. 같은 곡으로 wav와 나란히 호출해 서술·악기·
+# 구간 구조가 모두 유지되는 것을 확인했다(호출 시간은 OpenRouter 쪽 변동에 묻혀
+# 유의미한 차이가 없었다). 줄어드는 것은 이 미니PC의 업로드 대역이며, 같은 회선을
+# CafeStudy ADB 워커가 함께 쓴다.
+CLIP_CODEC = 'mp3'
+CLIP_BITRATE = '24k'
 MAX_TEXT = 4000
 MAX_ITEMS = 12
 MAX_ITEM_TEXT = 120
@@ -90,10 +97,11 @@ def plan_segments(duration_sec, count=DEFAULT_SEGMENTS, clip_sec=DEFAULT_CLIP_SE
 
 
 def extract_clip(audio_path, segment, ffmpeg='ffmpeg', runner=subprocess.run):
-    """구간 하나를 16kHz 모노 wav 바이트로 잘라낸다."""
+    """구간 하나를 16kHz 모노 mp3 바이트로 잘라낸다."""
     command = [ffmpeg, '-nostdin', '-loglevel', 'error', '-ss', str(segment['start_sec']),
                '-t', str(segment['duration_sec']), '-i', str(audio_path),
-               '-ac', '1', '-ar', str(CLIP_SAMPLE_RATE), '-f', 'wav', 'pipe:1']
+               '-ac', '1', '-ar', str(CLIP_SAMPLE_RATE), '-b:a', CLIP_BITRATE,
+               '-f', CLIP_CODEC, 'pipe:1']
     try:
         completed = runner(command, capture_output=True, timeout=120, check=True)
     except (subprocess.SubprocessError, OSError) as error:
@@ -109,7 +117,7 @@ def build_messages(clips, system_prompt=None):
     for clip in clips:
         content.append({
             'type': 'input_audio',
-            'input_audio': {'data': base64.b64encode(clip).decode('ascii'), 'format': 'wav'},
+            'input_audio': {'data': base64.b64encode(clip).decode('ascii'), 'format': CLIP_CODEC},
         })
     return [{'role': 'system', 'content': system_prompt or SYSTEM_PROMPT},
             {'role': 'user', 'content': content}]
@@ -206,6 +214,7 @@ def describe(audio_path, duration_sec, audio_sha256, config,
         'prompt_version': prompt_version,
         'segments': segments,
         'clip_sample_rate': CLIP_SAMPLE_RATE,
+        'clip_codec': CLIP_CODEC,
         'input_sha256': audio_sha256,
         'created_at': datetime.now(timezone.utc).isoformat(),
         **({'usage': usage} if usage else {}),
