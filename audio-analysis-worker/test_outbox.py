@@ -18,7 +18,9 @@ import subprocess
 
 class OutboxTest(unittest.TestCase):
     def config(self, root):
-        return SimpleNamespace(root=Path(root), server_url='https://example.test')
+        # webhook을 비워 두면 시작 알림이 발송을 건너뛴다. 테스트가 망을 타지 않는다.
+        return SimpleNamespace(root=Path(root), server_url='https://example.test',
+                               discord_webhook_url='')
 
     def test_completed_analysis_survives_outage_and_restart(self):
         with tempfile.TemporaryDirectory() as root:
