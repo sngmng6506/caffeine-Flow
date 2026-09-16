@@ -20,6 +20,7 @@ import subprocess
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+from timing import measure
 
 PROMPT_VERSION = 'audio-llm-1'
 DEFAULT_MODEL = 'google/gemini-2.5-pro'
@@ -196,16 +197,21 @@ def call_openrouter(messages, config, opener=urllib.request.urlopen):
 
 
 def describe(audio_path, duration_sec, audio_sha256, config,
-             opener=urllib.request.urlopen, runner=subprocess.run):
+             opener=urllib.request.urlopen, runner=subprocess.run, report=None):
     """구간을 잘라 LLM에 넘기고 보존할 원본을 만든다."""
     segments = plan_segments(duration_sec, config.get('segments', DEFAULT_SEGMENTS),
                              config.get('clip_sec', DEFAULT_CLIP_SEC))
     if not segments:
         raise AudioLLMError('샘플 구간을 만들 수 없습니다')
-    clips = [extract_clip(audio_path, segment, config.get('ffmpeg', 'ffmpeg'), runner)
-             for segment in segments]
+    with measure(report, 'audio_llm_clip_extract'):
+        clips = [extract_clip(audio_path, segment, config.get('ffmpeg', 'ffmpeg'), runner)
+                 for segment in segments]
+    if report is not None:
+        report({'stage': 'audio_llm_payload', 'status': 'completed',
+                'clip_count': len(clips), 'audio_bytes': sum(map(len, clips))})
     system_prompt, prompt_version = resolve_prompt(config.get('prompt'))
-    data = call_openrouter(build_messages(clips, system_prompt), config, opener)
+    with measure(report, 'audio_llm_request'):
+        data = call_openrouter(build_messages(clips, system_prompt), config, opener)
     parsed = parse_response(data)
     usage = read_usage(data)
     generation_id = data.get('id') if isinstance(data.get('id'), str) else None

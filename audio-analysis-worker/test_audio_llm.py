@@ -118,6 +118,19 @@ class DescribeTest(unittest.TestCase):
         self.assertEqual(len(raw['segments']), 4)
         self.assertIn('created_at', raw)
 
+    def test_reports_clip_and_request_times_without_changing_result(self):
+        events = []
+        clip = SimpleNamespace(stdout=b'RIFFdata')
+        with patch.object(audio_llm, 'call_openrouter', return_value=response()):
+            raw = describe('/tmp/a.wav', 100, 'a' * 64,
+                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           runner=lambda *a, **k: clip, report=events.append)
+
+        self.assertEqual(raw['description'], '잔잔한 피아노가 이어진다')
+        self.assertEqual([event['stage'] for event in events],
+                         ['audio_llm_clip_extract', 'audio_llm_payload', 'audio_llm_request'])
+        self.assertEqual(events[1]['audio_bytes'], len(b'RIFFdata') * 4)
+
     def test_clip_extraction_failure_is_reported(self):
         def broken(*_args, **_kwargs):
             raise OSError('ffmpeg missing')

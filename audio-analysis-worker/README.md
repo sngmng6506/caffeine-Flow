@@ -220,6 +220,28 @@ python analyze.py ./authorized-track.wav \
 
 `--dry-run`은 제출 없이 JSON만 출력한다. `--source-reference`에는 권리를 다시 확인할 수 있는 내부 참조값을 넣고 개인정보나 시크릿을 넣지 않는다. Windows PowerShell에서는 `export` 대신 `$env:` 문법을 쓴다.
 
+## Audio LLM 처리시간 실험
+
+운영 DB와 서버 큐에 쓰지 않고 실제 한 곡으로 `4x30`, `3x15`, `3x10` 구간 전략을
+비교한다. 음원은 한 번만 내려받고 전략 순서를 반복마다 바꿔, 다운로드 편차와 첫 호출
+warm-up이 특정 전략에 유리하게 섞이지 않게 한다. 각 실행은 구간 추출, LLM 왕복,
+전체 호출 시간을 분리하며 결과 JSON에는 다운로드를 합친 예상 end-to-end P50·P90을
+남긴다.
+
+```bash
+export OPENROUTER_API_KEY='...'
+python audio-analysis-worker/benchmark_audio_llm.py \
+  --platform youtube \
+  --track-key VIDEO_ID \
+  --repeats 3 \
+  --output ./audio-llm-benchmark.json
+```
+
+`--strategies 4x30,3x15,3x10`, `--model`, `--timeout-sec`로 조건을 바꿀 수 있다.
+출력의 `estimated_end_to_end_sec`는 같은 곡에서 한 번 측정한 다운로드 시간과 해당
+Audio LLM 호출 시간을 합친 비교값이다. 실제 신청 적용 전에는 장르·길이·보컬 유무가
+다른 곡으로 반복하고 평균보다 `p90_end_to_end_sec`가 30초 안에 드는지 확인한다.
+
 추출 범위는 BPM·비트 신뢰도, 조성·장단조·조성 강도, danceability, 평균 음량, 다이내믹 복잡도, spectral centroid, energy와 이에 기반한 템포·리듬 추천이다. 분위기 추천은 Valence/Arousal이 있을 때만 만든다.
 
 ### Valence/Arousal

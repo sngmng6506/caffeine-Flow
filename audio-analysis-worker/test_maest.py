@@ -151,7 +151,7 @@ class PipelineModeTest(unittest.TestCase):
         raw = summarize(np.zeros((1, 519)), 20)
         raw['essentia_version'] = 'test'
 
-        def describe(*args):
+        def describe(*args, **kwargs):
             started.set()
             if not cpu_done.wait(3):
                 raise AssertionError('CPU 분석과 겹쳐 실행되어야 한다')

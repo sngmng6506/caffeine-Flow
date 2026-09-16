@@ -68,7 +68,7 @@ def run(audio, job, output, models=None, report=None):
         try:
             with measure(report, 'audio_llm'):
                 return describe(audio, audio_duration, audio_sha256,
-                                audio_llm_config(job.get('audio_llm_prompt')))
+                                audio_llm_config(job.get('audio_llm_prompt')), report=report)
         except AudioLLMError:
             return None
 
