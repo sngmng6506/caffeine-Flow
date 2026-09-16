@@ -151,23 +151,41 @@ def finish(job_dir, root, outcome):
     return destination
 
 
-def notify_discord(webhook_url, job_id, message, timeout=10):
-    """실패 알림. CafeStudy 워커와 같은 정책으로, 알림 실패가 작업을 죽이지 않는다."""
+def notify_discord_raw(webhook_url, content, timeout=10, **log_fields):
+    """공통 발송 함수. 알림 실패가 워커를 죽이지 않는다.
+
+    urllib의 기본 User-Agent(`Python-urllib/x.y`)는 Cloudflare가 봇으로 보고
+    403(error code 1010)으로 막는다. UA를 명시해야 실제로 전송된다.
+    """
     if not webhook_url:
         return False
-    content = f"🎧 Caffeine Flow 음향 분석 실패\njob: `{job_id}`\n원인: {message}"[:1900]
     request = Request(
         webhook_url,
-        data=json.dumps({"content": content}).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        data=json.dumps({"content": content[:1900]}).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "caffeine-audio-worker (https://github.com/sngmng6506/caffeine-Flow)",
+        },
         method="POST",
     )
     try:
         with urlopen(request, timeout=timeout):
             return True
     except (HTTPError, URLError, TimeoutError) as error:
-        log("warn", "discord_alert_failed", job_id=job_id, message=str(error)[:200])
+        log("warn", "discord_alert_failed", message=str(error)[:200], **log_fields)
         return False
+
+
+def notify_discord(webhook_url, job_id, message, timeout=10):
+    """실패 알림. CafeStudy 워커와 같은 정책으로, 알림 실패가 작업을 죽이지 않는다."""
+    content = f"🎧 Caffeine Flow 음향 분석 실패\njob: `{job_id}`\n원인: {message}"
+    return notify_discord_raw(webhook_url, content, timeout, job_id=job_id)
+
+
+def notify_discord_started(webhook_url, server_url, root, timeout=10):
+    """worker가 정상 시작해 job을 받을 준비가 됐다는 확인용 알림."""
+    content = f"✅ Caffeine Flow 음향 분석 워커 시작됨\nserver: {server_url}\nroot: {root}"
+    return notify_discord_raw(webhook_url, content, timeout)
 
 
 def process_job(job_dir, config, predictor):
@@ -267,6 +285,7 @@ def main():
         valence_arousal=predictor is not None,
         dry_run=config.dry_run,
     )
+    notify_discord_started(config.discord_webhook_url, config.server_url, config.root)
 
     running = True
 

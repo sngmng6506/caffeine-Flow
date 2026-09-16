@@ -14,7 +14,7 @@ from discover import DiscoveryError, collect
 from download import download_audio, DownloadError, error_hint
 from maest import CONTRACT
 import outbox
-from worker import WorkerConfig, ensure_queue_dirs, acquire_lock, log
+from worker import WorkerConfig, ensure_queue_dirs, acquire_lock, log, notify_discord_started
 from analysis_process import AnalysisProcess
 from timing import measure
 
@@ -116,6 +116,7 @@ def main():
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     log('info', 'remote_worker_started')
+    notify_discord_started(config.discord_webhook_url, config.server_url, config.root)
     current_job = None
     analyzer = AnalysisProcess(lambda fields: log('info', 'audio_stage_finished', job_id=current_job, **fields))
     failures = 0
