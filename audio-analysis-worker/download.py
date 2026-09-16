@@ -88,45 +88,24 @@ def source_url(platform, track_key):
     raise DownloadError('SOURCE_UNSUPPORTED')
 
 
-def probe_duration(url, runner=subprocess.run):
-    """오디오를 받기 전에 길이만 확인한다.
-
-    10분을 넘는 것은 대개 플레이리스트·믹스라 곡 단위 분석 대상이 아니다. 받아 본
-    뒤 실패로 처리하면 서버가 일시 장애로 보고 6시간마다 영원히 다시 시도한다.
-    미리 걸러 영구 실패로 보내면 그 반복이 사라진다.
-    """
-    command = [sys.executable, '-m', 'yt_dlp', '--ignore-config', '--no-playlist',
-               '--no-cache-dir', '--quiet', '--skip-download', '--socket-timeout', '20',
-               '--print', '%(duration)s|%(is_live)s', '--', url]
-    try:
-        completed = runner(command, check=True, timeout=120, capture_output=True)
-    except (subprocess.SubprocessError, OSError) as error:
-        raise DownloadError(classify_error(error)) from error
-    raw = (completed.stdout or b'')
-    if isinstance(raw, bytes):
-        raw = raw.decode('utf-8', errors='replace')
-    duration, _, live = raw.strip().partition('|')
-    if live.strip().lower() == 'true':
-        raise DownloadError('SOURCE_UNSUPPORTED')
-    try:
-        seconds = float(duration)
-    except ValueError:
-        # 길이를 못 읽는 소스가 있다. 그때는 막지 않고 받아 보되 match-filter가 다시 본다.
-        return None
-    if not MIN_DURATION <= seconds <= MAX_DURATION:
-        raise DownloadError('SOURCE_UNSUPPORTED')
-    return seconds
-
-
 def download_audio(platform, track_key, directory, runner=subprocess.run):
+    """길이 한도를 통과한 곡만 wav로 받는다.
+
+    길이·라이브 여부는 `--match-filter`가 **받기 전에** 본다. 예전에는 같은 검사를
+    `--skip-download` yt-dlp 호출로 한 번 더 했는데, 추출을 두 번 하느라 2.5초를
+    더 쓰면서 걸러내는 곡은 같았다. 신청한 사람이 기다리는 경로라 그 시간이 그대로
+    체감된다.
+
+    받는 속도를 늦추던 `--sleep-interval`도 뺐다. 워커는 한 곡을 받아 분석까지
+    끝내는 데 100초 넘게 쓰고(실측 중앙값 약 125초) 그동안 다음 곡을 받지 않으므로,
+    2~5초를 더 자는 것은 요청 지연만 늘렸다.
+    """
     url = source_url(platform, track_key)
-    probe_duration(url, runner)
     directory = Path(directory)
     command = [sys.executable, '-m', 'yt_dlp', '--ignore-config', '--no-playlist',
                '--no-cache-dir', '--no-progress', '--quiet', '--socket-timeout', '20',
                '--retries', '2', '--fragment-retries', '2', '--max-filesize', str(MAX_BYTES),
                '--match-filter', f'duration >= {MIN_DURATION} & duration <= {MAX_DURATION} & !is_live',
-               '--sleep-interval', '2', '--max-sleep-interval', '5',
                '--format', 'bestaudio/best', '--extract-audio', '--audio-format', 'wav',
                '--postprocessor-args', 'ExtractAudio+ffmpeg_o:-ac 1 -ar 16000', '--output', str(directory / 'audio.%(ext)s'),
                '--', url]
@@ -136,6 +115,13 @@ def download_audio(platform, track_key, directory, runner=subprocess.run):
         # 외부 출력은 URL 등이 포함될 수 있으므로 API에는 고정 코드만 보낸다.
         raise DownloadError(classify_error(error)) from error
     files = [p for p in directory.glob('audio.*') if p.suffix not in ('.part', '.ytdl') and p.is_file()]
+    if not files:
+        # yt-dlp가 정상 종료했는데 파일이 없으면 받기를 시작하지도 않은 것이다.
+        # 그렇게 되는 경우는 --match-filter(길이·라이브)와 --max-filesize뿐이고,
+        # 셋 다 다시 받아도 결과가 같다. DOWNLOAD_FAILED로 두면 서버가 일시 장애로
+        # 보고 6시간마다 같은 곡을 영원히 다시 시도한다 — 148분짜리 플레이리스트가
+        # 큐를 막았던 것이 이 경로다.
+        raise DownloadError('SOURCE_UNSUPPORTED')
     if len(files) != 1 or files[0].suffix != '.wav' or not 0 < files[0].stat().st_size <= MAX_BYTES:
         raise DownloadError('DOWNLOAD_FAILED')
     return files[0]

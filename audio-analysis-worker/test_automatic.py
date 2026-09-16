@@ -68,7 +68,7 @@ class AutomaticTest(unittest.TestCase):
 
     def test_timeout_is_sanitized(self):
         # runner를 주입한다. download.subprocess.run을 patch해도 기본 인자는 def
-        # 시점에 묶여 있어 probe_duration이 실제 yt-dlp를 부른다 — 테스트가 망을
+        # 시점에 묶여 있어 download_audio가 실제 yt-dlp를 부른다 — 테스트가 망을
         # 타면 느리고, 바깥 세상이 바뀌면 코드와 무관하게 깨진다.
         import tempfile
 
@@ -84,36 +84,45 @@ if __name__ == '__main__': unittest.main()
 
 
 class DurationGateTest(unittest.TestCase):
-    """10분을 넘는 곡은 받기 전에 영구 실패로 보낸다.
+    """길이 한도를 벗어난 곡은 받기 전에 영구 실패로 보낸다.
 
     받아 본 뒤 DOWNLOAD_FAILED로 처리하면 서버가 일시 장애로 보고 6시간마다
-    영원히 다시 시도한다(temporary_codes).
+    영원히 다시 시도한다(temporary_codes). 실측: 148분짜리 "케이팝 노동요"
+    플레이리스트가 큐에 있었다.
+
+    게이트는 yt-dlp의 --match-filter 하나다. 예전에는 --skip-download 호출로
+    길이를 미리 재는 단계가 앞에 하나 더 있었지만, 추출을 두 번 하느라 2.5초를
+    더 쓰면서 걸러내는 곡은 같았다.
     """
 
-    def probe(self, stdout):
-        from download import probe_duration
-        return probe_duration('https://www.youtube.com/watch?v=abcdefghijk',
-                              runner=lambda *a, **k: SimpleNamespace(stdout=stdout.encode()))
+    def filtered_run(self, directory, seen=None):
+        # yt-dlp는 --match-filter로 거른 곡을 오류 없이 넘긴다 — exit 0에 파일 없음.
+        def runner(command, **_kwargs):
+            if seen is not None:
+                seen.append(command)
+            return SimpleNamespace(stdout=b'', stderr=b'')
+        return download_audio('youtube', 'abcdefghijk', directory, runner=runner)
 
-    def test_normal_length_passes(self):
-        self.assertEqual(self.probe('186.0|False'), 186.0)
+    def test_filtered_source_is_permanently_rejected(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            # DOWNLOAD_FAILED로 떨어지면 6시간마다 영원히 재시도한다.
+            with self.assertRaisesRegex(DownloadError, '^SOURCE_UNSUPPORTED$'):
+                self.filtered_run(directory)
 
-    def test_playlist_length_is_permanently_rejected(self):
-        # 실측: 148분짜리 "케이팝 노동요" 플레이리스트가 큐에 있었다.
-        with self.assertRaisesRegex(DownloadError, '^SOURCE_UNSUPPORTED$'):
-            self.probe('8907|False')
-
-    def test_too_short_is_rejected(self):
-        with self.assertRaisesRegex(DownloadError, '^SOURCE_UNSUPPORTED$'):
-            self.probe('5|False')
-
-    def test_live_stream_is_rejected(self):
-        with self.assertRaisesRegex(DownloadError, '^SOURCE_UNSUPPORTED$'):
-            self.probe('300|True')
-
-    def test_unknown_duration_is_not_blocked_here(self):
-        # 길이를 못 읽는 소스가 있다. 막지 않고 받아 보되 match-filter가 다시 본다.
-        self.assertIsNone(self.probe('NA|False'))
+    def test_match_filter_carries_the_contract_limits(self):
+        # 게이트가 yt-dlp 인자 안으로 들어갔으므로 한도가 실제로 실리는지 본다.
+        import tempfile
+        import download
+        seen = []
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(DownloadError):
+                self.filtered_run(directory, seen)
+        command = seen[0]
+        matched = command[command.index('--match-filter') + 1]
+        self.assertIn(f'duration >= {download.MIN_DURATION}', matched)
+        self.assertIn(f'duration <= {download.MAX_DURATION}', matched)
+        self.assertIn('!is_live', matched)
 
     def test_limit_comes_from_the_shared_contract(self):
         import json
