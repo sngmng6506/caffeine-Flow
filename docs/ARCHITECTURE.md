@@ -13,8 +13,8 @@ flowchart LR
     G["손님 모바일 웹"] -->|"신청·투표·댓글"| S
     O["사장님 React/Electron"] -->|"큐 관리·재생 상태"| S
     A["플랫폼 운영자 콘솔"] -->|"카페 모니터링·관리"| S
-    S -->|"분석 작업 lease"| W["미니PC 분석 워커<br/>Essentia · MAEST"]
-    W -->|"특징값·자동 라벨만"| S
+    S -->|"분석 작업 lease"| W["미니PC 분석 워커"]
+    W -->|"특징값·모델 결과·자동 라벨"| S
 
     subgraph Railway
         S["Express + Socket.IO"] --- DB[("PostgreSQL")]
@@ -23,6 +23,7 @@ flowchart LR
     S -->|"트랙 메타데이터"| MUSIC["YouTube · SoundCloud · Spotify"]
     W -->|"임시 다운로드(원본은 서버로 보내지 않음)"| MUSIC
     S -->|"곡 심사"| LLM["OpenRouter LLM"]
+    W -->|"오디오 샘플·서술 요청"| LLM
     S -->|"사장님 로그인"| OAUTH["Google · Naver"]
 ```
 
@@ -37,8 +38,8 @@ flowchart LR
 | `owner/electron/` | 창 관리, 실제 음악 재생, 종료 감지 |
 | `admin/` | 운영자용 카페 모니터링·정지·삭제와 AI 랩 진입 |
 | `music-filter-lab/` | 모델·프롬프트별 필터 판단을 저장 없이 비교하는 운영자 UI |
-| `music-labeling-lab/` | 전체 신청곡 자동 라벨을 곡별로 빠르게 확인·수정하는 운영자 UI |
-| `audio-analysis-worker/` | 서버 큐에서 YouTube·SoundCloud 신청곡을 받아 임시 다운로드·Essentia/MAEST 분석 후 자동 라벨 저장. Spotify 미지원. 원본 전송 없음. 자동 큐는 MAEST_ONLY, 수동 CLI 감정 모델은 별도 |
+| `music-labeling-lab/` | 신청·수집곡의 자동 분석을 검토하고 재분석·수집·프롬프트를 관리하는 운영자 UI |
+| `audio-analysis-worker/` | 서버 큐의 YouTube·SoundCloud 곡을 임시 다운로드·음향 분석하고 결과 제출. 모델·선택 단계는 [워커 README](../audio-analysis-worker/README.md)가 기준. Spotify 자동 분석 미지원 |
 | `server/` | 인증, 검증, 영속화, 실시간 이벤트, 통계, AI 판단 |
 
 서버는 판단과 데이터 일관성을, Electron은 실제 외부 플랫폼 재생을 책임진다. 여러 사장님이 접속해도 서버가 카페별 재생 리더 Electron 한 대를 정한다. 리더 선출·재연결 lease·재생 시작 확인 순서는 [PLAYBACK.md](PLAYBACK.md)가 기준이다.
@@ -157,9 +158,9 @@ stateDiagram-v2
 | `recommendations` | 신청곡, 일반 상태, AI 판단, 신청·재생 시각 |
 | `music_filter_prompt_history` | 매장 분위기 설명 변경 이력. `baseline`과 `changed`를 구분 |
 | `music_filter_reviews` | AI 판단과 분리된 운영자 골드 라벨, 사유 코드, 선택적 메타데이터 충분 여부 |
-| `music_track_annotations` | 플랫폼 원본 곡별 수동 음악 특성 라벨. 정규화 아티스트 키로 참고 조회 |
+| `music_track_annotations` | 플랫폼 원본 곡별 자동·사람 최종 라벨과 검토 상태. 정규화 아티스트 키로 참고 조회 |
 | `music_audio_jobs` | 플랫폼·곡별 자동 분석 작업과 lease·재시도 상태 |
-| `music_audio_runs` | MAEST 실행별 추가 전용 원본과 입력·모델 정보 |
+| `music_audio_runs` | 실행별 추가 전용 MAEST·Audio LLM 원본과 입력·모델 정보 |
 | `music_audio_analyses` | 곡·모델 버전별 자동 음향 특징, 권리 근거, 추천 라벨과 검수 상태 |
 | `votes` | 매장·곡 단위 좋아요와 중복 방지. 신청 건이 사라져도 남는다 |
 | `comments` | 개별 신청곡 댓글 |
@@ -185,17 +186,17 @@ stateDiagram-v2
 
 ## 자동 음향 라벨링
 
-신청 저장 → 플랫폼·곡별 DB 작업 등록 → 미니PC가 lease 획득 → URL 오디오 임시 다운로드 → 기본 특징·MAEST 519 스타일 추론 → 자동 라벨/최종 라벨/작업 완료를 원자적으로 저장 → 임시 음원 삭제 → Lab에서 확인·수정한다.
+신청 저장 → 플랫폼·곡별 DB 작업 등록 → 미니PC가 lease 획득 → URL 오디오 임시 다운로드·분석 → 원본/자동 라벨/작업 완료를 원자적으로 저장 → 임시 음원 삭제 → Lab에서 검토한다. 추론 단계와 동시 실행은 [워커 README](../audio-analysis-worker/README.md#신청곡-자동-워커)가 기준이다.
 
 - `music_audio_jobs`는 기존·신규 신청 모두 포함한다. 필터 OFF/거절도 대상이며 같은 곡은 한 건이다. Spotify는 unsupported로 남긴다.
 - `music_audio_runs`는 실행별 전체 구간 점수·평균·최댓값·입력 해시·모델/전처리/매핑 버전·자동 라벨의 추가 전용 원본이다. `music_audio_analyses`는 최신 검토용 특징·자동 라벨·MAEST 요약과 latest_run_id를 유지하며 재분석 시 revision이 증가한다. `human_verdict`는 해당 최신 분석의 판정이며 새 분석 저장 시 초기화한다.
 - `music_track_annotations`는 처음 자동 라벨을 보관한다. 사람이 `맞음`으로 판정하거나 직접 고치면 label_source=human으로 보호하고 confirmed/corrected를 구분한다. `틀림` 판정은 확인만 한 라벨을 automatic으로 되돌린다. 직접 수정 이력은 `human_edited`로 별도 보존한다. 재분석은 새 원본 이력과 최신 분석을 저장하며 사람 최종 라벨을 덮어쓰지 않는다.
 - 워커는 결과를 디스크 outbox에 기록한 뒤 전송한다. 재시작 시 outbox를 먼저 복구하고 미인계 lease만 갱신한다. 오류별 지연·중단과 공통 장애 시 워커 휴지기로 무분별한 실패 소진을 막는다. 관리자 재큐잉은 generation으로 경쟁을 막으며 오래된 토큰을 폐기한다.
 - Lab의 곡 검토와 매장 정책 골드 판단은 별개다. 최종 라벨과 분석 revision을 비교해 보지 않은 결과가 검토 완료되지 않게 한다.
-- 원본 음원은 서버에 전송하지 않는다.
-- 자동 분석은 실시간 음악 필터 프롬프트에 들어간다. 판단을 돕는 재료이지 판단의 전제가 아니다 — 대부분의 곡은 첫 신청 때 아직 분석되지 않았고, 분석이 없거나 조회에 실패하면 제목·아티스트만으로 판단한다. 자세한 내용은 [LLM_FILTER.md](LLM_FILTER.md). 사람 라벨은 아직 라이브 입력·자동수락에 연결하지 않는다.
+- 원본 음원은 자체 서버에 전송하지 않는다. 외부 Audio LLM에는 샘플 구간을 보낸다.
+- 신청 필터는 이미 저장된 자동 분석만 참고하고 신규 분석 완료를 기다리지 않는다. 사전 수집한 곡은 첫 신청에도 분석이 있을 수 있다. 조회·제외·fallback 규칙은 [LLM_FILTER.md](LLM_FILTER.md)가 기준이며, 사람 라벨은 아직 라이브 입력·자동수락에 연결하지 않는다.
 
-자동 분석 모델 메타데이터·설정·택소노미는 server/src/constants의 JSON을 서버와 Python이 공유한다. 정규화 서버 검증과 Lab 재정규화는 같은 함수를 사용한다. 3단 Audio LLM의 실행 여부와 시스템 프롬프트는 `audio_pipeline_settings`가 단일 기준이며 워커는 claim 응답으로 받는다. 프롬프트 본문은 `audio_prompt_revisions`에 추가만 된다.
+자동 분석 모델 메타데이터·설정·택소노미는 server/src/constants의 JSON을 서버와 Python이 공유한다. 정규화 서버 검증과 Lab 재정규화는 같은 함수를 사용한다. 3단 Audio LLM의 실행 여부와 시스템 프롬프트 설정은 `audio_pipeline_settings`가 기준이며 워커는 claim 응답으로 받는다. 기본·사용자 프롬프트의 보존 위치는 [워커 README](../audio-analysis-worker/README.md#3단-audio-llm)를 따른다.
 
 곡 검토 완료는 모든 필드의 정답 확정을 뜻하지 않으며 reviewed_fields와 artist_confirmed로 확인 범위를 구분한다.
 

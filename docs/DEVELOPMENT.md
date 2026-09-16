@@ -18,6 +18,7 @@
 CI도 같은 이유로 `server-test`는 Node 20, `frontend-build`는 22.13.0으로 나눠 실행한다.
 
 ```bash
+npm ci                          # 운영자 Lab 린트 도구
 npm ci --prefix server
 npm ci --prefix customer
 npm ci --prefix owner
@@ -100,9 +101,9 @@ owner Vite 빌드는 `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_ENABLED`를 사용한�
 
 ## Essentia 라벨링 워커
 
-`audio-analysis-worker/`는 서버와 별도 Python 프로세스로 실행한다. 기존 로컬 CLI와 서버 작업 큐 기반 자동 워커를 제공한다. 원본 음원은 서버에 전송하지 않는다.
+`audio-analysis-worker/`는 서버와 별도 Python 프로세스로 실행한다. 기존 로컬 CLI와 서버 작업 큐 기반 자동 워커를 제공한다. 음원·외부 LLM 전송 경계는 [워커 README](../audio-analysis-worker/README.md)를 따른다.
 
-서버와 워커에 같은 `AUDIO_ANALYSIS_WORKER_TOKEN`을 설정한다. 설치·실행·환경변수는 [워커 README](../audio-analysis-worker/README.md)가 단일 기준이다.
+서버와 워커에 같은 `AUDIO_ANALYSIS_WORKER_TOKEN`을 설정한다. Railway 환경변수는 미니PC에 자동 전달되지 않는다. 서버 필터와 워커 Audio LLM은 각 실행 환경의 `OPENROUTER_API_KEY`를 읽는다. 설치·실행·환경변수는 [워커 README](../audio-analysis-worker/README.md#환경변수)가 단일 기준이다.
 
 ```bash
 python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
@@ -117,13 +118,14 @@ npm run migrate --prefix server
 npm run migrate:rollback --prefix server
 ```
 
-> 공유·운영 DB에 로컬에서 `migrate`를 실행하지 않는다. 배포 start command가 적용한다.
+> 공유·운영 DB에 로컬에서 `migrate`를 실행하지 않는다. Railway의 `preDeployCommand`가 적용한다.
 
 `up`·`down` 구현, 기존 데이터 보존 우선, UUID를 정수 PK처럼 다루지 않기, partial unique index 전 충돌 데이터 정리, 실제 PostgreSQL 스키마 검증이 기본이다. 상세 계약은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md#migration-contract)에 있다.
 
 ## 테스트·빌드
 
 ```bash
+npm run lint:labs                   # 정적 운영자 Lab ESLint (루트 의존성 필요)
 npm run lint --prefix server         # ESLint
 npm run test:unit --prefix server    # DB 비의존 테스트만
 npm test --prefix server             # 마이그레이션 포함 통합 테스트
@@ -160,7 +162,7 @@ npm run build --prefix owner
 않는다 — 기존 스타일이 이미 일관되고, 한 번 돌리면 전 파일이 diff로 뒤집혀
 리뷰가 불가능해진다. 기존 effect 의도를 검토하며 도입할 수 있도록
 `react-hooks/exhaustive-deps`만 경고이고 나머지 버그성 규칙은 오류다.
-정적 `admin`·lab 화면은 아직 린트 대상이 아니다.
+정적 `music-filter-lab`·`music-labeling-lab`은 루트 `lint:labs`로 검사한다. `admin`은 아직 린트 대상이 아니다.
 
 `test:unit`은 `vitest.unit.config.mjs`에 명시된 테스트만 실행하며 PostgreSQL에 연결하지 않는다.
 
@@ -171,7 +173,11 @@ JWT_SECRET=ci-only-secret \
 npm test --prefix server
 ```
 
-CI는 `server-test`(PostgreSQL + 린트 + 단위·통합 테스트)와 `frontend-build`(customer·owner 린트·테스트와 Vite 빌드)를 실행한다. owner 린트가 Electron 메인·preload 프로세스의 구문과 전역 사용도 함께 검사한다.
+CI 구성은 [.github/workflows/ci.yml](../.github/workflows/ci.yml)이 기준이다.
+
+- `server-test`: PostgreSQL 기반 서버 테스트·린트와 운영자 Lab 린트
+- `audio-worker-test`: Python 단위 테스트. 실제 모델·음원 다운로드·외부 LLM은 실행하지 않음
+- `frontend-build`: customer·owner 린트·테스트와 Vite 빌드. owner 린트는 Electron 메인·preload도 포함
 
 ## 서버 배포
 
@@ -281,8 +287,4 @@ server/src/db/migrations/
 owner/package.json
 ```
 
-자동 워커 설치·실행과 단계별 동작은 [워커 README](../audio-analysis-worker/README.md)를 따른다. 서버는 20260911100000_audio_review_and_discovery_pages 마이그레이션까지 배포해야 한다. 공유 DB에 로컬 migrate를 실행하지 않는다.
-
-워커 설치·서비스 등록과 실패 코드별 진단은 [워커 README](../audio-analysis-worker/README.md#실패-진단)를 따른다.
-
-서버 마이그레이션을 먼저 배포한 뒤 미니PC 저장소 전체를 갱신한다. 날짜 수집 페이지 형식은 서버와 워커를 함께 업데이트해야 한다. 구버전 워커의 수집 완료는 400으로 거절되며 날짜 진도는 보존된다. 결과 복구와 추가 시험은 [워커 README](../audio-analysis-worker/README.md#결과-보존과-장애-복구)를 따른다.
+서버 마이그레이션을 배포한 뒤 호환되는 미니PC 저장소 전체를 갱신한다. 워커 Python 파일만 복사하면 공유 JSON 계약·프롬프트가 어긋날 수 있다. 설치·진단·결과 복구는 [워커 README](../audio-analysis-worker/README.md)가 기준이다.
