@@ -16,7 +16,8 @@
 {% for part in analysis.structure %}  {{ loop.index }}) {{ part }}
 {% endfor %}{% endif %}{% if analysis.styles.length %}장르 후보: {{ analysis.styles | join(', ') }}
 {% endif %}{% if analysis.tempo %}템포: {{ analysis.tempo }}
-{% endif %}{% if analysis.energy %}밝기·활력: {{ analysis.energy }}
+{% endif %}{% if analysis.brightness %}밝기: {{ analysis.brightness }}
+{% endif %}{% if analysis.energy %}활력: {{ analysis.energy }}
 {% endif %}
 장르 후보 점수는 보정되지 않은 상대값이라 곡끼리 비교할 수 없다. 순위만 참고한다.
 분석은 제목·아티스트보다 곡의 실제 소리를 잘 나타내지만 틀릴 수 있다. 매장 분위기와

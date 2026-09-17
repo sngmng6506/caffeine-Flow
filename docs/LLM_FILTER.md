@@ -38,7 +38,7 @@
 | 3단 자유 서술 | 문장, 600자까지 |
 | 분위기·악기·보컬 | 목록, 각 8개까지 |
 | 구간별 서술 | 3단이 들은 구간 순서대로 |
-| 밝기·활력 | Valence·Arousal을 `어두움 · 격렬함`처럼 말로 바꾼 것 |
+| 밝기·활력 | Valence·Arousal을 `0.60 (0.00 어두움 ~ 1.00 밝음)`처럼 척도를 붙인 숫자로, 한 줄씩 |
 | 장르 후보·템포 | MAEST가 돌았던 옛 분석 행에만 있다. 장르는 이름만 순위대로 |
 
 현재 신청 시점 분석(`EMOTION_LLM`)에는 장르 후보와 템포가 없고, 값이 없는 줄은 프롬프트에서 빠진다. 형태는 `track-analysis.js`와 `prompts/music-filter.user.njk`가 기준이고, MAEST 점수를 넣지 않는 규칙은 [가드레일](AI_CHANGE_GUARDRAILS.md#audio-analysis-contract)에 있다.

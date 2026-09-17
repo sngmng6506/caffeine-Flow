@@ -65,8 +65,7 @@ SCHEMA = {
 # 악기 이름은 사람끼리도 잘 안 맞는 층위인데 지금은 그쪽이 판정을 좌우한다(실측:
 # 기타로 읽으면 accept, 신스로 읽으면 reject). 그래서 악기를 빼고 2축을 넣는다.
 #
-# 척도는 0~1이다. 서버 band()가 0.35/0.65를 경계로 쓰는 것과 같은 스케일이라,
-# 필터의 `밝기·활력` 칸에 그대로 들어간다.
+# 척도는 0~1이다. 필터의 `밝기`·`활력` 줄과 같은 스케일이라 그대로 들어간다.
 EXPERIMENT_FIELDS = ('mood', 'vocal', 'structure')
 
 EXPERIMENT_SCORES = ()
@@ -89,10 +88,10 @@ EXPERIMENT_SCHEMA = {
 # 체계적으로 높았다(LLM 0.7/0.8 vs 모델 0.601/0.641). 결정론적 모델이 1.5초면 내는
 # 값을 흔들리는 추정으로 대체할 이유가 없다.
 #
-# 숫자를 그대로 넣되 척도를 같이 알려 준다. 필터에서 Valence·Arousal을 말로 바꾸는
-# 것은 MAEST 점수와 함께 다루기 때문인데, MAEST 쪽은 문서가 밝히듯 "보정되지 않은
-# 상대값"이라 숫자가 뜻을 갖지 못한다. V/A는 다르다 — normalize_score가 DEAM 원본
-# 척도 [1,9]를 [0,1]로 옮긴 보정된 값이라 0.6은 어디서나 같은 뜻이다.
+# 숫자를 그대로 넣되 척도를 같이 알려 준다. MAEST 점수는 "보정되지 않은 상대값"이라
+# 숫자가 뜻을 갖지 못하지만 V/A는 다르다 — normalize_score가 DEAM 원본 척도 [1,9]를
+# [0,1]로 옮긴 보정된 값이라 0.6은 어디서나 같은 뜻이다. 서버 필터 프롬프트
+# (prompt.builder.js의 describeScale)도 같은 형식을 쓴다.
 #
 # 말로 바꾸면 손실이 크다. 밴드 경계가 0.35/0.65라 valence 0.601과 arousal 0.641이
 # 똑같이 "중간"이 되는데, arousal은 "격렬함"에서 0.009 떨어져 있다. 그 차이가 통째로
@@ -101,7 +100,7 @@ VA_LOW, VA_HIGH = 0.35, 0.65
 
 
 def va_label(value, low, high):
-    """밴드 이름. 서버 prompt.builder.js의 band()와 경계가 같아야 한다."""
+    """밴드 이름. 숫자 형식과 비교하는 실험(style='label')에서만 쓴다."""
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return None
     return low if value < VA_LOW else high if value > VA_HIGH else '중간'
@@ -209,7 +208,7 @@ def _clean_text(value, limit=MAX_TEXT):
 
 
 def _clean_score(value):
-    """0~1 밖으로 나온 값은 잘라 맞춘다. 서버 band()가 이 범위를 전제로 읽는다."""
+    """0~1 밖으로 나온 값은 잘라 맞춘다. 서버 필터가 0~1 척도를 전제로 적는다."""
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return None
     return round(min(1.0, max(0.0, float(value))), 3)

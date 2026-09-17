@@ -51,7 +51,7 @@ function distinctDescriptions(report) {
       mood: run.mood || [],
       instruments: run.instruments || [],
       vocal: run.vocal || [],
-      // 필터의 `밝기·활력` 칸은 0~1 스케일이다. Essentia V/A(report 최상위, 곡당 한
+      // 필터의 `밝기`·`활력` 줄은 0~1 스케일이다. Essentia V/A(report 최상위, 곡당 한
       // 값)를 우선 쓰고, 없으면 LLM이 직접 낸 값으로 떨어진다. 둘 다 없으면 그 줄은
       // 렌더되지 않는다 — 1단을 통째로 뺀 구성이 된다.
       valence: report.valence ?? run.brightness ?? null,

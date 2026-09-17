@@ -56,12 +56,21 @@ describe('음악 필터에 들어가는 음향 분석', () => {
     expect(shaped.structure).toEqual(['1구간', '2구간']);
   });
 
-  it('0~1 값은 숫자가 아니라 말로 준다', () => {
-    // 척도를 모르는 모델에게 0.81을 주면 제멋대로 해석한다.
+  it('V/A는 척도의 양 끝을 붙인 숫자로 준다', () => {
+    // 보정된 값이라 숫자가 뜻을 갖는다. 밴드 이름으로 뭉치면 가까운 값의 차이가
+    // 사라지고, 척도 없이 숫자만 주면 모델이 제멋대로 해석한다.
     const text = userText({ cafePrompt: '잔잔한 카페', track, analysis });
-    expect(text).toContain('격렬함');
+    expect(text).toContain('밝기: 0.63 (0.00 어두움 ~ 1.00 밝음)');
+    expect(text).toContain('활력: 0.81 (0.00 차분함 ~ 1.00 격렬함)');
     expect(text).toContain('약 143 BPM');
-    expect(text).not.toContain('0.81');
+  });
+
+  it('V/A 중 없는 값의 줄은 렌더하지 않는다', () => {
+    const text = userText({ cafePrompt: '잔잔한 카페',
+      track,
+      analysis: { ...analysis, valence: null } });
+    expect(text).not.toContain('밝기:');
+    expect(text).toContain('활력: 0.81');
   });
 
   it('MAEST 점수는 프롬프트에 넣지 않는다', () => {
