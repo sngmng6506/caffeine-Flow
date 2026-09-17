@@ -24,4 +24,4 @@
 - 음악 라벨링은 판단 당시 매장 정책 아래에 AI 승인·거절 결과를 표시한다. 제목에 `Playlist` 또는 `플리`가 포함된 항목은 큐와 집계에서 제외한다.
 - 헤더에서 관리자 세션을 유지한 채 [`필터 테스트`](../music-filter-lab/README.md)와 [`음악 라벨링`](../music-labeling-lab/README.md)으로 이동한다. 정책 검수와 곡 라벨이 모두 저장된 항목만 완료로 센다.
 
-라벨 값과 수집 정책은 [docs/LLM_FILTER.md](../docs/LLM_FILTER.md#평가-데이터셋)가 기준이다.
+라벨 수집 정책은 [docs/LLM_FILTER.md](../docs/LLM_FILTER.md#평가-데이터셋), 허용값은 `server/src/constants/music-filter-review.js`가 기준이다.

@@ -33,19 +33,17 @@
 
 여기에 그 곡의 최신 음향 분석이 있으면 함께 넣는다. 해당 분석에 `inaccurate` 또는 기존 `unclear` 판정이 있으면 분석 전체를 제외하며 이전 분석으로 되돌아가지 않는다. 새 재분석 결과는 이전 판정을 물려받지 않는다. 분석은 참고 데이터이며 판단 품질 개선이 검증됐다는 뜻은 아니다.
 
-| 넣는 것 | 형태 | 이유 |
-| --- | --- | --- |
-| 3단 자유 서술 | 문장, 600자까지 | 판단 근거로 가장 밀도가 높다 |
-| 분위기·악기·보컬 | 목록, 각 8개까지 | 매장 정책이 흔히 거는 축이다 |
-| MAEST 장르 후보 | 이름만, `prompt_styles` 순서 | 점수는 넣지 않는다 |
-| 템포 | `빠름 (약 143 BPM)` | 숫자만으로는 척도를 모른다 |
-| 밝기·활력 | `어두움 · 격렬함` | Valence·Arousal을 말로 바꾼 것 |
+| 넣는 것 | 형태 |
+| --- | --- |
+| 3단 자유 서술 | 문장, 600자까지 |
+| 분위기·악기·보컬 | 목록, 각 8개까지 |
+| 구간별 서술 | 3단이 들은 구간 순서대로 |
+| 밝기·활력 | Valence·Arousal을 `어두움 · 격렬함`처럼 말로 바꾼 것 |
+| 장르 후보·템포 | MAEST가 돌았던 옛 분석 행에만 있다. 장르는 이름만 순위대로 |
 
-MAEST 점수를 넣지 않는 이유는 보정되지 않은 상대값이기 때문이다. 숫자를 보여주면 모델이 곡끼리 비교하는데, 점수 스케일은 곡마다 다르다. 순위만 주고 보정되지 않았음을 프롬프트에 밝힌다. 같은 이유로 0~1인 Valence·Arousal도 말로 바꿔 넣는다.
+현재 신청 시점 분석(`EMOTION_LLM`)에는 장르 후보와 템포가 없고, 값이 없는 줄은 프롬프트에서 빠진다. 형태는 `track-analysis.js`와 `prompts/music-filter.user.njk`가 기준이고, MAEST 점수를 넣지 않는 규칙은 [가드레일](AI_CHANGE_GUARDRAILS.md#audio-analysis-contract)에 있다.
 
 **신규 오디오 분석을 기다리지 않는다.** 이미 저장된 분석만 읽으며, 사전 수집한 곡은 첫 신청에도 분석이 있을 수 있다. 분석이 없거나 제외됐거나 조회에 실패하면 그 사실을 프롬프트에 밝히고 메타데이터만으로 판단한다. 선택적 분석 조회 실패는 아래 LLM 호출의 fail-closed 오류와 구분한다.
-
-조회 키는 `canonicalizeVideoId`를 거친다. 분석 작업의 `track_key`는 저장될 때 정규화된 값인데 필터는 신청 URL에서 막 뽑은 원본 ID를 들고 있어서, 같은 규칙을 적용하지 않으면 항상 못 찾는다.
 
 출력은 tool(function) call 인자의 JSON Schema로 강제한다. `response_format(json_schema)`은 일부 프로바이더만 지원하므로 사용하지 않는다.
 
@@ -128,23 +126,10 @@ filter_error_code · filter_checked_at · filter_prompt_snapshot
 
 ## 평가 데이터셋
 
-운영자는 관리자 콘솔의 카페별 판단 이력 에서 정책 골드 라벨을 기록한다. `/labeling-lab`은 별도의 곡 자동 라벨 검토 화면이다. 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이다.
+운영자는 관리자 콘솔의 카페별 판단 이력에서 정책 골드 라벨을 기록한다. `/labeling-lab`은 별도의 곡 자동 라벨 검토 화면이다. 필드와 허용값·개수 제한은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이다.
 
-**정책 검수** — `music_filter_reviews`에 추천곡당 한 건.
-
-```text
-human_decision       accept | reject | undetermined
-human_reason_code    policy_match | policy_mismatch | unsafe_content | metadata_insufficient | other
-metadata_sufficient  boolean | null
-```
-
-**곡 특성 라벨** — `music_track_annotations`에 `(platform, track_key)`당 한 건. 값은 워커의 자동 분석이 채우며, 사람은 그것이 곡과 맞는지만 판정한다(택소노미를 직접 고르지 않는다).
-
-```text
-artist_name · track_version · tempo_class · mood_tags(최대 2)
-instrumentation_type · rhythmic_character · vocal_type
-genre_tags(선택, 최대 2) · note(선택) · usage_scope · schema_version
-```
+- **정책 검수** — `music_filter_reviews`에 추천곡당 한 건.
+- **곡 특성 라벨** — `music_track_annotations`에 `(platform, track_key)`당 한 건. 값은 워커의 자동 분석이 채우며, 사람은 그것이 곡과 맞는지만 판정한다(택소노미를 직접 고르지 않는다).
 
 - 화면에는 한국어로 표시하고 DB에는 상수의 코드로 저장한다. `unknown`은 같은 항목의 다른 값과 함께 저장하지 않는다.
 - 아티스트명은 운영자가 곡을 듣고 확인한다. 정규화 키는 같은 아티스트의 다른 곡 라벨을 찾는 용도로만 쓰며 자동 추정이나 라벨 복사는 하지 않는다. 참고 조회는 운영자가 요청할 때 최대 3건이다.
@@ -167,12 +152,13 @@ server/src/features/music-filter/
 ├── music-filter.service.js  전체 판단 흐름
 ├── prompt.builder.js        정책과 곡 데이터를 메시지로 구성
 ├── llm.client.js            OpenRouter 호출·timeout·tool call 파싱
+├── track-analysis.js        필터에 넣을 음향 분석 조회·요약
 ├── public-guide.service.js  매장 설명을 손님용 안내로 정제
 └── decision.policy.js       판단 정규화와 오류 변환
 server/src/features/music-labeling/annotation.js  수동 곡 라벨 정규화·검증
 server/src/constants/music-labeling.js            수동 곡 라벨 코드·개수 제한
 server/src/features/audio-analysis/               자동 분석 결과 검증·저장
-audio-analysis-worker/                            Essentia 특징 추출·추천값 생성
+audio-analysis-worker/                            음향 분석과 자동 라벨 생성
 
 owner/src/pages/dashboard/MusicFilterSettings.jsx
 owner/src/pages/dashboard/useRecommendationQueue.js
