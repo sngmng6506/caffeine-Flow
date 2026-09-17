@@ -34,6 +34,7 @@ function promptAnalysis(analysis) {
     mood: analysis.mood || [],
     instruments: analysis.instruments || [],
     vocal: analysis.vocal || [],
+    structure: analysis.structure || [],
     // 점수는 넣지 않는다. 보정되지 않은 상대값이라 숫자를 보여주면 곡끼리 비교하게 된다.
     styles: (analysis.styles || []).map((v) => v.label),
     tempo: describeTempo(analysis),

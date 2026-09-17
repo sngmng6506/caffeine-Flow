@@ -45,6 +45,9 @@ function shape(row) {
     mood: list(llm?.mood),
     instruments: list(llm?.instruments),
     vocal: list(llm?.vocal),
+    // 구간별 서술. 3단이 들은 구간 순서와 같다. 곡 전체를 한 문장으로 뭉갠 서술로는
+    // 알 수 없는 것(조용히 시작해 후렴에서 커진다 등)이 매장 적합성 판단에 쓰인다.
+    structure: list(llm?.structure),
     analyzed_at: row.analyzed_at,
   };
 }

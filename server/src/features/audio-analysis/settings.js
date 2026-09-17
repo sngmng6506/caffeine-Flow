@@ -6,7 +6,7 @@ const db = require('../../db/knex');
 const DEFAULTS = Object.freeze({ audio_llm_enabled: true, audio_llm_prompt: null });
 
 // 워커가 들고 있는 j2 템플릿을 쓴다는 뜻이다. 워커의 audio_llm.PROMPT_VERSION과 같다.
-const BUILTIN_PROMPT_VERSION = 'audio-llm-1';
+const BUILTIN_PROMPT_VERSION = 'audio-llm-2';
 const PROMPT_MAX = 4000;
 
 const sha256 = (text) => crypto.createHash('sha256').update(text, 'utf8').digest('hex');

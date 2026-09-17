@@ -114,8 +114,10 @@ class DescribeTest(unittest.TestCase):
 
         self.assertEqual(raw['model_id'], 'google/gemini-2.5-pro')
         self.assertEqual(raw['input_sha256'], 'a' * 64)
-        self.assertEqual(raw['prompt_version'], 'audio-llm-1')
-        self.assertEqual(len(raw['segments']), 4)
+        self.assertEqual(raw['prompt_version'], 'audio-llm-2')
+        # 기본값은 3x10이다. 숫자를 상수로 빼지 않는 것은 기본값 변경이 이 줄을 고치는
+        # 의식적 결정이 되게 하기 위해서다.
+        self.assertEqual(len(raw['segments']), 3)
         self.assertIn('created_at', raw)
 
     def test_reports_clip_and_request_times_without_changing_result(self):
@@ -129,7 +131,7 @@ class DescribeTest(unittest.TestCase):
         self.assertEqual(raw['description'], '잔잔한 피아노가 이어진다')
         self.assertEqual([event['stage'] for event in events],
                          ['audio_llm_clip_extract', 'audio_llm_payload', 'audio_llm_request'])
-        self.assertEqual(events[1]['audio_bytes'], len(b'RIFFdata') * 4)
+        self.assertEqual(events[1]['audio_bytes'], len(b'RIFFdata') * 3)
 
     def test_clip_extraction_failure_is_reported(self):
         def broken(*_args, **_kwargs):

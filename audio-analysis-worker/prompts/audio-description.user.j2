@@ -1,1 +1,15 @@
 같은 곡에서 고르게 뽑은 {{ clip_count }}개 구간이다.
+{%- if segments is defined and segments %}
+들어오는 순서와 곡에서의 위치는 다음과 같다.
+{%- for range in segments %}
+{{ loop.index }}번: {{ range }}
+{%- endfor %}
+structure 배열에는 각 구간을 이 순서대로 하나씩 서술한다. 구간 수와 항목 수를 맞춘다.
+{%- endif %}
+{%- if va is defined and va %}
+
+음향 모델이 같은 구간을 분석한 결과는 다음과 같다.
+밝기: {{ va.brightness }}
+활력: {{ va.energy }}
+이 값은 참고용이다. 네가 들은 것과 어긋나면 들은 대로 쓰고, 어긋난다는 점을 적는다.
+{%- endif %}

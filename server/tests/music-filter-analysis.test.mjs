@@ -30,6 +30,32 @@ describe('음악 필터에 들어가는 음향 분석', () => {
     expect(text).toContain('트럼펫');
   });
 
+  it('구간별 서술을 순서를 유지해 넣는다', () => {
+    // 곡 전체를 한 문장으로 뭉갠 서술로는 "조용히 시작해 후렴에서 커진다"를 알 수
+    // 없다. 매장 적합성에는 그 변화가 쓰인다. 3단이 들은 구간 순서를 유지해야
+    // 사장님 정책의 "갑자기 시끄러워지는 곡"과 맞춰볼 수 있다.
+    const text = userText({ cafePrompt: '잔잔한 카페',
+      track,
+      analysis: { ...analysis, structure: ['조용한 피아노 인트로', '드럼이 들어오며 커진다', '후렴이 반복된다'] } });
+    expect(text).toContain('구간별');
+    expect(text).toContain('1) 조용한 피아노 인트로');
+    expect(text).toContain('3) 후렴이 반복된다');
+  });
+
+  it('구간별 서술이 없으면 그 줄을 렌더하지 않는다', () => {
+    const text = userText({ cafePrompt: '잔잔한 카페', track, analysis });
+    expect(text).not.toContain('구간별');
+  });
+
+  it('shape가 구간별 서술을 필터까지 전달한다', () => {
+    // 저장은 되는데 소비처로 오지 않던 필드다. 배관이 끊기면 조용히 사라진다.
+    const shaped = shape({
+      features: {},
+      maest_summary: { audio_llm: { description: '서술', structure: ['1구간', '2구간'] } },
+    });
+    expect(shaped.structure).toEqual(['1구간', '2구간']);
+  });
+
   it('0~1 값은 숫자가 아니라 말로 준다', () => {
     // 척도를 모르는 모델에게 0.81을 주면 제멋대로 해석한다.
     const text = userText({ cafePrompt: '잔잔한 카페', track, analysis });

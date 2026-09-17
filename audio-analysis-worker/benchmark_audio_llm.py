@@ -16,7 +16,10 @@ import wave
 from datetime import datetime, timezone
 from pathlib import Path
 
-from audio_llm import DEFAULT_BASE_URL, DEFAULT_MODEL, describe
+from audio_llm import (
+    DEFAULT_BASE_URL, DEFAULT_MODEL, describe,
+    EXPERIMENT_FIELDS, EXPERIMENT_SCHEMA, EXPERIMENT_SCORES, va_context,
+)
 from download import download_audio, source_url
 from emotion import file_sha256
 
@@ -93,10 +96,14 @@ def run_strategy(audio, duration_sec, audio_sha256, strategy, repeat, download_s
             'llm_request_sec': stage_elapsed(events, 'audio_llm_request'),
             'audio_bytes': payload.get('audio_bytes'), 'audio_llm_total_sec': elapsed,
             'estimated_end_to_end_sec': round(download_sec + elapsed, 4),
-            'description': result['description'], 'mood': result['mood'],
-            'instruments': result['instruments'], 'vocal': result['vocal'],
-            'structure': result['structure'], 'usage': result.get('usage'),
+            # 스키마에 따라 없는 필드가 있다. 실험 스키마에는 instruments가 없고
+            # 기본 스키마에는 brightness/energy가 없다.
+            'description': result['description'], 'mood': result.get('mood', []),
+            'instruments': result.get('instruments', []), 'vocal': result.get('vocal', []),
+            'brightness': result.get('brightness'), 'energy': result.get('energy'),
+            'structure': result.get('structure', []), 'usage': result.get('usage'),
             'generation_id': result.get('generation_id'),
+            'prompt_version': result.get('prompt_version'),
         }
     except Exception as error:
         elapsed = round(time.monotonic() - started, 4)
@@ -123,6 +130,18 @@ def main():
     parser.add_argument('--model', default=os.environ.get('AUDIO_LLM_MODEL', DEFAULT_MODEL))
     parser.add_argument('--timeout-sec', type=int,
                         default=int(os.environ.get('AUDIO_LLM_TIMEOUT_SEC', '180')))
+    # 후보 프롬프트를 배포 없이 재 본다. 운영에서 Lab이 넘기는 오버라이드와 같은 경로라
+    # (resolve_prompt), 여기서 좋았던 문구를 그대로 Lab에 넣으면 같은 서술이 나온다.
+    parser.add_argument('--prompt-file', type=Path,
+                        help='시스템 프롬프트 후보 파일. 생략하면 기본 프롬프트를 쓴다')
+    # 1단을 빼면 밝기·활력을 아무도 주지 않는다. MAEST(실측 중앙값 76초) 대신
+    # Essentia V/A(6초)만 남겨 그 값을 3단 프롬프트에 말로 넣는 안을 재 본다.
+    parser.add_argument('--experiment-schema', action='store_true',
+                        help='악기 필드를 뺀 스키마로 돌린다')
+    parser.add_argument('--with-va', action='store_true',
+                        help='Essentia V/A를 계산해 프롬프트에 밝기·활력으로 넣는다')
+    parser.add_argument('--va-style', choices=['number', 'label'], default='number',
+                        help='V/A를 척도를 붙인 숫자로 넣을지 밴드 이름으로 넣을지')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     api_key = os.environ.get('OPENROUTER_API_KEY', '').strip()
@@ -131,6 +150,10 @@ def main():
     if args.repeats < 1:
         parser.error('--repeats는 1 이상이어야 합니다')
 
+    prompt = args.prompt_file.read_text(encoding='utf-8').strip() if args.prompt_file else ''
+    if args.prompt_file and not prompt:
+        parser.error('--prompt-file이 비어 있습니다')
+
     base_config = {
         'model': args.model,
         'base_url': os.environ.get('OPENROUTER_BASE_URL', DEFAULT_BASE_URL),
@@ -138,6 +161,10 @@ def main():
         'timeout_sec': args.timeout_sec,
         'app_url': os.environ.get('OPENROUTER_APP_URL', ''),
         'app_name': 'Caffeine Flow Audio Benchmark',
+        # 빈 문자열이면 resolve_prompt가 기본 프롬프트로 되돌린다.
+        'prompt': prompt,
+        **({'schema': EXPERIMENT_SCHEMA, 'fields': EXPERIMENT_FIELDS,
+            'scores': EXPERIMENT_SCORES} if args.experiment_schema else {}),
     }
     with tempfile.TemporaryDirectory(prefix='caffeine-audio-benchmark-') as directory:
         started = time.monotonic()
@@ -146,6 +173,27 @@ def main():
         with wave.open(str(audio), 'rb') as source:
             duration_sec = source.getnframes() / source.getframerate()
         audio_sha256 = file_sha256(audio)
+
+        va_sec = None
+        va_summary = None
+        if args.with_va:
+            # 곡당 한 번만 도는 비용이다. 결정론적이라 반복 사이에 값이 바뀌지 않는다.
+            import essentia.standard as standard
+            from emotion import estimate_valence_arousal, load_emotion_predictor
+            started = time.monotonic()
+            predictor = load_emotion_predictor(
+                os.environ.get('AUDIO_MODEL_DIR', '~/caffeine-audio/models').replace('~', os.path.expanduser('~')))
+            summary = estimate_valence_arousal(
+                standard.MonoLoader(filename=str(audio), sampleRate=16_000)(), predictor)
+            va_sec = round(time.monotonic() - started, 4)
+            if summary:
+                base_config['va'] = va_context(summary['valence'], summary['arousal'], args.va_style)
+                va_summary = summary
+                report_va = {**summary, 'labels': base_config['va'], 'elapsed_sec': va_sec}
+            else:
+                report_va = {'elapsed_sec': va_sec, 'error': 'V/A 계산 실패'}
+            print(json.dumps({'stage': 'valence_arousal', **report_va}, ensure_ascii=False), flush=True)
+
         rows = []
         for repeat in range(args.repeats):
             # 항상 같은 전략이 먼저 호출돼 공급자 warm-up 이득을 받지 않도록 순환한다.
@@ -161,6 +209,12 @@ def main():
                   'source_url': source_url(args.platform, args.track_key),
                   'duration_sec': round(duration_sec, 3)},
         'model': args.model, 'download_sec': download_sec,
+        'valence_arousal_sec': va_sec,
+        'valence': (va_summary or {}).get('valence'), 'arousal': (va_summary or {}).get('arousal'), 'va_style': args.va_style if args.with_va else None,
+        'va_prompt': base_config.get('va'),
+        # 어떤 문구로 만든 서술인지 남긴다. 기본은 audio-llm-1, 후보는 custom-<해시>다.
+        'prompt_version': next((r.get('prompt_version') for r in rows if r.get('prompt_version')), None),
+        'prompt_file': str(args.prompt_file) if args.prompt_file else None,
         'note': 'estimated_end_to_end_sec는 한 번 측정한 다운로드 시간과 각 호출 시간을 합친 값',
         'runs': rows, 'summary': summarize(rows),
     }

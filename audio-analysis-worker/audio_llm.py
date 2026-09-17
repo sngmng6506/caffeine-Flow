@@ -22,11 +22,15 @@ import urllib.request
 from datetime import datetime, timezone
 from timing import measure
 
-PROMPT_VERSION = 'audio-llm-1'
+PROMPT_VERSION = 'audio-llm-2'
 DEFAULT_MODEL = 'google/gemini-2.5-pro'
 DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
-DEFAULT_SEGMENTS = 4
-DEFAULT_CLIP_SEC = 30
+# 3x10으로 고정한다. 같은 곡 8회씩 비교한 실측에서 4x30은 E2E P50 34.4초로 20~30초
+# 목표를 넘겼고, 3x10은 P50 17.7초·P90 20.3초로 여유 있게 들어왔다. 구간을 더 줄여도
+# 이득이 없다 — 호출 시간의 81%가 구간 수와 무관한 고정 비용이라, 구간을 1개로 줄여도
+# 13.6초가 11.1초가 될 뿐이다.
+DEFAULT_SEGMENTS = 3
+DEFAULT_CLIP_SEC = 10
 DEFAULT_TIMEOUT_SEC = 180
 # 구간만 잘라 보낸다. 곡 전체를 보내면 요금과 지연이 함께 커진다.
 CLIP_SAMPLE_RATE = 16000
@@ -55,6 +59,70 @@ SCHEMA = {
     'required': ['description', 'mood', 'instruments', 'vocal', 'structure'],
     'additionalProperties': False,
 }
+
+# 1단(MAEST)을 빼는 실험용 스키마. MAEST가 사라지면 valence/arousal을 아무도 주지
+# 않는데, 음악 감정 연구에서 이 2축은 사람 사이 일치도가 가장 높은 층위다. 반대로
+# 악기 이름은 사람끼리도 잘 안 맞는 층위인데 지금은 그쪽이 판정을 좌우한다(실측:
+# 기타로 읽으면 accept, 신스로 읽으면 reject). 그래서 악기를 빼고 2축을 넣는다.
+#
+# 척도는 0~1이다. 서버 band()가 0.35/0.65를 경계로 쓰는 것과 같은 스케일이라,
+# 필터의 `밝기·활력` 칸에 그대로 들어간다.
+EXPERIMENT_FIELDS = ('mood', 'vocal', 'structure')
+
+EXPERIMENT_SCORES = ()
+
+EXPERIMENT_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'description': {'type': 'string', 'description': '곡 전체에 대한 한국어 자유 서술'},
+        'mood': {'type': 'array', 'items': {'type': 'string'}, 'description': '분위기를 나타내는 표현'},
+        'vocal': {'type': 'array', 'items': {'type': 'string'}, 'description': '보컬의 유무와 특징'},
+        'structure': {'type': 'array', 'items': {'type': 'string'},
+                      'description': '제공된 구간을 들어온 순서대로 하나씩 서술한다. 항목 수는 구간 수와 같다'},
+    },
+    'required': ['description', 'mood', 'vocal', 'structure'],
+    'additionalProperties': False,
+}
+
+# 밝기·활력은 LLM에게 묻지 않고 Essentia V/A를 말로 바꿔 넣어 준다. 실측에서 LLM은
+# 같은 곡에 brightness 0.4~0.8을 내놓아 band() 경계(0.35/0.65)를 넘나들었고, 값도
+# 체계적으로 높았다(LLM 0.7/0.8 vs 모델 0.601/0.641). 결정론적 모델이 1.5초면 내는
+# 값을 흔들리는 추정으로 대체할 이유가 없다.
+#
+# 숫자를 그대로 넣되 척도를 같이 알려 준다. 필터에서 Valence·Arousal을 말로 바꾸는
+# 것은 MAEST 점수와 함께 다루기 때문인데, MAEST 쪽은 문서가 밝히듯 "보정되지 않은
+# 상대값"이라 숫자가 뜻을 갖지 못한다. V/A는 다르다 — normalize_score가 DEAM 원본
+# 척도 [1,9]를 [0,1]로 옮긴 보정된 값이라 0.6은 어디서나 같은 뜻이다.
+#
+# 말로 바꾸면 손실이 크다. 밴드 경계가 0.35/0.65라 valence 0.601과 arousal 0.641이
+# 똑같이 "중간"이 되는데, arousal은 "격렬함"에서 0.009 떨어져 있다. 그 차이가 통째로
+# 사라진다.
+VA_LOW, VA_HIGH = 0.35, 0.65
+
+
+def va_label(value, low, high):
+    """밴드 이름. 서버 prompt.builder.js의 band()와 경계가 같아야 한다."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    return low if value < VA_LOW else high if value > VA_HIGH else '중간'
+
+
+def va_context(valence, arousal, style='number'):
+    """1단 V/A를 3단 프롬프트에 넣을 문구로 만든다. 없으면 None.
+
+    style='number'면 척도를 붙인 숫자를, 'label'이면 밴드 이름을 준다.
+    """
+    def render(value, low, high):
+        label = va_label(value, low, high)
+        if label is None:
+            return None
+        return label if style == 'label' else f'{value:.2f} (0.00 {low} ~ 1.00 {high})'
+
+    brightness = render(valence, '어두움', '밝음')
+    energy = render(arousal, '차분함', '격렬함')
+    if not brightness and not energy:
+        return None
+    return {'brightness': brightness, 'energy': energy}
 
 # 택소노미를 주지 않는다. 선택지를 좁히면 학습 분포 밖 음악(국악, 트로트 등)의
 # 정보가 통째로 소실된다. 정규화는 나중에 사람이 보거나 별도 매핑이 한다.
@@ -112,9 +180,21 @@ def extract_clip(audio_path, segment, ffmpeg='ffmpeg', runner=subprocess.run):
     return completed.stdout
 
 
-def build_messages(clips, system_prompt=None):
-    """오디오 구간만 담은 메시지. 장르·택소노미·임베딩은 넣지 않는다."""
-    content = [{'type': 'text', 'text': render_prompt('audio-description.user.j2', clip_count=len(clips))}]
+def segment_ranges(segments):
+    """구간을 '0~10초'처럼 사람이 읽는 표시로 바꾼다.
+
+    모델에게 몇 초 지점을 듣고 있는지 알려 준다. 모르면 구간별로 서술하라고 해도
+    무엇을 기준으로 나눠 쓸지 알 수 없다.
+    """
+    return [f"{s['start_sec']:.0f}~{s['start_sec'] + s['duration_sec']:.0f}초"
+            for s in (segments or [])]
+
+
+def build_messages(clips, system_prompt=None, va=None, segments=None):
+    """오디오 구간과 1단 V/A 요약을 담은 메시지. 장르·택소노미·임베딩은 넣지 않는다."""
+    content = [{'type': 'text', 'text': render_prompt(
+        'audio-description.user.j2', clip_count=len(clips), va=va,
+        segments=segment_ranges(segments))}]
     for clip in clips:
         content.append({
             'type': 'input_audio',
@@ -126,6 +206,13 @@ def build_messages(clips, system_prompt=None):
 
 def _clean_text(value, limit=MAX_TEXT):
     return value.strip()[:limit] if isinstance(value, str) else ''
+
+
+def _clean_score(value):
+    """0~1 밖으로 나온 값은 잘라 맞춘다. 서버 band()가 이 범위를 전제로 읽는다."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    return round(min(1.0, max(0.0, float(value))), 3)
 
 
 def _clean_items(value):
@@ -149,7 +236,7 @@ def read_usage(data):
     return picked or None
 
 
-def parse_response(data):
+def parse_response(data, fields=FIELDS, scores=()):
     """tool call 우선, content fallback. 자유 서술이 비면 실패로 본다."""
     message = (data.get('choices') or [{}])[0].get('message') or {}
     raw = None
@@ -168,7 +255,9 @@ def parse_response(data):
     description = _clean_text(parsed.get('description'))
     if not description:
         raise AudioLLMError('자유 서술이 비어 있습니다')
-    return {'description': description, **{field: _clean_items(parsed.get(field)) for field in FIELDS}}
+    return {'description': description,
+            **{field: _clean_items(parsed.get(field)) for field in fields},
+            **{score: _clean_score(parsed.get(score)) for score in scores}}
 
 
 def call_openrouter(messages, config, opener=urllib.request.urlopen):
@@ -177,7 +266,7 @@ def call_openrouter(messages, config, opener=urllib.request.urlopen):
         'messages': messages,
         'tools': [{'type': 'function',
                    'function': {'name': 'describe_audio', 'description': '들은 내용을 정리한다',
-                                'parameters': SCHEMA}}],
+                                'parameters': config.get('schema') or SCHEMA}}],
         'tool_choice': {'type': 'function', 'function': {'name': 'describe_audio'}},
     }
     request = urllib.request.Request(
@@ -211,8 +300,9 @@ def describe(audio_path, duration_sec, audio_sha256, config,
                 'clip_count': len(clips), 'audio_bytes': sum(map(len, clips))})
     system_prompt, prompt_version = resolve_prompt(config.get('prompt'))
     with measure(report, 'audio_llm_request'):
-        data = call_openrouter(build_messages(clips, system_prompt), config, opener)
-    parsed = parse_response(data)
+        data = call_openrouter(
+            build_messages(clips, system_prompt, config.get('va'), segments), config, opener)
+    parsed = parse_response(data, config.get('fields') or FIELDS, config.get('scores') or ())
     usage = read_usage(data)
     generation_id = data.get('id') if isinstance(data.get('id'), str) else None
     return {
