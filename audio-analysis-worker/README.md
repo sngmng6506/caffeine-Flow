@@ -4,7 +4,7 @@
 > **함께 갱신할 때:** 실행 파일, 모델, 환경변수, 서비스 운영 절차가 바뀔 때
 > **생략 가능한 경우:** 서버 API 내부 리팩터링이나 화면 문구만 수정할 때
 
-신청곡 URL을 미니PC가 임시 다운로드해 분석하고 **특징값과 자동 라벨만** 서버에 저장한다. 원본 오디오는 서버로 보내지 않고, 미니PC는 outbound HTTPS만 사용하며 들어오는 포트를 열지 않는다.
+신청곡 URL을 미니PC가 임시 다운로드해 분석하고 특징값·모델 결과·자동 라벨을 서버에 저장한다. 원본 음원은 자체 서버로 보내지 않지만, Audio LLM이 켜져 있으면 샘플 구간을 OpenRouter로 보낸다. 미니PC는 outbound HTTPS만 사용하며 들어오는 포트를 열지 않는다.
 
 | 실행 파일 | 역할 |
 | --- | --- |
@@ -16,9 +16,9 @@
 
 ## 신청곡 자동 워커
 
-1. 서버가 신청 저장 트랜잭션에서 작업을 등록한다. 동일 플랫폼·곡은 한 번만 분석한다.
+1. 서버가 신청 저장 트랜잭션에서 작업을 등록한다. 동일 플랫폼·곡은 작업 한 건으로 중복 제거하며, 명시적 재분석은 가능하다.
 2. 미니PC가 `/audio-analysis/jobs/claim`으로 작업을 가져와 YouTube·SoundCloud 오디오를 임시 다운로드한다. Spotify는 서버가 unsupported로 처리한다.
-3. **상주 자식 프로세스 하나**에서 한 곡씩 Essentia 기본 특징, MAEST 519 스타일, Valence/Arousal을 추론한다. 자식 시작 시 모델 해시를 검증하고 예측기를 한 번 만든다. MAEST·감정 모델은 같은 16kHz 배열을 나눠 쓰며 기본 음향 특징은 44.1kHz 입력을 사용한다.
+3. **상주 자식 프로세스 하나**에서 한 곡씩 Essentia 기본 특징·MAEST 519 스타일을 추론하고, 감정 모델이 준비돼 있으면 Valence/Arousal도 구한다. 자식 시작 시 모델 해시를 검증하고 예측기를 한 번 만든다. MAEST·감정 모델은 같은 16kHz 배열을 나눠 쓰며 기본 음향 특징은 44.1kHz 입력을 사용한다.
 4. 서버 설정이 켜져 있으면 CPU 분석과 동시에 곡에서 고르게 뽑은 구간을 오디오 입력 LLM에 보내 무드·악기·보컬을 자유 서술로 받는다([3단 Audio LLM](#3단-audio-llm)). 두 결과가 모인 뒤 제출한다. CPU 분석이 실패하면 3단을 기다리지 않고 실패로 끝내지만, 이미 시작한 외부 호출의 비용은 발생할 수 있다.
 5. 분석 원본·자동 라벨·작업 완료를 한 트랜잭션에 저장한다. 임시 음원은 성공·실패 모두 삭제한다. 사람이 수정한 라벨은 덮어쓰지 않는다.
 6. 중단된 작업은 lease 만료 후 회수한다. 결과는 로컬 outbox에 보존하고 같은 lease로 전송을 재개한다. 오류별 재시도 정책은 아래 장애 복구 절을 따른다.
@@ -31,7 +31,7 @@
 | 2단 | `msd-musicnn` + `deam-msd-musicnn-2` | 밝은가 격렬한가 | valence·arousal |
 | 3단 | 오디오 입력 LLM | 무엇이 들리는가 | 자유 서술 + 무드·악기·보컬·구조 |
 
-1단과 3단은 서로의 결과를 보지 않는다. 두 결과가 갈리는 곡이 곧 어려운 곡이라는 신호다.
+1단과 3단은 서로의 결과를 보지 않는다. 결과 간 불일치만으로 어느 쪽이 틀렸는지 확정하지 않는다.
 
 모델과 파라미터를 고른 근거는 [experiments/](experiments/)에 있다. 기준 문서가 아니라 특정 시점의 측정이므로 현재 동작은 이 README를 따른다.
 
@@ -95,20 +95,22 @@ systemctl --user daemon-reload
 
 서비스를 시작하면 **대기 중인 신청곡을 모두 처리한다.** 특정 곡만 돌리는 명령이 아니다. 같은 미니PC에서 다른 워커가 함께 돈다면 유닛의 `Nice`·`IOSchedulingClass`·`CPUQuota`로 분석이 양보하게 둔다. 자원 한도는 설치한 기계에서 실측해 맞춘다.
 
+Discord 웹훅이 있으면 설정 검증·락 획득 뒤 시작 알림을 보낸다. 모델 초기화·서버 claim 전이므로 알림만으로 분석 준비 완료를 판단하지 않는다.
+
 ### MAEST 추론과 원본
 
 - 모델은 `discogs-maest-30s-pw-519l-2`, 출력은 `PartitionedCall/Identity_13` sigmoid다. [공식 메타데이터](https://essentia.upf.edu/models/feature-extractors/maest/discogs-maest-30s-pw-519l-2.json)의 클래스 순서를 `server/src/constants/maest-metadata.json`에 보존한다.
 - WAV mono 16kHz로 변환한 뒤 **실제 입력 파일**의 SHA-256을 계산한다. 추론 설정(patch 크기·hop·마지막 구간 처리)은 `server/src/constants/audio-pipeline.json`이 단일 기준이며 Essentia 버전과 함께 원본에 기록한다.
 - 전체 구간의 519개 점수와 mean/max를 저장한다. 점수는 보정된 정확도가 아니고 곡의 기원 증명도 아니다. max는 특정 구간의 높은 반응을 보여준다.
 - `server/src/constants/music-taxonomy.json`의 정적 매핑과 태그별 임계값으로 Lab 장르를 최대 2개 만든다. 기본 임계값은 **미보정 실험 기준**이다. `maest.normalize(raw, taxonomy)`로 재추론 없이 정규화만 다시 돌릴 수 있다. 지원되지 않거나 약한 장르는 `unknown`이다.
-- 무드는 Valence/Arousal에서만 만든다. 감정 모델을 쓸 수 없으면 `pipeline_mode=MAEST_ONLY`로 남고 무드는 null이다. 보컬·악기는 `unknown`이며 **장르에서 추측해 채우지 않는다.**
+- 정규화 무드는 Valence/Arousal에서만 만든다. 감정 모델을 쓸 수 없으면 무드는 null이다. 보컬·악기는 `unknown`이며 **장르에서 추측해 채우지 않는다.** Audio LLM 서술은 별도 원본으로 보존하며, `pipeline_mode`는 아래 표를 따른다.
 - 입력 파일은 처리 후 삭제하므로 `audio_local_path`는 null이다. 재분석은 원본을 새 이력으로 추가하고 사람이 수정한 최종 라벨은 보존한다. 재다운로드 파일의 해시가 다르면 다른 입력으로 구분한다.
-- 길이 한도는 계약(`audio_duration_sec`)이 단일 기준이다. 오디오를 받기 전에 길이만 먼저 확인해, 한도를 벗어나면 `SOURCE_UNSUPPORTED`로 **영구 실패** 처리한다. 받아 본 뒤 실패로 두면 서버가 일시 장애로 보고 6시간마다 다시 시도한다.
-- 용량·시간 제한과 다운로드 간격은 `download.py`가 단일 기준이다. 로그인·지역제한·삭제·플랫폼 변경은 실패로 남기며 DRM·쿠키 우회는 하지 않는다.
+- 길이 한도는 `server/src/constants/audio-pipeline.json`의 `audio_duration_sec`가 기준이다. yt-dlp 한 번의 호출에서 `--match-filter`로 길이·라이브 여부를 거른다. 별도 사전 조회나 인위적 다운로드 대기는 없다. 정상 종료했어도 파일이 없으면 `SOURCE_UNSUPPORTED`로 남긴다.
+- 용량·시간 제한과 오류 분류는 `download.py`가 기준이다. 로그인·지역제한·삭제·플랫폼 변경은 실패로 남기며 DRM·쿠키 우회는 하지 않는다.
 
 ### 실제 곡 테스트 (서버 쓰기 없음)
 
-서버나 서비스를 바꾸기 전에 같은 venv에서 실행한다. 서버에 아무것도 쓰지 않는다.
+서버나 서비스를 바꾸기 전에 같은 venv에서 실행한다. 서버에 쓰거나 Lab 설정을 읽지는 않는다. 워커 환경에 API 키가 있으면 기본 프롬프트로 Audio LLM도 호출하므로 외부 요금은 발생할 수 있다.
 
 ```bash
 export AUDIO_MODEL_DIR="$HOME/caffeine-audio/models"
@@ -127,7 +129,7 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 
 ### 최신곡 수집
 
-운영자가 Lab 툴바의 `최신곡 수집`을 누르면 요청이 쌓이고, 워커가 **분석 큐가 빈 뒤에** 하나씩 처리한다. 신청곡 처리가 항상 먼저다.
+운영자가 Lab 툴바의 `최신곡 수집`을 누르면 요청이 쌓인다. 워커는 claim 가능한 분석 작업이 없을 때 수집 요청을 처리한다. 이미 등록된 분석 작업은 출처와 무관하게 `available_at`, `id` 순으로 가져오며 신청곡 전용 우선순위나 선점은 없다.
 
 | 소스 | 가져오는 것 | 분석하는 음원 |
 | --- | --- | --- |
@@ -135,9 +137,9 @@ python test_track.py --platform youtube --track-key <VIDEO_ID> \
 | `musicbrainz_kr` | 한국 발매 곡을 날짜 구간으로 조회해 YouTube에서 찾아 등록 | YouTube |
 | `soundcloud_trending` | 장르별 인기 플레이리스트를 돈다(20장르 × 50곡). 곡 URL이 곧 track_key라 검색을 거치지 않는다. `policy != ALLOW`(Go+ 전용)와 길이 한도 밖은 큐에 넣지 않는다 | SoundCloud |
 
-**어느 소스도 장르나 검색어로 좁히지 않는다.** 수집의 목적은 카페에 어울리는 곡을 모으는 것이 아니라 필터가 판단할 곡을 모으는 것이다. 장르를 골라 긁으면 거절해야 할 곡이 표본에서 빠져 필터가 거절을 배우지 못한다.
+사용자가 장르·검색어를 지정하지 않고 소스별 구간을 순회한다. SoundCloud는 코드에 정의된 장르 목록을 쓴다. 매장 적합성으로 수집 대상을 미리 거르지 않는다.
 
-Apple 피드는 국가 코드가 필수라 전 세계 통합 차트가 없다(`global`·`ww` 모두 500). SoundCloud는 국가별 인기 차트 API가 죽었고 지역 필터도 사라져 한국으로 한정할 수 없다 — 대신 장르가 갈려 있어 장르 다양성을 채운다. 실측 경위는 [ROADMAP](../docs/ROADMAP.md)에 있다.
+`apple_global`은 국가별 차트 순회이지 전 세계 통합 순위가 아니다. `soundcloud_trending`도 한국 한정 목록이 아니다. 소스 구현은 `discovery.py`가 기준이다.
 
 한 구간(한 나라·한 장르)이 바닥나도 `scanned`를 요청량보다 작게 보고하지 않는다. 서버가 그것을 "소스를 끝까지 봤다"로 읽어 커서를 0으로 되감으면 영영 첫 구간만 본다.
 
@@ -151,13 +153,17 @@ Apple 피드는 국가 코드가 필수라 전 세계 통합 차트가 없다(`g
 
 **소스별 진도를 서버가 기억한다.** 누를 때마다 다음 구간을 보므로 여유가 될 때마다 눌러 조금씩 채울 수 있다. 끝까지 보면 처음으로 돌아가 그 사이 바뀐 차트를 다시 본다. 곡 중복은 `(platform, track_key)` unique가 무시하므로 이미 분석한 곡은 다시 등록되지도, 재분석되지도 않는다. 계약의 길이 범위를 벗어난 후보는 등록 전에 걸러 헛된 작업을 만들지 않는다.
 
-Lab은 이번에 **새로 등록된 곡 수**를 보여준다. 0이면 그 구간은 이미 다 분석한 것이다.
+Lab은 이번에 **새로 등록된 곡 수**를 보여준다. 0은 중복·제외·매칭 실패도 포함하므로 해당 구간의 분석 완료를 뜻하지 않는다.
 
-곡 버전(MV·라이브·직캠)은 구분하지 않는다. 무드 파악이 목적이라 버전이 달라도 쓸 수 있다.
+곡 버전(MV·라이브·직캠)은 자동으로 구분하지 않으며, 검색 결과가 의도한 버전과 같다고 보장하지 않는다.
 
 ### 실패 진단
 
-`audio_stage_finished` 로그는 `job_id`, 단계(`stage`), 완료·실패, `elapsed_seconds`를 남긴다. 모델 초기화는 claim 전에 실행하므로 job_id가 null이다. 다운로드·입력 해시·디코딩·리듬·조성·danceability·다이내믹·spectral centroid·감정·MAEST·Audio LLM·전송을 구분한다. `features_and_emotion`은 하위 단계들을 포함하고, LLM은 CPU 분석과 겹치므로 단계 시간을 전부 더하지 않는다. `audio_llm_wait`는 CPU 분석 이후 남은 LLM 대기 시간이다. `remote_job_elapsed`는 다운로드부터 제출까지의 총시간이며 전송 실패 때도 남는다.
+`audio_stage_finished` 로그는 `job_id`, 단계(`stage`), 완료·실패, `elapsed_seconds`를 남긴다. 모델 초기화는 claim 전에 실행하므로 job_id가 null이다. 다운로드·입력 해시·디코딩·음향 특징·감정·MAEST·Audio LLM·전송을 구분한다. 측정 경계는 다음과 같다.
+
+- `features_and_emotion`은 하위 단계를 포함한다. LLM은 CPU 분석과 겹치므로 단계 시간을 전부 더하지 않는다.
+- `audio_llm`은 구간 추출·인코딩·API 호출·응답 처리를 포함한다. 순수 API 왕복 시간이 아니다. `audio_llm_wait`는 CPU 분석 이후 남은 LLM 대기다.
+- `remote_job_elapsed`는 claim 이후 다운로드부터 제출까지이며 전송 실패 때도 남는다. 큐 대기·폴링·모델 초기화·신청 필터 시간은 제외하므로 손님 요청의 종단 지연으로 읽지 않는다.
 
 `analysis_resources`는 분석 자식의 곡당 CPU 시간과 Linux에서 프로세스 수명 전체의 최대 RSS(KiB)를 남긴다. 최대 RSS는 곡별 메모리가 아니라 누적 최고치다. 첫 곡과 이후 곡, 곡 길이별 총시간을 비교하고 운영 systemd cgroup의 `cpu.stat`에 있는 throttling도 함께 확인한다. `estimated_seconds_per_track`은 실행 시간 예측에 사용되지 않는 기존 참고값이며 실측 근거로 쓰지 않는다.
 
@@ -180,21 +186,22 @@ HTTP 응답에서는 401·503이 토큰 설정, 404가 서버 배포 버전, 413
 
 오디오를 직접 듣는 LLM에게 무드·악기·보컬·구간 변화를 **자유 서술**로 받는다. 실행 여부와 **시스템 프롬프트** 모두 서버 설정이 정하고(기본 켜짐), 운영자가 Lab에서 바꾼다 — 토글은 툴바에, 프롬프트 편집기는 `틀림 판정` 보기에 있다. 워커는 claim 응답으로 둘 다 받으므로 재시작이 필요 없다. `OPENROUTER_API_KEY`가 없으면 켜져 있어도 건너뛴다. 모델은 `AUDIO_LLM_MODEL`로 고른다.
 
-동작 계약 — 이 세 가지가 이 단계의 존재 이유다.
+이 단계는 매장 정책을 받아 승인·거절하는 심사가 아니다. 현재 신청 필터는 [LLM_FILTER.md](../docs/LLM_FILTER.md)처럼 저장된 분석을 참고하며, 신규 분석 완료를 기다리지 않는다.
 
-- **1단의 장르 판단을 프롬프트에 넣지 않는다.** `audio_llm.py`에는 장르를 받을 인자 자체가 없다. 예외는 Valence/Arousal로, `describe`가 `config['va']`로 받아 척도를 붙인 숫자로 넣는다(`va_context`). 보정된 값이라 숫자가 뜻을 갖는다는 것이 근거이며, 보정되지 않은 MAEST 태그 점수와 구분된다 — [가드레일](../docs/AI_CHANGE_GUARDRAILS.md#audio-analysis-contract).
+동작 계약:
+
+- **1단의 장르 판단을 프롬프트에 넣지 않는다.** `audio_llm.py`에는 장르를 받을 인자 자체가 없다. 예외는 Valence/Arousal로, `describe`가 `config['va']`로 받아 척도를 붙인 숫자로 넣는다(`va_context`). 보정된 값이라 숫자가 뜻을 갖는다는 것이 근거이며 보정되지 않은 MAEST 태그 점수와 구분된다 — [가드레일](../docs/AI_CHANGE_GUARDRAILS.md#audio-analysis-contract).
+- **각 구간의 시간 범위를 알려 주고 `structure`를 구간별로 하나씩 받는다.** 3구간을 한 서술로 뭉치게 하면 구간마다 다르게 들린 곡에서 모델이 매번 한쪽을 골라야 하고, 그 선택이 실행마다 뒤집혀 필터 판정까지 흔들렸다(실측 일치율 56% → 구간별로 나눈 뒤 90%).
 - **임베딩 벡터를 텍스트로 넣지 않는다.** LLM에는 오디오 자체를 준다.
 - **택소노미를 주지 않는다.** 자유 서술로 받고 정규화는 나중에 한다.
 
-곡 전체를 고르게 나눠 `AUDIO_LLM_SEGMENTS`개 구간을 `AUDIO_LLM_CLIP_SEC`초씩 16kHz 모노 **24kbps mp3**로 잘라 보낸다. 무압축 wav는 4구간에 base64 4.9MB인데 mp3는 0.46MB다 — 같은 곡으로 나란히 호출해 서술·악기·구간 구조가 모두 유지되는 것을 확인했다. 호출 시간은 3회 측정에서 wav 18.8~22.2초, mp3 17.1~22.1초로 각자의 편차가 차이보다 커 유의미한 속도 이득은 확인되지 않았다. 줄어드는 것은 업로드 대역이며 같은 회선을 CafeStudy ADB 워커가 함께 쓴다. 인트로만 듣지 않으며 마지막 구간은 곡 끝에 닿는다. 원본에는 모델 ID, 프롬프트 버전, 샘플 구간, 입력 파일 해시를 함께 남겨 재현할 수 있게 한다.
+곡 전체를 고르게 나눠 `AUDIO_LLM_SEGMENTS`개 구간을 `AUDIO_LLM_CLIP_SEC`초씩 16kHz 모노 **24kbps mp3**로 잘라 보낸다. 마지막 구간은 곡 끝에 닿는다. 모델 ID·프롬프트 버전·샘플 구간·입력 해시와 토큰 사용량·generation ID를 함께 저장한다. 구간 선택·인코딩·응답 스키마는 `audio_llm.py`가 기준이다.
 
-프롬프트 버전은 기본 문장이면 `audio-llm-2`, 운영자가 고쳤으면 `custom-<sha256 앞 12자>`다. 서버(`settings.promptVersion`)와 워커(`audio_llm.resolve_prompt`)가 같은 규칙으로 만든다. 본문은 실행 결과에 넣지 않는다 — 곡마다 같은 문장이 복제되기 때문이다. 대신 `audio_prompt_revisions`에 추가만 되고 DB trigger가 수정·삭제를 막으므로, 옛 서술의 `prompt_version`으로 당시 문장을 되짚을 수 있다.
-
-토큰 사용량과 generation ID도 함께 남긴다. 요금 추적과 구간 수 조정 판단에 쓴다.
+프롬프트 본문은 곡별 실행 결과에 복제하지 않는다. 기본 문장은 Git 템플릿·버전으로, Lab에서 고친 문장은 추가 전용 `audio_prompt_revisions`의 `custom-<sha256 앞 12자>`로 추적한다. 기본 문장이 이 테이블에 자동 저장되는 것은 아니다. 변경 절차는 [프롬프트 파일 관리](#프롬프트-파일-관리)를 따른다.
 
 3단이 실패해도 1단 결과는 그대로 저장하고 `audio_llm_raw`만 null로 남는다.
 
-실측(3~4분 곡, `google/gemini-2.5-pro`, 4구간 × 30초): 곡당 **$0.023**. 호출 지연은 워커가 쉴 때 약 20초, 큐가 도는 중 중앙값 90초로 변동이 크다 — 로컬 처리(ffmpeg 추출·base64)는 0.07초라 거의 전부 OpenRouter 왕복이다. 비용을 줄이려면 `AUDIO_LLM_MODEL`을 `google/gemini-2.5-flash`로 바꾸거나 `AUDIO_LLM_SEGMENTS`·`AUDIO_LLM_CLIP_SEC`을 줄인다. 대량 재분석에는 `:batch` 변형이 절반 가격이다.
+비용·품질의 과거 측정은 [날짜별 실험 기록](experiments/)으로 분리한다. 다른 모델·구간 설정·실행 환경에 그대로 적용하지 않으며, 현재 경로에 배치 API 호출은 구현돼 있지 않다.
 
 `pipeline_mode`는 실제로 돈 단계를 가리킨다.
 
@@ -219,47 +226,6 @@ python analyze.py ./authorized-track.wav \
 ```
 
 `--dry-run`은 제출 없이 JSON만 출력한다. `--source-reference`에는 권리를 다시 확인할 수 있는 내부 참조값을 넣고 개인정보나 시크릿을 넣지 않는다. Windows PowerShell에서는 `export` 대신 `$env:` 문법을 쓴다.
-
-## Audio LLM 처리시간 실험
-
-운영 DB와 서버 큐에 쓰지 않고 실제 한 곡으로 `4x30`, `3x15`, `3x10` 구간 전략을
-비교한다. 음원은 한 번만 내려받고 전략 순서를 반복마다 바꿔, 다운로드 편차와 첫 호출
-warm-up이 특정 전략에 유리하게 섞이지 않게 한다. 각 실행은 구간 추출, LLM 왕복,
-전체 호출 시간을 분리하며 결과 JSON에는 다운로드를 합친 예상 end-to-end P50·P90을
-남긴다.
-
-```bash
-export OPENROUTER_API_KEY='...'
-python audio-analysis-worker/benchmark_audio_llm.py \
-  --platform youtube \
-  --track-key VIDEO_ID \
-  --repeats 3 \
-  --output ./audio-llm-benchmark.json
-```
-
-`--strategies 4x30,3x15,3x10`, `--model`, `--timeout-sec`로 조건을 바꿀 수 있다.
-`--prompt-file`은 후보 시스템 프롬프트를 배포 없이 재 본다 — 운영에서 Lab이 넘기는
-오버라이드와 같은 경로(`resolve_prompt`)라 좋았던 문구를 그대로 Lab에 넣을 수 있다.
-`--with-va`는 Essentia V/A를 계산해 프롬프트에 넣고, `--va-style`이 숫자와 밴드 이름을
-가른다. 출력의 `estimated_end_to_end_sec`는 같은 곡에서 한 번 측정한 다운로드 시간과
-해당 Audio LLM 호출 시간을 합친 비교값이다.
-
-### 측정 결과 — 3x10 고정 (2026-09-17, 1곡 × 전략당 8회)
-
-| 전략 | E2E P50 | E2E P90 |
-| --- | --- | --- |
-| 4x30 | 34.4초 | 42.8초 |
-| 3x15 | 22.7초 | 59.0초 (55초 이상치 1건) |
-| **3x10** | **17.7초** | **20.3초** |
-
-구간을 더 줄여도 이득이 없다. **호출 시간의 81%가 구간 수와 무관한 고정 비용**이라,
-구간을 1개로 줄여도 13.6초가 11.1초가 될 뿐이다(1x10 6회 실측). 같은 이유로 구간별
-병렬 호출도 권하지 않는다 — 벌 수 있는 것은 1초 남짓인데 비용은 3배가 되고, wall
-time이 `max(호출들)`이라 P90이 오히려 나빠지며, 한 호출이 여러 구간을 들어야 쓸 수
-있는 `structure` 필드를 잃는다.
-
-표본이 K-pop 1곡이라 장르·길이·보컬 유무가 다른 곡으로 반복해 `p90_end_to_end_sec`가
-30초 안에 드는지 확인해야 한다.
 
 추출 범위는 BPM·비트 신뢰도, 조성·장단조·조성 강도, danceability, 평균 음량, 다이내믹 복잡도, spectral centroid, energy와 이에 기반한 템포·리듬 추천이다. 분위기 추천은 Valence/Arousal이 있을 때만 만든다.
 
@@ -298,13 +264,13 @@ manifest 필드와 허용 확장자·크기 제한, 경로 검증 규칙은 `man
 | `AUDIO_MODEL_DIR` | `~/caffeine-audio/models` | 모델 `.pb` 위치 |
 | `AUDIO_WORKER_ROOT` | `~/caffeine-audio` | 락 파일과 수동 큐 디렉터리 루트 |
 | `POLL_INTERVAL_MS` | `5000` | 큐가 비었을 때 재확인 간격 |
-| `ENABLE_VALENCE_AROUSAL` | `true` | 수동 CLI 감정 모델 스위치. 자동 큐는 모델이 있으면 항상 돌린다 |
+| `ENABLE_VALENCE_AROUSAL` | 실행 경로별 | `analyze.py` 기본 true, 수동 디렉터리 큐 기본 false. 자동 큐는 이 플래그와 무관하게 모델이 준비되면 실행 |
 | `AUDIO_WORKER_DRY_RUN` | `false` | 자동 워커는 `true`면 **기동을 거절한다**. 수동 큐에서는 제출을 생략한다 |
-| `DISCORD_AUDIO_WEBHOOK_URL` | — | 수동 큐 실패 알림. 자동 워커는 작업 상태와 journald로 진단한다 |
+| `DISCORD_AUDIO_WEBHOOK_URL` | — | 자동·수동 워커 시작 알림, 수동 큐 실패 알림. 자동 작업 실패는 상태와 journald로 진단 |
 | `OPENROUTER_API_KEY` | — | 3단 인증. 없으면 서버가 켜 두어도 3단을 건너뛴다 |
 | `AUDIO_LLM_MODEL` | `google/gemini-2.5-pro` | 사용할 오디오 입력 모델 |
-| `AUDIO_LLM_SEGMENTS` | `4` | 곡에서 고르게 뽑을 구간 수 |
-| `AUDIO_LLM_CLIP_SEC` | `30` | 구간 길이(초) |
+| `AUDIO_LLM_SEGMENTS` | `3` | 곡에서 고르게 뽑을 구간 수 |
+| `AUDIO_LLM_CLIP_SEC` | `10` | 구간 길이(초) |
 | `AUDIO_LLM_TIMEOUT_SEC` | `180` | 3단 호출 제한 시간 |
 
 ## 테스트
@@ -341,6 +307,6 @@ python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 
 [오디오 분석 prompts 폴더](prompts)의 `audio-description.system.j2`와 `audio-description.user.j2`가 3단 LLM의 **기본** 텍스트 본문이다. 운영자가 Lab에서 시스템 프롬프트를 저장하면 claim 응답으로 실려 와 `audio-description.system.j2`를 대신한다. Lab에서 비우면 다시 이 파일로 돌아간다. 사용자 메시지 템플릿은 서버가 덮어쓰지 않는다. `prompt_renderer.py`는 Jinja2의 StrictUndefined로 누락 변수를 거절하고 일반 텍스트를 렌더링한다. 오디오 데이터 첨부·구간 선택·응답 스키마는 `audio_llm.py`에 유지한다.
 
-user 템플릿의 입력은 `clip_count`다. MAEST 결과·곡 제목·아티스트·택소노미를 추가하지 않는다. 템플릿 본문을 바꿀 때는 `audio_llm.py`의 `PROMPT_VERSION`도 올리고 Python 테스트를 실행한다. 이번 파일 분리는 출력 문구가 같으므로 기존 버전을 유지한다.
+user 템플릿의 입력은 `clip_count`다. MAEST 결과·곡 제목·아티스트·택소노미를 추가하지 않는다. 기본 본문을 바꿀 때는 워커 `audio_llm.py`의 `PROMPT_VERSION`과 서버 `settings.js`의 `BUILTIN_PROMPT_VERSION`을 맞춰 올리고 양쪽 프롬프트 테스트를 실행한다.
 
 업데이트 시 사용하는 requirements 파일로 의존성(Jinja2 포함)을 설치하고 저장소의 prompts 폴더까지 갱신한 뒤 서비스를 재시작한다. 전체 프롬프트 목록은 [최상단 README](../README.md#llm-프롬프트-바로가기)에 있다.
