@@ -36,22 +36,22 @@
 
 ## 색상
 
-| 역할 | 권장값 | 용도 |
-| --- | ---: | --- |
-| Canvas | `#F5F6F8` | 앱 기본 배경 |
-| Surface | `#FFFFFF` | 콘텐츠와 설정 면 |
-| Surface subtle | `#F2F4F6` | 보조 영역, 빈 상태 |
-| Text strong | `#191F28` | 제목, 핵심 값 |
-| Text | `#333D4B` | 기본 본문 |
-| Text muted | `#6B7684` | 설명, 보조 정보 |
-| Text disabled | `#AAB2BD` | 비활성 정보 |
-| Stroke | `#E5E8EB` | 구분선, 입력 테두리 |
-| Primary / hover | `#3182F6` / `#1B64DA` | 주요 행동, focus |
-| Success | `#00A878` | 정상 완료, 연결됨 |
-| Warning | `#F59F00` | 확인이 필요한 상태 |
-| Danger | `#E42939` | 삭제, 실패, 중단 위험 |
+실제 값은 `owner/src/styles/global.css`가 단일 기준이다. 이 문서는 각 토큰의 **역할**만 정의하고 hex를 복사하지 않는다.
 
-- 새 색상을 역할 없이 추가하지 않는다.
+| 토큰 | 역할 |
+| --- | --- |
+| `--owner-canvas` | 앱 기본 배경 |
+| `--owner-surface`, `--owner-surface-subtle` | 콘텐츠·설정 면과 보조 영역·빈 상태 |
+| `--owner-text-strong`, `--owner-text`, `--owner-text-muted`, `--owner-text-disabled` | 제목·핵심 값 / 기본 본문 / 설명·보조 / 비활성의 4단계 위계 |
+| `--owner-stroke` | 구분선, 입력 테두리 |
+| `--owner-primary`, `--owner-primary-hover` | 주요 행동과 focus |
+| `--owner-success` | 정상 완료, 연결됨 |
+| `--owner-warning` | 확인이 필요한 상태 |
+| `--owner-danger` | 삭제, 실패, 중단 위험 |
+
+사용 규칙:
+
+- 새 색상을 역할 없이 추가하지 않는다. hex를 화면 코드에 직접 쓰지 않고 토큰을 참조한다.
 - 플랫폼 공식 색상은 작은 로고·점·배지에만 쓰고 버튼이나 카드 전체 배경으로 확장하지 않는다.
 - 색상만으로 상태를 전달하지 않고 문구나 아이콘을 함께 쓴다.
 - 장식용 그라데이션, glow, 강한 그림자를 쓰지 않는다.
