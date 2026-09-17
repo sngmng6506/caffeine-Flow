@@ -22,7 +22,8 @@ customer/src/constants/recommendationStatus.js
 - 동일 카페·동일 곡의 활성 중복은 DB 제약으로도 막는다.
 - 상태 문자열을 라우트나 UI에 새로 직접 작성하지 않는다.
 
-상태 흐름: [ARCHITECTURE.md#recommendation-status-contract](ARCHITECTURE.md#recommendation-status-contract)
+상태 흐름:
+[ARCHITECTURE.md#recommendation-status-contract](ARCHITECTURE.md#recommendation-status-contract)
 
 ## Music Filter Status Contract
 
@@ -79,33 +80,25 @@ server/src/routes/admin.js
 audio-analysis-worker/
 server/src/constants/audio-analysis.js
 server/src/features/audio-analysis/
-server/src/db/migrations/20260907090000_music_audio_analyses.js
 server/src/routes/audio-analysis.js
-server/src/features/audio-analysis/runs.js
 ```
 
-- 수집 소스·범위는 [워커 README](../audio-analysis-worker/README.md#최신곡-수집)가 기준이다. 순위 소스에서 한 구간(한 나라·한 장르)이 바닥나도 `scanned`를 요청량보다 작게 보고하지 않는다. 서버가 커서를 0으로 되감아 첫 구간만 반복하게 된다.
-- 최신곡 수집은 워커가 곡 목록과 플랫폼 검색을 맡는다. 서버에서 검색하지 않는다. 소스별 진도는 `music_source_cursors`가 단일 기준이다. 순위 소스는 offset이 끝에서 0으로 돌아가고, 날짜 소스는 절대 날짜(`covered_from`·`covered_to`)를 쓴다 — 상대적인 며칠 전으로 잡으면 누르지 않은 기간의 곡이 빠진다. 곡 중복은 `(platform, track_key)` unique로 무시하고 기존 작업 상태를 건드리지 않는다.
-- 받을 수 없는 곡은 큐에 넣지 않는다. SoundCloud는 `policy != ALLOW`(Go+ 전용 SNIP 등)를 수집 단계에서 뺀다 — 받으려 하면 `This video is DRM protected`가 나고 DRM 우회는 지원하지 않으므로 영원히 실패한다. 그래도 들어온 것은 `SOURCE_UNAVAILABLE`로 영구 실패시킨다.
-- 길이 한도를 벗어난 소스는 다운로드 전에 `SOURCE_UNSUPPORTED`로 영구 실패시킨다. `DOWNLOAD_FAILED`는 재시도가 끝나지 않는 코드라, 영원히 성공할 수 없는 소스에 쓰면 6시간마다 반복된다.
-- 자동 워커는 사용자가 지정한 YouTube·SoundCloud 신청곡 URL을 임시 다운로드한다. `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않는다. 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
-- 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증을 사용한다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
-- 워커가 보고하는 두 길이는 서로 다른 샘플레이트로 잰 값이다(`audio_duration_sec`은 16kHz wav 헤더, `features.duration_seconds`는 Essentia가 44.1kHz로 재계산). 밀리초 단위 차이는 리샘플러 때문에 정상이며 `runs.DURATION_TOLERANCE_SEC`가 단일 기준이다. 두 디코더를 같은 샘플로 맞추라는 검사가 아니라 파일이 바뀐 것을 잡자는 검사다.
-- 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. MAEST 원본은 별도 music_audio_runs에 lease당 한 번 추가한다. 재분석·검토에서 원본을 수정·삭제하지 않으며 DB trigger로도 차단한다.
-- 신청 저장과 작업 등록은 한 트랜잭션이며 플랫폼·곡별 unique로 중복을 막는다. `/admin/audio-labels`의 Lab 큐는 `/admin/music-filter-reviews`의 정책 골드 큐와 완료 정의를 혼용하지 않는다.
-- 자동 라벨은 즉시 DB에 저장한다. 자동 원본과 최종 라벨을 분리하고 사람이 확인·수정한 최종 라벨은 자동 분석으로 덮어쓰지 않는다. 분석 revision과 최종 라벨 revision이 화면과 같을 때만 검토한다.
-- `pipeline_mode`는 실제로 돈 단계를 가리킨다. 신청 시점 경로는 MAEST를 돌리지 않는 `EMOTION_LLM`이며, `MAEST_ONLY`·`MAEST_EMOTION`·`FULL`은 이미 저장된 행을 읽을 때만 쓴다. `sources_used`에 실행한 모델을 순서대로 남기고, 원본의 무드 값은 `features`의 감정값과 일치해야 한다. 보컬·악기는 unknown이며 장르에서 추측하지 않는다.
-- **MAEST는 신청 시점 경로에서 빼기로 했다(2026-09-17, 운영자 판단).** 이 미니PC에서 곡당 76초를 쓰면서, 같은 4코어를 나눠 쓰는 3단까지 4~5배 느리게 만들었다(실측: 3단 단독 16초, MAEST와 동시 76초). `EMOTION_LLM`에서 `maest_raw`는 null이고 `normalized.genre`는 빈 배열이어야 한다 — 장르를 `unknown`으로 채우지 않는다. "모른다"와 "판단할 모델이 돌지 않았다"는 다르고, 소비처는 빈 배열일 때 장르 줄을 렌더하지 않는다.
-- 3단 Audio LLM 프롬프트에 MAEST 태그 점수·임베딩 벡터·고정 택소노미를 넣지 않는다. MAEST 점수는 보정되지 않은 상대값이라 숫자로 넣으면 모델이 곡끼리 비교하게 되고, 택소노미는 선택지를 좁혀 학습 분포 밖 음악의 정보를 지운다. `audio_llm_raw`는 자유 서술 원문과 모델 ID·프롬프트 버전·샘플 구간·입력 해시를 보존하고, 입력 해시는 1단이 분석한 파일과 같아야 한다.
-- **Valence/Arousal은 예외로 3단 프롬프트에 넣는다(2026-09-17, 운영자 판단).** MAEST 태그 점수와 달리 `normalize_score`가 DEAM 원본 척도 [1,9]를 [0,1]로 옮긴 보정된 값이라 0.6이 어디서나 같은 뜻이다. 척도를 함께 적어 숫자로 넣고 밴드 이름으로 바꾸지 않는다 — 경계가 0.35/0.65라 valence 0.601과 arousal 0.641이 똑같이 `중간`이 되어 차이가 사라진다. 참고값임을 밝혀 3단이 들은 것과 어긋나면 들은 대로 쓰게 한다. 이 예외는 V/A 한정이며 위 항목의 나머지 금지는 그대로다.
-- 3단은 외부 유료 API로 오디오 구간을 보낸다. 실행 여부와 시스템 프롬프트 설정은 `audio_pipeline_settings`가 기준이며 워커는 claim 응답으로 받는다. Lab의 제어를 워커 환경변수로 대체하지 않는다. 사용자 프롬프트 이력의 수정·삭제 금지와 서버·워커 버전 일치를 유지한다. 기본·사용자 본문의 보존 위치는 [워커 README](../audio-analysis-worker/README.md#3단-audio-llm)를 따른다. 3단 실패가 1단 결과 저장을 막지 않는다.
-- 모델 가중치 파일을 저장소에 커밋하지 않는다. 워커가 시작할 때 SHA-256으로 공식 배포본인지 확인한다.
-- 일괄 재분석은 작업 행만 잠근다(`FOR UPDATE OF "job"`). 조인한 `music_track_annotations`까지 잠그면 재분석이 도는 동안 사람 판정 저장이 막힌다. 쿼리 조립은 `rejectedJobsQuery`로 분리해 DB 없이 검사한다 — 빌더 오용은 통합 테스트에서만 드러나는데 그건 Postgres가 있어야 돌아 건너뛰기 쉽다.
-- 틀림 판정한 최신 분석은 실시간 프롬프트에서 제외하며, 이전 분석을 대신 사용하지 않는다. 새 재분석만 기존 분석 판정을 초기화한다.
-- 자동 분석은 실시간 음악 필터 프롬프트에 들어간다(`music-filter/track-analysis.js`). 판단을 돕는 재료이지 판단의 전제가 아니다 — 분석이 없거나 조회에 실패해도 제목·아티스트만으로 판단하며, 조회 실패를 fail-closed 거절로 만들지 않는다. 조회 키는 `canonicalizeVideoId`를 거친다.
-- 필터 프롬프트에 MAEST 점수를 넣지 않는다. 보정되지 않은 상대값이라 숫자를 보여주면 곡끼리 비교하게 된다. 순위(`prompt_styles`의 label)만 넣고 보정되지 않았음을 밝힌다. Valence·Arousal도 숫자 대신 말로 바꿔 넣는다 — 척도를 모르는 모델은 0.81을 제멋대로 해석한다.
+- **신청 시점 경로는 `EMOTION_LLM`이다** — Valence/Arousal + Audio LLM. MAEST는 곡당 76초를 쓰면서 같은 4코어를 나눠 쓰는 3단까지 4~5배 느리게 만들어 뺐다(2026-09-17, 운영자 판단). `MAEST_ONLY`·`MAEST_EMOTION`·`FULL`은 이미 저장된 행을 읽을 때만 쓴다.
+- `EMOTION_LLM`에서 `maest_raw`는 null이고 `normalized.genre`는 **빈 배열**이어야 한다. `unknown`으로 채우지 않는다 — "모른다"와 "판단할 모델이 돌지 않았다"는 다르고, 소비처는 빈 배열일 때 장르 줄을 렌더하지 않는다. 보컬·악기도 장르에서 추측하지 않는다.
+- **3단 프롬프트에 MAEST 태그 점수·임베딩 벡터·고정 택소노미를 넣지 않는다.** 점수는 보정되지 않은 상대값이라 모델이 곡끼리 비교하게 되고, 택소노미는 학습 분포 밖 음악의 정보를 지운다. **Valence/Arousal만 예외다** — `normalize_score`가 DEAM `[1,9]`를 `[0,1]`로 옮긴 보정된 값이라 0.6이 어디서나 같은 뜻이다. 척도를 함께 적어 숫자로 넣고 밴드 이름으로 바꾸지 않는다 (경계가 0.35/0.65라 0.601과 0.641이 똑같이 `중간`이 되어 차이가 사라진다).
+- 3단은 외부 유료 API로 오디오 구간을 보낸다. 실행 여부와 시스템 프롬프트는 `audio_pipeline_settings`가 기준이며 워커는 claim 응답으로 받는다 — 워커 환경변수로 대체하면 운영자가 Lab에서 끄지 못한다. 기본 본문을 바꾸면 서버·워커 버전을 맞춰 올린다. 3단 실패가 나머지 결과 저장을 막지 않는다.
+- `audio_llm_raw`는 자유 서술 원문과 모델 ID·프롬프트 버전·샘플 구간·입력 해시를 보존하고, 입력 해시는 분석한 파일과 같아야 한다.
+- 결과 제출은 `AUDIO_ANALYSIS_WORKER_TOKEN` 전용 인증이다. 관리자·사장님 JWT와 합치거나 공개 엔드포인트로 열지 않는다.
+- 최신 검토용 분석은 `(platform, track_key, model_name, model_version)`으로 upsert한다. 원본은 `music_audio_runs`에 lease당 한 번 추가하며 재분석·검토에서 수정·삭제하지 않는다 (DB trigger로도 차단).
+- 자동 원본과 사람이 확인·수정한 최종 라벨을 분리한다. 최종 라벨을 자동 분석으로 덮어쓰지 않으며, 분석 revision과 최종 라벨 revision이 화면과 같을 때만 검토한다.
+- **영원히 성공할 수 없는 소스는 영구 실패로 분류한다.** 길이 한도 밖·라이브·DRM은 `SOURCE_UNSUPPORTED`/`SOURCE_UNAVAILABLE`이다. `DOWNLOAD_FAILED`는 재시도가 끝나지 않는 코드라 6시간마다 같은 곡이 돌아온다.
+- `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않고 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
+- 일괄 재분석은 작업 행만 잠근다(`FOR UPDATE OF "job"`). 조인한 `music_track_annotations`까지 잠그면 재분석이 도는 동안 사람 판정 저장이 막힌다.
+- 자동 분석은 실시간 필터 프롬프트에 들어가지만 **판단의 전제가 아니다** — 분석이 없거나 조회에 실패해도 제목·아티스트만으로 판단하며 조회 실패를 fail-closed 거절로 만들지 않는다. 조회 키는 `canonicalizeVideoId`를 거친다. 틀림 판정한 분석은 제외하되 이전 분석을 대신 쓰지 않는다.
+- 필터 프롬프트에 MAEST 점수를 숫자로 넣지 않는다. 순위(`prompt_styles`의 label)만 넣고 보정되지 않았음을 밝힌다. 선택 기준은 `runs.selectPromptStyles`가 단일 기준이며 **1위 점수의 0.5배 이상, 최대 5개**다 — 소비처가 절대 임계값으로 바꾸지 않는다. 점수 스케일이 곡마다 다르기 때문이다.
 - 자동 분석을 라이브 입력에 연결한 사실만으로 품질 향상을 주장하지 않는다. 골드 라벨·false accept 평가는 [ROADMAP](ROADMAP.md)에 남긴다.
-- 소비 프롬프트의 MAEST 스타일은 `runs.selectPromptStyles`가 단일 기준이다. 1위 점수의 0.5배 이상, 최대 5개이며 완료 시 `maest_summary.prompt_styles`에 저장한다. 소비처가 임계값을 다시 정의하거나 절대 임계값으로 바꾸지 않는다 — 점수 스케일이 곡마다 다르다. 보정되지 않은 상대 점수임을 프롬프트에 밝힌다.
+- 수집 소스·진도 규칙은 [워커 README](../audio-analysis-worker/README.md#최신곡-수집)가 기준이다. 소스별 진도는 `music_source_cursors`가 단일 기준이다.
+- 모델 가중치를 저장소에 커밋하지 않는다. 워커가 시작할 때 SHA-256으로 확인한다.
 
 ## Router Mount Order Contract
 
