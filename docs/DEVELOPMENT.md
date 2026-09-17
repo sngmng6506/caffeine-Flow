@@ -89,17 +89,11 @@ owner Vite 빌드는 `VITE_GOOGLE_CLIENT_ID`, `VITE_NAVER_ENABLED`를 사용한�
 
 구조화 출력을 tool(function) call로 받으므로 모델은 tool calling을 지원해야 한다. 동작 계약은 [LLM_FILTER.md](LLM_FILTER.md)를 따른다.
 
-## Essentia 라벨링 워커
+## 오디오 분석 워커
 
-`audio-analysis-worker/`는 서버와 별도 Python 프로세스로 실행한다. 기존 로컬 CLI와 서버 작업 큐 기반 자동 워커를 제공한다. 음원·외부 LLM 전송 경계는 [워커 README](../audio-analysis-worker/README.md)를 따른다.
+`audio-analysis-worker/`는 서버와 별도로 미니PC에서 도는 Python 프로세스다. 설치·실행·환경변수·테스트·진단은 [워커 README](../audio-analysis-worker/README.md)가 기준이다. 서버와 공유하는 두 변수는 위 [환경변수](#환경변수) 표에 있다.
 
-서버와 워커에 같은 `AUDIO_ANALYSIS_WORKER_TOKEN`을 설정한다. Railway 환경변수는 미니PC에 자동 전달되지 않는다. 서버 필터와 워커 Audio LLM은 각 실행 환경의 `OPENROUTER_API_KEY`를 읽는다. 설치·실행·환경변수는 [워커 README](../audio-analysis-worker/README.md#환경변수)가 단일 기준이다.
-
-```bash
-python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
-```
-
-미니PC 상주 운영은 `remote_worker.py`가 서버 DB 큐를 폴링한다. 기존 `worker.py`는 수동 디렉터리 큐 호환용이다.
+서버 마이그레이션을 배포한 뒤 호환되는 미니PC 저장소 전체를 갱신한다. 워커 Python 파일만 복사하면 공유 JSON 계약·프롬프트가 어긋날 수 있다.
 
 ## 마이그레이션
 
@@ -252,5 +246,3 @@ railway.json
 server/src/db/migrations/
 owner/package.json
 ```
-
-서버 마이그레이션을 배포한 뒤 호환되는 미니PC 저장소 전체를 갱신한다. 워커 Python 파일만 복사하면 공유 JSON 계약·프롬프트가 어긋날 수 있다. 설치·진단·결과 복구는 [워커 README](../audio-analysis-worker/README.md)가 기준이다.

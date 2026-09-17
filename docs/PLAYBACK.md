@@ -48,37 +48,20 @@ BGM 재생 → BGM 음소거 → recView에서 신청곡 재생
 
 ## 보안 경계
 
-Electron은 DRM 재생을 위해 CastLabs Electron과 Widevine을 사용한다. 외부 페이지 대응 코드는 공격면을 넓히기 쉬우므로 다음을 지킨다.
+Electron은 DRM 재생을 위해 CastLabs Electron과 Widevine을 사용한다. IPC·sandbox·`contextIsolation` 예외·`media` 권한 규칙은 [가드레일](AI_CHANGE_GUARDRAILS.md#web-security-boundary-contract)이 기준이고, 재생 쪽에서 더 지킬 것은 다음이다.
 
-- IPC 채널을 임의로 확장하지 않고, 사장님 메인 renderer에서 온 이벤트만 처리한다.
 - 신청곡은 서버가 서명한 메타데이터의 플랫폼·ID만 재생한다.
-- 기본 BGM URL은 YouTube·SoundCloud·Spotify HTTPS host allowlist를 통과해야 한다.
-- 외부 음악·팝업 WebContents는 Chromium sandbox를 사용한다. YouTube preload는 `contextIsolation`을 켜고, main world 보정이 필요한 Spotify/SoundCloud·로그인 stealth preload만 격리 예외로 둔다.
-- 외부 음악 페이지에 camera/microphone을 포함하는 `media` 권한을 주지 않으며 DRM 권한만 허용된 음악 origin에 부여한다.
+- 기본 BGM URL은 `navigation-policy.js`의 HTTPS host allowlist를 통과해야 한다.
 - 외부 페이지 DOM 조작은 플랫폼별 어댑터 경계 안에 둔다.
 - 로그인 정보와 토큰을 로그에 남기지 않는다.
 
 ## 이벤트 계약
 
-아래는 재생 흐름의 주요 이벤트다. 전체 공개 API는 `owner/electron/preload.js`, 메인 IPC 처리는 각 책임 모듈이 기준이다.
+renderer에 노출하는 API 목록은 `owner/electron/preload.js`, 메인 IPC 처리는 각 책임 모듈이 기준이다. 이름만으로 알 수 없는 약속은 다음이다.
 
-```text
-playRec             신청곡 URL 검증·navigation 요청. Promise<{ ok, error? }>
-endRec              신청곡 종료 처리 및 BGM 복귀
-setBgmUrl           기본 BGM 설정. Promise<boolean>
-clearBgm            기본 BGM 해제. Promise<boolean>
-isRecActive         메인 프로세스의 실제 신청곡 재생 모드 조회
-onVideoEnded        신청곡 정상 종료. 다음 곡 자동 재생
-onRecLeft           신청곡 이탈. 원곡 종료만, 자동 재생 없음
-onNowPlaying        현재 재생 정보
-onPlaybackState     재생·일시정지·버퍼링 상태
-onCurrentTrack      현재 BrowserView에서 감지한 공개 곡 메타데이터
-onManualTrackEnded  직접 재생곡 종료. playback_history 기록을 트리거
-onWidevineStatus    Widevine 상태
-setPanelRatio       렌더러/BrowserView 경계 조정
-setPanelCollapsed   사장님 화면을 48px 상태 레일로 접거나 복원
-```
-
+- `onVideoEnded`는 신청곡 정상 종료로 다음 곡을 자동 재생한다. `onRecLeft`는 이탈이라 원곡을 종료만 하고 자동 재생하지 않는다.
+- `onManualTrackEnded`가 직접 재생곡의 `playback_history` 기록을 트리거한다.
+- `supports*` 값은 원격 owner SPA가 기존 설치본과 새 설치본을 구분하는 capability다. 새 호출 방식을 추가하면 capability도 함께 노출한다.
 - `on*` 구독 함수는 해당 리스너만 제거하는 해제 함수를 반환한다. 컴포넌트 정리 시 다른 화면의 구독을 일괄 삭제하지 않는다.
 - 패널을 접을 때 `bgmView`와 `recView`를 제거하지 않고 bounds만 바꾼다. 접힘 상태는 재시작·reload 시 초기화하고 마지막 펼친 비율만 로컬에 보존한다.
 
@@ -88,19 +71,19 @@ setPanelCollapsed   사장님 화면을 48px 상태 레일로 접거나 복원
 - 현재 곡 메타데이터는 Media Session의 제목·아티스트·아트워크를 우선 읽고 플랫폼별 최소 DOM fallback을 사용한다. 사장님이 오른쪽 화면에서 곡을 직접 바꿔도 리더 소켓이 `playback_state.track`으로 전달한다. 손님 화면은 이 값을 DB 신청곡보다 우선 표시하고, 감지 실패 시 기존 `playing` 신청곡으로 되돌아간다.
 - 서버는 제목 길이·플랫폼·썸네일 host를 allowlist로 제한하고 계정·세션·원본 페이지 URL은 손님에게 전달하지 않는다.
 - 기본 BGM 화면에서 사장님이 직접 고른 곡은 감지 즉시 UUID 재생 세션을 만들고 `playback_state.track`에 세션 댓글 키와 확인된 곡 ID를 포함한다. 신청곡 `playing`과 별개이며 추천·TOP 통계에 넣지 않는다.
-- 직접 재생곡은 정상 종료 시 재생 시간과 무관하게, 다른 곡으로 바뀌면 60초 이상일 때만 `playback_history`에 저장한다. 60초 미만 탐색 재생도 이미 작성된 댓글은 보존하고, 실제 곡 ID가 확인되면 세션 댓글 키를 곡 ID로 병합한다.
+- 직접 재생곡은 정상 종료 시 재생 시간과 무관하게, 다른 곡으로 바뀌면 기준 시간(`playback-history-policy.js`) 이상일 때만 `playback_history`에 저장한다. 기준 미만 탐색 재생도 이미 작성된 댓글은 보존하고, 실제 곡 ID가 확인되면 세션 댓글 키를 곡 ID로 병합한다.
 
 ## 재생 리더와 시작 확인
 
 - Electron renderer는 앱 실행 세션 동안 유지되는 UUID를 소켓 handshake에 보낸다.
 - 서버는 카페별 첫 재생 가능 세션을 리더로 선출하고 `playback_role`을 보낸다.
-- 리더 연결이 끊기면 같은 세션의 재연결을 15초 기다린 뒤 follower를 승격한다.
+- 리더 연결이 끊기면 같은 세션의 재연결을 `PLAYBACK_LEADER_GRACE_MS`(`time-policy.js`)만큼 기다린 뒤 follower를 승격한다.
 - renderer reload로 같은 세션이 돌아오면 진행 중인 `playing`을 초기화하지 않는다. 완전히 새 리더가 선출된 경우에만 남은 `playing`을 `accepted`로 복구한다.
 - 서버 프로세스만 재시작된 경우 메인 프로세스의 실제 재생 모드를 확인한다. 같은 실행 세션에서 신청곡이 계속 재생 중이면 DB `playing`을 유지하고 registry만 ACK한다.
 - 복구 필요 상태는 DB 복구 성공 ACK 전까지 유지한다. API·소켓 오류로 ACK하지 못하면 같은 리더가 재시도한다.
 - 브라우저나 follower가 보낸 `playback_state`는 서버가 무시한다.
 
-재생 시작은 `playRec` 확인 응답이 먼저다. `{ ok: true }`는 음원이 이미 소리 난다는 뜻이 아니라 URL 검증과 navigation을 Electron이 수락했다는 뜻이다. 이 응답 뒤에만 renderer가 DB를 `playing`으로 바꾸고, DB 갱신이 실패하면 `endRec`으로 되돌린다. 원격 owner SPA가 설치본보다 먼저 배포될 수 있으므로 preload는 `supportsPlayRecAck` capability를 함께 노출한다. 이 값이 없는 기존 설치본은 기존 send 방식으로 동작한다.
+재생 시작은 `playRec` 확인 응답이 먼저다. `{ ok: true }`는 음원이 이미 소리 난다는 뜻이 아니라 URL 검증과 navigation을 Electron이 수락했다는 뜻이다. 이 응답 뒤에만 renderer가 DB를 `playing`으로 바꾸고, DB 갱신이 실패하면 `endRec`으로 되돌린다. `supportsPlayRecAck`가 없는 기존 설치본은 기존 send 방식으로 동작한다.
 
 ## 실패와 복구
 
