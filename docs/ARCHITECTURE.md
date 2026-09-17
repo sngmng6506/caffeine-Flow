@@ -110,13 +110,7 @@ stateDiagram-v2
     rejected --> [*]
 ```
 
-- 활성 상태는 `pending`, `accepted`, `playing`이고 종료 상태는 `played`, `skipped`, `rejected`다.
-- 종료 상태는 다시 활성 상태로 돌리지 않는다.
-- 같은 카페·같은 곡은 활성 상태로 동시에 두 개 존재할 수 없다.
-- 활성 큐는 신청 시각과 관계없이 모두 노출하며 목록·한도·중복이 같은 범위를 사용한다.
-- 허용 상태값과 전이 범위는 `server/src/constants/recommendation-status.js`와 서버 상태 전이 정책이 기준이다.
-
-변경 시 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md#recommendation-status-contract)를 먼저 확인한다.
+활성 상태는 `pending`·`accepted`·`playing`, 종료 상태는 `played`·`skipped`·`rejected`다. 지켜야 할 규칙(종료 상태 되돌리기 금지, 활성 중복 금지, 상태 문자열 직접 작성 금지)은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md#recommendation-status-contract)가 단일 기준이다.
 
 ## 실시간 동기화
 

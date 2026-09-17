@@ -61,17 +61,9 @@ MAEST 점수를 넣지 않는 이유는 보정되지 않은 상대값이기 때�
 
 ## 상태 계약
 
-AI 판단 결과는 일반 큐 상태와 분리해 저장한다.
-
-| 상황 | `status` | `filter_status` |
-| --- | --- | --- |
-| 필터 OFF | `pending` | `skipped` |
-| LLM 수락 | `pending` | `accepted` |
-| LLM 거절 | `rejected` | `rejected` |
-| LLM 오류 | `rejected` | `error_rejected` |
+AI 판단 결과는 일반 큐 상태와 분리해 저장한다. `status`·`filter_status` 매핑은 [AI_CHANGE_GUARDRAILS.md](AI_CHANGE_GUARDRAILS.md#music-filter-status-contract)가 단일 기준이다.
 
 - LLM이 수락해도 서버는 `pending`으로 저장한다. `accepted`·`playing` 전환은 사장님 앱이 담당한다.
-- 자동수락은 `status=pending && filter_status=accepted`만 승격한다. 필터가 꺼진 동안 들어온 `skipped` 곡은 승격하지 않는다.
 - 자동수락 판단은 사장님 화면이 하고 실제 재생 시작만 재생 리더로 제한한다. 여러 대가 붙어 있으면 수락 요청이 중복될 수 있으나 서버 상태 전이가 이를 흡수한다.
 
 ## Fail-closed
@@ -90,10 +82,10 @@ API key 누락 · 요청 timeout · 네트워크·HTTP 오류
 [서비스의 prompts 폴더](../server/src/features/music-filter/prompts)에서 음악 심사와 손님용 안내의 system/user 본문을 관리한다. `prompt.renderer.js`가 Nunjucks로 렌더링하고, 기존 builder/service가 입력 정규화와 역할별 메시지 구성을 담당한다. 매장 정책은 DB의 기존 설정값을 변수로 전달하며 템플릿 파일로 만들지 않는다.
 
 - 템플릿은 저장소에 등록된 파일만 사용한다. 사용자 입력을 템플릿 소스로 실행하거나 렌더링 결과를 재해석하지 않는다.
-- 일반 텍스트이므로 HTML 자동 이스케이프는 끄고, 출력 변수 누락은 오류로 처리한다. 기존 메타데이터의 `unknown` 기본값은 유지한다.
+- 일반 텍스트이므로 HTML 자동 이스케이프는 끄고, 출력 변수 누락은 오류로 처리한다.
 - 판단 로직·제한값·응답 JSON Schema는 코드가 단일 기준이다. 템플릿에는 문장 구성만 둔다.
-- 변경은 Git으로 추적한다. 기존 `filter_prompt_snapshot`은 매장 정책 스냅샷이며 전체 템플릿 버전 기록은 아니다.
-- `npm run test:unit --prefix server`로 프롬프트·상태·오류 계약을 확인한다. `prompt-templates.test.mjs`의 이전 메시지 fixture는 문구 변경이 의도된 경우에만 함께 갱신한다.
+- `filter_prompt_snapshot`은 매장 정책 스냅샷이며 **템플릿 버전 기록이 아니다.** 템플릿 변경은 Git으로만 추적된다.
+- `prompt-templates.test.mjs`의 이전 메시지 fixture는 문구 변경이 의도된 경우에만 함께 갱신한다.
 - 템플릿은 배포 파일에 포함하고 수정 후 서버를 재시작한다.
 
 ## 프롬프트 안전

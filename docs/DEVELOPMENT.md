@@ -70,26 +70,16 @@ YouTube 아닌 플랫폼, 같은 곡의 추적 파라미터 변형, 전체 TOP �
 
 루트 `.env`를 서버가 읽고 배포에서는 Railway 환경변수를 사용한다. 전체 예시는 [.env.example](../.env.example), 기본값은 `server/src/config.js`가 기준이다.
 
-| 키 | 설명 |
+이 표는 전체 목록이 아니다. **빠뜨리거나 잘못 두면 조용히 다치는 것**만 적는다.
+
+| 키 | 놓치면 생기는 일 |
 | --- | --- |
-| `DATABASE_URL` | **필수.** PostgreSQL 연결 문자열 |
-| `JWT_SECRET` | **필수.** 32바이트 이상 랜덤 문자열. 누락·기본값이면 서버가 시작하지 않는다 |
-| `PORT` | 서버 포트, 기본 3000 |
-| `APP_URL` | OAuth 이동·Socket.IO CORS 기준 URL |
-| `SERVER_URL` | Naver callback 기준 서버 URL |
-| `DATABASE_SSL` | `disable`, `no-verify`, `verify` |
-| `ADMIN_PASSWORD` | 운영자 콘솔 비밀번호. 없으면 `/admin/login`이 503 |
-| `AUDIO_ANALYSIS_WORKER_TOKEN` | 워커 전용 토큰. 결과 제출과 자동 작업 큐(`/audio-analysis/jobs/*`)를 함께 게이트한다. 없으면 두 경로 모두 503이라 자동 라벨링이 아예 돌지 않는다 |
-| `GOOGLE_CLIENT_ID` | Google 로그인 |
-| `NAVER_CLIENT_ID` | Naver 로그인 |
-| `NAVER_CLIENT_SECRET` | Naver 로그인 |
-| `ALERT_WEBHOOK_URL` | 운영자 에러 알림 Discord webhook. 미설정이면 알림 없이 로그만 남는다. **프로세스 시작 시 한 번만 읽으므로 배포 후 추가했다면 재시작해야 켜진다** — production에서 비어 있으면 시작 로그에 경고가 남는다 |
-| `NODE_ENV` | `production` / `development` / `test`. 배포에서는 **명시적으로 `production`을 설정한다** — 없으면 운영이 아닌 것으로 취급돼 개발 localhost origin이 허용되고, CORS·쿠키 Secure·rate limit·알림 경고가 함께 어긋난다 |
-| `OPENROUTER_API_KEY` | OpenRouter 인증. 필터 ON에서 누락 시 fail-closed |
-| `OPENROUTER_BASE_URL` | 기본 `https://openrouter.ai/api/v1` |
-| `OPENROUTER_APP_NAME` | 기본 `Caffeine Flow` |
-| `MUSIC_FILTER_MODEL` | 기본 `anthropic/claude-sonnet-5` |
-| `MUSIC_FILTER_TIMEOUT_MS` | 기본 `8000` |
+| `JWT_SECRET` | 누락·기본값이면 서버가 시작하지 않는다. 32바이트 이상 랜덤 |
+| `NODE_ENV` | 배포에서 **명시적으로 `production`**. 없으면 운영이 아닌 것으로 취급돼 개발 localhost origin이 허용되고 CORS·쿠키 Secure·rate limit·알림 경고가 함께 어긋난다 |
+| `ALERT_WEBHOOK_URL` | **프로세스 시작 시 한 번만 읽는다.** 배포 후 추가했다면 재시작해야 켜진다. production에서 비어 있으면 시작 로그에 경고가 남는다 |
+| `AUDIO_ANALYSIS_WORKER_TOKEN` | 결과 제출과 작업 큐를 함께 게이트한다. 없으면 두 경로 모두 503이라 자동 라벨링이 아예 돌지 않는다. 서버와 워커에 같은 값을 넣는다 — Railway 환경변수는 미니PC에 자동 전달되지 않는다 |
+| `OPENROUTER_API_KEY` | 필터 ON에서 누락 시 fail-closed. 서버 필터와 워커 3단이 **각자의 실행 환경**에서 읽는다 |
+| `MUSIC_FILTER_MODEL` | 구조화 출력을 tool call로 받으므로 tool calling을 지원하는 모델이어야 한다 |
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -137,32 +127,13 @@ npm run build --prefix customer
 npm run build --prefix owner
 ```
 
-`owner` 테스트는 재생 리더와 자동수락의 **배선**을 검증한다. 순수 판단 로직은
-`src/pages/dashboard/*.mjs` 헬퍼로 빠져 server 테스트가 덮으므로, 여기서는
-"그 헬퍼를 어느 자리에서 호출하는가"만 본다. 리더가 아닌 화면이 재생을
-시작하는 실수는 순수 함수 테스트로 잡히지 않기 때문이다.
+테스트가 고정하는 것은 개별 가드가 아니라 **관찰 가능한 속성**이다. 예컨대 리더 게이트는 `startPlaying` 내부와 각 호출부에 이중으로 걸려 있어 한 쪽만 지워도 테스트는 통과한다 — 고정 대상은 "리더가 아닌 화면은 `playRec`을 호출하지 않는다"이다. 가드가 중복으로 보여도 지우기 전에 이 점을 확인한다.
 
-리더 게이트는 `startPlaying` 내부와 각 호출부에 이중으로 걸려 있다. 그래서 한
-쪽만 지워도 테스트는 통과한다 — 테스트가 고정하는 것은 개별 가드가 아니라
-"리더가 아닌 화면은 `playRec`을 호출하지 않는다"는 관찰 가능한 속성이다.
+`customer` 테스트는 손님 신원과 상호작용 판정을 덮는다. visitor ID는 신청 취소 권한의 근거라 모든 요청에 실려야 하고, 길게 눌러 링크 복사는 탭과 같은 요소를 공유해 판정이 조금만 어긋나도 정반대로 망가진다. 색상·레이아웃은 대상이 아니다 — 화면 확인이 불가능한 환경에서 스타일을 검증하면 의미 없는 스냅샷만 쌓인다.
 
-`customer` 테스트는 손님 신원과 상호작용 판정을 덮는다. visitor ID는 신청 취소
-권한의 근거이므로 모든 요청에 실려야 하고, 길게 눌러 링크 복사는 탭과 같은
-요소를 공유해 판정이 조금만 어긋나도 정반대로 망가진다. 둘 다 화면을 봐야만
-드러나는 종류라 시간과 좌표를 직접 넣어 고정한다. 색상·레이아웃은 대상이
-아니다 — 화면 확인이 불가능한 환경에서 스타일을 검증하면 의미 없는 스냅샷만
-쌓인다.
+`vi.fn()`은 vitest config의 `restoreMocks` 대상이 아니다. 호출 기록에 의존하는 테스트는 `beforeEach`에서 직접 `mockClear()`한다.
 
-`vi.fn()`은 vitest config의 `restoreMocks` 대상이 아니다. 호출 기록에 의존하는
-테스트는 `beforeEach`에서 직접 `mockClear()`한다.
-
-린트는 서버·customer·owner에 적용된다. owner는 React 화면뿐 아니라 Electron
-메인·preload 프로세스도 검사한다. 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만
-다룬다(`no-unused-vars`, `no-undef`, `eqeqeq`, React Hooks 등). 포맷터는 두지
-않는다 — 기존 스타일이 이미 일관되고, 한 번 돌리면 전 파일이 diff로 뒤집혀
-리뷰가 불가능해진다. 기존 effect 의도를 검토하며 도입할 수 있도록
-`react-hooks/exhaustive-deps`만 경고이고 나머지 버그성 규칙은 오류다.
-정적 `music-filter-lab`·`music-labeling-lab`은 루트 `lint:labs`로 검사한다. `admin`은 아직 린트 대상이 아니다.
+**포맷터는 두지 않는다.** 기존 스타일이 이미 일관되고, 한 번 돌리면 전 파일이 diff로 뒤집혀 리뷰가 불가능해진다. 린트 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만 다룬다. 기존 effect 의도를 검토하며 도입할 수 있도록 `react-hooks/exhaustive-deps`만 경고이고 나머지 버그성 규칙은 오류다. `admin`은 아직 린트 대상이 아니다.
 
 `test:unit`은 `vitest.unit.config.mjs`에 명시된 테스트만 실행하며 PostgreSQL에 연결하지 않는다.
 
@@ -234,12 +205,7 @@ labeling lab → 루트 music-labeling-lab을 /labeling-lab에서 제공
 
 집계는 카페가 아니라 에러 코드 단위로 하고 영향받은 카페 수를 함께 센다. 한 카페에서만 반복되면 그 매장 설정 문제, 여러 카페에서 동시에 나면 플랫폼 전체 사고로 읽는다.
 
-| 값 | 현재 | 역할 |
-| --- | --- | --- |
-| `ALERT_WINDOW_MS` | 5분 | 집계 창. 이 밖의 발생은 세지 않는다 |
-| `DEFAULT_THRESHOLD` | 1 | 창 안에 이만큼 쌓이면 발사 |
-| `CODE_THRESHOLDS` | 비어 있음 | 특정 코드만 반복 확인이 필요할 때의 예외 |
-| `ALERT_COOLDOWN_MS` | 30분 | 같은 코드 재알림 최소 간격. 코드당 최대 48회/일 |
+창·임계값·쿨다운의 실제 값은 `server/src/observability/error-taxonomy.js`가 단일 기준이다.
 
 쿨다운 중에도 집계는 계속되므로 해제 직후 문제가 여전하면 바로 다시 알린다. 채널이 시끄러우면 임계값보다 쿨다운을 먼저 늘리는 편이 효과적이다.
 
