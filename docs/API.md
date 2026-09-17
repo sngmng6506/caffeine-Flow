@@ -196,7 +196,6 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 - 곡별 최신 분석의 `maest_summary`에는 상위 10개(mean·max)와 소비 프롬프트용 `prompt_styles`가 들어간다. `prompt_styles`는 1위 점수의 0.5배 이상인 스타일 최대 5개이며 `prompt_style_calibrated`는 항상 false다.
 
-- 날짜로 진도를 잡는 소스(`musicbrainz_kr`)는 claim 응답에 `offset` 대신 `window`(`from`·`to`)가 온다. 완료 시 그 창을 그대로 돌려주면 커서가 움직인다. 백필 하한(12개월)에 닿으면 `window`가 null이다.
 - 최신곡 수집은 곡 목록 조회와 플랫폼 검색을 워커가 한다. 서버에 yt-dlp가 없고 Railway 공용 IP에서 검색을 반복하면 막힐 수 있다. claim 응답의 `offset`부터 `requested_limit`개를 훑고, 완료 시 `offset`과 실제로 훑은 `scanned`를 함께 보고한다. `scanned`가 요청 개수보다 작으면 소스를 끝까지 본 것이라 진도가 0으로 돌아간다. `enqueued_count`는 새로 등록된 곡 수이며 이미 있던 곡은 세지 않는다.
 - 길이가 계약 범위(`audio_duration_sec`) 밖이면 워커가 다운로드 전에 `SOURCE_UNSUPPORTED`로 실패시키며 재시도하지 않는다.
 - 3단 Audio LLM 실행 여부는 서버 설정이 정한다. `/jobs/claim` 응답에 `audio_llm_enabled`가 실려 오며 워커는 이 값을 따른다. 워커에 키가 없으면 켜져 있어도 건너뛴다.
@@ -208,16 +207,16 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 - 검토 완료는 최종 라벨의 `human_review_status`가 `confirmed|corrected`이고 연결된 분석이 없거나 `reviewed`일 때다. 매장 정책 골드 판단과 무관하다. 저장 후 서버 집계를 다시 조회한다.
 - 기존 정책 검수 API에서 `audio_analysis_id`를 보낼 경우에도 `audio_analysis_revision`이 필요하다. 분석 없이 정책 판단만 저장하는 기존 요청은 유지한다.
 
-`ready`는 자동 라벨 저장이 끝났고 사람 검토가 남은 곡만 보여준다. Lab 기본 보기이며 대기·실패·Spotify 상태는 미검토 전체/전체 보기에서 확인한다.
+`ready`는 자동 라벨 저장이 끝났고 사람 검토가 남은 곡만 보여주는 Lab 기본 보기다. 대기·실패·Spotify는 미검토 전체/전체 보기에 있다.
 
-MAEST 완료 요청은 `maest_run`에 schema_version=1, pipeline_mode(`MAEST_ONLY`·`MAEST_EMOTION`·`FULL`), sources_used, maest_model_version, model_sha256, audio_source_url, audio_local_path=null, audio_sha256, audio_duration_sec, audio_sample_rate=16000, maest_raw, audio_llm_raw, normalized를 포함한다. maest_raw는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이다. 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. normalized에는 taxonomy_version, calibrated=false, genre(label/source/raw_label/confidence), mood를 보낸다. MAEST_ONLY의 mood는 null이고 감정 모델 실행 시 valence·arousal·source·tags를 features와 일치시킨다. FULL에서도 감정 모델은 선택이다. 감정 모델을 실행하지 않았다면 mood=null이고 sources_used에는 MAEST와 Audio LLM만 순서대로 포함한다. FULL은 입력 해시·모델·구간·서술을 포함한 audio_llm_raw를 보존하며 다른 모드는 null이다. 원본·자동 라벨·최신 분석·작업 완료는 같은 트랜잭션이다.
+**MAEST 완료 요청.** `maest_run`에 `schema_version=1`, `pipeline_mode`(`MAEST_ONLY`·`MAEST_EMOTION`·`FULL`), `sources_used`, `maest_model_version`, `model_sha256`, `audio_source_url`, `audio_local_path=null`, `audio_sha256`, `audio_duration_sec`, `audio_sample_rate=16000`, `maest_raw`, `audio_llm_raw`, `normalized`를 담는다. `maest_raw`는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이며 서버가 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. `normalized`는 taxonomy_version, `calibrated=false`, genre(label/source/raw_label/confidence), mood다.
 
-`essentia-maest` 모델은 원본이 필수다. 이전 MSD 워커 제출 형식은 이행 기간에 허용한다. MAEST 작업 경로만 워커 인증 후 1MB JSON을 허용하며 나머지 API의 64KB 제한은 유지한다. 목록의 maest_summary에는 상위 평균/최댓값, 구간 수, 매핑 정보, 입력 해시를 포함하고 전체 구간 원본은 별도 조회한다. 원본 보존은 이 마이그레이션 이후 MAEST 실행부터 적용되며 과거 덮어쓴 분석을 복원하지 않는다.
+감정 모델은 `FULL`에서도 선택이다. 실행하지 않았으면 `mood=null`이고 `sources_used`에 MAEST와 Audio LLM만 순서대로 들어간다. 실행했으면 valence·arousal·source·tags가 `features`와 일치해야 한다. `audio_llm_raw`는 `FULL`에서만 보존하고 다른 모드는 null이다.
 
-MAEST의 모델명·해시·설정·클래스 순서는 공통 계약과 정확히 일치해야 한다. 서버가 원본 점수에서 정규화 장르를 재계산해 워커의 normalized와 자동 라벨을 검증한다. MAEST tag_scores는 생략 가능하며 서버가 생성한다. 제출했다면 전체 원본 평균과 일치해야 한다. 기존 `/audio-analysis/results`로 MAEST 최신 행을 덮어쓰는 제출은 400이다.
+**검증과 크기 한도.** 모델명·해시·설정·클래스 순서가 공통 계약과 정확히 일치해야 한다. 서버가 원본 점수에서 정규화 장르를 재계산해 워커의 `normalized`와 자동 라벨을 검증한다. `tag_scores`는 생략하면 서버가 만들고, 보냈다면 전체 원본 평균과 일치해야 한다. `essentia-maest`는 원본 없이 저장할 수 없어 `/audio-analysis/results`로 최신 행을 덮어쓰는 제출은 400이다 — 그 경로는 원본을 만들지 않는 호환 워커(`worker.py`·`analyze.py`)용으로 남겨 둔다. MAEST 작업 경로만 워커 인증 후 1MB JSON을 허용하고 나머지 API는 64KB를 유지한다.
 
-목록에는 generation·attempts·available_at이 포함된다. 재큐잉은 generation을 올리고 이전 lease를 폐기하며 최종 사람 라벨을 보존한다. 재정규화 결과가 이미 동일하면 unchanged=true로 revision을 올리지 않는다. 변경되면 최신 분석 revision을 올리고 검토를 다시 대기시키며, 자동 최종 라벨만 갱신한다. 기존 원본 이력은 변경하지 않는다.
+**재큐잉과 재정규화.** 목록에 `generation`·`attempts`·`available_at`이 포함된다. 재큐잉은 `generation`을 올리고 이전 lease를 폐기하되 최종 사람 라벨은 보존한다. 재정규화 결과가 같으면 `unchanged=true`로 revision을 올리지 않고, 달라지면 최신 분석 revision을 올려 검토를 다시 대기시키며 자동 최종 라벨만 갱신한다. 원본 이력은 어느 쪽도 바꾸지 않는다.
 
-판정만 보내는 경로의 기본 reviewed_fields는 값이 알려진 장르·템포·리듬이며, `accurate`일 때만 누적한다 — `inaccurate`는 라벨을 보증하지 않으므로 확인 범위를 넓히지 않는다. 수정 저장은 값이 바뀐 필드를 확인 범위로 추가한다. unknown/빈 배열 필드는 정답 확인 범위에서 제외한다. artist_confirmed는 별도 명시적 boolean이며 이름 변경 시 생략하면 확인을 해제한다. 확인된 아티스트 참고 검색은 human 라벨 중 artist_confirmed=true만 사용한다. 마이그레이션 전 확인 범위는 추정하지 않는다.
+**확인 범위(reviewed_fields).** 판정만 보내면 값이 알려진 장르·템포·리듬이 기본이며 `accurate`일 때만 누적한다 — `inaccurate`는 라벨을 보증하지 않으므로 범위를 넓히지 않는다. 수정 저장은 값이 바뀐 필드를 추가한다. unknown·빈 배열은 제외한다. `artist_confirmed`는 별도 boolean이며 이름 변경 시 생략하면 확인이 해제된다. 확인된 아티스트 참고 검색은 `artist_confirmed=true`인 human 라벨만 쓴다.
 
-날짜 기반 수집(`musicbrainz_kr`) claim은 `window`, `offset`, `page_schema_version=1`을 반환한다. 완료 요청은 이 세 값을 그대로 보내고, `scanned`에는 필터링 전 원본 페이지에서 읽은 개수(0~요청 limit)를 보낸다. claim과 다른 구간·offset, 구버전 페이지 형식은 400이며 진도를 옮기지 않는다. limit만큼 읽으면 같은 구간의 다음 페이지를 유지하고, limit 미만이면 날짜 구간을 완료한다.
+**날짜 기반 수집(`musicbrainz_kr`).** claim이 주는 `window`·`offset`·`page_schema_version=1`을 완료 요청에 그대로 돌려보낸다. `scanned`는 필터링 전 원본 페이지에서 읽은 개수(0~요청 limit)다. claim과 다른 구간·offset이나 구버전 페이지 형식은 400이며 진도를 옮기지 않는다. 백필 하한(12개월)에 닿으면 `window`가 null이다.
