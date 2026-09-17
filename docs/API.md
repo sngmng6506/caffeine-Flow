@@ -181,43 +181,23 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | POST | `/audio-analysis/discoveries/claim` | 워커 | 대기 중인 수집 요청 1건을 20분 lease로 획득. 없으면 204 |
 | POST | `/audio-analysis/discoveries/:id/complete` | 워커 | `lease_token`과 `tracks[]` 제출. 곡을 분석 큐에 등록하고 중복은 무시한다 |
 | POST | `/audio-analysis/discoveries/:id/fail` | 워커 | `lease_token`, `error_code` 제출. 최대 3회 재시도 |
-| GET | `/admin/audio-labels` | 🛡 | 모든 신청곡을 플랫폼·곡별 중복 제거해 조회. `view=suspicious|ready|unreviewed|inaccurate|reviewed|all`, `offset`, 50건. `inaccurate`는 사람이 틀림으로 판정한 곡만(이미 저장된 옛 `unclear` 판정도 함께 보여준다). `suspicious`는 `ready` 범위에서 서술이 있는 곡만 서술이 틀렸을 법한 순으로 정렬한다. 작업 상태와 정렬 사유(`review_reasons`)도 반환 |
+| GET | `/admin/audio-labels` | 🛡 | 신청·수집곡 목록과 집계. `view`, `offset`으로 조회하며 50건씩 반환. 보기 종류는 [Lab README](../music-labeling-lab/README.md) 참고 |
 | GET | `/admin/audio-labels/:id/runs` | 🛡 | 해당 곡의 최근 원본 이력 ID·시각 최대 100건 |
 | GET | `/admin/audio-runs/:id` | 🛡 | 실행별 전체 원본 JSON. lease 토큰 제외, 수정 API 없음 |
 | POST | `/admin/audio-labels/:id/requeue` | 🛡 | generation을 비교해 실패 재시도·완료곡 재분석 등록. 처리 중은 409, Spotify는 400 |
-| POST | `/admin/audio-labels/requeue-rejected` | 🛡 | 사람이 틀림으로 표시한 곡을 한 번에 재분석 큐에 등록. 처리 중과 자동 분석 미지원 플랫폼은 건너뜀. `{dry_run:true}`면 큐를 건드리지 않고 대상 건수만 반환. `{eligible, requeued}` 반환 |
-| POST | `/admin/audio-labels/:id/renormalize` | 🛡 | generation, analysis_id, analysis_revision을 비교해 원본에 현재 택소노미 적용. 원본·사람 라벨 보존. 라벨링 Lab에 버튼은 없고 API로만 호출한다 |
+| POST | `/admin/audio-labels/requeue-rejected` | 🛡 | 틀림 판정곡 일괄 재분석. 처리 중·미지원 제외. `{dry_run:true}`는 건수만 조회하며 `{eligible, requeued}` 반환 |
+| POST | `/admin/audio-labels/:id/renormalize` | 🛡 | `generation`, `analysis_id`, `analysis_revision`으로 재정규화. 원본·사람 라벨 보존, 변경 없으면 `unchanged=true` |
 | PUT | `/admin/audio-labels/:id/review` | 🛡 | 작업 ID에 해당하는 곡의 라벨 확인·수정. 매장 정책 판단 불필요 |
 | GET | `/admin/audio-discoveries` | 🛡 | 최근 최신곡 수집 요청 목록 |
-| POST | `/admin/audio-discoveries` | 🛡 | 수집 요청. body는 `{ source, limit? }`. 모든 소스가 인기·발매 순서를 그대로 훑으므로 검색어를 받지 않는다(보내도 무시하고 `query`는 항상 null). 같은 소스가 대기 중이면 기존 요청을 200으로 돌려준다 |
-| GET | `/admin/audio-settings` | 🛡 | 3단 Audio LLM 스위치와 프롬프트 조회. `audio_llm_prompt_version`은 기본 `audio-llm-2` 또는 `custom-<sha256 앞 12자>` |
-| PUT | `/admin/audio-settings` | 🛡 | 스위치·프롬프트 변경. body는 `{ audio_llm_enabled: boolean, audio_llm_prompt?: string }`. 필드를 생략하면 저장된 프롬프트를 유지하고, 빈 문자열·null이면 워커 기본 문장으로 되돌림. 4000자 제한 |
+| POST | `/admin/audio-discoveries` | 🛡 | `{ source, limit? }`로 수집 요청. 검색어는 무시하며 같은 소스가 대기 중이면 기존 요청을 200으로 반환 |
+| GET | `/admin/audio-settings` | 🛡 | Audio LLM 스위치·시스템 프롬프트·프롬프트 버전 조회 |
+| PUT | `/admin/audio-settings` | 🛡 | `{ audio_llm_enabled, audio_llm_prompt? }`로 변경. 프롬프트 생략은 유지, 빈 문자열·null은 기본값 복귀. 최대 4000자 |
 | GET | `/admin/audio-prompt-revisions` | 🛡 | 3단 프롬프트 수정 이력 최근 20건. 추가만 되며 수정·삭제는 DB trigger가 막음 |
 
-- 곡별 최신 분석의 `maest_summary`에는 상위 10개(mean·max)와 소비 프롬프트용 `prompt_styles`가 들어간다. `prompt_styles`는 1위 점수의 0.5배 이상인 스타일 최대 5개이며 `prompt_style_calibrated`는 항상 false다.
+- 작업 완료는 같은 lease로 재전송할 수 있다. 만료 lease는 `resume`으로 복구하며, 다른 워커에 인계됐거나 재큐잉으로 폐기된 토큰은 409다.
+- MAEST는 `maest_run`을 포함해 작업 완료 API로 제출한다. `tag_scores`는 생략 가능하며 `/audio-analysis/results`로 제출하면 400이다. 원본 스키마·검증은 [runs.js](../server/src/features/audio-analysis/runs.js), 모델·실패 코드는 [공통 계약](../server/src/constants/audio-pipeline.json)이 기준이다.
+- 검토 body는 `{ annotation_revision, audio_analysis_id, audio_analysis_revision, verdict?, track_annotation?, artist_confirmed?, reviewed_fields? }`다. `track_annotation`을 생략하면 판정만 저장한다. 조회 후 버전이 바뀌었거나 판정할 자동 라벨·서술이 없으면 409다.
+- 수집 완료에는 claim의 `offset`과 원본에서 읽은 개수 `scanned`를 보낸다. 날짜 소스는 `window`·`page_schema_version`도 그대로 돌려주며 불일치는 400이다. `enqueued_count`는 중복을 제외한 신규 등록 수다.
+- `/audio-analysis/jobs/*`는 워커 인증 후 JSON 1MB까지, 나머지는 64KB까지 받는다.
 
-- 날짜로 진도를 잡는 소스(`musicbrainz_kr`)는 claim 응답에 `offset` 대신 `window`(`from`·`to`)가 온다. 완료 시 그 창을 그대로 돌려주면 커서가 움직인다. 백필 하한(12개월)에 닿으면 `window`가 null이다.
-- 최신곡 수집은 곡 목록 조회와 플랫폼 검색을 워커가 한다. 서버에 yt-dlp가 없고 Railway 공용 IP에서 검색을 반복하면 막힐 수 있다. claim 응답의 `offset`부터 `requested_limit`개를 훑고, 완료 시 `offset`과 실제로 훑은 `scanned`를 함께 보고한다. `scanned`가 요청 개수보다 작으면 소스를 끝까지 본 것이라 진도가 0으로 돌아간다. `enqueued_count`는 새로 등록된 곡 수이며 이미 있던 곡은 세지 않는다.
-- 길이가 계약 범위(`audio_duration_sec`) 밖이면 워커가 다운로드 전에 `SOURCE_UNSUPPORTED`로 실패시키며 재시도하지 않는다.
-- 3단 Audio LLM 실행 여부는 서버 설정이 정한다. `/jobs/claim` 응답에 `audio_llm_enabled`가 실려 오며 워커는 이 값을 따른다. 워커에 키가 없으면 켜져 있어도 건너뛴다.
-- 신규 신청과 작업 등록은 같은 트랜잭션이며 기존 신청은 마이그레이션에서 등록한다. AI 필터 OFF·거절 곡도 포함한다. Spotify는 `unsupported`로 등록하며 claim하지 않는다.
-- 완료 응답 유실 시 같은 lease로 재전송하면 기존 결과를 반환한다. 만료 lease로 바로 완료하면 409다. resume은 같은 토큰을 유지하고 다른 워커가 인계받지 않은 작업만 재개한다. 교체되거나 관리자 재큐잉으로 폐기한 토큰은 409다. 완료되지 않은 lease는 만료 후 다음 claim에서 회수한다.
-- 실패 코드와 분류의 단일 기준은 `server/src/constants/audio-pipeline.json`이다. 인프라 오류는 짧은 대기, 일시 다운로드 오류는 초기 지수 지연 후 장기 재시도, 영구 소스 오류는 중단이다. 분석 실패·lease 소진은 횟수 제한 후 failed이며 관리자 재시도가 가능하다. 플랫폼 원문 오류·토큰·음원은 보내지 않는다.
-- 자동 라벨은 `evaluation`으로 저장하며 원본은 분석 행의 `automatic_annotation`, 최종 라벨은 `music_track_annotations`에 남긴다. 사람 확인·수정 후에는 자동 갱신이 최종 라벨을 덮어쓰지 않는다.
-- 검토 body: `{ annotation_revision, audio_analysis_id, audio_analysis_revision, verdict?, track_annotation?, artist_confirmed?, reviewed_fields? }`. `track_annotation` 생략은 판정만 남기는 경로, 포함은 수정 저장이다. 화면에서 본 분석 ID·revision과 최종 라벨 revision을 잠금 안에서 비교하고 변경됐으면 409로 전체 롤백한다. 자동 라벨이 없으면 단순 확인은 409다. 명시적인 `verdict`에는 비어 있지 않은 Audio LLM 서술이 필요하며 없으면 409다.
-- 검토 완료는 최종 라벨의 `human_review_status`가 `confirmed|corrected`이고 연결된 분석이 없거나 `reviewed`일 때다. 매장 정책 골드 판단과 무관하다. 저장 후 서버 집계를 다시 조회한다.
-- 기존 정책 검수 API에서 `audio_analysis_id`를 보낼 경우에도 `audio_analysis_revision`이 필요하다. 분석 없이 정책 판단만 저장하는 기존 요청은 유지한다.
-
-`ready`는 자동 라벨 저장이 끝났고 사람 검토가 남은 곡만 보여준다. Lab 기본 보기이며 대기·실패·Spotify 상태는 미검토 전체/전체 보기에서 확인한다.
-
-MAEST 완료 요청은 `maest_run`에 schema_version=1, pipeline_mode(`MAEST_ONLY`·`MAEST_EMOTION`·`FULL`), sources_used, maest_model_version, model_sha256, audio_source_url, audio_local_path=null, audio_sha256, audio_duration_sec, audio_sample_rate=16000, maest_raw, audio_llm_raw, normalized를 포함한다. maest_raw는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이다. 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. normalized에는 taxonomy_version, calibrated=false, genre(label/source/raw_label/confidence), mood를 보낸다. MAEST_ONLY의 mood는 null이고 감정 모델 실행 시 valence·arousal·source·tags를 features와 일치시킨다. FULL에서도 감정 모델은 선택이다. 감정 모델을 실행하지 않았다면 mood=null이고 sources_used에는 MAEST와 Audio LLM만 순서대로 포함한다. FULL은 입력 해시·모델·구간·서술을 포함한 audio_llm_raw를 보존하며 다른 모드는 null이다. 원본·자동 라벨·최신 분석·작업 완료는 같은 트랜잭션이다.
-
-`essentia-maest` 모델은 원본이 필수다. 이전 MSD 워커 제출 형식은 이행 기간에 허용한다. MAEST 작업 경로만 워커 인증 후 1MB JSON을 허용하며 나머지 API의 64KB 제한은 유지한다. 목록의 maest_summary에는 상위 평균/최댓값, 구간 수, 매핑 정보, 입력 해시를 포함하고 전체 구간 원본은 별도 조회한다. 원본 보존은 이 마이그레이션 이후 MAEST 실행부터 적용되며 과거 덮어쓴 분석을 복원하지 않는다.
-
-MAEST의 모델명·해시·설정·클래스 순서는 공통 계약과 정확히 일치해야 한다. 서버가 원본 점수에서 정규화 장르를 재계산해 워커의 normalized와 자동 라벨을 검증한다. MAEST tag_scores는 생략 가능하며 서버가 생성한다. 제출했다면 전체 원본 평균과 일치해야 한다. 기존 `/audio-analysis/results`로 MAEST 최신 행을 덮어쓰는 제출은 400이다.
-
-목록에는 generation·attempts·available_at이 포함된다. 재큐잉은 generation을 올리고 이전 lease를 폐기하며 최종 사람 라벨을 보존한다. 재정규화 결과가 이미 동일하면 unchanged=true로 revision을 올리지 않는다. 변경되면 최신 분석 revision을 올리고 검토를 다시 대기시키며, 자동 최종 라벨만 갱신한다. 기존 원본 이력은 변경하지 않는다.
-
-판정만 보내는 경로의 기본 reviewed_fields는 값이 알려진 장르·템포·리듬이며, `accurate`일 때만 누적한다 — `inaccurate`는 라벨을 보증하지 않으므로 확인 범위를 넓히지 않는다. 수정 저장은 값이 바뀐 필드를 확인 범위로 추가한다. unknown/빈 배열 필드는 정답 확인 범위에서 제외한다. artist_confirmed는 별도 명시적 boolean이며 이름 변경 시 생략하면 확인을 해제한다. 확인된 아티스트 참고 검색은 human 라벨 중 artist_confirmed=true만 사용한다. 마이그레이션 전 확인 범위는 추정하지 않는다.
-
-날짜 기반 수집(`musicbrainz_kr`) claim은 `window`, `offset`, `page_schema_version=1`을 반환한다. 완료 요청은 이 세 값을 그대로 보내고, `scanned`에는 필터링 전 원본 페이지에서 읽은 개수(0~요청 limit)를 보낸다. claim과 다른 구간·offset, 구버전 페이지 형식은 400이며 진도를 옮기지 않는다. limit만큼 읽으면 같은 구간의 다음 페이지를 유지하고, limit 미만이면 날짜 구간을 완료한다.
+분석·재시도·수집 동작은 [워커 README](../audio-analysis-worker/README.md), 보기·사람 판정은 [Lab README](../music-labeling-lab/README.md)를 따른다. 세부 요청·응답은 [워커 라우트](../server/src/routes/audio-analysis.js)와 [관리자 라우트](../server/src/routes/admin.js)가 기준이다.
