@@ -209,7 +209,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 
 `ready`는 자동 라벨 저장이 끝났고 사람 검토가 남은 곡만 보여주는 Lab 기본 보기다. 대기·실패·Spotify는 미검토 전체/전체 보기에 있다.
 
-**MAEST 완료 요청.** `maest_run`에 `schema_version=1`, `pipeline_mode`(`MAEST_ONLY`·`MAEST_EMOTION`·`FULL`), `sources_used`, `maest_model_version`, `model_sha256`, `audio_source_url`, `audio_local_path=null`, `audio_sha256`, `audio_duration_sec`, `audio_sample_rate=16000`, `maest_raw`, `audio_llm_raw`, `normalized`를 담는다. `maest_raw`는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이며 서버가 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. `normalized`는 taxonomy_version, `calibrated=false`, genre(label/source/raw_label/confidence), mood다.
+**완료 요청.** MAEST를 돌리지 않은 `EMOTION_LLM`은 `maest_raw`·`maest_model_version`·`model_sha256`이 null이고 `normalized.genre`가 빈 배열이어야 하며, 아래 MAEST 검사는 건너뛴다. MAEST 실행은 `maest_run`에 `schema_version=1`, `pipeline_mode`(`EMOTION_LLM`·`MAEST_ONLY`·`MAEST_EMOTION`·`FULL`), `sources_used`, `maest_model_version`, `model_sha256`, `audio_source_url`, `audio_local_path=null`, `audio_sha256`, `audio_duration_sec`, `audio_sample_rate=16000`, `maest_raw`, `audio_llm_raw`, `normalized`를 담는다. `maest_raw`는 519개 classes/mean/max, 최대 64개 segments(start_sec/end_sec/scores), settings, essentia_version이며 서버가 집계와 구간 점수 일치·마지막 구간 포함을 검증한다. `normalized`는 taxonomy_version, `calibrated=false`, genre(label/source/raw_label/confidence), mood다.
 
 감정 모델은 `FULL`에서도 선택이다. 실행하지 않았으면 `mood=null`이고 `sources_used`에 MAEST와 Audio LLM만 순서대로 들어간다. 실행했으면 valence·arousal·source·tags가 `features`와 일치해야 한다. `audio_llm_raw`는 `FULL`에서만 보존하고 다른 모드는 null이다.
 

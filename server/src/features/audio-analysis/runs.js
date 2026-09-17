@@ -10,7 +10,11 @@ const EMBEDDING_MODEL = contract.emotion_models.embedding;
 const EMOTION_MODEL = contract.emotion_models.regression;
 const MAEST_ONLY_SOURCES = [MODEL];
 const EMOTION_SOURCES = [MODEL, EMBEDDING_MODEL, EMOTION_MODEL];
-const MODES = ['MAEST_ONLY', 'MAEST_EMOTION', 'FULL'];
+// EMOTION_LLM은 MAEST를 돌리지 않은 실행이다. MAEST는 이 미니PC에서 곡당 76초를
+//쓰면서 같은 CPU를 나눠 쓰는 3단까지 4~5배 느리게 만들었다(실측: 3단 단독 16초,
+// MAEST와 동시 76초). 장르 후보가 사라지는 대신 신청 시점 판단이 가능해진다.
+const MODES = ['MAEST_ONLY', 'MAEST_EMOTION', 'FULL', 'EMOTION_LLM'];
+const EMOTION_LLM_SOURCES = [EMBEDDING_MODEL, EMOTION_MODEL];
 const TEXT_MAX = 4000;
 const ITEM_MAX = 120;
 const LIST_MAX = 12;
@@ -29,8 +33,10 @@ function validUsage(usage) {
 
 // 2단 원본. 자유 서술이라 값을 검사하지 않고 형태와 크기만 본다. 입력 해시가
 // 같은 파일을 가리켜야 1단과 2단이 같은 오디오를 들었다고 말할 수 있다.
+const LLM_MODES = ['FULL', 'EMOTION_LLM'];
+
 function validAudioLlm(raw, mode, audioSha256, duration) {
-  if (mode !== 'FULL') return raw === null;
+  if (!LLM_MODES.includes(mode)) return raw === null;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
   if (!text(raw.model_id, 200) || !text(raw.prompt_version, 100)) return false;
   if (raw.input_sha256 !== audioSha256) return false;
@@ -66,8 +72,44 @@ function validMood(mood, full, features) {
 // 두 디코더를 같은 샘플로 맞추자는 검사가 아니다. 구간 끝 검사와 같은 값을 쓴다.
 const DURATION_TOLERANCE_SEC = 0.1;
 
+// MAEST를 돌리지 않은 실행. 장르는 MAEST만 만들 수 있으므로 빈 배열이어야 하고,
+// 무드는 2단 감정값에서 그대로 온다. MAEST 쪽 검사(519개 클래스 순서, 구간 hop
+// 계산, 모델 해시)는 검증할 원본이 없으므로 건너뛴다.
+function validateEmotionLlmRun(input, result) {
+  const invalid = () => ({ error: '감정·서술 원본이 올바르지 않습니다' });
+  const expected = [...EMOTION_LLM_SOURCES, input?.audio_llm_raw?.model_id];
+  if (input.maest_raw != null || input.maest_model_version != null) return invalid();
+  if (!hash(input.audio_sha256) || input.audio_local_path !== null ||
+      !finite(input.audio_duration_sec) ||
+      Math.abs(input.audio_duration_sec - result.features.duration_seconds) > DURATION_TOLERANCE_SEC ||
+      input.audio_sample_rate !== 16000 ||
+      input.audio_duration_sec < contract.audio_duration_sec.min ||
+      input.audio_duration_sec > contract.audio_duration_sec.max ||
+      input.audio_source_url !== result.source_reference ||
+      !Array.isArray(input.sources_used) || input.sources_used.length !== expected.length ||
+      expected.some((v, i) => input.sources_used[i] !== v) ||
+      !validAudioLlm(input.audio_llm_raw, 'EMOTION_LLM', input.audio_sha256, input.audio_duration_sec)) return invalid();
+  const normalized = input.normalized;
+  // 장르를 비워 두는 것과 unknown으로 채우는 것은 다르다. 여기서는 판단할 모델이
+  // 돌지 않았다는 뜻이며, 소비처가 장르 줄을 렌더하지 않는다.
+  if (!normalized || typeof normalized.taxonomy_version !== 'string' || normalized.taxonomy_version.length > 100 ||
+      typeof normalized.calibrated !== 'boolean' ||
+      !Array.isArray(normalized.genre) || normalized.genre.length !== 0 ||
+      !validMood(normalized.mood, normalized.mood != null, result.features)) return invalid();
+  return { value: {
+    schema_version: 1, pipeline_mode: 'EMOTION_LLM', sources_used: expected,
+    maest_model_version: null, model_sha256: null, maest_raw: null,
+    audio_source_url: input.audio_source_url, audio_local_path: null,
+    audio_sha256: input.audio_sha256, audio_duration_sec: input.audio_duration_sec,
+    audio_sample_rate: input.audio_sample_rate,
+    audio_llm_raw: input.audio_llm_raw, normalized,
+  } };
+}
+
 function validateRun(input, result) {
   const invalid = () => ({ error: 'MAEST 원본·입력 정보가 올바르지 않습니다' });
+  if (input?.schema_version !== 1 || !MODES.includes(input?.pipeline_mode)) return invalid();
+  if (input.pipeline_mode === 'EMOTION_LLM') return validateEmotionLlmRun(input, result);
   if (result.model_name !== 'essentia-maest' || !result.model_version.split('+').includes(MODEL)) return invalid();
   const mode = input?.pipeline_mode;
   const withEmotion = mode === 'MAEST_EMOTION' || (mode === 'FULL' && input?.normalized?.mood != null);
@@ -149,10 +191,13 @@ function summary(run) {
   const raw = run.maest_raw;
   const top = (key) => raw.classes.map((label, i) => ({ label, mean: raw.mean[i], max: raw.max[i] }))
     .sort((a, b) => b[key] - a[key]).slice(0, 10);
-  return { model_version: run.maest_model_version, segment_count: raw.segments.length,
-    top_mean: top('mean'), top_max: top('max'), normalized: run.normalized, audio_sha256: run.audio_sha256,
+  // MAEST를 돌리지 않은 실행에는 스타일 점수가 없다. 빈 배열로 두면 소비처가
+  // 장르 후보 줄을 렌더하지 않는다 — 없는 장르를 unknown으로 지어내지 않는다.
+  return { model_version: run.maest_model_version, segment_count: raw ? raw.segments.length : 0,
+    top_mean: raw ? top('mean') : [], top_max: raw ? top('max') : [],
+    normalized: run.normalized, audio_sha256: run.audio_sha256,
     // 보정되지 않은 상대 점수다. 소비처는 이 사실을 프롬프트에 함께 밝힌다.
-    prompt_styles: selectPromptStyles(raw), prompt_style_calibrated: false,
+    prompt_styles: raw ? selectPromptStyles(raw) : [], prompt_style_calibrated: false,
     // 사람이 검토할 때 읽을 자유 서술. 없으면 null이다.
     audio_llm: run.audio_llm_raw ? {
       model_id: run.audio_llm_raw.model_id,

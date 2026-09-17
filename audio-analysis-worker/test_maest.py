@@ -70,12 +70,12 @@ class MaestTest(unittest.TestCase):
             with wave.open(str(audio), 'wb') as output:
                 output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
                 output.writeframes(b'\0\0' * 16000 * 20)
-            with patch.object(remote_analyze, 'analyze_audio', return_value=({'duration_seconds': 20, 'sample_rate': 16000}, 'test')), patch.object(remote_analyze, 'predict', return_value=raw):
+            with patch.object(remote_analyze, 'analyze_for_judgement', return_value=({'duration_seconds': 20, 'sample_rate': 16000}, 'test')):
                 result = remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk', 'artist_name': 'unknown'}, Path(directory) / 'result.json')
             self.assertEqual(len(result['maest_run']['audio_sha256']), 64)
             self.assertIsNone(result['maest_run']['audio_llm_raw'])
             self.assertIsNone(result['maest_run']['audio_local_path'])
-            self.assertEqual(result['maest_run']['pipeline_mode'], 'MAEST_ONLY')
+            self.assertEqual(result['maest_run']['pipeline_mode'], 'EMOTION_LLM')
 
 
 class MoodNormalizeTest(unittest.TestCase):
@@ -129,64 +129,99 @@ class MoodNormalizeTest(unittest.TestCase):
                 output.writeframes(b'\0\0' * 16000 * 20)
             with patch.object(remote_analyze, 'load_emotion_predictor', return_value=lambda a: None), \
                  patch.object(remote_analyze, 'load_audio', return_value=[0.0]), \
-                 patch.object(remote_analyze, 'analyze_audio', return_value=(features, 'test')), \
-                 patch.object(remote_analyze, 'predict', return_value=raw):
+                 patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')):
                 result = remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
                                                     'artist_name': 'unknown'}, Path(directory) / 'result.json')
             run_data = result['maest_run']
-            self.assertEqual(run_data['pipeline_mode'], 'MAEST_EMOTION')
-            self.assertEqual(run_data['sources_used'],
-                             ['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2'])
+            self.assertEqual(run_data['pipeline_mode'], 'EMOTION_LLM')
+            self.assertEqual(run_data['sources_used'], ['msd-musicnn-1', 'deam-msd-musicnn-2'])
             self.assertEqual(run_data['normalized']['mood']['tags'], ['joyful', 'uplifting'])
             self.assertEqual(result['automatic_annotation']['mood_tags'], ['joyful', 'uplifting'])
 
 
 class PipelineModeTest(unittest.TestCase):
-    def test_llm_overlaps_cpu_and_failure_preserves_maest(self):
-        import tempfile, wave, os, threading
+    def test_valence_arousal_reaches_the_audio_llm(self):
+        """2단 V/A가 3단 프롬프트까지 간다.
+
+        저장만 되고 소비처로 오지 않는 필드가 이미 한 번 있었다(structure). 배선은
+        조용히 끊기고 테스트가 없으면 드러나지 않는다. 3단이 2단 뒤에 출발해야
+        넘길 값이 생기므로 순서를 되돌리면 여기서 걸린다.
+        """
+        import tempfile, wave, os
         from pathlib import Path
         import remote_analyze
         from audio_llm import AudioLLMError
-        started, cpu_done = threading.Event(), threading.Event()
         raw = summarize(np.zeros((1, 519)), 20)
         raw['essentia_version'] = 'test'
+        seen = {}
 
-        def describe(*args, **kwargs):
-            started.set()
-            if not cpu_done.wait(3):
-                raise AssertionError('CPU 분석과 겹쳐 실행되어야 한다')
-            raise AudioLLMError('unavailable')
-
-        def predict(*args, **kwargs):
-            self.assertTrue(started.wait(3))
-            cpu_done.set()
-            return raw
+        def describe(_audio, _duration, _sha, config, **_kwargs):
+            seen['va'] = config.get('va')
+            raise AudioLLMError('stop here')
 
         with tempfile.TemporaryDirectory() as directory:
             audio = Path(directory) / 'input.wav'
             with wave.open(str(audio), 'wb') as output:
                 output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
                 output.writeframes(b'\0\0' * 16000 * 20)
+            features = {'duration_seconds': 20, 'valence': 0.12, 'arousal': 0.91}
             with patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test'}), \
                  patch.object(remote_analyze, 'load_emotion_predictor', side_effect=EmotionModelError()), \
-                 patch.object(remote_analyze, 'analyze_audio', return_value=({'duration_seconds': 20}, 'test')), \
-                 patch.object(remote_analyze, 'predict', side_effect=predict), \
+                 patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
+                 patch.object(remote_analyze, 'describe', side_effect=describe):
+                remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
+                                           'artist_name': 'unknown'}, Path(directory) / 'result.json')
+
+        # 숫자를 척도와 함께 넘긴다. 밴드 이름으로 뭉개면 0.12와 0.34가 같아진다.
+        self.assertIsNotNone(seen['va'], 'V/A가 3단 설정에 실리지 않았다')
+        self.assertIn('0.12', seen['va']['brightness'])
+        self.assertIn('0.91', seen['va']['energy'])
+
+    def test_llm_failure_does_not_lose_the_rest_of_the_analysis(self):
+        """3단이 실패해도 특징값과 무드는 저장된다.
+
+        예전에는 3단이 MAEST와 겹쳐 돌았고 이 테스트가 그 동시성까지 확인했다.
+        MAEST를 빼면서 겹칠 CPU 작업이 없어져 3단은 2단 뒤에 홀로 돈다 — 동시성
+        검사는 지켰던 대상이 사라졌으므로 함께 지웠다. 남은 것은 가드레일이 요구하는
+        "3단 실패가 나머지 저장을 막지 않는다"이다.
+        """
+        import tempfile, wave, os
+        from pathlib import Path
+        import remote_analyze
+        from audio_llm import AudioLLMError
+
+        def describe(*args, **kwargs):
+            raise AudioLLMError('unavailable')
+
+        features = {'duration_seconds': 20, 'valence': 0.7, 'arousal': 0.7}
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / 'input.wav'
+            with wave.open(str(audio), 'wb') as output:
+                output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
+                output.writeframes(b'\0\0' * 16000 * 20)
+            with patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test'}), \
+                 patch.object(remote_analyze, 'load_emotion_predictor', return_value=lambda a: None), \
+                 patch.object(remote_analyze, 'load_audio', return_value=[0.0]), \
+                 patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
                  patch.object(remote_analyze, 'describe', side_effect=describe):
                 result = remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
                     'artist_name': 'unknown'}, Path(directory) / 'result.json')
             self.assertIsNone(result['maest_run']['audio_llm_raw'])
-            self.assertEqual(result['maest_run']['maest_raw'], raw)
+            self.assertEqual(result['maest_run']['normalized']['mood']['tags'], ['joyful', 'uplifting'])
 
     def test_mode_reflects_which_stages_ran(self):
         from remote_analyze import pipeline_mode
         mood = {'valence': 0.5, 'arousal': 0.5}
         llm = {'model_id': 'google/gemini-2.5-pro'}
+        raw = {'classes': [], 'mean': []}
 
-        self.assertEqual(pipeline_mode(None, None), 'MAEST_ONLY')
-        self.assertEqual(pipeline_mode(mood, None), 'MAEST_EMOTION')
-        self.assertEqual(pipeline_mode(mood, llm), 'FULL')
-        # 감정 모델이 없어도 3단이 돌면 FULL이다. sources_used가 실제 목록을 남긴다.
-        self.assertEqual(pipeline_mode(None, llm), 'FULL')
+        # MAEST를 돌리지 않는 것이 현재 경로다. 옛 모드는 이미 저장된 행을 읽을 때만
+        # 쓰이므로 판정 규칙은 그대로 둔다.
+        self.assertEqual(pipeline_mode(mood, llm), 'EMOTION_LLM')
+        self.assertEqual(pipeline_mode(None, None), 'EMOTION_LLM')
+        self.assertEqual(pipeline_mode(None, None, raw), 'MAEST_ONLY')
+        self.assertEqual(pipeline_mode(mood, None, raw), 'MAEST_EMOTION')
+        self.assertEqual(pipeline_mode(mood, llm, raw), 'FULL')
 
     def test_audio_llm_follows_the_server_setting(self):
         # 3단 실행 여부는 서버가 정한다. 워커 환경변수로 되돌리면 운영자가 Lab에서
@@ -207,9 +242,8 @@ class PipelineModeTest(unittest.TestCase):
                     output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
                     output.writeframes(b'\0\0' * 16000 * 20)
                 with patch.dict(os.environ, {'OPENROUTER_API_KEY': key}), \
-                     patch.object(remote_analyze, 'analyze_audio', return_value=(features, 'test')), \
-                     patch.object(remote_analyze, 'predict', return_value=raw), \
-                     patch.object(remote_analyze, 'describe',
+                     patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
+                         patch.object(remote_analyze, 'describe',
                                   side_effect=lambda *a, **k: calls.append(a) or {
                                       'model_id': 'm', 'description': 'x'}):
                     job = {'platform': 'youtube', 'track_key': 'abcdefghijk',

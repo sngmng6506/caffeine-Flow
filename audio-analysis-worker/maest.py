@@ -78,9 +78,14 @@ def normalize_mood(features):
 
 
 def normalize(raw, taxonomy=None, features=None):
+    """raw가 없으면 장르를 비운다 — 판단할 모델이 돌지 않았다는 뜻이다.
+
+    무드는 MAEST와 무관하게 2단 감정값에서 나오므로 그대로 채운다. 장르를
+    unknown으로 채우지 않는 것은 "모른다"와 "안 돌렸다"가 다르기 때문이다.
+    """
     taxonomy = taxonomy or json.loads((ROOT / 'music-taxonomy.json').read_text())
     candidates = {}
-    for style, score in zip(raw['classes'], raw['mean']):
+    for style, score in zip(raw['classes'], raw['mean']) if raw else ():
         label = taxonomy['style_overrides'].get(style) or taxonomy['parent_mapping'].get(style.split('---')[0])
         threshold = taxonomy['thresholds'].get(style, taxonomy['default_threshold'])
         if label and score >= threshold and score > candidates.get(label, {}).get('confidence', -1):

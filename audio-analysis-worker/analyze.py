@@ -118,6 +118,55 @@ def analyze_audio(path, emotion_predictor=None, audio_16k=None, report=None):
     return features, model_version
 
 
+def analyze_for_judgement(path, emotion_predictor=None, audio_16k=None,
+                          segments=None, report=None):
+    """신청 시점 판단에 쓰는 최소 특징. 44.1kHz 계열은 뽑지 않는다.
+
+    BPM·조성·danceability는 판단에 쓰이지 않는데 44.1kHz 재디코딩까지 합쳐 곡당 5초를
+    쓴다. 로컬 파일을 분석하는 호환 CLI는 그대로 `analyze_audio`를 쓴다.
+
+    segments가 오면 그 구간만 이어 붙여 V/A를 구한다. 3단이 듣는 구간과 같은 곳을
+    보게 되고, 전곡 대비 값 차이는 실측에서 0.004였다(0.605/0.622 vs 0.601/0.641).
+    """
+    import essentia
+    import essentia.standard as standard
+    import numpy as np
+
+    if audio_16k is None:
+        audio_16k = standard.MonoLoader(filename=str(path), sampleRate=EMOTION_SAMPLE_RATE)()
+    duration = len(audio_16k) / EMOTION_SAMPLE_RATE
+    if duration < 10:
+        raise ValueError("분석 음원은 10초 이상이어야 합니다.")
+
+    features = {
+        "duration_seconds": finite_or_none(duration),
+        "sample_rate": EMOTION_SAMPLE_RATE,
+        **{key: None for key in (
+            "bpm", "beat_confidence", "key", "scale", "key_strength", "danceability",
+            "loudness_db", "dynamic_complexity", "spectral_centroid_hz", "energy",
+            "valence", "arousal")},
+    }
+    model_version = getattr(essentia, "__version__", "unknown")
+    if emotion_predictor is None:
+        return features, model_version
+
+    sampled = audio_16k
+    if segments:
+        picked = [audio_16k[int(s['start_sec'] * EMOTION_SAMPLE_RATE):
+                            int((s['start_sec'] + s['duration_sec']) * EMOTION_SAMPLE_RATE)]
+                  for s in segments]
+        picked = [v for v in picked if len(v)]
+        if picked:
+            sampled = np.concatenate(picked)
+    with measure(report, 'emotion'):
+        emotion = estimate_valence_arousal(sampled, emotion_predictor)
+    if emotion:
+        features["valence"] = emotion["valence"]
+        features["arousal"] = emotion["arousal"]
+        model_version = f"{model_version}+{EMOTION_MODEL_NAME}"
+    return features, model_version
+
+
 def build_payload(manifest, features, model_version):
     """manifest(dict 또는 argparse 네임스페이스)와 특징값으로 제출 payload를 만든다."""
     read = manifest.get if isinstance(manifest, dict) else lambda key: getattr(manifest, key)
