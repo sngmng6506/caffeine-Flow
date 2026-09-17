@@ -44,8 +44,6 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/cafes/me/stats/weekday-songs` | 🔒 | 특정 요일 곡 `?day=` |
 
 - `GET /cafes/me`와 `PUT /cafes/me/slug` 응답은 최초 가입 slug를 `initial_slug`로 반환한다. slug 변경 응답에는 새 JWT가 포함되며 클라이언트가 즉시 교체해야 한다.
-- 매장 분위기 설명이 바뀌면 손님용 신청곡 안내를 한 번 생성해 저장한다. 생성 실패 시 설정 저장을 중단한다.
-- 직접 재생곡은 정상 종료 또는 60초 이상 재생만 이력에 저장한다.
 
 ## 추천곡 — `/cafes/:slug/recommendations`
 
@@ -73,13 +71,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | PUT | `/:id` | 🏪 | 상태 변경 |
 | DELETE | `/:id` | 🏪 | 신청곡 삭제 |
 
-계약:
-
-- 사장님 라우터를 public 라우터보다 먼저 마운트한다.
-- `/:id` 기반 mutation은 URL `:slug`가 가리키는 카페 범위에서만 조회·수정한다. 다른 카페의 ID는 존재 여부와 무관하게 404다.
-- 공개 응답은 화면에 필요한 곡·상태·투표·시각 필드만 반환한다. `requester_ip`, `visitor_id`, AI 모델·confidence·오류 코드는 공개 HTTP와 공용 소켓 이벤트에 넣지 않으며 사장님 응답도 IP와 visitor ID를 반환하지 않는다.
 - `is_mine`은 요청의 `X-Visitor-Id`와 저장값을 서버가 비교한 boolean이다. 손님 취소도 이 값이 일치할 때만 허용한다.
-- 공개 큐 조회의 `notice`는 사장님 원본 설명이 아니라 저장된 손님용 신청곡 안내다. 조회 시 LLM을 호출하지 않으며 수동 공지 변경 API는 없다.
 - `metadataToken`은 `GET /tracks/oembed`가 확인한 곡 정보에 5분 서명을 붙인 값이다. body의 `videoId`, `title`, `platform`은 신뢰하지 않고 만료·변조 토큰은 400이다.
 
 ## 곡 댓글 — `/songs/:videoId/comments`
@@ -96,17 +88,12 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 - `:commentId`는 URL `:videoId`에 속한 최상위 댓글이어야 한다.
 - 모든 댓글 응답에서 `commenter_ip`와 `visitor_id`를 제외한다.
 - `videoId`가 전체 URL인 SoundCloud·Spotify는 클라이언트가 단일 path segment로 URL 인코딩해 전달한다.
-- 직접 재생곡 댓글은 재생 세션 키로 저장하고, 종료 보고에서 실제 곡 ID가 확인되면 같은 카페 범위에서 곡 키로 병합한다.
 
 ## 트랙 메타데이터 — `/tracks`
 
 | Method | Path | 인증 | 요약 |
 | --- | --- | :-: | --- |
 | GET | `/tracks/oembed?url=` | 🔓 | 음악 URL을 공통 트랙 메타데이터로 변환하고 5분 유효 `metadataToken` 발급 |
-
-사용자 URL 요청은 `safeAxiosGet`을 거쳐 SSRF를 방어한다.
-
-사장님 JWT는 불변 `cafeId`로 카페를 조회한 뒤 토큰의 slug가 현재 slug와 같은지 확인한다. slug 변경 전에 발급된 토큰은 401이다.
 
 ## 운영자 — `/admin`
 
@@ -126,11 +113,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | DELETE | `/admin/cafes/:id` | 🛡 | 카페와 종속 데이터 삭제 |
 
 - 잘못된 UUID와 미존재 카페는 404다. 정지 카페는 손님 HTTP와 Socket.IO 접근이 차단된다.
-- 곡 라벨 검토는 `verdict`(`accurate` 또는 `inaccurate`)만 보내는 경로를 지원한다. 택소노미를 고르지 않고 자동 서술이 곡과 맞는지만 답한다. `accurate`만 `label_source`를 `human`으로 승격하며 `inaccurate`는 `automatic`으로 남겨 재분석·재정규화 대상으로 둔다. `track_annotation`을 함께 보내면 기존처럼 수정으로 기록된다.
 - 검수 body는 `{ human_decision, human_reason_code, metadata_sufficient, audio_analysis_id?, audio_analysis_revision?, track_annotation? }`다. `metadata_sufficient`는 `boolean|null`이며 `null`은 미확인이다. 화면에 표시한 최신 자동 분석 ID를 함께 보내면 해당 곡·분석 한 건만 `reviewed`로 바뀐다. 나머지 허용값은 `server/src/constants/music-filter-review.js`와 `server/src/constants/music-labeling.js`가 기준이며 분위기·장르는 각각 최대 2개, `unknown`은 단독으로만 쓴다.
-- 해당 카페의 AI 처리 이력만 검수할 수 있고, 사람 라벨은 신청곡 상태나 LLM 판단을 바꾸지 않는다.
-- 곡 라벨은 `(platform, track_key)`당 한 건으로 upsert한다.
-- 라벨링 큐 `view`는 `unreviewed`(기본), `reviewed`, `all`이며 최근 판단순 50건을 반환한다. 정책 검수와 곡 라벨이 모두 있어야 `reviewed`다. 저장하면 미검수 목록이 줄어들므로 다음 묶음은 `offset=0`부터 다시 조회한다. 제목에 대소문자 구분 없이 `Playlist` 또는 `플리`가 포함된 항목은 모든 view와 집계에서 제외한다.
 
 ## 오디오 분석 워커 — `/audio-analysis`
 
@@ -141,8 +124,6 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 - `Authorization: Bearer <AUDIO_ANALYSIS_WORKER_TOKEN>` 전용 경계이며 관리자·사장님 JWT를 재사용하지 않는다. 토큰 미설정 시 503이다.
 - body는 `platform`, `track_key`, `model_name`, `model_version`, `feature_schema_version`, `rights_basis`, `source_reference`, `features`, `suggested_annotation`, `analyzed_at`을 받는다.
 - `rights_basis`는 `owned`, `licensed`, `public_domain`, `other_authorized`, `platform_stream`을 허용한다. `platform_stream`은 허가 증명이 아닌 다운로드 출처 구분이다. 오디오 파일이나 외부 다운로드 URL은 받지 않는다.
-- 동일한 `(platform, track_key, model_name, model_version)` 결과는 갱신되고 다시 `pending` 검수 상태가 된다.
-- 라벨링 큐는 곡별 최신 분석을 `audio_analysis`로 반환한다. 새 분석이 `pending`이면 기존 수동 라벨이 있어도 미검수 목록에 다시 나타나며, 수동 곡 라벨 저장 시 `reviewed`가 된다.
 
 ## 통합 TOP10과 헬스체크
 

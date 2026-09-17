@@ -188,4 +188,4 @@ owner/src/pages/RecommendCard.jsx
 admin/admin.js
 ```
 
-환경변수는 [DEVELOPMENT.md](DEVELOPMENT.md#환경변수), 엔드포인트는 [API.md](API.md#카페-관리--cafes), 미구현 후보는 [ROADMAP.md](ROADMAP.md#ai-음악-필터)를 기준으로 한다.
+환경변수는 [DEVELOPMENT.md](DEVELOPMENT.md#환경변수), 엔드포인트는 [API.md](API.md#카페-관리--cafes), 미구현 후보는 [ROADMAP.md](ROADMAP.md)를 기준으로 한다.

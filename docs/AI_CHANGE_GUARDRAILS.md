@@ -104,7 +104,7 @@ server/src/features/audio-analysis/runs.js
 - 틀림 판정한 최신 분석은 실시간 프롬프트에서 제외하며, 이전 분석을 대신 사용하지 않는다. 새 재분석만 기존 분석 판정을 초기화한다.
 - 자동 분석은 실시간 음악 필터 프롬프트에 들어간다(`music-filter/track-analysis.js`). 판단을 돕는 재료이지 판단의 전제가 아니다 — 분석이 없거나 조회에 실패해도 제목·아티스트만으로 판단하며, 조회 실패를 fail-closed 거절로 만들지 않는다. 조회 키는 `canonicalizeVideoId`를 거친다.
 - 필터 프롬프트에 MAEST 점수를 넣지 않는다. 보정되지 않은 상대값이라 숫자를 보여주면 곡끼리 비교하게 된다. 순위(`prompt_styles`의 label)만 넣고 보정되지 않았음을 밝힌다. Valence·Arousal도 숫자 대신 말로 바꿔 넣는다 — 척도를 모르는 모델은 0.81을 제멋대로 해석한다.
-- 자동 분석을 라이브 입력에 연결한 사실만으로 품질 향상을 주장하지 않는다. 골드 라벨·false accept 평가는 [ROADMAP](ROADMAP.md#자동-분위기-모델과-라이브-판단-확장)에 남긴다.
+- 자동 분석을 라이브 입력에 연결한 사실만으로 품질 향상을 주장하지 않는다. 골드 라벨·false accept 평가는 [ROADMAP](ROADMAP.md)에 남긴다.
 - 소비 프롬프트의 MAEST 스타일은 `runs.selectPromptStyles`가 단일 기준이다. 1위 점수의 0.5배 이상, 최대 5개이며 완료 시 `maest_summary.prompt_styles`에 저장한다. 소비처가 임계값을 다시 정의하거나 절대 임계값으로 바꾸지 않는다 — 점수 스케일이 곡마다 다르다. 보정되지 않은 상대 점수임을 프롬프트에 밝힌다.
 
 ## Router Mount Order Contract
