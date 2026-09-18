@@ -18,7 +18,7 @@ from pathlib import Path
 
 from audio_llm import (
     DEFAULT_BASE_URL, DEFAULT_MODEL, describe,
-    EXPERIMENT_FIELDS, EXPERIMENT_SCHEMA, EXPERIMENT_SCORES, va_context,
+    EXPERIMENT_FIELDS, EXPERIMENT_SCHEMA, EXPERIMENT_SCORES, plan_segments_by_energy, va_context,
 )
 from download import download_audio, source_url
 from emotion import file_sha256
@@ -81,10 +81,12 @@ def stage_elapsed(events, stage):
 
 
 def run_strategy(audio, duration_sec, audio_sha256, strategy, repeat, download_sec,
-                 base_config, describe_fn=describe):
+                 base_config, describe_fn=describe, segment_plan=None):
     count, clip_sec = strategy
     events = []
     config = {**base_config, 'segments': count, 'clip_sec': clip_sec}
+    if segment_plan:
+        config['segment_plan'] = segment_plan
     started = time.monotonic()
     try:
         result = describe_fn(audio, duration_sec, audio_sha256, config, report=events.append)
@@ -92,7 +94,7 @@ def run_strategy(audio, duration_sec, audio_sha256, strategy, repeat, download_s
         payload = next((value for value in events if value.get('stage') == 'audio_llm_payload'), {})
         return {
             'strategy': f'{count}x{clip_sec}', 'repeat': repeat, 'status': 'completed',
-            'clip_extract_sec': stage_elapsed(events, 'audio_llm_clip_extract'),
+            'segments': segment_plan, 'clip_extract_sec': stage_elapsed(events, 'audio_llm_clip_extract'),
             'llm_request_sec': stage_elapsed(events, 'audio_llm_request'),
             'audio_bytes': payload.get('audio_bytes'), 'audio_llm_total_sec': elapsed,
             'estimated_end_to_end_sec': round(download_sec + elapsed, 4),
@@ -142,6 +144,10 @@ def main():
                         help='Essentia V/A를 계산해 프롬프트에 밝기·활력으로 넣는다')
     parser.add_argument('--va-style', choices=['number', 'label'], default='number',
                         help='V/A를 척도를 붙인 숫자로 넣을지 밴드 이름으로 넣을지')
+    # 균등 배치는 인트로와 아웃트로를 항상 포함한다. 운영 경로(remote_analyze)는
+    # energy를 쓰므로, 여기서 even을 고르면 그 이전 측정과 비교하는 뜻이 된다.
+    parser.add_argument('--sampling', choices=['even', 'energy'], default='even',
+                        help='구간을 곡 전체에 균등 배치할지 소리가 큰 쪽에서 고를지')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     api_key = os.environ.get('OPENROUTER_API_KEY', '').strip()
@@ -174,17 +180,21 @@ def main():
             duration_sec = source.getnframes() / source.getframerate()
         audio_sha256 = file_sha256(audio)
 
+        # 운영 경로와 같이 16kHz 배열을 한 번만 만들어 V/A와 구간 선택이 나눠 쓴다.
+        audio_16k = None
+        if args.with_va or args.sampling == 'energy':
+            import essentia.standard as standard
+            audio_16k = standard.MonoLoader(filename=str(audio), sampleRate=16_000)()
+
         va_sec = None
         va_summary = None
         if args.with_va:
             # 곡당 한 번만 도는 비용이다. 결정론적이라 반복 사이에 값이 바뀌지 않는다.
-            import essentia.standard as standard
             from emotion import estimate_valence_arousal, load_emotion_predictor
             started = time.monotonic()
             predictor = load_emotion_predictor(
                 os.environ.get('AUDIO_MODEL_DIR', '~/caffeine-audio/models').replace('~', os.path.expanduser('~')))
-            summary = estimate_valence_arousal(
-                standard.MonoLoader(filename=str(audio), sampleRate=16_000)(), predictor)
+            summary = estimate_valence_arousal(audio_16k, predictor)
             va_sec = round(time.monotonic() - started, 4)
             if summary:
                 base_config['va'] = va_context(summary['valence'], summary['arousal'], args.va_style)
@@ -194,12 +204,20 @@ def main():
                 report_va = {'elapsed_sec': va_sec, 'error': 'V/A 계산 실패'}
             print(json.dumps({'stage': 'valence_arousal', **report_va}, ensure_ascii=False), flush=True)
 
+        # 구간 선택은 결정론적이라 전략당 한 번만 계산하면 반복 사이에 바뀌지 않는다.
+        plans = {}
+        if args.sampling == 'energy':
+            for count, clip_sec in args.strategies:
+                plans[(count, clip_sec)] = plan_segments_by_energy(audio_16k, count, clip_sec)
+                print(json.dumps({'stage': 'segment_plan', 'strategy': f'{count}x{clip_sec}',
+                                  'segments': plans[(count, clip_sec)]}, ensure_ascii=False), flush=True)
+
         rows = []
         for repeat in range(args.repeats):
             # 항상 같은 전략이 먼저 호출돼 공급자 warm-up 이득을 받지 않도록 순환한다.
             for strategy in rotated(args.strategies, repeat):
                 row = run_strategy(audio, duration_sec, audio_sha256, strategy, repeat + 1,
-                                   download_sec, base_config)
+                                   download_sec, base_config, segment_plan=plans.get(strategy))
                 rows.append(row)
                 print(json.dumps(row, ensure_ascii=False), flush=True)
 
@@ -211,7 +229,7 @@ def main():
         'model': args.model, 'download_sec': download_sec,
         'valence_arousal_sec': va_sec,
         'valence': (va_summary or {}).get('valence'), 'arousal': (va_summary or {}).get('arousal'), 'va_style': args.va_style if args.with_va else None,
-        'va_prompt': base_config.get('va'),
+        'va_prompt': base_config.get('va'), 'sampling': args.sampling,
         # 어떤 문구로 만든 서술인지 남긴다. 기본은 audio-llm-1, 후보는 custom-<해시>다.
         'prompt_version': next((r.get('prompt_version') for r in rows if r.get('prompt_version')), None),
         'prompt_file': str(args.prompt_file) if args.prompt_file else None,

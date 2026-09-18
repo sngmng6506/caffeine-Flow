@@ -12,7 +12,7 @@
 {% endif %}{% if analysis.mood.length %}분위기: {{ analysis.mood | join(', ') }}
 {% endif %}{% if analysis.instruments.length %}악기: {{ analysis.instruments | join(', ') }}
 {% endif %}{% if analysis.vocal.length %}보컬: {{ analysis.vocal | join(', ') }}
-{% endif %}{% if analysis.structure.length %}구간별(곡에서 고르게 뽑은 순서):
+{% endif %}{% if analysis.structure.length %}구간별(곡에서 뽑은 시간순):
 {% for part in analysis.structure %}  {{ loop.index }}) {{ part }}
 {% endfor %}{% endif %}{% if analysis.styles.length %}장르 후보: {{ analysis.styles | join(', ') }}
 {% endif %}{% if analysis.tempo %}템포: {{ analysis.tempo }}

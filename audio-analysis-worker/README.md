@@ -91,6 +91,7 @@ Discord 웹훅이 있으면 설정 검증·락 획득 뒤 시작 알림을 보�
 
 - **1단의 장르 판단을 프롬프트에 넣지 않는다.** `audio_llm.py`에 장르를 받을 인자가 없다. 예외는 Valence/Arousal이며 `config['va']`로 받아 척도를 붙인 숫자로 넣는다 — [가드레일](../docs/AI_CHANGE_GUARDRAILS.md#audio-analysis-contract).
 - **각 구간의 시간 범위를 알려 주고 `structure`를 구간별로 하나씩 받는다.** 한 서술로 뭉치게 하면 구간마다 다르게 들린 곡에서 모델이 매번 한쪽을 골라야 하고, 그 선택이 실행마다 뒤집혀 필터 판정까지 흔들렸다(실측 일치율 56% → 구간별로 나눈 뒤 90%).
+- **구간은 균등 배치가 아니라 소리가 큰 쪽에서 고르고, V/A와 3단이 같은 구간을 본다.** `remote_analyze.py`가 한 번 계산한 결과를 둘에 함께 넘긴다 — 프롬프트의 밝기·활력이 서술과 다른 구간의 값이면 모델이 듣는 것과 어긋난다.
 - **임베딩 벡터를 텍스트로 넣지 않는다.** LLM에는 오디오 자체를 준다.
 - **택소노미를 주지 않는다.** 자유 서술로 받고 정규화는 나중에 한다.
 
@@ -188,8 +189,8 @@ python analyze.py ./authorized-track.wav \
 | `DISCORD_AUDIO_WEBHOOK_URL` | — | 워커 시작 알림, 수동 큐 실패 알림 |
 | `OPENROUTER_API_KEY` | — | 3단 인증. 없으면 서버가 켜 두어도 건너뛴다 |
 | `AUDIO_LLM_MODEL` | `google/gemini-2.5-pro` | 사용할 오디오 입력 모델 |
-| `AUDIO_LLM_SEGMENTS` | `3` | 곡에서 고르게 뽑을 구간 수 |
-| `AUDIO_LLM_CLIP_SEC` | `10` | 구간 길이(초) |
+| `AUDIO_LLM_SEGMENTS` | `3` | 곡에서 뽑을 구간 수 |
+| `AUDIO_LLM_CLIP_SEC` | `10` | 구간 길이(초). 구간끼리 이 값의 2배를 띄운다 |
 | `AUDIO_LLM_TIMEOUT_SEC` | `180` | 3단 호출 제한 시간 |
 
 ## 테스트
