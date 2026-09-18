@@ -13,7 +13,7 @@ from emotion import (
     file_sha256,
     load_emotion_predictor,
 )
-from audio_llm import AudioLLMError, describe, plan_segments, va_context
+from audio_llm import AudioLLMError, describe, plan_segments, plan_segments_by_energy, va_context
 from download import source_url
 from maest import load_audio, normalize, make_annotation
 
@@ -71,6 +71,7 @@ def run(audio, job, output, models=None, report=None):
             with measure(report, 'audio_llm'):
                 config = audio_llm_config(job.get('audio_llm_prompt'))
                 config['va'] = va
+                config['segment_plan'] = segments
                 return describe(audio, audio_duration, audio_sha256, config, report=report)
         except AudioLLMError:
             return None
@@ -88,7 +89,12 @@ def run(audio, job, output, models=None, report=None):
         shared = load_audio(audio) if emotion is not None or models is not None else None
     # V/A는 3단이 듣는 구간에서만 구한다. 전곡을 돌리면 6초, 구간만이면 1.5초이고
     # 값 차이는 0.004였다. 두 단계가 같은 곳을 듣는다는 점도 맞아떨어진다.
-    segments = plan_segments(audio_duration)
+    #
+    # 구간은 소리가 큰 쪽부터 고른다. 균등 배치는 인트로와 아웃트로를 고정으로 먹어
+    # 곡을 대표하지 않는 곳을 듣는다(2026-09-18 실측: 평균 에너지 0.39 -> 0.94).
+    # 16kHz 배열이 없으면 균등 배치로 떨어진다.
+    segments = (plan_segments_by_energy(shared) if shared is not None
+                else plan_segments(audio_duration))
     with measure(report, 'features_and_emotion'):
         features, version = analyze_for_judgement(audio, emotion, audio_16k=shared,
                                                   segments=segments, report=report)

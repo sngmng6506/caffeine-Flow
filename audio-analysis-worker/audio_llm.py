@@ -98,6 +98,10 @@ EXPERIMENT_SCHEMA = {
 # 사라진다.
 VA_LOW, VA_HIGH = 0.35, 0.65
 
+# 구간 후보의 에너지 하한. 최고 구간의 이 비율에 못 미치면 고르지 않는다 — 간격을
+# 채우려고 무음을 집는 것을 막는다. 제곱평균이라 진폭 기준으로는 약 0.32배다.
+QUIET_RATIO = 0.10
+
 
 def va_label(value, low, high):
     """밴드 이름. 숫자 형식과 비교하는 실험(style='label')에서만 쓴다."""
@@ -162,6 +166,68 @@ def plan_segments(duration_sec, count=DEFAULT_SEGMENTS, clip_sec=DEFAULT_CLIP_SE
     starts = [round(i * step, 3) for i in range(count)]
     unique = sorted(set(starts))
     return [{'start_sec': s, 'duration_sec': round(clip, 3)} for s in unique]
+
+
+def plan_segments_by_energy(audio_16k, count=DEFAULT_SEGMENTS, clip_sec=DEFAULT_CLIP_SEC,
+                            sample_rate=CLIP_SAMPLE_RATE):
+    """소리가 큰 구간부터 고른다. 겹치지 않게 고르고 시간순으로 돌려준다.
+
+    균등 배치는 첫 구간을 0초에, 마지막을 곡 끝에 붙이므로 인트로와 아웃트로가 항상
+    들어간다. 둘 다 곡을 대표하지 않는다. 실측(2026-09-18)에서 186초 재즈 곡의 3x10이
+    고른 세 구간의 평균 에너지가 0.39였고, 그중 둘이 곡에서 가장 조용한 지점이었다 —
+    중간 구간마저 하필 브레이크다운에 떨어졌다. 그 결과 4x30이 잡아내던 록/메탈 전환을
+    8회 중 7회 놓쳤다.
+
+    겹치면 같은 소리를 두 번 보내고 structure 항목도 중복된다. 하나를 고를 때마다
+    좌우로 clip_sec만큼을 후보에서 빼 겹칠 수 없게 한다.
+    """
+    import numpy as np
+
+    count = max(1, min(int(count), 8))
+    total = len(audio_16k) / sample_rate if sample_rate else 0
+    if total <= 0:
+        return []
+    clip = min(float(clip_sec), total)
+    window = max(1, int(clip * sample_rate))
+    if len(audio_16k) < window:
+        return [{'start_sec': 0.0, 'duration_sec': round(total, 3)}]
+
+    # 1초 간격 후보의 창 평균 에너지. RMS 대신 제곱평균을 쓰는 것은 순위만 필요해서다.
+    hop = max(1, sample_rate)
+    squared = np.square(np.asarray(audio_16k, dtype=np.float64))
+    cumulative = np.concatenate(([0.0], np.cumsum(squared)))
+    last_start = len(audio_16k) - window
+    starts = list(range(0, last_start + 1, hop))
+    if starts[-1] != last_start:
+        starts.append(last_start)
+    scores = [(float(cumulative[i + window] - cumulative[i]) / window, i) for i in starts]
+
+    # 겹치지 않는 것만으로는 부족하다. 고에너지가 한곳에 뭉친 곡에서는 바로 옆을
+    # 집어 같은 악절을 두 번 듣게 된다(실측: 151~161s와 172~182s를 고르자 두 번째
+    # 서술이 "비슷하게 이어지나"로 나왔다). 시작점을 구간 길이의 2배만큼 떼어 놓는다.
+    #
+    # 짧은 곡에서는 그 간격으로 count개를 놓을 수 없다. 겹침 금지(1배)까지 단계적으로
+    # 좁히고, 그래도 안 되면 놓을 수 있는 만큼만 돌려준다 — 겹치는 것보다 적은 편이 낫다.
+    ordered = sorted(scores, key=lambda v: (-v[0], v[1]))
+    # 간격을 지키려다 무음을 고르면 인트로·아웃트로를 피하려던 목적을 잃는다. 최고
+    # 에너지의 일정 비율에 못 미치는 후보는 아예 제외하고, 남은 것 안에서 간격을 본다.
+    loudest = ordered[0][0] if ordered else 0.0
+    usable = [v for v in ordered if v[0] >= loudest * QUIET_RATIO] or ordered
+
+    picked = []
+    for spacing in (2.0, 1.5, 1.0):
+        gap = int(window * spacing)
+        picked = []
+        for _score, start in usable:
+            if len(picked) >= count:
+                break
+            if any(abs(start - chosen) < gap for chosen in picked):
+                continue
+            picked.append(start)
+        if len(picked) >= count:
+            break
+    return [{'start_sec': round(v / sample_rate, 3), 'duration_sec': round(clip, 3)}
+            for v in sorted(picked)]
 
 
 def extract_clip(audio_path, segment, ffmpeg='ffmpeg', runner=subprocess.run):
@@ -287,8 +353,11 @@ def call_openrouter(messages, config, opener=urllib.request.urlopen):
 def describe(audio_path, duration_sec, audio_sha256, config,
              opener=urllib.request.urlopen, runner=subprocess.run, report=None):
     """구간을 잘라 LLM에 넘기고 보존할 원본을 만든다."""
-    segments = plan_segments(duration_sec, config.get('segments', DEFAULT_SEGMENTS),
-                             config.get('clip_sec', DEFAULT_CLIP_SEC))
+    # 호출부가 오디오를 들고 있으면 에너지 기반으로 고른 구간을 넘긴다. 없으면
+    # 균등 배치로 떨어진다 — 오디오 없이 구간만 계획해야 하는 경로가 있다.
+    segments = config.get('segment_plan') or plan_segments(
+        duration_sec, config.get('segments', DEFAULT_SEGMENTS),
+        config.get('clip_sec', DEFAULT_CLIP_SEC))
     if not segments:
         raise AudioLLMError('샘플 구간을 만들 수 없습니다')
     with measure(report, 'audio_llm_clip_extract'):

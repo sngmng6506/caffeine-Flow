@@ -43,6 +43,56 @@ class PlanSegmentsTest(unittest.TestCase):
         self.assertEqual(plan_segments(0), [])
 
 
+class PlanSegmentsByEnergyTest(unittest.TestCase):
+    """소리가 큰 구간부터 고르되 겹치지 않는다."""
+
+    def silence_then_loud(self):
+        import numpy as np
+        # 무음 20초 / 0.5 진폭 20초 / 무음 20초 / 0.9 진폭 20초 / 무음 20초
+        sr = 16000
+        return np.concatenate([np.zeros(sr * 20), np.full(sr * 20, 0.5),
+                               np.zeros(sr * 20), np.full(sr * 20, 0.9),
+                               np.zeros(sr * 20)])
+
+    def test_picks_loud_regions_not_the_intro(self):
+        from audio_llm import plan_segments_by_energy
+        segments = plan_segments_by_energy(self.silence_then_loud(), count=3, clip_sec=10)
+
+        self.assertEqual(len(segments), 3)
+        # 균등 배치였다면 0초·45초·90초를 골라 셋 다 무음이다.
+        for segment in segments:
+            start = segment['start_sec']
+            self.assertTrue(20 <= start < 40 or 60 <= start < 80,
+                            f'조용한 구간을 골랐다: {start}s')
+
+    def test_segments_never_overlap(self):
+        """겹치면 같은 소리를 두 번 보내고 structure 항목도 중복된다."""
+        from audio_llm import plan_segments_by_energy
+        for count, clip in ((2, 10), (3, 10), (4, 15), (8, 10)):
+            with self.subTest(count=count, clip=clip):
+                segments = plan_segments_by_energy(self.silence_then_loud(),
+                                                   count=count, clip_sec=clip)
+                self.assertEqual(segments, sorted(segments, key=lambda v: v['start_sec']),
+                                 '시간순으로 돌려줘야 structure 순서와 맞는다')
+                for earlier, later in zip(segments, segments[1:]):
+                    self.assertLessEqual(earlier['start_sec'] + earlier['duration_sec'],
+                                         later['start_sec'] + 1e-9)
+
+    def test_never_runs_past_the_end(self):
+        from audio_llm import plan_segments_by_energy
+        audio = self.silence_then_loud()
+        total = len(audio) / 16000
+        for segment in plan_segments_by_energy(audio, count=5, clip_sec=30):
+            self.assertLessEqual(segment['start_sec'] + segment['duration_sec'], total + 0.001)
+
+    def test_short_track_gets_one_clip(self):
+        import numpy as np
+        from audio_llm import plan_segments_by_energy
+        segments = plan_segments_by_energy(np.full(16000 * 5, 0.5), count=3, clip_sec=10)
+
+        self.assertEqual(segments, [{'start_sec': 0.0, 'duration_sec': 5.0}])
+
+
 class PromptTest(unittest.TestCase):
     def test_prompt_carries_no_genre_or_taxonomy(self):
         # 3단은 1단과 독립이어야 한다. 앵커링되면 앙상블이 아니라 복창이 된다.
