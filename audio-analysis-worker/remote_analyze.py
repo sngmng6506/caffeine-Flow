@@ -13,7 +13,8 @@ from emotion import (
     file_sha256,
     load_emotion_predictor,
 )
-from audio_llm import AudioLLMError, describe, plan_segments, plan_segments_by_energy, va_context
+from audio_llm import (AudioLLMError, DEFAULT_CLIP_SEC, DEFAULT_SEGMENTS, describe,
+                       plan_segments, plan_segments_by_energy, va_context)
 from download import source_url
 from maest import load_audio, normalize, make_annotation
 
@@ -66,12 +67,15 @@ def run(audio, job, output, models=None, report=None):
     with measure(report, 'audio_hash'):
         audio_sha256 = file_sha256(audio)
 
+    # 구간 수·길이를 여기서 읽는다. 구간은 3단보다 먼저 정해지고(2단이 같은 구간을
+    # 듣는다) describe는 넘겨받은 계획을 그대로 쓰므로, 계획을 세울 때 이 설정을
+    # 반영하지 않으면 AUDIO_LLM_SEGMENTS를 바꿔도 아무 일이 일어나지 않는다.
+    llm_config = audio_llm_config(job.get('audio_llm_prompt'))
+
     def describe_independently(va):
         try:
             with measure(report, 'audio_llm'):
-                config = audio_llm_config(job.get('audio_llm_prompt'))
-                config['va'] = va
-                config['segment_plan'] = segments
+                config = {**llm_config, 'va': va, 'segment_plan': segments}
                 return describe(audio, audio_duration, audio_sha256, config, report=report)
         except AudioLLMError:
             return None
@@ -93,8 +97,10 @@ def run(audio, job, output, models=None, report=None):
     # 구간은 소리가 큰 쪽부터 고른다. 균등 배치는 인트로와 아웃트로를 고정으로 먹어
     # 곡을 대표하지 않는 곳을 듣는다(2026-09-18 실측: 평균 에너지 0.39 -> 0.94).
     # 16kHz 배열이 없으면 균등 배치로 떨어진다.
-    segments = (plan_segments_by_energy(shared) if shared is not None
-                else plan_segments(audio_duration))
+    count = llm_config.get('segments', DEFAULT_SEGMENTS)
+    clip_sec = llm_config.get('clip_sec', DEFAULT_CLIP_SEC)
+    segments = (plan_segments_by_energy(shared, count, clip_sec) if shared is not None
+                else plan_segments(audio_duration, count, clip_sec))
     with measure(report, 'features_and_emotion'):
         features, version = analyze_for_judgement(audio, emotion, audio_16k=shared,
                                                   segments=segments, report=report)

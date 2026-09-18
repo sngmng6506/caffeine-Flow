@@ -144,10 +144,11 @@ def main():
                         help='Essentia V/A를 계산해 프롬프트에 밝기·활력으로 넣는다')
     parser.add_argument('--va-style', choices=['number', 'label'], default='number',
                         help='V/A를 척도를 붙인 숫자로 넣을지 밴드 이름으로 넣을지')
-    # 균등 배치는 인트로와 아웃트로를 항상 포함한다. 운영 경로(remote_analyze)는
-    # energy를 쓰므로, 여기서 even을 고르면 그 이전 측정과 비교하는 뜻이 된다.
-    parser.add_argument('--sampling', choices=['even', 'energy'], default='even',
-                        help='구간을 곡 전체에 균등 배치할지 소리가 큰 쪽에서 고를지')
+    # 기본값을 운영 경로(remote_analyze)와 맞춘다. 여기서 나온 지연·비용은 운영
+    # 추정치로 인용되므로, 다른 구간을 듣는 값이 기본으로 나오면 안 된다.
+    # `even`은 2026-09-18 이전 기록과 비교할 때만 쓴다.
+    parser.add_argument('--sampling', choices=['energy', 'even'], default='energy',
+                        help='구간을 소리가 큰 쪽에서 고를지 곡 전체에 균등 배치할지')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     api_key = os.environ.get('OPENROUTER_API_KEY', '').strip()

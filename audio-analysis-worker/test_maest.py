@@ -177,6 +177,41 @@ class PipelineModeTest(unittest.TestCase):
         self.assertIn('0.12', seen['va']['brightness'])
         self.assertIn('0.91', seen['va']['energy'])
 
+    def test_segment_settings_reach_the_plan(self):
+        """AUDIO_LLM_SEGMENTS·CLIP_SEC가 실제 구간 계획에 반영된다.
+
+        구간은 3단보다 먼저 정해진다(2단이 같은 구간을 듣는다). describe는 넘겨받은
+        계획을 그대로 쓰므로, 계획을 세울 때 설정을 읽지 않으면 환경변수를 바꿔도
+        기본값 그대로 돈다 — 조용히 무시되는 설정이 된다.
+        """
+        import tempfile, wave, os
+        from pathlib import Path
+        import remote_analyze
+        from audio_llm import AudioLLMError
+        seen = {}
+
+        def describe(_audio, _duration, _sha, config, **_kwargs):
+            seen['plan'] = config.get('segment_plan')
+            raise AudioLLMError('stop here')
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / 'input.wav'
+            with wave.open(str(audio), 'wb') as output:
+                output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
+                output.writeframes(b'\0\0' * 16000 * 120)
+            features = {'duration_seconds': 120, 'valence': 0.5, 'arousal': 0.5}
+            with patch.dict(os.environ, {'OPENROUTER_API_KEY': 'test',
+                                         'AUDIO_LLM_SEGMENTS': '2', 'AUDIO_LLM_CLIP_SEC': '20'}), \
+                 patch.object(remote_analyze, 'load_emotion_predictor', return_value=lambda a: None), \
+                 patch.object(remote_analyze, 'load_audio', return_value=np.zeros(16000 * 120)), \
+                 patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
+                 patch.object(remote_analyze, 'describe', side_effect=describe):
+                remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
+                                           'artist_name': 'unknown'}, Path(directory) / 'result.json')
+
+        self.assertEqual(len(seen['plan']), 2)
+        self.assertTrue(all(segment['duration_sec'] == 20 for segment in seen['plan']))
+
     def test_llm_failure_does_not_lose_the_rest_of_the_analysis(self):
         """3단이 실패해도 특징값과 무드는 저장된다.
 
