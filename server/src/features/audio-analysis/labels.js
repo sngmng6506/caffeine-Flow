@@ -63,7 +63,7 @@ function review(jobId, input, annotation) {
       analysis = await trx('music_audio_analyses').where({ id: job.analysis_id }).forUpdate().first();
       if (analysis.revision !== input.audio_analysis_revision) throw conflict();
     }
-    if (input.verdict !== undefined && !analysis?.maest_summary?.audio_llm?.description?.trim()) {
+    if (input.verdict !== undefined && !analysis?.analysis_summary?.audio_llm?.description?.trim()) {
       throw Object.assign(new Error('판정할 Audio LLM 서술이 없습니다'), { status: 409 });
     }
     const current = await trx('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).forUpdate().first();

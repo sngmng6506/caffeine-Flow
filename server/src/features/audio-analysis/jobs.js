@@ -52,7 +52,7 @@ async function lockedJob(trx, id, token) {
   return job;
 }
 
-function complete(id, token, result, automaticAnnotation, tagScores, maestRun = null) {
+function complete(id, token, result, automaticAnnotation, tagScores, analysisRun = null) {
   return db.transaction(async (trx) => {
     const job = await lockedJob(trx, id, token);
     // 제출 응답만 유실된 재전송은 라벨을 다시 갱신하지 않는다.
@@ -63,23 +63,17 @@ function complete(id, token, result, automaticAnnotation, tagScores, maestRun = 
     if (checked.error) throw Object.assign(new Error(checked.error), { status: 400 });
     const automatic = checked.value;
     let runFields = {};
-    if (result.model_name === 'essentia-maest' && !maestRun) throw Object.assign(new Error('MAEST 원본이 필요합니다'), { status: 400 });
-    if (maestRun) {
-      const checkedRun = require('./runs').validateRun(maestRun, result);
+    if (analysisRun) {
+      const checkedRun = require('./runs').validateRun(analysisRun, result);
       if (checkedRun.error) throw Object.assign(new Error(checkedRun.error), { status: 400 });
-      const raw = checkedRun.value.maest_raw;
-      const derivedScores = Object.fromEntries(raw.classes.map((name, i) => [name, raw.mean[i]]));
-      if (tagScores && (Object.keys(tagScores).length !== raw.classes.length || raw.classes.some((name, i) => Math.abs(tagScores[name] - raw.mean[i]) > 0.000001 || !Number.isFinite(tagScores[name])))) {
-        throw Object.assign(new Error('원본과 태그 점수가 다릅니다'), { status: 400 });
-      }
+      // 장르를 판단할 모델이 없으므로 자동 라벨의 장르도 unknown이어야 한다.
       if (JSON.stringify(automatic.genre_tags) !== JSON.stringify(genreTags(checkedRun.value.normalized)) ||
           JSON.stringify(automatic.mood_tags) !== JSON.stringify(checkedRun.value.normalized.mood?.tags?.length ? checkedRun.value.normalized.mood.tags : ['unknown']) || automatic.vocal_type !== 'unknown' || automatic.instrumentation_type !== 'unknown') {
         throw Object.assign(new Error('원본과 자동 라벨이 다릅니다'), { status: 400 });
       }
-      tagScores = derivedScores;
       const [run] = await trx('music_audio_runs').insert({ lease_token: token, platform: job.platform,
         track_key: job.track_key, payload: JSON.stringify({ ...checkedRun.value, result, automatic_annotation: automatic }) }).returning('id');
-      runFields = { latest_run_id: run.id, maest_summary: require('./runs').summary(checkedRun.value) };
+      runFields = { latest_run_id: run.id, analysis_summary: require('./runs').summary(checkedRun.value) };
     }
     const saved = await analysisService.saveResult({ ...result, automatic_annotation: automatic, tag_scores: tagScores, ...runFields }, trx);
     const row = {

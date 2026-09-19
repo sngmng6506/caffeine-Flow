@@ -497,10 +497,3 @@ router.post('/audio-labels/:id/requeue', requireAdmin, async (req, res) => {
   try { res.json(await require('../features/audio-analysis/jobs').requeue(req.params.id, req.body.generation)); }
   catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
 });
-router.post('/audio-labels/:id/renormalize', requireAdmin, async (req, res) => {
-  if (!isUuid(req.params.id) || !isUuid(req.body?.analysis_id) || !Number.isSafeInteger(req.body?.analysis_revision) || !Number.isSafeInteger(req.body?.generation)) {
-    return res.status(400).json({ error: '분석·작업 버전이 필요합니다' });
-  }
-  try { res.json(await require('../features/audio-analysis/renormalize').apply(req.params.id, req.body)); }
-  catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
-});

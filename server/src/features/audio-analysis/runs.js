@@ -1,19 +1,12 @@
 const db = require('../../db/knex');
-const { GENRE_TAGS, MOOD_TAGS, MAX_MOOD_TAGS } = require('../../constants/music-labeling');
+const { MOOD_TAGS, MAX_MOOD_TAGS } = require('../../constants/music-labeling');
 const contract = require('../../constants/audio-pipeline.json');
-const { classes } = require('../../constants/maest-metadata.json');
-const { normalize } = require('./normalization');
-const MODEL = contract.model_version;
 // 감정값을 채운 실행은 임베딩·회귀 모델을 함께 기록한다. 순서까지 고정해 원본만 보고
 // 어떤 모델이 돌았는지 알 수 있게 한다.
 const EMBEDDING_MODEL = contract.emotion_models.embedding;
 const EMOTION_MODEL = contract.emotion_models.regression;
-const MAEST_ONLY_SOURCES = [MODEL];
-const EMOTION_SOURCES = [MODEL, EMBEDDING_MODEL, EMOTION_MODEL];
-// EMOTION_LLM은 MAEST를 돌리지 않은 실행이다. MAEST는 이 미니PC에서 곡당 76초를
-//쓰면서 같은 CPU를 나눠 쓰는 3단까지 4~5배 느리게 만들었다(실측: 3단 단독 16초,
-// MAEST와 동시 76초). 장르 후보가 사라지는 대신 신청 시점 판단이 가능해진다.
-const MODES = ['MAEST_ONLY', 'MAEST_EMOTION', 'FULL', 'EMOTION_LLM'];
+// 신청 시점 경로가 도는 단계는 하나다 — Valence/Arousal + Audio LLM. 장르를 판단할
+// 모델이 없으므로 분기할 모드도 없다.
 const EMOTION_LLM_SOURCES = [EMBEDDING_MODEL, EMOTION_MODEL];
 const TEXT_MAX = 4000;
 const ITEM_MAX = 120;
@@ -50,7 +43,6 @@ function validAudioLlm(raw, mode, audioSha256, duration) {
 }
 const hash = (v) => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v);
 const score = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
-const vector = (v) => Array.isArray(v) && v.length === classes.length && v.every(score);
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 
 // 감정값은 features와 원본이 같은 값을 가리켜야 한다. 한쪽만 고쳐 보내는 것을 막는다.
@@ -72,17 +64,17 @@ function validMood(mood, full, features) {
 // 두 디코더를 같은 샘플로 맞추자는 검사가 아니다. 구간 끝 검사와 같은 값을 쓴다.
 const DURATION_TOLERANCE_SEC = 0.1;
 
-// MAEST를 돌리지 않은 실행. 장르는 MAEST만 만들 수 있으므로 빈 배열이어야 하고,
-// 무드는 2단 감정값에서 그대로 온다. MAEST 쪽 검사(519개 클래스 순서, 구간 hop
-// 계산, 모델 해시)는 검증할 원본이 없으므로 건너뛴다.
-function validateEmotionLlmRun(input, result) {
+// 신청 시점 경로가 만든 실행. 장르를 판단할 모델이 없으므로 genre는 빈 배열이어야
+// 한다. `unknown`으로 채우지 않는 것은 "모른다"와 "판단할 모델이 돌지 않았다"가
+// 다르기 때문이다 — 소비처는 빈 배열일 때 장르 줄을 렌더하지 않는다.
+function validateRun(input, result) {
   const invalid = () => ({ error: '감정·서술 원본이 올바르지 않습니다' });
+  if (input?.schema_version !== 1 || input?.pipeline_mode !== 'EMOTION_LLM') return invalid();
   const expected = [...EMOTION_LLM_SOURCES, input?.audio_llm_raw?.model_id];
-  if (input.maest_raw != null || input.maest_model_version != null) return invalid();
   if (!hash(input.audio_sha256) || input.audio_local_path !== null ||
       !finite(input.audio_duration_sec) ||
       Math.abs(input.audio_duration_sec - result.features.duration_seconds) > DURATION_TOLERANCE_SEC ||
-      input.audio_sample_rate !== 16000 ||
+      input.audio_sample_rate !== contract.audio.sample_rate ||
       input.audio_duration_sec < contract.audio_duration_sec.min ||
       input.audio_duration_sec > contract.audio_duration_sec.max ||
       input.audio_source_url !== result.source_reference ||
@@ -90,15 +82,10 @@ function validateEmotionLlmRun(input, result) {
       expected.some((v, i) => input.sources_used[i] !== v) ||
       !validAudioLlm(input.audio_llm_raw, 'EMOTION_LLM', input.audio_sha256, input.audio_duration_sec)) return invalid();
   const normalized = input.normalized;
-  // 장르를 비워 두는 것과 unknown으로 채우는 것은 다르다. 여기서는 판단할 모델이
-  // 돌지 않았다는 뜻이며, 소비처가 장르 줄을 렌더하지 않는다.
-  if (!normalized || typeof normalized.taxonomy_version !== 'string' || normalized.taxonomy_version.length > 100 ||
-      typeof normalized.calibrated !== 'boolean' ||
-      !Array.isArray(normalized.genre) || normalized.genre.length !== 0 ||
+  if (!normalized || !Array.isArray(normalized.genre) || normalized.genre.length !== 0 ||
       !validMood(normalized.mood, normalized.mood != null, result.features)) return invalid();
   return { value: {
     schema_version: 1, pipeline_mode: 'EMOTION_LLM', sources_used: expected,
-    maest_model_version: null, model_sha256: null, maest_raw: null,
     audio_source_url: input.audio_source_url, audio_local_path: null,
     audio_sha256: input.audio_sha256, audio_duration_sec: input.audio_duration_sec,
     audio_sample_rate: input.audio_sample_rate,
@@ -106,98 +93,8 @@ function validateEmotionLlmRun(input, result) {
   } };
 }
 
-function validateRun(input, result) {
-  const invalid = () => ({ error: 'MAEST 원본·입력 정보가 올바르지 않습니다' });
-  if (input?.schema_version !== 1 || !MODES.includes(input?.pipeline_mode)) return invalid();
-  if (input.pipeline_mode === 'EMOTION_LLM') return validateEmotionLlmRun(input, result);
-  if (result.model_name !== 'essentia-maest' || !result.model_version.split('+').includes(MODEL)) return invalid();
-  const mode = input?.pipeline_mode;
-  const withEmotion = mode === 'MAEST_EMOTION' || (mode === 'FULL' && input?.normalized?.mood != null);
-  const expectedSources = withEmotion ? EMOTION_SOURCES : MAEST_ONLY_SOURCES;
-  if (!input || input.schema_version !== 1 || !MODES.includes(mode) ||
-      input.maest_model_version !== MODEL || input.model_sha256 !== contract.model_sha256 || !hash(input.audio_sha256) ||
-      input.audio_local_path !== null ||
-      !finite(input.audio_duration_sec) || Math.abs(input.audio_duration_sec - result.features.duration_seconds) > DURATION_TOLERANCE_SEC || input.audio_sample_rate !== 16000 ||
-      input.audio_duration_sec < contract.audio_duration_sec.min ||
-      input.audio_duration_sec > contract.audio_duration_sec.max ||
-      input.audio_source_url !== result.source_reference || !Array.isArray(input.sources_used) ||
-      input.sources_used.length !== expectedSources.length + (mode === 'FULL' ? 1 : 0) ||
-      expectedSources.some((v, i) => input.sources_used[i] !== v) ||
-      (mode === 'FULL' && input.sources_used.at(-1) !== input.audio_llm_raw?.model_id) ||
-      !validAudioLlm(input.audio_llm_raw, mode, input.audio_sha256, input.audio_duration_sec)) return invalid();
-  const raw = input.maest_raw;
-  if (!raw || !Array.isArray(raw.classes) || raw.classes.length !== classes.length || new Set(raw.classes).size !== classes.length ||
-      raw.classes.some((v, i) => v !== classes[i]) ||
-      !vector(raw.mean) || !vector(raw.max) || !Array.isArray(raw.segments) ||
-      raw.segments.length < 1 || raw.segments.length > contract.max_segments ||
-      typeof raw.essentia_version !== 'string' || raw.essentia_version.length > 100) return invalid();
-  const settings = raw.settings;
-  if (!settings || Object.entries(contract.settings).some(([k, v]) => settings[k] !== v)) return invalid();
-  const hop = settings.patch_hop_size * settings.frame_hop / settings.sample_rate;
-  const duration = settings.patch_size * settings.frame_hop / settings.sample_rate;
-  for (const [i, segment] of raw.segments.entries()) {
-    if (!segment || !finite(segment.start_sec) || !finite(segment.end_sec) ||
-        Math.abs(segment.start_sec - i * hop) > 0.001 ||
-        Math.abs(segment.end_sec - Math.min(input.audio_duration_sec, i * hop + duration)) > 0.001 || segment.end_sec <= segment.start_sec || segment.end_sec > input.audio_duration_sec + 0.001 || !vector(segment.scores)) return invalid();
-  }
-  if (Math.abs(raw.segments.at(-1).end_sec - input.audio_duration_sec) > 0.1) return invalid();
-  for (let i = 0; i < classes.length; i++) {
-    const values = raw.segments.map((v) => v.scores[i]);
-    if (Math.abs(raw.mean[i] - values.reduce((a, b) => a + b, 0) / values.length) > 0.000001 ||
-        Math.abs(raw.max[i] - Math.max(...values)) > 0.000001) return invalid();
-  }
-  const normalized = input.normalized;
-  if (!normalized || typeof normalized.taxonomy_version !== 'string' || normalized.taxonomy_version.length > 100 ||
-      typeof normalized.calibrated !== 'boolean' || !validMood(normalized.mood, withEmotion, result.features) ||
-      !Array.isArray(normalized.genre) || normalized.genre.length > 2 ||
-      normalized.genre.some((v) => !v || !GENRE_TAGS.includes(v.label) || v.source !== 'maest' || !score(v.confidence) ||
-        !raw.classes.includes(v.raw_label) || Math.abs(raw.mean[raw.classes.indexOf(v.raw_label)] - v.confidence) > 0.000001)) return invalid();
-  const canonical = normalize(raw);
-  if (normalized.taxonomy_version !== canonical.taxonomy_version || normalized.calibrated !== canonical.calibrated ||
-      normalized.genre.length !== canonical.genre.length || normalized.genre.some((v, i) => {
-        const expected = canonical.genre[i];
-        return v.label !== expected.label || v.raw_label !== expected.raw_label || Math.abs(v.confidence - expected.confidence) > 0.000001;
-      })) return invalid();
-  return { value: {
-    schema_version: 1,
-    pipeline_mode: input.pipeline_mode,
-    // FULL이면 2단 모델까지 저장한다. 검증만 하고 빼면 원본으로 재현할 수 없다.
-    sources_used: mode === 'FULL' ? [...expectedSources, input.audio_llm_raw.model_id] : expectedSources,
-    maest_model_version: MODEL,
-    model_sha256: input.model_sha256, audio_source_url: input.audio_source_url, audio_local_path: null,
-    audio_sha256: input.audio_sha256, audio_duration_sec: input.audio_duration_sec, audio_sample_rate: input.audio_sample_rate,
-    audio_llm_raw: input.audio_llm_raw, normalized: { ...canonical, mood: normalized.mood },
-    maest_raw: { classes: raw.classes, mean: raw.mean, max: raw.max, settings: contract.settings,
-      essentia_version: raw.essentia_version,
-      segments: raw.segments.map(({ start_sec, end_sec, scores }) => ({ start_sec, end_sec, scores })) },
-  } };
-}
-
-// 소비 프롬프트에 넣을 스타일만 추린다. 점수 스케일이 곡마다 달라 절대 임계값을
-// 쓰지 않는다 — 1위가 0.33인 곡이 0.97인 곡보다 덜 확실하다는 뜻이 아니다.
-// 계수와 상한은 잠정값이며, 519개 원본이 남아 있어 언제든 다시 뽑을 수 있다.
-const PROMPT_STYLE_RATIO = 0.5;
-const PROMPT_STYLE_MAX = 5;
-
-function selectPromptStyles(raw, ratio = PROMPT_STYLE_RATIO, cap = PROMPT_STYLE_MAX) {
-  const scored = raw.classes.map((label, i) => ({ label, score: raw.mean[i] }))
-    .sort((a, b) => b.score - a.score);
-  const best = scored[0]?.score ?? 0;
-  if (!(best > 0)) return [];
-  return scored.filter((v) => v.score >= best * ratio).slice(0, cap);
-}
-
 function summary(run) {
-  const raw = run.maest_raw;
-  const top = (key) => raw.classes.map((label, i) => ({ label, mean: raw.mean[i], max: raw.max[i] }))
-    .sort((a, b) => b[key] - a[key]).slice(0, 10);
-  // MAEST를 돌리지 않은 실행에는 스타일 점수가 없다. 빈 배열로 두면 소비처가
-  // 장르 후보 줄을 렌더하지 않는다 — 없는 장르를 unknown으로 지어내지 않는다.
-  return { model_version: run.maest_model_version, segment_count: raw ? raw.segments.length : 0,
-    top_mean: raw ? top('mean') : [], top_max: raw ? top('max') : [],
-    normalized: run.normalized, audio_sha256: run.audio_sha256,
-    // 보정되지 않은 상대 점수다. 소비처는 이 사실을 프롬프트에 함께 밝힌다.
-    prompt_styles: raw ? selectPromptStyles(raw) : [], prompt_style_calibrated: false,
+  return { normalized: run.normalized, audio_sha256: run.audio_sha256,
     // 사람이 검토할 때 읽을 자유 서술. 없으면 null이다.
     audio_llm: run.audio_llm_raw ? {
       model_id: run.audio_llm_raw.model_id,
@@ -214,4 +111,4 @@ async function history(jobId) {
     .select('id', 'created_at').orderBy('created_at', 'desc').limit(100);
 }
 
-module.exports = { validateRun, summary, history, selectPromptStyles };
+module.exports = { validateRun, summary, history };

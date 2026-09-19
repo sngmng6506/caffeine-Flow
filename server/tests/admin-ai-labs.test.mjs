@@ -43,7 +43,7 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(app).toContain(`sessionStorage.getItem(TOKEN_KEY)`);
     // 사람은 택소노미를 고르지 않고 자동 서술이 곡과 맞는지만 답한다.
     expect(app).toContain('renderAutoDescription');
-    expect(app).toContain('maest_summary?.audio_llm');
+    expect(app).toContain('analysis_summary?.audio_llm');
     expect(app).toContain(`submitVerdict('accurate'`);
     expect(app).toContain(`submitVerdict('inaccurate'`);
     // 판정은 둘이다. 애매를 두면 판단을 미루는 칸이 되어 어느 쪽으로도 쓰지 못한다.
@@ -81,7 +81,7 @@ describe('관리자 AI 랩 정적 계약', () => {
     expect(html).not.toContain('노래와 랩이 섞임');
     expect(html).not.toContain('라벨 확신도');
     expect(html).toContain(`id='audioAnalysis'`);
-    expect(html).toContain('1단 · MAEST');
+    expect(html).toContain('음향 분석');
     expect(html).not.toContain('콘텐츠 주의 요소');
     expect(html).not.toContain('선택 기준 도움말');
     expect(html).not.toContain('곡 버전');

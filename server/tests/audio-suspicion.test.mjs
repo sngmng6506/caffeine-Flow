@@ -13,7 +13,7 @@ function clean(overrides = {}) {
     attempts: 1,
     track_annotation: { artist_name: '같은 아티스트', genre_tags: ['jazz'], ...annotation },
     audio_analysis: {
-      maest_summary: {
+      analysis_summary: {
         audio_llm: {
           description: LONG,
           instruments: ['피아노'],

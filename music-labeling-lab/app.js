@@ -172,7 +172,7 @@ function isQueueView() {
   return ['unreviewed', 'ready', 'suspicious', 'inaccurate'].includes($('viewFilter').value);
 }
 
-// 곡당 예상 시간. 실측(MAEST 79초 + 감정 6초 + 3단 약 30초)에서 온 값이며
+// 곡당 예상 시간. 실측(감정 1초 + 구간 선택 0.5초 + 3단 약 20초)에서 온 값이며
 // 서버 계약이 단일 기준이다. 큐가 길수록 오차가 누적되므로 어림수로만 보여준다.
 const SECONDS_PER_TRACK = 120;
 
@@ -214,13 +214,13 @@ function renderSummary() {
 }
 
 function canReviewDescription(item) {
-  return Boolean(item?.track_annotation && item?.audio_analysis?.maest_summary?.audio_llm?.description?.trim());
+  return Boolean(item?.track_annotation && item?.audio_analysis?.analysis_summary?.audio_llm?.description?.trim());
 }
 
 // 3단 자유 서술을 보여준다. 사람이 읽고 곡과 맞는지 판단할 유일한 근거다.
 function renderAutoDescription(item) {
   const target = $('autoDescription');
-  const llm = item.audio_analysis?.maest_summary?.audio_llm;
+  const llm = item.audio_analysis?.analysis_summary?.audio_llm;
   const genres = (item.track_annotation?.genre_tags || [])
     .filter((tag) => tag !== 'unknown').map((tag) => GENRE_LABELS[tag] || tag);
   const head = genres.length ? `<p class='auto-genre'>자동 장르 · ${escapeHtml(genres.join(', '))}</p>` : '';
@@ -254,17 +254,10 @@ function renderAudioAnalysis(item) {
   panel.hidden = !analysis;
   if (!analysis) return;
 
-  const maest = analysis.maest_summary;
-  $('maestRaw').hidden = true;
-  $('maestRaw').textContent = '';
-  $('loadMaestRaw').hidden = !analysis.latest_run_id;
-  $('loadMaestRaw').disabled = false;
-  $('maestSummary').innerHTML = maest ? `
-    <p>MAEST · ${escapeHtml(maest.segment_count)}개 구간 · 평균 기준 상위 스타일 (미보정 점수)</p>
-    <table><thead><tr><th>스타일</th><th>평균</th><th>최댓값</th></tr></thead><tbody>
-    ${maest.top_mean.map((v) => `<tr><td>${escapeHtml(v.label)}</td><td>${formatMetric(v.mean, 3)}</td><td>${formatMetric(v.max, 3)}</td></tr>`).join('')}
-    </tbody></table><p>구간 최댓값 상위: ${maest.top_max.slice(0, 5).map((v) => `${escapeHtml(v.label)} ${formatMetric(v.max, 3)}`).join(' · ')}</p>
-    <p>무드·보컬·악기는 이 모델의 분석 대상이 아닙니다.</p>` : '';
+  $('analysisRaw').hidden = true;
+  $('analysisRaw').textContent = '';
+  $('loadAnalysisRaw').hidden = !analysis.latest_run_id;
+  $('loadAnalysisRaw').disabled = false;
   const features = analysis.features || {};
   $('analysisStatus').textContent = analysis.review_status === 'reviewed' ? '검수 완료' : '검수 필요';
   $('analysisStatus').className = `analysis-status analysis-status--${analysis.review_status}`;
@@ -511,25 +504,25 @@ if (!currentToken()) {
   loadAudioSettings();
 }
 
-$('loadMaestRaw').addEventListener('click', async () => {
+$('loadAnalysisRaw').addEventListener('click', async () => {
   const item = items[currentIndex];
   const runId = item?.audio_analysis?.latest_run_id;
   if (!runId) return;
-  $('loadMaestRaw').disabled = true;
+  $('loadAnalysisRaw').disabled = true;
   try {
     const [raw, history] = await Promise.all([api('GET', `/admin/audio-runs/${runId}`), api('GET', `/admin/audio-labels/${item.id}/runs`)]);
     if (items[currentIndex]?.audio_analysis?.latest_run_id !== runId) return;
-    $('maestRaw').hidden = false;
-    $('maestRaw').textContent = raw.ok && history.ok
+    $('analysisRaw').hidden = false;
+    $('analysisRaw').textContent = raw.ok && history.ok
       ? JSON.stringify({ history: history.data, latest: raw.data }, null, 2)
       : '원본을 불러오지 못했습니다. 다시 시도해주세요.';
   } catch {
     if (items[currentIndex]?.audio_analysis?.latest_run_id === runId) {
-      $('maestRaw').hidden = false;
-      $('maestRaw').textContent = '원본을 불러오지 못했습니다. 다시 시도해주세요.';
+      $('analysisRaw').hidden = false;
+      $('analysisRaw').textContent = '원본을 불러오지 못했습니다. 다시 시도해주세요.';
     }
   } finally {
-    if (items[currentIndex]?.audio_analysis?.latest_run_id === runId) $('loadMaestRaw').disabled = false;
+    if (items[currentIndex]?.audio_analysis?.latest_run_id === runId) $('loadAnalysisRaw').disabled = false;
   }
 });
 

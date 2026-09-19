@@ -8,8 +8,7 @@ const { shape } = await import('../src/features/music-filter/track-analysis.js')
 
 const track = { platform: 'youtube', title: '곡', channelTitle: '아티스트', duration: '3:06' };
 const analysis = {
-  styles: [{ label: 'Jazz — Big Band', score: 0.742 }],
-  calibrated: false, valence: 0.63, arousal: 0.81, bpm: 142.6,
+  valence: 0.63, arousal: 0.81, bpm: 142.6,
   description: '재즈로 시작해 록으로 전환합니다.',
   mood: ['극적'], instruments: ['트럼펫'], vocal: ['남성 리드'],
 };
@@ -23,10 +22,9 @@ describe('음악 필터에 들어가는 음향 분석', () => {
     expect(text).toContain('판단 기준:');
   });
 
-  it('분석이 있으면 서술과 장르 후보를 함께 준다', () => {
+  it('분석이 있으면 서술과 악기를 함께 준다', () => {
     const text = userText({ cafePrompt: '잔잔한 카페', track, analysis });
     expect(text).toContain('재즈로 시작해 록으로 전환합니다.');
-    expect(text).toContain('Jazz — Big Band');
     expect(text).toContain('트럼펫');
   });
 
@@ -51,7 +49,7 @@ describe('음악 필터에 들어가는 음향 분석', () => {
     // 저장은 되는데 소비처로 오지 않던 필드다. 배관이 끊기면 조용히 사라진다.
     const shaped = shape({
       features: {},
-      maest_summary: { audio_llm: { description: '서술', structure: ['1구간', '2구간'] } },
+      analysis_summary: { audio_llm: { description: '서술', structure: ['1구간', '2구간'] } },
     });
     expect(shaped.structure).toEqual(['1구간', '2구간']);
   });
@@ -73,12 +71,11 @@ describe('음악 필터에 들어가는 음향 분석', () => {
     expect(text).toContain('활력: 0.81');
   });
 
-  it('MAEST 점수는 프롬프트에 넣지 않는다', () => {
-    // 보정되지 않은 상대값이라 숫자를 보여주면 곡끼리 비교하게 된다.
+  it('장르 후보를 프롬프트에 넣지 않는다', () => {
+    // 장르를 판단할 모델이 없다. 없는 장르를 지어내 넣지 않는다.
     const text = userText({ cafePrompt: '잔잔한 카페', track, analysis });
-    expect(text).not.toContain('0.742');
-    expect(text).toContain('보정되지 않은 상대값');
-    expect(promptAnalysis(analysis).styles).toEqual(['Jazz — Big Band']);
+    expect(text).not.toContain('장르 후보');
+    expect(promptAnalysis(analysis).styles).toBeUndefined();
   });
 
   it('사장님 매장 정책이 여전히 판단의 기준이다', () => {
@@ -88,24 +85,24 @@ describe('음악 필터에 들어가는 음향 분석', () => {
 
   it('쓸 만한 내용이 하나도 없는 분석은 없는 것으로 본다', () => {
     expect(shape(null)).toBeNull();
-    expect(shape({ features: {}, maest_summary: { prompt_styles: [] } })).toBeNull();
+    expect(shape({ features: {}, analysis_summary: {} })).toBeNull();
   });
 
   it('긴 서술은 잘라서 넣는다', () => {
-    const long = { features: {}, maest_summary: {
-      prompt_styles: [{ label: 'Pop', score: 0.5 }],
+    const long = { features: {}, analysis_summary: {
       audio_llm: { description: '가'.repeat(900), mood: [], instruments: [], vocal: [] },
     } };
     expect(shape(long).description.length).toBeLessThanOrEqual(601);
     expect(shape(long).description.endsWith('…')).toBe(true);
   });
 
-  it('3단 서술이 없어도 MAEST만으로 분석을 만든다', () => {
-    const maestOnly = shape({ features: { valence: 0.4, arousal: 0.2, bpm: 78 },
-      maest_summary: { prompt_styles: [{ label: 'Ballad', score: 0.6 }], audio_llm: null } });
-    expect(maestOnly.description).toBe('');
-    const text = userText({ cafePrompt: '잔잔한 카페', track, analysis: maestOnly });
-    expect(text).toContain('Ballad');
-    expect(text).toContain('차분함');
+  it('3단 서술이 없어도 감정값만으로 분석을 만든다', () => {
+    // 장르를 판단할 모델이 없으므로 서술이 빠지면 남는 객관 신호는 V/A뿐이다.
+    const emotionOnly = shape({ features: { valence: 0.4, arousal: 0.2, bpm: 78 },
+      analysis_summary: { audio_llm: null } });
+    expect(emotionOnly.description).toBe('');
+    const text = userText({ cafePrompt: '잔잔한 카페', track, analysis: emotionOnly });
+    expect(text).toContain('0.20');
+    expect(text).toContain('78');
   });
 });

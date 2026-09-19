@@ -28,8 +28,6 @@ function promptAnalysis(analysis) {
     instruments: analysis.instruments || [],
     vocal: analysis.vocal || [],
     structure: analysis.structure || [],
-    // 점수는 넣지 않는다. 보정되지 않은 상대값이라 숫자를 보여주면 곡끼리 비교하게 된다.
-    styles: (analysis.styles || []).map((v) => v.label),
     tempo: describeTempo(analysis),
     // Valence는 어두움·밝음, Arousal은 차분함·격렬함이다.
     brightness: describeScale(analysis.valence, '어두움', '밝음'),

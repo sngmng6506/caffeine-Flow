@@ -127,7 +127,7 @@ describe('자동 음향 분석 파이프라인', () => {
     const { validateMusicAnnotation } = (await import('../src/features/music-labeling/annotation.js')).default;
     await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: first.body.id, audio_analysis_revision: 1 },
       validateMusicAnnotation({ ...annotation, genre_tags: ['jazz'] }).value);
-    await db('music_audio_analyses').where({ id: first.body.id }).update({ maest_summary: JSON.stringify({ normalized: { taxonomy_version: 'old' } }) });
+    await db('music_audio_analyses').where({ id: first.body.id }).update({ analysis_summary: JSON.stringify({ normalized: { taxonomy_version: 'old' } }) });
     const input = { analysis_id: first.body.id, analysis_revision: 1, generation: job.generation };
     const admin = { Authorization: `Bearer ${issueAdminToken()}` };
     expect((await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).send(input)).status).toBe(401);
@@ -425,7 +425,7 @@ describe('분석 판정 회귀', () => {
   }
   it('감정 모델 없이도 Audio LLM 결과를 저장한다', async () => {
     const { saved } = await analyzed(false);
-    expect(saved.maest_summary.audio_llm.description).toBeTruthy();
+    expect(saved.analysis_summary.audio_llm.description).toBeTruthy();
   });
   it('맞음 확인을 철회하면 심사에서 제외하고 재분석 후 새 결과를 사용한다', async () => {
     const { findForTrack } = (await import('../src/features/music-filter/track-analysis.js')).default;

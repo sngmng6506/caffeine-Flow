@@ -6,13 +6,13 @@
 // 규칙을 여기 한 번만 적고 정렬용 SQL과 화면 표시용 사유를 모두 여기서 파생한다.
 // 두 벌로 적으면 "왜 위로 왔는지"와 실제 순서가 조용히 어긋난다.
 //
-// MAEST 점수는 쓰지 않는다. `runs.js`의 selectPromptStyles가 밝혔듯 점수 스케일이
+// 장르 점수는 쓰지 않는다. 점수 스케일이
 // 곡마다 달라서 1위가 0.33인 곡이 0.97인 곡보다 덜 확실하다는 뜻이 아니다. 정렬
 // 근거로 써도 같은 이유로 틀린다.
 
 const DESCRIPTION_MIN_LENGTH = 120;
 
-const LLM = `analysis.maest_summary->'audio_llm'`;
+const LLM = `analysis.analysis_summary->'audio_llm'`;
 
 // jsonb 배열이 아닐 때 jsonb_array_length는 예외를 낸다. 비어 있는 것과 없는 것을
 // 같게 본다.
@@ -21,7 +21,7 @@ const emptyArraySql = (path) => `NOT (jsonb_typeof(${path}) = 'array' AND jsonb_
 const emptyArray = (value) => !Array.isArray(value) || value.length === 0;
 const normalize = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
-const llmOf = (row) => row?.audio_analysis?.maest_summary?.audio_llm || null;
+const llmOf = (row) => row?.audio_analysis?.analysis_summary?.audio_llm || null;
 
 // 가중치는 "이걸 보면 실제로 틀린 경우가 많더라"의 순서다. 아티스트 이름이 다르면
 // 다른 곡을 분석했을 수 있어 서술 전체가 무의미해진다 — 다른 신호보다 무겁다.
@@ -63,7 +63,7 @@ const RULES = Object.freeze([
   {
     code: 'unknown_genre',
     weight: 1,
-    text: 'MAEST가 장르를 정하지 못했습니다',
+    text: '장르가 unknown입니다',
     sql: `annotation.genre_tags @> '["unknown"]'::jsonb`,
     test: (row) => (row.track_annotation?.genre_tags || []).includes('unknown'),
   },

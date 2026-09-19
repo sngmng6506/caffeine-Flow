@@ -1,21 +1,8 @@
-const taxonomy = require('../../constants/music-taxonomy.json');
-
-function normalize(raw, rules = taxonomy) {
-  const candidates = new Map();
-  raw.classes.forEach((style, i) => {
-    const label = rules.style_overrides[style] || rules.parent_mapping[style.split('---')[0]];
-    const confidence = raw.mean[i];
-    const threshold = rules.thresholds[style] ?? rules.default_threshold;
-    if (label && confidence >= threshold && confidence > (candidates.get(label)?.confidence ?? -1)) {
-      candidates.set(label, { label, source: 'maest', raw_label: style, confidence });
-    }
-  });
-  return { taxonomy_version: rules.version, calibrated: rules.calibrated,
-    genre: [...candidates.values()].sort((a, b) => b.confidence - a.confidence || (a.label < b.label ? -1 : a.label > b.label ? 1 : 0)).slice(0, rules.max_genres), mood: null };
-}
-
+// 장르를 판단할 모델이 없으므로 접을 택소노미도 없다. 빈 배열이면 unknown으로
+// 표시하되, 저장하는 normalized.genre 자체는 비워 둔다 — "모른다"와 "판단할 모델이
+// 돌지 않았다"를 구분하기 위해서다.
 function genreTags(normalized) {
   return normalized.genre.length ? normalized.genre.map((v) => v.label) : ['unknown'];
 }
 
-module.exports = { normalize, genreTags };
+module.exports = { genreTags };

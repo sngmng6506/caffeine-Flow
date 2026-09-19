@@ -26,18 +26,11 @@ const round = (value, digits = 2) => (Number.isFinite(value) ? Number(value.toFi
 function shape(row) {
   if (!row) return null;
   const features = row.features || {};
-  const summary = row.maest_summary || {};
+  const summary = row.analysis_summary || {};
   const llm = summary.audio_llm || null;
-  // MAEST 스타일은 runs.selectPromptStyles가 고른 것을 그대로 쓴다. 소비처가
-  // 임계값을 다시 정의하지 않는다 — 점수 스케일이 곡마다 다르다.
-  const styles = Array.isArray(summary.prompt_styles)
-    ? summary.prompt_styles.filter((v) => v && typeof v.label === 'string')
-      .map((v) => ({ label: v.label, score: round(v.score, 3) }))
-    : [];
-  if (!styles.length && !llm?.description && !Number.isFinite(features.valence)) return null;
+  // 장르를 판단할 모델이 없으므로 장르 후보를 넣지 않는다.
+  if (!llm?.description && !Number.isFinite(features.valence)) return null;
   return {
-    styles,
-    calibrated: summary.prompt_style_calibrated === true,
     valence: round(features.valence),
     arousal: round(features.arousal),
     bpm: round(features.bpm, 1),

@@ -12,7 +12,7 @@ function saveResult(result, connection = db) {
     human_verdict: null,
     automatic_annotation: result.automatic_annotation ? JSON.stringify(result.automatic_annotation) : null,
     tag_scores: JSON.stringify(result.tag_scores || {}),
-    maest_summary: result.maest_summary ? JSON.stringify(result.maest_summary) : null,
+    analysis_summary: result.analysis_summary ? JSON.stringify(result.analysis_summary) : null,
     latest_run_id: result.latest_run_id || null,
     updated_at: now,
   };
@@ -33,7 +33,7 @@ function saveResult(result, connection = db) {
       revision: connection.raw('music_audio_analyses.revision + 1'),
       automatic_annotation: row.automatic_annotation,
       tag_scores: row.tag_scores,
-      maest_summary: row.maest_summary,
+      analysis_summary: row.analysis_summary,
       latest_run_id: row.latest_run_id,
     })
     .returning('*')
