@@ -55,6 +55,12 @@ function initSocket(io) {
     onRoleChange: (socketId, isLeader) => {
       cafeNsp.sockets.get(socketId)?.emit('playback_role', { isLeader });
     },
+    // 다른 기기에서 로그인해 재생을 넘겨받았다. 역할만 내려 두면 이전 앱이 계속
+    // 소리를 내므로, 스스로 종료하라고 따로 알린다. 평범한 follower·브라우저는
+    // 이 이벤트를 받지 않는다 — 리더였던 소켓에만 간다.
+    onSuperseded: (socketId) => {
+      cafeNsp.sockets.get(socketId)?.emit('playback_superseded');
+    },
   });
 
   function clearPlaybackState(slug, socketId = null) {

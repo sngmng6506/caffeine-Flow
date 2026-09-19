@@ -290,3 +290,49 @@ describe('리더 선출 요청', () => {
     expect(socket.emit).toHaveBeenCalledWith('request_playback_role');
   });
 });
+
+describe('다른 기기 로그인으로 재생을 넘겨줄 때', () => {
+  it('스스로 종료한다', async () => {
+    // 리더가 아닌 Electron을 띄워 두면 두 곳에서 동시에 소리가 난다.
+    window.electronAPI.quitApp = vi.fn();
+    const { result } = mount();
+    await waitFor(() => expect(api.getRecommendations).toHaveBeenCalled());
+    await becomeLeader();
+    expect(result.current.canControlPlayback).toBe(true);
+
+    await act(async () => { socket.fire('playback_superseded'); });
+
+    expect(window.electronAPI.quitApp).toHaveBeenCalled();
+    expect(result.current.canControlPlayback).toBe(false);
+  });
+
+  it('종료 정리가 playing을 played로 바꾸지 않는다', async () => {
+    // played는 종료 상태라 새 리더가 그 곡을 되살릴 수 없다. 고아 playing으로
+    // 남겨 두면 넘겨받은 쪽의 복구가 accepted로 되돌린다.
+    window.electronAPI.quitApp = vi.fn();
+    api.getRecommendations.mockResolvedValue({
+      recommendations: [rec({ id: 'rec-playing', status: 'playing' })],
+      is_accepting: true,
+    });
+    const { result } = mount();
+    await waitFor(() => expect(api.getRecommendations).toHaveBeenCalled());
+    await becomeLeader();
+
+    await act(async () => { socket.fire('playback_superseded'); });
+    api.updateRec.mockClear();
+    await act(async () => { await result.current.finishPlaybackForExit(); });
+
+    // 실제 음원은 main의 before-quit(playbackController.cleanupForQuit)이 멈춘다.
+    expect(api.updateRec).not.toHaveBeenCalled();
+  });
+
+  it('Electron이 아닌 브라우저는 종료하지 않는다', async () => {
+    const quitApp = vi.fn();
+    window.electronAPI = { quitApp };
+    mount();
+
+    await act(async () => { socket.fire('playback_superseded'); });
+
+    expect(quitApp).not.toHaveBeenCalled();
+  });
+});

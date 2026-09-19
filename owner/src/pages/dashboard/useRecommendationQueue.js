@@ -140,6 +140,20 @@ export default function useRecommendationQueue({
 
     socket.on('playback_role', payload => roleFlow.handleRole(payload, { playbackAvailable }));
 
+    // 다른 기기에서 로그인해 재생을 넘겨줬다. 리더가 아닌 Electron을 띄워 둘
+    // 이유가 없고, 남겨 두면 두 곳에서 동시에 소리가 난다.
+    //
+    // 플래그를 먼저 내리는 것이 중요하다. 종료 정리(finishCurrentPlayback)는
+    // isLeader일 때만 playing을 played로 바꾸는데, 여기서 바꿔 버리면 played는
+    // 종료 상태라 새 리더가 그 곡을 되살릴 수 없다. 플래그를 내려 두면 음원만
+    // 멈추고 고아 playing은 새 리더의 복구가 accepted로 되돌린다.
+    socket.on('playback_superseded', () => {
+      if (!playbackAvailable) return;
+      playbackLeaderRef.current = false;
+      setIsPlaybackLeader(false);
+      window.electronAPI?.quitApp?.();
+    });
+
     socket.on('owner_recommendations_update', ({ action, rec, id }) => {
       if (action === 'add') {
         // 서버 판단과 별개로 클라이언트에서도 filter_status=accepted를 재확인한다.

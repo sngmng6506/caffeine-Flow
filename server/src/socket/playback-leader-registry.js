@@ -1,4 +1,4 @@
-function createPlaybackLeaderRegistry({ graceMs, onRoleChange }) {
+function createPlaybackLeaderRegistry({ graceMs, onRoleChange, onSuperseded = () => {} }) {
   const candidates = new Map(); // slug -> Map<socketId, sessionId>
   const leaders = new Map(); // slug -> { socketId, sessionId, timer }
 
@@ -46,6 +46,22 @@ function createPlaybackLeaderRegistry({ graceMs, onRoleChange }) {
         needsRecovery: leader.needsRecovery,
       });
       notify(slug);
+      return true;
+    }
+
+    // 다른 실행 세션이 들어오면 즉시 넘겨준다. 매장에서 실제로 소리를 내는 앱은
+    // 하나여야 하고, 리더가 아닌 Electron을 띄워 둘 이유가 없다. 넘겨받는 것이
+    // 아니라 넘겨주는 것이라 이전 리더에게 따로 알린다 — 그쪽이 스스로 종료해야
+    // 두 플레이어가 겹치지 않는다.
+    //
+    // 같은 세션은 위에서 이미 lease를 되찾았다. renderer reload나 짧은 network
+    // 단절은 sessionStorage가 살아 있어 같은 ID로 돌아오므로 여기 오지 않는다.
+    if (leader && leader.sessionId !== sessionId) {
+      const previousSocketId = leader.socketId;
+      if (leader.timer) clearTimeout(leader.timer);
+      leaders.set(slug, { socketId, sessionId, timer: null, needsRecovery: true });
+      notify(slug);
+      if (previousSocketId && previousSocketId !== socketId) onSuperseded(previousSocketId);
       return true;
     }
 

@@ -58,6 +58,11 @@ const electronAPI = {
   // 처리 후 'cleanup-done' 회신. main이 회신 받으면 quit 진행 (3초 timeout fallback).
   onCleanupBeforeQuit: (cb) => subscribe('cleanup-before-quit', cb, () => undefined),
   cleanupDone:         ()   => ipcRenderer.send('cleanup-done'),
+
+  // 다른 기기에서 로그인해 재생을 넘겨줬을 때 스스로 닫는다. 평범한 종료와 같은
+  // 경로(before-quit → cleanup-before-quit)를 탄다 — 이때는 이미 리더가 아니라
+  // 종료 정리가 DB를 건드리지 않고 실제 음원만 멈춘다.
+  quitApp:            ()   => ipcRenderer.send('quit-app'),
 };
 
 // 같은 BrowserWindow가 OAuth 외부 페이지로 이동해도 preload는 다시 실행된다.
