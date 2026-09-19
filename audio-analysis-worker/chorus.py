@@ -7,7 +7,7 @@
 구현은 pychorus(https://github.com/vivjay30/pychorus)를 옮긴 것이다. 그쪽은
 librosa·scipy를 쓰는데 둘 다 이 워커에 없고, 4코어 미니PC에 numba를 올릴 이유도
 없어 numpy만으로 다시 썼다. 세 곡(재즈·K-pop·trap)에서 같은 구간을 고르는 것을
-확인하고 들여왔다 — 검증 기록은 experiments/를 본다.
+확인하고 들여왔다. 같은 샘플레이트를 주면 결과가 일치한다 — 검증 기록은 experiments/를 본다.
 
 크로마는 음높이 분포만 남기고 음색을 버린다. 그래서 편곡이 달라도 같은 후렴으로
 인식하는 것이 강점이지만, **악기가 바뀌는 것은 보지 못한다.** 매장 정책이 악기를
@@ -33,7 +33,6 @@ NUM_ITERATIONS = 8
 # 겹침을 셀 때 허용하는 오차. 구간 길이에 비례시킨다.
 OVERLAP_PERCENT_MARGIN = 0.2
 
-A4_HZ = 440.0
 
 
 class Line:
@@ -45,25 +44,57 @@ class Line:
         self.start, self.end, self.lag = start, end, lag
 
 
+def chroma_filterbank(sample_rate, n_fft=FRAME_SIZE, n_chroma=12, tuning=0.0,
+                      centre_octave=5.0, octave_width=2.0):
+    """FFT 빈을 음이름으로 옮기는 가중치. `librosa.filters.chroma`와 같다.
+
+    빈을 가장 가까운 음이름에 통째로 몰아주면 경계에 걸친 성분이 한쪽으로만
+    가고, 그 작은 차이가 자기유사도 전체를 흔든다. 여기서는 음이름마다 가우시안
+    으로 걸쳐 나눠 담고, 옥타브 방향으로도 가운데(C5 부근)에 가중을 준다 —
+    아주 낮거나 높은 배음이 화성 판단을 끌고 가지 않게 하려는 것이다.
+
+    조율(tuning)은 0으로 둔다. librosa는 곡마다 추정하지만 실측 세 곡이
+    +0.03반음 이하였고, 추정기를 옮기려면 피치 추적까지 따라와야 한다.
+    """
+    frequencies = np.linspace(0, sample_rate, n_fft, endpoint=False)[1:]
+    a440 = 440.0 * 2.0 ** (tuning / n_chroma)
+    positions = n_chroma * np.log2(frequencies / (a440 / 16))
+    # 0Hz 빈은 비교할 음이름이 없다. 1번 빈보다 1.5옥타브 아래로 둔다.
+    positions = np.concatenate(([positions[0] - 1.5 * n_chroma], positions))
+    width = np.concatenate((np.maximum(positions[1:] - positions[:-1], 1.0), [1]))
+
+    half = np.round(n_chroma / 2.0)
+    offsets = np.subtract.outer(positions, np.arange(n_chroma, dtype=float)).T
+    offsets = np.remainder(offsets + half + 10 * n_chroma, n_chroma) - half
+    weights = np.exp(-0.5 * (2 * offsets / np.tile(width, (n_chroma, 1))) ** 2)
+
+    length = np.sqrt(np.sum(weights ** 2, axis=0, keepdims=True))
+    length[length < np.finfo(weights.dtype).tiny] = 1.0
+    weights /= length
+    weights *= np.tile(
+        np.exp(-0.5 * (((positions / n_chroma - centre_octave) / octave_width) ** 2)),
+        (n_chroma, 1))
+    # A 기준을 C 기준으로 돌린다.
+    weights = np.roll(weights, -3 * (n_chroma // 12), axis=0)
+    return np.ascontiguousarray(weights[:, :int(1 + n_fft / 2)])
+
+
 def chroma_of(audio, sample_rate):
     """12차원 크로마. 프레임마다 최댓값 1로 맞춘다.
 
-    FFT 빈을 음이름으로 접어 파워를 더한다. 프레임 정규화를 하는 것은 유사도가
-    음량이 아니라 화성으로 결정되게 하려는 것이다.
+    프레임 정규화를 하는 것은 유사도가 음량이 아니라 화성으로 결정되게 하려는
+    것이다.
     """
-    window = np.hanning(FRAME_SIZE)
-    bins = np.fft.rfftfreq(FRAME_SIZE, d=1.0 / sample_rate)
-    # 20Hz 아래와 나이퀴스트 근처는 음이름으로 접을 수 없다.
-    usable = (bins >= 20.0) & (bins <= sample_rate / 2.0 - 1.0)
-    pitch = np.zeros(len(bins), dtype=int)
-    pitch[usable] = np.round(12 * np.log2(bins[usable] / A4_HZ)).astype(int) % 12
+    # 주기적 Hann. np.hanning은 대칭이라 STFT 표준과 한 표본 어긋난다.
+    window = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(FRAME_SIZE) / FRAME_SIZE)
+    bank = chroma_filterbank(sample_rate)
 
     usable_end = max(1, len(audio) - FRAME_SIZE + 1)
     hop = max(HOP_SIZE, -(-usable_end // MAX_FRAMES))
     frames = []
     for start in range(0, usable_end, hop):
         spectrum = np.abs(np.fft.rfft(audio[start:start + FRAME_SIZE] * window)) ** 2
-        folded = np.bincount(pitch[usable], weights=spectrum[usable], minlength=12)
+        folded = bank @ spectrum
         peak = folded.max()
         frames.append(folded / peak if peak > 0 else folded)
     return np.array(frames).T if frames else np.zeros((12, 0))

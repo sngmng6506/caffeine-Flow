@@ -315,3 +315,23 @@ class ChorusDetectionTest(unittest.TestCase):
         self.assertIsNotNone(found, '반복이 뚜렷한 곡에서 후렴을 찾아야 한다')
         self.assertGreaterEqual(found[1] - found[0], 10)
         self.assertLess(found[0], 72, '반복부가 아니라 마지막 진행을 골랐다')
+
+    def test_filterbank_matches_librosa(self):
+        """크로마 필터뱅크가 librosa.filters.chroma와 같은 값을 낸다.
+
+        librosa는 이 워커에 없으므로 기준값을 고정한다(sr=16000, n_fft=16384,
+        tuning=0). 필터뱅크가 어긋나면 자기유사도 전체가 흔들려 다른 구간이
+        뽑히는데, 결과만 보고는 원인을 짚기 어렵다.
+        """
+        from chorus import chroma_filterbank
+        bank = chroma_filterbank(16000, 16384)
+
+        self.assertEqual(bank.shape, (12, 8193))
+        # librosa는 float32라 8193개를 더하면서 누적 오차가 붙는다(상대 4e-08).
+        self.assertAlmostEqual(float(bank.sum()), 6366.834472656, delta=0.01)
+        for (chroma, fft_bin), expected in {
+                (0, 1000): 0.058594309,
+                (3, 2048): 0.0,
+                (7, 512): 0.0,
+                (11, 4096): 0.524156094}.items():
+            self.assertAlmostEqual(float(bank[chroma, fft_bin]), expected, places=7)
