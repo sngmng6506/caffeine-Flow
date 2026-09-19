@@ -23,6 +23,11 @@ from datetime import datetime, timezone
 from timing import measure
 
 PROMPT_VERSION = 'audio-llm-3'
+# 위 버전이 가리키는 기본 본문(system + user)의 해시다. 본문을 고치면
+# test_prompt_templates가 여기서 걸린다 — 버전을 안 올리면 DB에 변경 전후 서술이
+# 같은 버전으로 섞여 어떤 문장으로 만든 서술인지 되짚을 수 없다. 문구만 고치고
+# 기대 문자열만 갱신하면 초록불이 되어버리므로 결정을 강제하는 자리를 따로 둔다.
+PROMPT_BODY_SHA256 = '74a3ca1104b24435'
 DEFAULT_MODEL = 'google/gemini-2.5-pro'
 DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 # 3x10으로 고정한다. 같은 곡 8회씩 비교한 실측에서 4x30은 E2E P50 34.4초로 20~30초

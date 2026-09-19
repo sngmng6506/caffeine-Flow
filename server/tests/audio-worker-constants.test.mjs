@@ -40,3 +40,17 @@ describe('오디오 파이프라인 계약', () => {
     expect(new Set(all).size, '같은 코드가 여러 분류에 들어가면 재시도 동작이 정해지지 않는다').toBe(all.length);
   });
 });
+
+describe('3단 프롬프트 버전', () => {
+  it('서버와 워커가 같은 버전을 적는다', () => {
+    // 서버는 Lab이 프롬프트를 비웠을 때 이 값을 기본 버전으로 돌려주고, 워커는
+    // 같은 값을 분석 원본에 적는다. 한쪽만 올리면 DB의 prompt_version이 실제
+    // 본문과 어긋나 어떤 문장으로 만든 서술인지 되짚을 수 없다.
+    const worker = read('audio-analysis-worker/audio_llm.py')
+      .match(/^PROMPT_VERSION = '([^']+)'/m)[1];
+    const server = read('server/src/features/audio-analysis/settings.js')
+      .match(/^const BUILTIN_PROMPT_VERSION = '([^']+)'/m)[1];
+
+    expect(server, `워커는 ${worker}인데 서버는 ${server}다`).toBe(worker);
+  });
+});

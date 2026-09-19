@@ -26,3 +26,27 @@ class PromptTemplateTest(unittest.TestCase):
         value = '<&> {{ 7 * 7 }}'
         self.assertEqual(render_prompt('audio-description.user.j2', clip_count=value),
                          f'같은 곡에서 뽑은 {value}개 구간이다.')
+
+
+class PromptVersionTest(unittest.TestCase):
+    def test_body_change_forces_a_version_decision(self):
+        """기본 본문을 고치면 PROMPT_VERSION을 올릴지 정하게 만든다.
+
+        본문만 바꾸고 버전을 그대로 두면 DB에 변경 전후 서술이 같은 버전으로
+        섞여 어떤 문장으로 만든 서술인지 되짚을 수 없다. 위쪽 문구 비교 테스트는
+        기대 문자열만 갱신하면 초록불이 되므로 버전 결정을 건너뛸 수 있다.
+        """
+        import hashlib
+        from pathlib import Path
+        from audio_llm import PROMPT_BODY_SHA256
+
+        digest = hashlib.sha256()
+        folder = Path(__file__).resolve().parent / 'prompts'
+        for name in ('audio-description.system.j2', 'audio-description.user.j2'):
+            digest.update((folder / name).read_bytes())
+        actual = digest.hexdigest()[:16]
+
+        self.assertEqual(
+            actual, PROMPT_BODY_SHA256,
+            f'기본 본문이 바뀌었다. PROMPT_VERSION(워커)과 BUILTIN_PROMPT_VERSION(서버)을 '
+            f'올릴지 정한 뒤 PROMPT_BODY_SHA256을 {actual}로 갱신한다')
