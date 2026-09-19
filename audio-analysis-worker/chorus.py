@@ -21,6 +21,11 @@ SMOOTHING_SIZE_SEC = 2.5
 # 크로마 한 프레임의 크기. 길게 잡을수록 화성이 안정적으로 잡히고 프레임 수가 준다.
 FRAME_SIZE = 16384
 HOP_SIZE = FRAME_SIZE // 4
+# 유사도 행렬이 프레임 수의 제곱으로 커진다. 10분 곡은 2340프레임이라 denoise가
+# 만드는 n x n 여덟 장만 350MB다 — 같은 자식 프로세스가 감정 모델을 들고 있으므로
+# 프레임 수를 묶고 긴 곡에서는 간격을 늘린다. 경계는 어차피 그 안에서 가장 큰
+# 15초를 다시 고르므로 0.5초 해상도면 충분하다.
+MAX_FRAMES = 1200
 # 선분으로 인정할 임계값. 충분한 수가 안 나오면 낮춰 가며 다시 찾는다.
 LINE_THRESHOLD = 0.15
 MIN_LINES = 8
@@ -53,8 +58,10 @@ def chroma_of(audio, sample_rate):
     pitch = np.zeros(len(bins), dtype=int)
     pitch[usable] = np.round(12 * np.log2(bins[usable] / A4_HZ)).astype(int) % 12
 
+    usable_end = max(1, len(audio) - FRAME_SIZE + 1)
+    hop = max(HOP_SIZE, -(-usable_end // MAX_FRAMES))
     frames = []
-    for start in range(0, max(1, len(audio) - FRAME_SIZE + 1), HOP_SIZE):
+    for start in range(0, usable_end, hop):
         spectrum = np.abs(np.fft.rfft(audio[start:start + FRAME_SIZE] * window)) ** 2
         folded = np.bincount(pitch[usable], weights=spectrum[usable], minlength=12)
         peak = folded.max()
@@ -85,8 +92,15 @@ def _local_maxima_rows(matrix):
 
 
 def _time_time(chroma):
-    difference = chroma[:, :, None] - chroma[:, None, :]
-    return 1.0 - np.linalg.norm(difference, axis=0) / np.sqrt(12)
+    """프레임끼리의 크로마 거리. 1이면 같고 0이면 가장 멀다.
+
+    차를 직접 만들면 (12, n, n) 배열이 생겨 10분 곡에서 526MB를 쓴다. 같은 자식
+    프로세스가 감정 모델을 들고 있으므로 ||a-b||^2 = ||a||^2 + ||b||^2 - 2a·b로
+    (n, n) 하나만 만든다.
+    """
+    squares = np.einsum('ij,ij->j', chroma, chroma)
+    distance = squares[:, None] + squares[None, :] - 2.0 * (chroma.T @ chroma)
+    return 1.0 - np.sqrt(np.maximum(distance, 0.0)) / np.sqrt(12)
 
 
 def _time_lag(time_time):

@@ -256,3 +256,62 @@ class ResolvePromptTest(unittest.TestCase):
                            {**PLAN, 'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
                            runner=lambda *a, **k: clip)
         self.assertEqual(raw['prompt_version'], audio_llm.PROMPT_VERSION)
+
+
+class ChorusDetectionTest(unittest.TestCase):
+    """후렴 탐지 포팅본의 안전장치. 실패해도 중앙 슬롯은 남아야 한다."""
+
+    def test_degenerate_audio_returns_none_instead_of_raising(self):
+        import numpy as np
+        from chorus import detect_chorus
+        for name, audio in (
+                ('빈 배열', np.zeros(0)),
+                ('무음', np.zeros(16000 * 60)),
+                ('클립보다 짧은 곡', np.ones(16000) * 0.5),
+                ('NaN', np.full(16000 * 60, np.nan)),
+                ('inf', np.full(16000 * 60, np.inf))):
+            with self.subTest(name=name):
+                self.assertIsNone(detect_chorus(audio, 16000, 15))
+
+    def test_frame_count_stays_bounded_on_long_tracks(self):
+        """유사도 행렬이 프레임 수의 제곱으로 커진다.
+
+        묶지 않으면 10분 곡에서 denoise가 만드는 n x n 여덟 장만 350MB다. 같은
+        자식 프로세스가 감정 모델을 들고 있어 그대로 두면 OOM 위험이 있다.
+        """
+        import numpy as np
+        from chorus import chroma_of, MAX_FRAMES
+        # 10분은 계약(audio-pipeline.json)의 길이 상한이다.
+        chroma = chroma_of(np.zeros(16000 * 600), 16000)
+        self.assertLessEqual(chroma.shape[1], MAX_FRAMES)
+
+    def test_picks_the_repeated_section(self):
+        """되풀이되는 화음 진행을 찾아낸다.
+
+        구간 안에서도 화음이 바뀌어야 한다. 한 화음을 길게 끌면 프레임이 전부
+        같아져 수평선을 찾을 근거가 사라진다. 반복도 충분히 많아야 한다 —
+        선분이 MIN_LINES개는 나와야 임계값 탐색이 멈춘다.
+        """
+        import numpy as np
+        from chorus import detect_chorus
+        rng = np.random.default_rng(0)
+
+        def progression(roots, seconds=3):
+            parts = []
+            for root in roots:
+                time = np.linspace(0, seconds, 16000 * seconds, endpoint=False)
+                parts.append(sum(np.sin(2 * np.pi * root * ratio * time)
+                                 for ratio in (1, 1.26, 1.5)) * 0.2)
+            return np.concatenate(parts)
+
+        verse = progression([220, 247, 262, 294])
+        hook = progression([330, 294, 262, 220])
+        outro = progression([196, 220, 247, 262])
+        # verse/hook를 세 번 되풀이하고 끝에만 다른 진행을 둔다(0~72초가 반복부).
+        audio = np.concatenate([verse, hook] * 3 + [outro])
+        audio = audio + rng.normal(0, 0.002, len(audio))
+        found = detect_chorus(audio, 16000, 10)
+
+        self.assertIsNotNone(found, '반복이 뚜렷한 곡에서 후렴을 찾아야 한다')
+        self.assertGreaterEqual(found[1] - found[0], 10)
+        self.assertLess(found[0], 72, '반복부가 아니라 마지막 진행을 골랐다')
