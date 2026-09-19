@@ -157,7 +157,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | --- | --- | :-: | --- |
 | POST | `/audio-analysis/jobs/:id/resume` | 워커 | lease_token으로 기존 결과 전송 재개. 인계 전 만료 lease 갱신, 이미 완료면 completed |
 | POST | `/audio-analysis/jobs/claim` | 워커 | 대기 작업 1건을 20분 lease로 획득. 없으면 204 |
-| POST | `/audio-analysis/jobs/:id/complete` | 워커 | `lease_token`, `result`, `automatic_annotation`, `tag_scores`, `maest_run` 제출. 분석·자동 라벨·작업 완료를 한 트랜잭션에 저장 |
+| POST | `/audio-analysis/jobs/:id/complete` | 워커 | `lease_token`, `result`, `automatic_annotation`, `analysis_run` 제출. 분석·자동 라벨·작업 완료를 한 트랜잭션에 저장 |
 | POST | `/audio-analysis/jobs/:id/fail` | 워커 | `lease_token`, `error_code` 제출. 오류 분류에 따라 지연 재시도 또는 중단 |
 | POST | `/audio-analysis/discoveries/claim` | 워커 | 대기 중인 수집 요청 1건을 20분 lease로 획득. 없으면 204 |
 | POST | `/audio-analysis/discoveries/:id/complete` | 워커 | `lease_token`과 `tracks[]` 제출. 곡을 분석 큐에 등록하고 중복은 무시한다 |
@@ -176,7 +176,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/admin/audio-prompt-revisions` | 🛡 | 3단 프롬프트 수정 이력 최근 20건. 추가만 되며 수정·삭제는 DB trigger가 막음 |
 
 - 작업 완료는 같은 lease로 재전송할 수 있다. 만료 lease는 `resume`으로 복구하며, 다른 워커에 인계됐거나 재큐잉으로 폐기된 토큰은 409다.
-- MAEST는 `maest_run`을 포함해 작업 완료 API로 제출한다. `tag_scores`는 생략 가능하며 `/audio-analysis/results`로 제출하면 400이다. 원본 스키마·검증은 [runs.js](../server/src/features/audio-analysis/runs.js), 모델·실패 코드는 [공통 계약](../server/src/constants/audio-pipeline.json)이 기준이다.
+- 신청 시점 분석은 `analysis_run`을 포함해 작업 완료 API로 제출한다. 원본 스키마·검증은 [runs.js](../server/src/features/audio-analysis/runs.js), 모델·실패 코드는 [공통 계약](../server/src/constants/audio-pipeline.json)이 기준이다.
 - 검토 body는 `{ annotation_revision, audio_analysis_id, audio_analysis_revision, verdict?, track_annotation?, artist_confirmed?, reviewed_fields? }`다. `track_annotation`을 생략하면 판정만 저장한다. 조회 후 버전이 바뀌었거나 판정할 자동 라벨·서술이 없으면 409다.
 - 수집 완료에는 claim의 `offset`과 원본에서 읽은 개수 `scanned`를 보낸다. 날짜 소스는 `window`·`page_schema_version`도 그대로 돌려주며 불일치는 400이다. `enqueued_count`는 중복을 제외한 신규 등록 수다.
 - `/audio-analysis/jobs/*`는 워커 인증 후 JSON 1MB까지, 나머지는 64KB까지 받는다.

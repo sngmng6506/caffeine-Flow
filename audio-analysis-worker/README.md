@@ -26,14 +26,11 @@ API 계약은 [API.md](../docs/API.md), 데이터 흐름은 [ARCHITECTURE.md](..
 
 ### 무엇을 돌리는가
 
-| `pipeline_mode` | 실행한 단계 |
-| --- | --- |
-| `EMOTION_LLM` | Valence/Arousal + Audio LLM. **신청 시점 경로가 쓰는 값** |
-| `MAEST_ONLY` / `MAEST_EMOTION` / `FULL` | MAEST를 돌리던 옛 실행. 저장된 행을 읽을 때만 |
+`pipeline_mode`는 `EMOTION_LLM` 하나다 — Valence/Arousal + Audio LLM. 장르를 판단할 모델이 없으므로 `normalized.genre`는 항상 빈 배열이고 분기할 모드도 없다.
 
-**MAEST(1단)는 신청 시점 경로에서 더 이상 돌지 않는다.** 곡당 76초를 쓰는 데다 같은 4코어를 나눠 쓰는 3단까지 4~5배 느리게 만들었다(실측: 3단 단독 16초, MAEST와 동시 76초). 장르 후보를 잃는 대신 E2E가 약 90초에서 25초가 됐다. 모델 파일과 추론 코드는 저장된 행을 읽기 위해 남아 있고 호환 CLI는 그대로 전체 특징을 뽑는다.
+**구간은 2단보다 먼저 한 번 정하고 두 단계가 같은 곳을 듣는다.** 역할이 다른 두 자리를 고른다 — 곡 중앙 ±15초에서 소리가 가장 큰 구간, 그리고 가장 많이 반복되는 구간(`chorus.py`). 곡 전체를 고르게 나눈 것이 아니다.
 
-V/A는 3단이 듣는 구간에서만 구한다 — 전곡 6.0초가 1.0초가 되고 값 차이는 0.002였다. 신청 시점 경로는 44.1kHz 계열 특징(BPM·조성·danceability 등)을 뽑지 않으므로 그 값들은 null이다.
+V/A는 그 구간에서만 구한다. 전곡을 돌리면 6.0초, 구간만이면 1.0초다. 신청 시점 경로는 44.1kHz 계열 특징(BPM·조성·danceability 등)을 뽑지 않으므로 그 값들은 null이다.
 
 검증하지 않은 위험은 [ROADMAP](../docs/ROADMAP.md)에 있다. 과거 측정은 [experiments/](experiments/)이며 현재 동작의 기준이 아니다.
 
@@ -48,7 +45,7 @@ python -m yt_dlp --version
 ffmpeg -version        # ffprobe도 함께 필요하다
 ```
 
-모델 파일은 [essentia.upf.edu/models](https://essentia.upf.edu/models.html)에서 받아 `AUDIO_MODEL_DIR`에 두고 **저장소에 커밋하지 않는다.** 해시는 `maest.py`·`emotion.py`가 기준이며 워커가 시작할 때 검증한다. 다르면 새 작업을 받지 않는다.
+모델 파일은 [essentia.upf.edu/models](https://essentia.upf.edu/models.html)에서 받아 `AUDIO_MODEL_DIR`에 두고 **저장소에 커밋하지 않는다.** 해시는 `emotion.py`가 기준이며 워커가 시작할 때 검증한다. 다르면 새 작업을 받지 않는다.
 
 yt-dlp에는 JavaScript 런타임(예: Deno)이 필요하다([지원 런타임](https://github.com/yt-dlp/yt-dlp/wiki/EJS)).
 배포판 패키지로 설치할 수 없으면 정적 빌드를 홈 아래(`~/caffeine-audio/bin`)에 둔다.
@@ -206,6 +203,6 @@ python -m unittest discover -s audio-analysis-worker -p 'test_*.py'
 [prompts 폴더](prompts)의 `audio-description.system.j2`와 `audio-description.user.j2`가 3단의 **기본** 본문이다. 운영자가 Lab에서 시스템 프롬프트를 저장하면 claim 응답으로 실려 와 system 쪽을 대신하고, 비우면 파일로 돌아간다. user 템플릿은 서버가 덮어쓰지 않는다.
 `prompt_renderer.py`는 StrictUndefined로 누락 변수를 거절한다.
 
-user 템플릿의 입력은 `clip_count`, `va`, `segments`다. MAEST 결과·곡 제목·아티스트·택소노미를 추가하지 않는다. **기본 본문을 바꾸면** 워커 `audio_llm.py`의 `PROMPT_VERSION`과 서버 `settings.js`의 `BUILTIN_PROMPT_VERSION`을 맞춰 올린다 — 그대로 두면 변경 전후 서술이 DB에서 구분되지 않아 어떤 문장으로 만든 서술인지 되짚을 수 없다.
+user 템플릿의 입력은 `clip_count`, `va`, `segments`, `selection`이다. 곡 제목·아티스트·택소노미를 추가하지 않는다. **기본 본문을 바꾸면** 워커 `audio_llm.py`의 `PROMPT_VERSION`과 서버 `settings.js`의 `BUILTIN_PROMPT_VERSION`을 맞춰 올린다 — 그대로 두면 변경 전후 서술이 DB에서 구분되지 않아 어떤 문장으로 만든 서술인지 되짚을 수 없다.
 
 전체 프롬프트 목록은 [최상단 README](../README.md#llm-프롬프트-바로가기)에 있다.
