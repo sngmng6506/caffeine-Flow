@@ -19,13 +19,13 @@ class AutomaticTest(unittest.TestCase):
             return audio
         def analyze(audio, job, output):
             self.assertNotIn('lease_token', job)
-            output.write_text(json.dumps({'result': {}, 'maest_run': {}}))
+            output.write_text(json.dumps({'result': {}, 'analysis_run': {}}))
         result = process({'id': 'job', 'platform': 'youtube', 'track_key': 'abcdefghijk',
                           'artist_name': 'artist', 'lease_token': 'lease'}, None,
                          downloader=download, analyzer=SimpleNamespace(analyze=analyze),
                          call=lambda _, path, body: calls.append((path, body)) or {'status': 'completed'})
         self.assertEqual(result['status'], 'completed')
-        self.assertEqual(set(calls[0][1]), {'result', 'maest_run', 'lease_token'})
+        self.assertEqual(set(calls[0][1]), {'result', 'analysis_run', 'lease_token'})
         self.assertFalse(paths[0].exists())
 
     def test_platform_urls_only(self):

@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 from discover import DiscoveryError, collect
 from download import download_audio, DownloadError, error_hint
-from maest import CONTRACT
+from labels import CONTRACT
 import outbox
 from worker import WorkerConfig, ensure_queue_dirs, acquire_lock, log, notify_discord_started
 from analysis_process import AnalysisProcess

@@ -28,7 +28,7 @@ def main():
         body['elapsed_sec'] = round(time.monotonic() - start, 2)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(body, ensure_ascii=False, indent=2), encoding='utf-8')
-        raw = body['maest_run']['maest_raw']
+        raw = None
         rows = sorted(zip(raw['classes'], raw['mean'], raw['max']), key=lambda row: -row[1])[:10]
         print(json.dumps({'input': body['test_input'], 'elapsed_sec': body['elapsed_sec'],
                           'segments': len(raw['segments']), 'top_mean': [dict(zip(['label', 'mean', 'max'], r)) for r in rows],

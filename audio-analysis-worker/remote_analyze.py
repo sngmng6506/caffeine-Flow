@@ -13,10 +13,10 @@ from emotion import (
     file_sha256,
     load_emotion_predictor,
 )
-from audio_llm import (AudioLLMError, DEFAULT_CLIP_SEC, DEFAULT_SEGMENTS, describe,
-                       plan_segments, plan_segments_by_energy, va_context)
+from audio_llm import (AudioLLMError, DEFAULT_CLIP_SEC, SELECTION_NOTE, describe,
+                       plan_segments_by_slots, va_context)
 from download import source_url
-from maest import load_audio, normalize, make_annotation
+from labels import load_audio, normalize, make_annotation
 
 
 def initialize_models():
@@ -32,13 +32,9 @@ def initialize_models():
     return None, emotion
 
 
-def pipeline_mode(mood, audio_llm_raw, maest_raw=None):
-    """실제로 돈 단계로 모드를 정한다. sources_used와 함께 읽으면 재현이 가능하다."""
-    if maest_raw is None:
-        return 'EMOTION_LLM'
-    if audio_llm_raw is not None:
-        return 'FULL'
-    return 'MAEST_EMOTION' if mood is not None else 'MAEST_ONLY'
+def pipeline_mode():
+    """신청 시점 경로가 도는 단계. Valence/Arousal + Audio LLM뿐이다."""
+    return 'EMOTION_LLM'
 
 
 def audio_llm_config(prompt=None):
@@ -67,48 +63,37 @@ def run(audio, job, output, models=None, report=None):
     with measure(report, 'audio_hash'):
         audio_sha256 = file_sha256(audio)
 
-    # 구간 수·길이를 여기서 읽는다. 구간은 3단보다 먼저 정해지고(2단이 같은 구간을
+    # 구간 길이를 여기서 읽는다. 구간은 3단보다 먼저 정해지고(2단이 같은 구간을
     # 듣는다) describe는 넘겨받은 계획을 그대로 쓰므로, 계획을 세울 때 이 설정을
-    # 반영하지 않으면 AUDIO_LLM_SEGMENTS를 바꿔도 아무 일이 일어나지 않는다.
+    # 반영하지 않으면 AUDIO_LLM_CLIP_SEC를 바꿔도 아무 일이 일어나지 않는다.
     llm_config = audio_llm_config(job.get('audio_llm_prompt'))
 
     def describe_independently(va):
         try:
             with measure(report, 'audio_llm'):
-                config = {**llm_config, 'va': va, 'segment_plan': segments}
+                config = {**llm_config, 'va': va, 'segment_plan': segments,
+                          'segment_selection': SELECTION_NOTE}
                 return describe(audio, audio_duration, audio_sha256, config, report=report)
         except AudioLLMError:
             return None
 
-    # MAEST는 돌리지 않는다. 이 미니PC에서 곡당 76초를 쓰면서, 같은 CPU를 나눠 쓰는
-    # 3단까지 4~5배 느리게 만들었다(실측: 3단 단독 16초, MAEST와 동시 76초). 장르
-    # 후보를 잃는 대신 신청 시점 판단이 가능해진다. 옛 분석 행의 MAEST 원본을 읽는
-    # 경로는 그대로 남아 있다.
-    #
-    # 그래서 3단을 별도 스레드에 띄우지 않는다. 3단은 넘길 V/A가 생긴 뒤에야 출발할
-    # 수 있고 그 뒤로는 겹칠 CPU 작업이 남지 않는다 — 스레드를 두면 제출하자마자
-    # 기다리기만 한다.
-    raw = None
     with measure(report, 'decode_16000'):
         shared = load_audio(audio) if emotion is not None or models is not None else None
-    # V/A는 3단이 듣는 구간에서만 구한다. 전곡을 돌리면 6초, 구간만이면 1.5초이고
-    # 값 차이는 0.004였다. 두 단계가 같은 곳을 듣는다는 점도 맞아떨어진다.
+    # V/A는 3단이 듣는 구간에서만 구한다. 전곡을 돌리면 6초, 구간만이면 1.5초다.
+    # 두 단계가 같은 곳을 들어야 프롬프트의 밝기·활력이 서술과 어긋나지 않는다.
     #
-    # 구간은 소리가 큰 쪽부터 고른다. 균등 배치는 인트로와 아웃트로를 고정으로 먹어
-    # 곡을 대표하지 않는 곳을 듣는다(2026-09-18 실측: 평균 에너지 0.39 -> 0.94).
-    # 16kHz 배열이 없으면 균등 배치로 떨어진다.
-    count = llm_config.get('segments', DEFAULT_SEGMENTS)
+    # 구간은 역할이 다른 두 자리를 고른다 — 곡 중앙 ±15초의 가장 큰 곳과 가장 많이
+    # 반복되는 구간이다. 근거는 experiments/2026-09-19를 본다.
     clip_sec = llm_config.get('clip_sec', DEFAULT_CLIP_SEC)
-    segments = (plan_segments_by_energy(shared, count, clip_sec) if shared is not None
-                else plan_segments(audio_duration, count, clip_sec))
+    segments = plan_segments_by_slots(shared, clip_sec) if shared is not None else []
     with measure(report, 'features_and_emotion'):
         features, version = analyze_for_judgement(audio, emotion, audio_16k=shared,
                                                   segments=segments, report=report)
     audio_llm_raw = None
-    if job.get('audio_llm_enabled', True) and os.environ.get('OPENROUTER_API_KEY', '').strip():
+    if segments and job.get('audio_llm_enabled', True) and os.environ.get('OPENROUTER_API_KEY', '').strip():
         audio_llm_raw = describe_independently(
             va_context(features.get('valence'), features.get('arousal')))
-    normalized = normalize(raw, features=features)
+    normalized = normalize(features=features)
     sources_used = [EMBEDDING_MODEL_NAME, EMOTION_MODEL_NAME]
     # 3단은 장르·택소노미를 받지 않는다. 넘길 통로 자체가 없다. 2단 V/A만 예외로
     # 넘어간다 — 보정된 값이라 숫자가 뜻을 갖는다.
@@ -118,15 +103,14 @@ def run(audio, job, output, models=None, report=None):
                 'source_reference': source_url(job['platform'], job['track_key'])}
     payload = build_payload(manifest, features, version)
     run_data = {'schema_version': 1,
-                'pipeline_mode': pipeline_mode(normalized['mood'], audio_llm_raw, raw),
+                'pipeline_mode': pipeline_mode(),
                 'sources_used': sources_used,
-                'maest_model_version': None, 'model_sha256': None,
                 'audio_source_url': manifest['source_reference'], 'audio_local_path': None,
                 'audio_sha256': audio_sha256, 'audio_duration_sec': audio_duration,
-                'audio_sample_rate': audio_sample_rate, 'maest_raw': raw,
+                'audio_sample_rate': audio_sample_rate,
                 'audio_llm_raw': audio_llm_raw, 'normalized': normalized}
     result = {'result': payload, 'automatic_annotation': make_annotation(features, normalized, job['artist_name']),
-              'maest_run': run_data}
+              'analysis_run': run_data}
     Path(output).write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
     return result
 

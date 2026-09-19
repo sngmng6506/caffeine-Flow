@@ -42,7 +42,7 @@ describe('자동 분석 판정', () => {
     const cleared = await request(app).put('/api/v1/admin/audio-settings')
       .set(admin()).send({ audio_llm_enabled: true, audio_llm_prompt: '' });
     expect(cleared.body.audio_llm_prompt).toBeNull();
-    expect(cleared.body.audio_llm_prompt_version).toBe('audio-llm-2');
+    expect(cleared.body.audio_llm_prompt_version).toBe('audio-llm-3');
     expect((await db('audio_prompt_revisions').where({ body }).first())).toBeTruthy();
   });
 

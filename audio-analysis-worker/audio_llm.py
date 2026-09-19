@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime, timezone
 from timing import measure
 
-PROMPT_VERSION = 'audio-llm-2'
+PROMPT_VERSION = 'audio-llm-3'
 DEFAULT_MODEL = 'google/gemini-2.5-pro'
 DEFAULT_BASE_URL = 'https://openrouter.ai/api/v1'
 # 3x10으로 고정한다. 같은 곡 8회씩 비교한 실측에서 4x30은 E2E P50 34.4초로 20~30초
@@ -149,85 +149,88 @@ class AudioLLMError(RuntimeError):
     """3단 호출이 실패했을 때. 1단 결과는 그대로 두고 무드만 비운다."""
 
 
-def plan_segments(duration_sec, count=DEFAULT_SEGMENTS, clip_sec=DEFAULT_CLIP_SEC):
-    """곡 전체를 고르게 나눠 샘플 구간을 정한다.
-
-    인트로만 듣지 않기 위해서다. 구간이 곡 길이를 넘지 않도록 잘라 맞춘다.
-    """
-    if duration_sec <= 0 or count < 1:
-        return []
-    count = max(1, min(int(count), 8))
-    clip = min(float(clip_sec), duration_sec)
-    if count == 1:
-        return [{'start_sec': round(max(0.0, (duration_sec - clip) / 2), 3), 'duration_sec': round(clip, 3)}]
-    # 각 구간의 시작점을 균등 배치하고, 마지막 구간이 곡 끝을 넘지 않게 한다.
-    last_start = max(0.0, duration_sec - clip)
-    step = last_start / (count - 1)
-    starts = [round(i * step, 3) for i in range(count)]
-    unique = sorted(set(starts))
-    return [{'start_sec': s, 'duration_sec': round(clip, 3)} for s in unique]
+MIDDLE_SLACK_SEC = 15.0
+SELECTION_NOTE = (
+    '곡 전체를 고르게 나눈 것이 아니라, 곡을 대표할 만한 자리 두 곳을 골라 뽑았다. '
+    '하나는 곡 중앙 30초 안에서 소리가 가장 큰 구간이고, '
+    '하나는 곡에서 가장 많이 반복되는 구간(하이라이트로 추정)이다.'
+)
+MIDDLE_LABEL = '곡 중앙 30초 안에서 소리가 가장 큰 구간'
+CHORUS_LABEL = '곡에서 가장 많이 반복되는 구간 (하이라이트로 추정)'
 
 
-def plan_segments_by_energy(audio_16k, count=DEFAULT_SEGMENTS, clip_sec=DEFAULT_CLIP_SEC,
-                            sample_rate=CLIP_SAMPLE_RATE):
-    """소리가 큰 구간부터 고른다. 겹치지 않게 고르고 시간순으로 돌려준다.
-
-    균등 배치는 첫 구간을 0초에, 마지막을 곡 끝에 붙이므로 인트로와 아웃트로가 항상
-    들어간다. 둘 다 곡을 대표하지 않는다. 실측(2026-09-18)에서 186초 재즈 곡의 3x10이
-    고른 세 구간의 평균 에너지가 0.39였고, 그중 둘이 곡에서 가장 조용한 지점이었다 —
-    중간 구간마저 하필 브레이크다운에 떨어졌다. 그 결과 4x30이 잡아내던 록/메탈 전환을
-    8회 중 7회 놓쳤다.
-
-    겹치면 같은 소리를 두 번 보내고 structure 항목도 중복된다. 하나를 고를 때마다
-    좌우로 clip_sec만큼을 후보에서 빼 겹칠 수 없게 한다.
-    """
+def _window_energy(audio_16k, window, sample_rate):
+    """1초 간격으로 본 창 평균 에너지. 순위만 쓰므로 제곱평균이면 충분하다."""
     import numpy as np
 
-    count = max(1, min(int(count), 8))
+    squared = np.square(np.asarray(audio_16k, dtype=np.float64))
+    cumulative = np.concatenate(([0.0], np.cumsum(squared)))
+    last = len(audio_16k) - window
+    starts = np.arange(0, last + 1, max(1, sample_rate))
+    return starts, (cumulative[starts + window] - cumulative[starts]) / window
+
+
+def _loudest_in(audio_16k, window, sample_rate, low, high):
+    """[low, high] 안에서 창 에너지가 가장 큰 시작 표본. 비면 None."""
+    import numpy as np
+
+    starts, energy = _window_energy(audio_16k, window, sample_rate)
+    inside = (starts >= low) & (starts <= high)
+    if not inside.any():
+        return None
+    return int(starts[inside][int(np.argmax(energy[inside]))])
+
+
+def plan_segments_by_slots(audio_16k, clip_sec=DEFAULT_CLIP_SEC, sample_rate=CLIP_SAMPLE_RATE):
+    """역할이 다른 두 구간을 고른다. 시간순으로 돌려준다.
+
+    한 벌의 구간으로 서로 다른 두 문제를 풀 수 없다. 분위기·보컬은 곡을 대표하는
+    자리를 들어야 하고, 그래서 여기서는 대표성 쪽으로 몰아 고른다.
+
+    - **중앙 30초 슬롯**: 곡 중앙 ±15초 안에서 창 에너지가 가장 큰 곳. 곡 중앙만
+      고정으로 집으면 하필 브레이크다운이나 무음에 떨어진다(실측: 재즈 E0.22,
+      trap E0.03). 탐색 여유를 주면 세 곡 모두 E0.91 이상으로 올라간다. 여유를
+      ±30초까지 넓히면 "중앙"의 뜻이 사라져 에너지 기반 선택과 같아진다.
+    - **하이라이트 슬롯**: 가장 많이 반복되는 구간(chorus.detect_chorus) 안에서
+      창 에너지가 가장 큰 곳. 후렴 탐지가 실패하면 이 슬롯은 비운다.
+
+    두 구간이 겹쳐도 밀어내지 않는다. 대표성이 있는 자리를 고르는 것이 목적이라
+    인접이 곧 손해는 아니다.
+
+    이 구성은 후렴 밖에 있는 특이 구간을 구조적으로 듣지 못한다. 매장 정책이
+    악기를 가리키는데 그 악기가 후렴 밖에만 나오면 놓친다 — 크로마는 음색을 버리고
+    중앙 슬롯은 위치가 고정이기 때문이다.
+    """
+    from chorus import detect_chorus
+
     total = len(audio_16k) / sample_rate if sample_rate else 0
     if total <= 0:
         return []
     clip = min(float(clip_sec), total)
     window = max(1, int(clip * sample_rate))
     if len(audio_16k) < window:
-        return [{'start_sec': 0.0, 'duration_sec': round(total, 3)}]
-
-    # 1초 간격 후보의 창 평균 에너지. RMS 대신 제곱평균을 쓰는 것은 순위만 필요해서다.
-    hop = max(1, sample_rate)
-    squared = np.square(np.asarray(audio_16k, dtype=np.float64))
-    cumulative = np.concatenate(([0.0], np.cumsum(squared)))
-    last_start = len(audio_16k) - window
-    starts = list(range(0, last_start + 1, hop))
-    if starts[-1] != last_start:
-        starts.append(last_start)
-    scores = [(float(cumulative[i + window] - cumulative[i]) / window, i) for i in starts]
-
-    # 겹치지 않는 것만으로는 부족하다. 고에너지가 한곳에 뭉친 곡에서는 바로 옆을
-    # 집어 같은 악절을 두 번 듣게 된다(실측: 151~161s와 172~182s를 고르자 두 번째
-    # 서술이 "비슷하게 이어지나"로 나왔다). 시작점을 구간 길이의 2배만큼 떼어 놓는다.
-    #
-    # 짧은 곡에서는 그 간격으로 count개를 놓을 수 없다. 겹침 금지(1배)까지 단계적으로
-    # 좁히고, 그래도 안 되면 놓을 수 있는 만큼만 돌려준다 — 겹치는 것보다 적은 편이 낫다.
-    ordered = sorted(scores, key=lambda v: (-v[0], v[1]))
-    # 간격을 지키려다 무음을 고르면 인트로·아웃트로를 피하려던 목적을 잃는다. 최고
-    # 에너지의 일정 비율에 못 미치는 후보는 아예 제외하고, 남은 것 안에서 간격을 본다.
-    loudest = ordered[0][0] if ordered else 0.0
-    usable = [v for v in ordered if v[0] >= loudest * QUIET_RATIO] or ordered
+        return [{'start_sec': 0.0, 'duration_sec': round(total, 3),
+                 'label': MIDDLE_LABEL}]
 
     picked = []
-    for spacing in (2.0, 1.5, 1.0):
-        gap = int(window * spacing)
-        picked = []
-        for _score, start in usable:
-            if len(picked) >= count:
-                break
-            if any(abs(start - chosen) < gap for chosen in picked):
-                continue
-            picked.append(start)
-        if len(picked) >= count:
-            break
-    return [{'start_sec': round(v / sample_rate, 3), 'duration_sec': round(clip, 3)}
-            for v in sorted(picked)]
+    middle = (len(audio_16k) - window) // 2
+    slack = int(MIDDLE_SLACK_SEC * sample_rate)
+    start = _loudest_in(audio_16k, window, sample_rate,
+                        max(0, middle - slack), middle + slack)
+    if start is not None:
+        picked.append((start, MIDDLE_LABEL))
+
+    chorus = detect_chorus(audio_16k, sample_rate, clip)
+    if chorus is not None:
+        low = int(chorus[0] * sample_rate)
+        high = min(len(audio_16k) - window, int(chorus[1] * sample_rate) - window)
+        start = _loudest_in(audio_16k, window, sample_rate, low, max(low, high))
+        if start is not None:
+            picked.append((start, CHORUS_LABEL))
+
+    return [{'start_sec': round(value / sample_rate, 3), 'duration_sec': round(clip, 3),
+             'label': label}
+            for value, label in sorted(picked)]
 
 
 def extract_clip(audio_path, segment, ffmpeg='ffmpeg', runner=subprocess.run):
@@ -250,16 +253,28 @@ def segment_ranges(segments):
 
     모델에게 몇 초 지점을 듣고 있는지 알려 준다. 모르면 구간별로 서술하라고 해도
     무엇을 기준으로 나눠 쓸지 알 수 없다.
+
+    구간마다 역할이 다른 선택 방식에서는 label로 그 근거를 함께 적는다. 문구는
+    탐지 기준을 사실대로 쓴다 — "하이라이트"처럼 해석을 단정하면 검증하지 않은
+    음악적 판단을 모델에게 전제로 주게 되고, 판정이 서술을 그대로 따라간다.
     """
-    return [f"{s['start_sec']:.0f}~{s['start_sec'] + s['duration_sec']:.0f}초"
-            for s in (segments or [])]
+    out = []
+    for s in (segments or []):
+        text = f"{s['start_sec']:.0f}~{s['start_sec'] + s['duration_sec']:.0f}초"
+        label = s.get('label') if isinstance(s, dict) else None
+        out.append(f'{text} — {label}' if label else text)
+    return out
 
 
-def build_messages(clips, system_prompt=None, va=None, segments=None):
-    """오디오 구간과 1단 V/A 요약을 담은 메시지. 장르·택소노미·임베딩은 넣지 않는다."""
+def build_messages(clips, system_prompt=None, va=None, segments=None, selection=None):
+    """오디오 구간과 1단 V/A 요약을 담은 메시지. 장르·택소노미·임베딩은 넣지 않는다.
+
+    selection은 구간을 어떤 구성으로 골랐는지 한두 문장으로 알려 준다. 구간마다
+    역할이 다르면 개별 label만으로는 조합의 의도가 전달되지 않는다.
+    """
     content = [{'type': 'text', 'text': render_prompt(
         'audio-description.user.j2', clip_count=len(clips), va=va,
-        segments=segment_ranges(segments))}]
+        segments=segment_ranges(segments), selection=selection)}]
     for clip in clips:
         content.append({
             'type': 'input_audio',
@@ -353,13 +368,12 @@ def call_openrouter(messages, config, opener=urllib.request.urlopen):
 def describe(audio_path, duration_sec, audio_sha256, config,
              opener=urllib.request.urlopen, runner=subprocess.run, report=None):
     """구간을 잘라 LLM에 넘기고 보존할 원본을 만든다."""
-    # 호출부가 오디오를 들고 있으면 에너지 기반으로 고른 구간을 넘긴다. 없으면
-    # 균등 배치로 떨어진다 — 오디오 없이 구간만 계획해야 하는 경로가 있다.
-    segments = config.get('segment_plan') or plan_segments(
-        duration_sec, config.get('segments', DEFAULT_SEGMENTS),
-        config.get('clip_sec', DEFAULT_CLIP_SEC))
+    # 구간은 호출부가 정해 넘긴다. 여기서 대신 계획하지 않는 것은 2단이 같은 구간을
+    # 들어야 하기 때문이다 — 각자 계획하면 프롬프트의 밝기·활력이 서술과 다른 구간의
+    # 값이 된다. 슬롯 선택에는 16kHz 배열이 필요한데 이 함수는 그것을 들고 있지 않다.
+    segments = config.get('segment_plan')
     if not segments:
-        raise AudioLLMError('샘플 구간을 만들 수 없습니다')
+        raise AudioLLMError('샘플 구간을 받지 못했습니다')
     with measure(report, 'audio_llm_clip_extract'):
         clips = [extract_clip(audio_path, segment, config.get('ffmpeg', 'ffmpeg'), runner)
                  for segment in segments]
@@ -369,7 +383,8 @@ def describe(audio_path, duration_sec, audio_sha256, config,
     system_prompt, prompt_version = resolve_prompt(config.get('prompt'))
     with measure(report, 'audio_llm_request'):
         data = call_openrouter(
-            build_messages(clips, system_prompt, config.get('va'), segments), config, opener)
+            build_messages(clips, system_prompt, config.get('va'), segments,
+                           config.get('segment_selection')), config, opener)
     parsed = parse_response(data, config.get('fields') or FIELDS, config.get('scores') or ())
     usage = read_usage(data)
     generation_id = data.get('id') if isinstance(data.get('id'), str) else None

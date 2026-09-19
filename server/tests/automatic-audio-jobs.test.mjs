@@ -65,7 +65,7 @@ function llmBody(job) {
   body.maest_run.pipeline_mode = 'FULL';
   body.maest_run.sources_used = [...body.maest_run.sources_used, 'google/gemini-2.5-pro'];
   body.maest_run.audio_llm_raw = {
-    model_id: 'google/gemini-2.5-pro', prompt_version: 'audio-llm-2',
+    model_id: 'google/gemini-2.5-pro', prompt_version: 'audio-llm-3',
     input_sha256: body.maest_run.audio_sha256, description: '잔잔한 피아노가 이어진다',
     mood: ['차분함'], instruments: ['피아노'], vocal: ['보컬 없음'], structure: ['후반에 커진다'],
     segments: [{ start_sec: 0, duration_sec: 30 }, { start_sec: 15, duration_sec: 30 }],

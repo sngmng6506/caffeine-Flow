@@ -10,8 +10,12 @@ from audio_llm import (
     build_messages,
     describe,
     parse_response,
-    plan_segments,
 )
+
+
+# describe는 구간을 스스로 계획하지 않는다(2단이 같은 구간을 들어야 하므로).
+PLAN = {'segment_plan': [{'start_sec': 10.0, 'duration_sec': 10.0},
+                         {'start_sec': 40.0, 'duration_sec': 10.0}]}
 
 
 def response(**overrides):
@@ -21,76 +25,57 @@ def response(**overrides):
         {'function': {'name': 'describe_audio', 'arguments': json.dumps(payload, ensure_ascii=False)}}]}}]}
 
 
-class PlanSegmentsTest(unittest.TestCase):
-    def test_samples_across_the_whole_track(self):
-        segments = plan_segments(200, count=4, clip_sec=30)
+class PlanSegmentsBySlotsTest(unittest.TestCase):
+    """역할이 다른 두 자리를 고른다 — 곡 중앙의 큰 곳과 가장 많이 반복되는 곳."""
 
-        self.assertEqual(len(segments), 4)
-        self.assertEqual(segments[0]['start_sec'], 0.0)
-        # 인트로만 듣지 않는다. 마지막 구간이 곡 끝에 닿아야 한다.
-        self.assertAlmostEqual(segments[-1]['start_sec'] + segments[-1]['duration_sec'], 200, places=2)
-
-    def test_never_runs_past_the_end(self):
-        for duration in (12, 45, 61, 300):
-            for segment in plan_segments(duration, count=5, clip_sec=30):
-                self.assertLessEqual(segment['start_sec'] + segment['duration_sec'], duration + 0.001)
-
-    def test_short_track_gets_one_centered_clip(self):
-        self.assertEqual(plan_segments(20, count=4, clip_sec=30),
-                         [{'start_sec': 0.0, 'duration_sec': 20.0}])
-
-    def test_no_segments_without_duration(self):
-        self.assertEqual(plan_segments(0), [])
-
-
-class PlanSegmentsByEnergyTest(unittest.TestCase):
-    """소리가 큰 구간부터 고르되 겹치지 않는다."""
-
-    def silence_then_loud(self):
+    def repeated_song(self):
         import numpy as np
-        # 무음 20초 / 0.5 진폭 20초 / 무음 20초 / 0.9 진폭 20초 / 무음 20초
+        # 무음 20초 / A 20초 / 무음 20초 / A 20초(반복) / 무음 20초
         sr = 16000
-        return np.concatenate([np.zeros(sr * 20), np.full(sr * 20, 0.5),
-                               np.zeros(sr * 20), np.full(sr * 20, 0.9),
-                               np.zeros(sr * 20)])
+        phrase = np.sin(np.linspace(0, 400 * np.pi, sr * 20)) * 0.6
+        return np.concatenate([np.zeros(sr * 20), phrase,
+                               np.zeros(sr * 20), phrase, np.zeros(sr * 20)])
 
-    def test_picks_loud_regions_not_the_intro(self):
-        from audio_llm import plan_segments_by_energy
-        segments = plan_segments_by_energy(self.silence_then_loud(), count=3, clip_sec=10)
+    def test_middle_slot_avoids_a_quiet_centre(self):
+        """곡 중앙을 고정으로 집으면 하필 무음에 떨어진다(실측: trap E0.03)."""
+        from audio_llm import plan_segments_by_slots, MIDDLE_LABEL
+        segments = plan_segments_by_slots(self.repeated_song(), clip_sec=10)
+        middle = [s for s in segments if s['label'] == MIDDLE_LABEL]
 
-        self.assertEqual(len(segments), 3)
-        # 균등 배치였다면 0초·45초·90초를 골라 셋 다 무음이다.
-        for segment in segments:
-            start = segment['start_sec']
-            self.assertTrue(20 <= start < 40 or 60 <= start < 80,
-                            f'조용한 구간을 골랐다: {start}s')
+        self.assertEqual(len(middle), 1)
+        start = middle[0]['start_sec']
+        self.assertTrue(20 <= start < 40 or 60 <= start < 80,
+                        f'조용한 구간을 골랐다: {start}s')
 
-    def test_segments_never_overlap(self):
-        """겹치면 같은 소리를 두 번 보내고 structure 항목도 중복된다."""
-        from audio_llm import plan_segments_by_energy
-        for count, clip in ((2, 10), (3, 10), (4, 15), (8, 10)):
-            with self.subTest(count=count, clip=clip):
-                segments = plan_segments_by_energy(self.silence_then_loud(),
-                                                   count=count, clip_sec=clip)
-                self.assertEqual(segments, sorted(segments, key=lambda v: v['start_sec']),
-                                 '시간순으로 돌려줘야 structure 순서와 맞는다')
-                for earlier, later in zip(segments, segments[1:]):
-                    self.assertLessEqual(earlier['start_sec'] + earlier['duration_sec'],
-                                         later['start_sec'] + 1e-9)
+    def test_returns_segments_in_time_order(self):
+        """structure 항목이 들어온 순서와 맞아야 한다."""
+        from audio_llm import plan_segments_by_slots
+        segments = plan_segments_by_slots(self.repeated_song(), clip_sec=10)
+
+        self.assertEqual(segments, sorted(segments, key=lambda v: v['start_sec']))
+        self.assertTrue(all(s.get('label') for s in segments), '근거 없는 구간을 보내지 않는다')
 
     def test_never_runs_past_the_end(self):
-        from audio_llm import plan_segments_by_energy
-        audio = self.silence_then_loud()
+        from audio_llm import plan_segments_by_slots
+        audio = self.repeated_song()
         total = len(audio) / 16000
-        for segment in plan_segments_by_energy(audio, count=5, clip_sec=30):
+        for segment in plan_segments_by_slots(audio, clip_sec=30):
             self.assertLessEqual(segment['start_sec'] + segment['duration_sec'], total + 0.001)
 
     def test_short_track_gets_one_clip(self):
         import numpy as np
-        from audio_llm import plan_segments_by_energy
-        segments = plan_segments_by_energy(np.full(16000 * 5, 0.5), count=3, clip_sec=10)
+        from audio_llm import plan_segments_by_slots, MIDDLE_LABEL
+        segments = plan_segments_by_slots(np.full(16000 * 5, 0.5), clip_sec=10)
 
-        self.assertEqual(segments, [{'start_sec': 0.0, 'duration_sec': 5.0}])
+        self.assertEqual(len(segments), 1)
+        self.assertEqual(segments[0]['start_sec'], 0.0)
+        self.assertEqual(segments[0]['duration_sec'], 5.0)
+        self.assertEqual(segments[0]['label'], MIDDLE_LABEL)
+
+    def test_no_segments_without_audio(self):
+        import numpy as np
+        from audio_llm import plan_segments_by_slots
+        self.assertEqual(plan_segments_by_slots(np.zeros(0), clip_sec=10), [])
 
 
 class PromptTest(unittest.TestCase):
@@ -159,15 +144,15 @@ class DescribeTest(unittest.TestCase):
         clip = SimpleNamespace(stdout=b'RIFFdata')
         with patch.object(audio_llm, 'call_openrouter', return_value=response()):
             raw = describe('/tmp/a.wav', 200, 'a' * 64,
-                           {'model': 'google/gemini-2.5-pro', 'base_url': 'https://x', 'api_key': 'k'},
+                           {**PLAN, 'model': 'google/gemini-2.5-pro', 'base_url': 'https://x', 'api_key': 'k'},
                            runner=lambda *a, **k: clip)
 
         self.assertEqual(raw['model_id'], 'google/gemini-2.5-pro')
         self.assertEqual(raw['input_sha256'], 'a' * 64)
-        self.assertEqual(raw['prompt_version'], 'audio-llm-2')
+        self.assertEqual(raw['prompt_version'], 'audio-llm-3')
         # 기본값은 3x10이다. 숫자를 상수로 빼지 않는 것은 기본값 변경이 이 줄을 고치는
         # 의식적 결정이 되게 하기 위해서다.
-        self.assertEqual(len(raw['segments']), 3)
+        self.assertEqual(len(raw['segments']), 2)
         self.assertIn('created_at', raw)
 
     def test_reports_clip_and_request_times_without_changing_result(self):
@@ -175,13 +160,13 @@ class DescribeTest(unittest.TestCase):
         clip = SimpleNamespace(stdout=b'RIFFdata')
         with patch.object(audio_llm, 'call_openrouter', return_value=response()):
             raw = describe('/tmp/a.wav', 100, 'a' * 64,
-                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           {**PLAN, 'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
                            runner=lambda *a, **k: clip, report=events.append)
 
         self.assertEqual(raw['description'], '잔잔한 피아노가 이어진다')
         self.assertEqual([event['stage'] for event in events],
                          ['audio_llm_clip_extract', 'audio_llm_payload', 'audio_llm_request'])
-        self.assertEqual(events[1]['audio_bytes'], len(b'RIFFdata') * 3)
+        self.assertEqual(events[1]['audio_bytes'], len(b'RIFFdata') * 2)
 
     def test_clip_extraction_failure_is_reported(self):
         def broken(*_args, **_kwargs):
@@ -189,7 +174,7 @@ class DescribeTest(unittest.TestCase):
 
         with self.assertRaises(AudioLLMError):
             describe('/tmp/a.wav', 200, 'a' * 64,
-                     {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'}, runner=broken)
+                     {**PLAN, 'model': 'm', 'base_url': 'https://x', 'api_key': 'k'}, runner=broken)
 
 
 if __name__ == '__main__':
@@ -204,7 +189,7 @@ class UsageTest(unittest.TestCase):
         clip = SimpleNamespace(stdout=b'RIFFdata')
         with patch.object(audio_llm, 'call_openrouter', return_value=data):
             raw = describe('/tmp/a.wav', 100, 'a' * 64,
-                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           {**PLAN, 'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
                            runner=lambda *a, **k: clip)
 
         # 서버가 세 항목만 허용한다. cost 같은 추가 필드는 걸러 보낸다.
@@ -215,7 +200,7 @@ class UsageTest(unittest.TestCase):
         clip = SimpleNamespace(stdout=b'RIFFdata')
         with patch.object(audio_llm, 'call_openrouter', return_value=response()):
             raw = describe('/tmp/a.wav', 100, 'a' * 64,
-                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           {**PLAN, 'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
                            runner=lambda *a, **k: clip)
 
         self.assertNotIn('usage', raw)
@@ -257,7 +242,7 @@ class ResolvePromptTest(unittest.TestCase):
 
         with patch.object(audio_llm, 'call_openrouter', side_effect=call):
             raw = describe('/tmp/a.wav', 200, 'a' * 64,
-                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k',
+                           {**PLAN, 'model': 'm', 'base_url': 'https://x', 'api_key': 'k',
                             'prompt': '고친 문장이다.'},
                            runner=lambda *a, **k: clip)
 
@@ -268,6 +253,6 @@ class ResolvePromptTest(unittest.TestCase):
         clip = SimpleNamespace(stdout=b'RIFFdata')
         with patch.object(audio_llm, 'call_openrouter', return_value=response()):
             raw = describe('/tmp/a.wav', 200, 'a' * 64,
-                           {'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
+                           {**PLAN, 'model': 'm', 'base_url': 'https://x', 'api_key': 'k'},
                            runner=lambda *a, **k: clip)
         self.assertEqual(raw['prompt_version'], audio_llm.PROMPT_VERSION)

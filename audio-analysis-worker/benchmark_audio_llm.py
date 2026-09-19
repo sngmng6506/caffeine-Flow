@@ -18,12 +18,14 @@ from pathlib import Path
 
 from audio_llm import (
     DEFAULT_BASE_URL, DEFAULT_MODEL, describe,
-    EXPERIMENT_FIELDS, EXPERIMENT_SCHEMA, EXPERIMENT_SCORES, plan_segments_by_energy, va_context,
+    EXPERIMENT_FIELDS, EXPERIMENT_SCHEMA, EXPERIMENT_SCORES, SELECTION_NOTE,
+    plan_segments_by_slots, va_context,
 )
 from download import download_audio, source_url
 from emotion import file_sha256
 
-DEFAULT_STRATEGIES = ((4, 30), (3, 15), (3, 10))
+# 구간 수는 슬롯 구성이 정한다. 전략은 클립 길이만 바꿔 본다.
+DEFAULT_STRATEGIES = ((2, 15), (2, 10))
 
 
 def parse_strategies(raw):
@@ -127,7 +129,7 @@ def main():
     parser.add_argument('--platform', choices=['youtube', 'soundcloud'], required=True)
     parser.add_argument('--track-key', required=True, help='YouTube ID 또는 SoundCloud 단일 곡 URL')
     parser.add_argument('--strategies', type=parse_strategies,
-                        default=DEFAULT_STRATEGIES, help='기본값: 4x30,3x15,3x10')
+                        default=DEFAULT_STRATEGIES, help='기본값: 2x15,2x10. 구간 수는 슬롯이 정하므로 길이만 의미가 있다')
     parser.add_argument('--repeats', type=int, default=3)
     parser.add_argument('--model', default=os.environ.get('AUDIO_LLM_MODEL', DEFAULT_MODEL))
     parser.add_argument('--timeout-sec', type=int,
@@ -136,19 +138,17 @@ def main():
     # (resolve_prompt), 여기서 좋았던 문구를 그대로 Lab에 넣으면 같은 서술이 나온다.
     parser.add_argument('--prompt-file', type=Path,
                         help='시스템 프롬프트 후보 파일. 생략하면 기본 프롬프트를 쓴다')
-    # 1단을 빼면 밝기·활력을 아무도 주지 않는다. MAEST(실측 중앙값 76초) 대신
-    # Essentia V/A(6초)만 남겨 그 값을 3단 프롬프트에 말로 넣는 안을 재 본다.
+    # 악기 필드가 판정을 좌우하는지 보려고 뺀 스키마. 실험 전용이다.
     parser.add_argument('--experiment-schema', action='store_true',
                         help='악기 필드를 뺀 스키마로 돌린다')
     parser.add_argument('--with-va', action='store_true',
                         help='Essentia V/A를 계산해 프롬프트에 밝기·활력으로 넣는다')
     parser.add_argument('--va-style', choices=['number', 'label'], default='number',
                         help='V/A를 척도를 붙인 숫자로 넣을지 밴드 이름으로 넣을지')
-    # 기본값을 운영 경로(remote_analyze)와 맞춘다. 여기서 나온 지연·비용은 운영
-    # 추정치로 인용되므로, 다른 구간을 듣는 값이 기본으로 나오면 안 된다.
-    # `even`은 2026-09-18 이전 기록과 비교할 때만 쓴다.
-    parser.add_argument('--sampling', choices=['energy', 'even'], default='energy',
-                        help='구간을 소리가 큰 쪽에서 고를지 곡 전체에 균등 배치할지')
+    # 구간을 밖에서 정해 넣는다. 후렴 탐지처럼 운영에 못 넣는 의존성(librosa 등)으로
+    # 고른 구간도 여기로 시험할 수 있다. 항목마다 label을 달면 프롬프트에 근거가 들어간다.
+    parser.add_argument('--segments-json', type=Path,
+                        help='{start_sec, duration_sec, label} 목록. 주면 슬롯 선택을 대신한다')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     api_key = os.environ.get('OPENROUTER_API_KEY', '').strip()
@@ -183,7 +183,7 @@ def main():
 
         # 운영 경로와 같이 16kHz 배열을 한 번만 만들어 V/A와 구간 선택이 나눠 쓴다.
         audio_16k = None
-        if args.with_va or args.sampling == 'energy':
+        if True:
             import essentia.standard as standard
             audio_16k = standard.MonoLoader(filename=str(audio), sampleRate=16_000)()
 
@@ -207,9 +207,21 @@ def main():
 
         # 구간 선택은 결정론적이라 전략당 한 번만 계산하면 반복 사이에 바뀌지 않는다.
         plans = {}
-        if args.sampling == 'energy':
+        if args.segments_json:
+            loaded = json.loads(args.segments_json.read_text(encoding='utf-8'))
+            # 목록만 줘도 되고, {selection, segments}로 구성 설명을 함께 줘도 된다.
+            fixed = loaded['segments'] if isinstance(loaded, dict) else loaded
+            if isinstance(loaded, dict) and loaded.get('selection'):
+                base_config['segment_selection'] = loaded['selection']
+            for strategy in args.strategies:
+                plans[strategy] = fixed
+            print(json.dumps({'stage': 'segment_plan', 'source': str(args.segments_json),
+                              'selection': base_config.get('segment_selection'),
+                              'segments': fixed}, ensure_ascii=False), flush=True)
+        else:
             for count, clip_sec in args.strategies:
-                plans[(count, clip_sec)] = plan_segments_by_energy(audio_16k, count, clip_sec)
+                plans[(count, clip_sec)] = plan_segments_by_slots(audio_16k, clip_sec)
+                base_config.setdefault('segment_selection', SELECTION_NOTE)
                 print(json.dumps({'stage': 'segment_plan', 'strategy': f'{count}x{clip_sec}',
                                   'segments': plans[(count, clip_sec)]}, ensure_ascii=False), flush=True)
 
@@ -230,7 +242,8 @@ def main():
         'model': args.model, 'download_sec': download_sec,
         'valence_arousal_sec': va_sec,
         'valence': (va_summary or {}).get('valence'), 'arousal': (va_summary or {}).get('arousal'), 'va_style': args.va_style if args.with_va else None,
-        'va_prompt': base_config.get('va'), 'sampling': args.sampling,
+        'va_prompt': base_config.get('va'),
+        'segment_selection': base_config.get('segment_selection'),
         # 어떤 문구로 만든 서술인지 남긴다. 기본은 audio-llm-1, 후보는 custom-<해시>다.
         'prompt_version': next((r.get('prompt_version') for r in rows if r.get('prompt_version')), None),
         'prompt_file': str(args.prompt_file) if args.prompt_file else None,
