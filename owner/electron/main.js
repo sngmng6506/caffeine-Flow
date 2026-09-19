@@ -40,7 +40,28 @@ playbackController.registerIpcHandlers();
 sessionTools.registerIpcHandlers();
 autoUpdateManager.registerIpcHandlers();
 
+// 한 기기에서 앱이 두 번 뜨면 재생 플레이어도 두 개가 되어 같은 매장에서 소리가
+// 겹친다. 서버 쪽 리더 인계로 뒤늦게 정리하는 것보다 아예 두 번째를 띄우지 않는
+// 편이 낫다 — 사장님이 아이콘을 다시 누른 것은 "앱을 보고 싶다"는 뜻이지
+// "새로 시작하고 싶다"는 뜻이 아니다.
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  // 두 번째 실행은 창을 만들지 않고 바로 빠진다. 먼저 뜬 앱이 second-instance를
+  // 받아 자기 창을 앞으로 가져온다.
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const mainWindow = windowManager.getMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
 app.whenReady().then(async () => {
+  if (!hasSingleInstanceLock) return;
   if (components) {
     await components.whenReady();
     console.log('[widevine] components ready:', components.status());
@@ -84,5 +105,12 @@ app.on('before-quit', (event) => {
 ipcMain.on('cleanup-done', (event) => {
   if (!windowManager.isFromMainRenderer(event.sender)) return;
   isQuitting = true;
+  app.quit();
+});
+
+// 다른 기기에서 로그인해 재생 리더를 넘겨준 뒤 renderer가 부른다. 평범한 종료와
+// 같은 경로를 타도록 app.quit()만 부른다 — before-quit이 cleanup을 돌린다.
+ipcMain.on('quit-app', (event) => {
+  if (!windowManager.isFromMainRenderer(event.sender)) return;
   app.quit();
 });
