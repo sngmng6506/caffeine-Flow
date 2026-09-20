@@ -1,6 +1,6 @@
-/* 아래쪽 여백은 바로 뒤에 오는 로그아웃 행의 border-top과 짝을 이룬다. 그쪽이
-   padding-top:16이라 여기를 비워 두면 구분선이 메일 버튼에 붙어 보인다. */
-.contact-wrap  { padding-top: 4px; padding-bottom: 16px; }
+/* 아래쪽 여백은 바로 뒤에 오는 로그아웃 행의 border-top과 짝을 이룬다(그쪽은
+   padding-top:20). 설정 패널의 섹션 구분선은 모두 위아래 20으로 맞춘다. */
+.contact-wrap  { padding-top: 4px; padding-bottom: 20px; }
 .contact-title { margin: 0 0 10px; color: var(--owner-text-strong); font-size: 15px; font-weight: 700; }
 
 /* 로그아웃 행(settingsStyles.accountActions)과 같은 값. 좁은 창에서는 줄바꿈해

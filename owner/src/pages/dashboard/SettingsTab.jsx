@@ -180,7 +180,9 @@ export default function SettingsTab({
 
 const settingsStyles = {
   wrap:        { paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 12 },
-  innerSection:{ paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid #eee' },
+  // 패널 안 섹션 구분선. 색은 토큰, 위아래 여백은 20으로 통일한다 — divider와
+  // accountActions도 같은 값이어서 어느 탭을 열어도 선 간격이 같다.
+  innerSection:{ paddingBottom: 20, marginBottom: 20, borderBottom: '1px solid var(--owner-stroke)' },
   title:       { fontSize: 15, fontWeight: 700, color: 'var(--owner-text-strong)', marginBottom: 4 },
   desc:        { fontSize: 12, color: 'var(--owner-text-muted)', marginBottom: 14 },
   platforms:   { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
@@ -197,7 +199,7 @@ const settingsStyles = {
   summaryTitle:{ fontSize: 15, fontWeight: 700, color: 'var(--owner-text-strong)' },
   summaryDesc: { fontSize: 12, color: 'var(--owner-text-muted)', lineHeight: 1.45 },
   detailsContent: { borderTop: '1px solid var(--owner-stroke)', padding: '16px' },
-  divider:     { height: 1, background: 'var(--owner-stroke)', margin: '20px 0 4px' },
-  accountActions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 16, borderTop: '1px solid var(--owner-stroke)' },
+  divider:     { height: 1, background: 'var(--owner-stroke)', margin: '20px 0' },
+  accountActions: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, paddingTop: 20, borderTop: '1px solid var(--owner-stroke)' },
   accountHint: { fontSize: 12, color: 'var(--owner-text-muted)', lineHeight: 1.45 },
 };
