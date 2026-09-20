@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getMe, testMusicFilter, updateMusicFilter } from '../../api';
+import { getMe, testMusicFilter, updateMusicFilter, updatePublicNotice } from '../../api';
 import { DEFAULT_MUSIC_FILTER_PROMPT } from '../../constants/musicFilterPolicy';
 import SettingsStatus from './SettingsStatus';
 
 // 켜기/끄기는 대시보드의 'AI 필터' 버튼이 담당 — 이 화면은 프롬프트만 편집한다.
+// 손님 화면 안내의 길이 상한. 서버 PUBLIC_GUIDE_MAX_LENGTH와 같은 값이며, 넘으면
+// 서버가 400을 돌려준다. 손님 화면 안내 패널이 이 길이를 전제로 그려진다.
+const NOTICE_MAX = 180;
 function normalize(latest = {}) {
   return {
     prompt: latest.music_filter_prompt || '',
@@ -50,6 +53,11 @@ export default function MusicFilterSettings() {
   const [testLoading, setTestLoading] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [testMessage, setTestMessage] = useState('');
+  // 손님 화면 안내 직접 수정. 매장 분위기 설명 저장과 독립된 흐름이다 —
+  // 설명은 그대로 두고 문구만 다듬는 경우가 대부분이다.
+  const [editingNotice, setEditingNotice] = useState(false);
+  const [noticeDraft, setNoticeDraft] = useState('');
+  const [noticeSaving, setNoticeSaving] = useState(false);
 
   useEffect(() => {
     getMe()
@@ -95,6 +103,27 @@ export default function MusicFilterSettings() {
       setMessage({ tone: 'error', text: error.message || '매장 분위기 설명을 적용하지 못했어요. 다시 시도해 주세요.' });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveNotice() {
+    const notice = noticeDraft.trim();
+    if (!notice || noticeSaving) return;
+    setNoticeSaving(true);
+    setMessage(null);
+    try {
+      const updated = await updatePublicNotice(notice);
+      const next = normalize(updated);
+      // 매장 분위기 설명은 이 흐름에서 바뀌지 않는다. 편집 중이던 설명을
+      // 서버 값으로 되돌리지 않도록 안내만 갈아 끼운다.
+      setInitial(prev => ({ ...prev, publicNotice: next.publicNotice }));
+      setForm(prev => ({ ...prev, publicNotice: next.publicNotice }));
+      setEditingNotice(false);
+      setMessage({ tone: 'success', text: '손님 화면 안내를 저장했어요. 손님 화면에 바로 반영돼요.' });
+    } catch (error) {
+      setMessage({ tone: 'error', text: error.message || '손님 화면 안내를 저장하지 못했어요. 다시 시도해 주세요.' });
+    } finally {
+      setNoticeSaving(false);
     }
   }
 
@@ -156,14 +185,58 @@ export default function MusicFilterSettings() {
         )}
 
         <div style={styles.publicNoticeBox}>
-          <div style={styles.publicNoticeLabel}>손님 화면 안내</div>
-          <div style={form.publicNotice ? styles.publicNoticeText : styles.publicNoticeEmpty}>
-            {form.publicNotice || '매장 분위기 설명을 적용하면 손님이 읽기 편한 신청곡 안내를 만들어요.'}
+          <div style={styles.publicNoticeHeader}>
+            <div style={styles.publicNoticeLabel}>손님 화면 안내</div>
+            {form.publicNotice && !editingNotice && (
+              <button
+                type="button"
+                style={styles.noticeEditBtn}
+                onClick={() => { setNoticeDraft(form.publicNotice); setEditingNotice(true); }}
+              >
+                직접 수정
+              </button>
+            )}
           </div>
+
+          {editingNotice ? (
+            <>
+              <textarea
+                id="owner-public-notice"
+                value={noticeDraft}
+                onChange={event => setNoticeDraft(event.target.value.slice(0, NOTICE_MAX))}
+                rows={3}
+                style={styles.noticeTextarea}
+              />
+              <div style={styles.count}>{noticeDraft.length}/{NOTICE_MAX}</div>
+              <div style={styles.noticeActions}>
+                <button
+                  type="button"
+                  style={styles.noticeCancelBtn}
+                  onClick={() => setEditingNotice(false)}
+                  disabled={noticeSaving}
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  style={styles.noticeSaveBtn}
+                  onClick={handleSaveNotice}
+                  disabled={noticeSaving || !noticeDraft.trim()}
+                >
+                  {noticeSaving ? '저장 중…' : '안내 저장'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={form.publicNotice ? styles.publicNoticeText : styles.publicNoticeEmpty}>
+              {form.publicNotice || '매장 분위기 설명을 적용하면 손님이 읽기 편한 신청곡 안내를 만들어요.'}
+            </div>
+          )}
+
           <div style={styles.publicNoticeHint}>
             {changed
               ? '설명을 적용하면 안내도 새로 정리돼요.'
-              : '정리된 안내는 다음 설명 변경 전까지 저장해서 사용해요.'}
+              : '직접 고친 문구도 손님에게 바로 보여요. 매장 분위기 설명을 바꿔 저장하면 안내는 새로 정리돼요.'}
           </div>
         </div>
 
@@ -235,7 +308,13 @@ const styles = {
   count: { fontSize: 11, color: '#98a2b3', textAlign: 'right', marginTop: 4 },
   warn: { fontSize: 12, color: '#b42318', marginTop: 6 },
   publicNoticeBox: { marginTop: 14, padding: 12, borderRadius: 8, border: '1px solid var(--owner-stroke)', background: 'var(--owner-surface-subtle)' },
-  publicNoticeLabel: { marginBottom: 6, color: 'var(--owner-text-strong)', fontSize: 12, fontWeight: 700 },
+  publicNoticeHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 },
+  publicNoticeLabel: { color: 'var(--owner-text-strong)', fontSize: 12, fontWeight: 700 },
+  noticeEditBtn: { padding: '4px 10px', borderRadius: 6, border: '1px solid var(--owner-stroke)', background: 'var(--owner-surface)', color: 'var(--owner-text)', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  noticeTextarea: { width: '100%', boxSizing: 'border-box', padding: 10, borderRadius: 8, border: '1px solid var(--owner-stroke)', background: 'var(--owner-surface)', color: 'var(--owner-text)', fontSize: 13, lineHeight: 1.5, resize: 'vertical', fontFamily: 'inherit' },
+  noticeActions: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  noticeCancelBtn: { minHeight: 34, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--owner-stroke)', background: 'var(--owner-surface)', color: 'var(--owner-text)', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  noticeSaveBtn: { minHeight: 34, padding: '7px 14px', borderRadius: 8, border: 'none', background: 'var(--owner-primary)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
   publicNoticeText: { color: 'var(--owner-text)', fontSize: 13, lineHeight: 1.5 },
   publicNoticeEmpty: { color: 'var(--owner-text-disabled)', fontSize: 13, lineHeight: 1.5 },
   publicNoticeHint: { marginTop: 6, color: 'var(--owner-text-muted)', fontSize: 11, lineHeight: 1.45 },

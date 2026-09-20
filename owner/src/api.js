@@ -51,6 +51,8 @@ export const updatePlatforms = allowed_platforms =>
   apiFetch('PUT', '/cafes/me/platforms', { allowed_platforms });
 export const updateMusicFilter = ({ enabled, prompt }) =>
   apiFetch('PUT', '/cafes/me/music-filter', { enabled, prompt });
+export const updatePublicNotice = notice =>
+  apiFetch('PUT', '/cafes/me/music-filter/public-notice', { notice });
 export const testMusicFilter = ({ url, prompt }) =>
   apiFetch('POST', '/cafes/me/music-filter/test', { url, prompt });
 

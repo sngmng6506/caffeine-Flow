@@ -126,6 +126,24 @@ async function updateMusicFilterSettings(id, {
   });
 }
 
+// 사장님이 직접 고친 손님용 안내. 매장 분위기 설명을 다시 저장하면 AI가 만든
+// 문구로 덮인다(운영자 판단) — 정책이 바뀌면 안내도 함께 바뀌는 편이 자연스럽고,
+// 손으로 쓴 문구가 옛 정책을 계속 설명하는 상태를 남기지 않는다.
+//
+// 직접 쓴 문구에는 모델 이름을 남기지 않는다. 누가 쓴 문장인지가 달라진다.
+async function updatePublicNotice(id, notice) {
+  const [cafe] = await db('cafes')
+    .where({ id })
+    .update({
+      music_filter_public_notice: notice,
+      music_filter_public_notice_model: null,
+      music_filter_public_notice_generated_at: new Date(),
+    })
+    .returning('*');
+  if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+  return cafe;
+}
+
 // slug 변경 — 자동 재발급(무작위) 또는 수동 지정(아크릴 QR 재등록) 모두 처리.
 // 트랜잭션으로 이력 기록과 갱신을 묶어 부분 실패를 막는다.
 async function changeSlug(cafeId, newSlug) {
@@ -193,6 +211,7 @@ module.exports = {
   create,
   update,
   updateMusicFilterSettings,
+  updatePublicNotice,
   uniqueSlug,
   isValidSlugFormat,
   changeSlug,

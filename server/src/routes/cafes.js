@@ -20,7 +20,16 @@ const { logError, CAUSE } = require('../observability');
 const {
   generatePublicMusicGuide,
   normalizePublicGuide,
+  PUBLIC_GUIDE_MAX_LENGTH,
 } = require('../features/music-filter/public-guide.service');
+
+// 손님 화면은 소켓으로 즉시 바뀐다. 값이 실제로 달라졌을 때만 발행한다.
+function emitNoticeUpdate(req, before, after) {
+  if (before.music_filter_public_notice === after.music_filter_public_notice) return;
+  req.app.get('io')?.of('/cafe').to(after.slug).emit('notice_updated', {
+    notice: after.music_filter_public_notice,
+  });
+}
 
 const MANUAL_PLAYBACK_END_REASONS = ['ended', 'changed'];
 
@@ -188,11 +197,31 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
     publicNoticeModel: generated?.model || null,
   });
 
-  if (current.music_filter_public_notice !== cafe.music_filter_public_notice) {
-    req.app.get('io')?.of('/cafe').to(cafe.slug).emit('notice_updated', {
-      notice: cafe.music_filter_public_notice,
-    });
-  }
+  emitNoticeUpdate(req, current, cafe);
+
+  res.json({
+    music_filter_enabled: cafe.music_filter_enabled,
+    music_filter_prompt: cafe.music_filter_prompt,
+    music_filter_public_notice: cafe.music_filter_public_notice,
+  });
+});
+
+// PUT /api/v1/cafes/me/music-filter/public-notice  (손님용 안내 직접 수정)
+//
+// 손님에게 그대로 보이는 문구다. AI가 만든 것과 같은 길이 상한을 적용한다 —
+// 손님 화면의 안내 패널이 그 길이를 전제로 그려진다.
+router.put('/me/music-filter/public-notice', requireAuth, async (req, res) => {
+  const noticeCheck = validateString(req.body?.notice, {
+    max: PUBLIC_GUIDE_MAX_LENGTH,
+    name: '손님 화면 안내',
+  });
+  if (noticeCheck.error) return res.status(400).json({ error: noticeCheck.error });
+
+  const current = await cafeService.findById(req.owner.cafeId);
+  if (!current) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
+
+  const cafe = await cafeService.updatePublicNotice(req.owner.cafeId, noticeCheck.value);
+  emitNoticeUpdate(req, current, cafe);
 
   res.json({
     music_filter_enabled: cafe.music_filter_enabled,
