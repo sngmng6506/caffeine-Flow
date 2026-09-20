@@ -10,14 +10,16 @@ export default function ContactTab({ provider }) {
   return (
     <div className="contact-wrap">
       <h3 className="contact-title">서비스 문의</h3>
-      <div className="contact-box">
-        <p className="contact-desc">
+      {/* 바로 아래 로그아웃 행(settingsStyles.accountActions)과 같은 모양이다.
+          설명은 왼쪽, 버튼은 오른쪽. */}
+      <div className="contact-row">
+        <span className="contact-desc">
           운영 중 불편한 점이나 필요한 기능이 있다면 메일로 알려주세요.
-        </p>
+        </span>
+        <a href={mailUrl} target="_blank" rel="noreferrer" className="contact-btn">
+          메일 보내기
+        </a>
       </div>
-      <a href={mailUrl} target="_blank" rel="noreferrer" className="contact-btn">
-        메일 보내기
-      </a>
     </div>
   );
 }

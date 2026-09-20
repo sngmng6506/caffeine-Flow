@@ -1,11 +1,13 @@
 .contact-wrap  { padding-top: 4px; }
 .contact-title { margin: 0 0 8px; color: var(--owner-text-strong); font-size: 15px; font-weight: 700; }
-.contact-box   { padding: 14px; border: 1px solid var(--owner-stroke); border-radius: 10px; background: var(--owner-surface-subtle); }
-.contact-desc  { margin: 0; color: var(--owner-text-muted); font-size: 12px; line-height: 1.6; }
+
+/* 로그아웃 행(settingsStyles.accountActions)과 같은 값. 좁은 창에서는 줄바꿈해
+   버튼이 설명을 밀어내지 않게 한다. */
+.contact-row   { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.contact-desc  { color: var(--owner-text-muted); font-size: 12px; line-height: 1.45; }
 .contact-btn   {
   display: inline-flex;
   min-height: 40px;
-  margin-top: 12px;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
@@ -17,5 +19,6 @@
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
+  white-space: nowrap;
 }
 .contact-btn:hover { background: var(--owner-primary-hover); }
