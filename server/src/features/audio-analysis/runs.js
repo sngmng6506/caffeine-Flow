@@ -24,12 +24,10 @@ function validUsage(usage) {
       && Number.isSafeInteger(usage[k]) && usage[k] >= 0);
 }
 
-// 2단 원본. 자유 서술이라 값을 검사하지 않고 형태와 크기만 본다. 입력 해시가
-// 같은 파일을 가리켜야 1단과 2단이 같은 오디오를 들었다고 말할 수 있다.
-const LLM_MODES = ['FULL', 'EMOTION_LLM'];
-
-function validAudioLlm(raw, mode, audioSha256, duration) {
-  if (!LLM_MODES.includes(mode)) return raw === null;
+// Audio LLM은 서버가 껐거나 워커에 API 키가 없거나 호출에 실패하면 null일 수 있다.
+// 결과가 있을 때만 자유 서술의 형태와 입력 오디오 일치를 검증한다.
+function validAudioLlm(raw, audioSha256, duration) {
+  if (raw === null) return true;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
   if (!text(raw.model_id, 200) || !text(raw.prompt_version, 100)) return false;
   if (raw.input_sha256 !== audioSha256) return false;
@@ -70,7 +68,8 @@ const DURATION_TOLERANCE_SEC = 0.1;
 function validateRun(input, result) {
   const invalid = () => ({ error: '감정·서술 원본이 올바르지 않습니다' });
   if (input?.schema_version !== 1 || input?.pipeline_mode !== 'EMOTION_LLM') return invalid();
-  const expected = [...EMOTION_LLM_SOURCES, input?.audio_llm_raw?.model_id];
+  const expected = [...EMOTION_LLM_SOURCES];
+  if (input?.audio_llm_raw) expected.push(input.audio_llm_raw.model_id);
   if (!hash(input.audio_sha256) || input.audio_local_path !== null ||
       !finite(input.audio_duration_sec) ||
       Math.abs(input.audio_duration_sec - result.features.duration_seconds) > DURATION_TOLERANCE_SEC ||
@@ -80,7 +79,7 @@ function validateRun(input, result) {
       input.audio_source_url !== result.source_reference ||
       !Array.isArray(input.sources_used) || input.sources_used.length !== expected.length ||
       expected.some((v, i) => input.sources_used[i] !== v) ||
-      !validAudioLlm(input.audio_llm_raw, 'EMOTION_LLM', input.audio_sha256, input.audio_duration_sec)) return invalid();
+      !validAudioLlm(input.audio_llm_raw, input.audio_sha256, input.audio_duration_sec)) return invalid();
   const normalized = input.normalized;
   if (!normalized || !Array.isArray(normalized.genre) || normalized.genre.length !== 0 ||
       !validMood(normalized.mood, normalized.mood != null, result.features)) return invalid();

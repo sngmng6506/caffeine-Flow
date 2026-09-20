@@ -52,7 +52,7 @@ async function lockedJob(trx, id, token) {
   return job;
 }
 
-function complete(id, token, result, automaticAnnotation, tagScores, analysisRun = null) {
+function complete(id, token, result, automaticAnnotation, analysisRun = null) {
   return db.transaction(async (trx) => {
     const job = await lockedJob(trx, id, token);
     // 제출 응답만 유실된 재전송은 라벨을 다시 갱신하지 않는다.
@@ -75,7 +75,7 @@ function complete(id, token, result, automaticAnnotation, tagScores, analysisRun
         track_key: job.track_key, payload: JSON.stringify({ ...checkedRun.value, result, automatic_annotation: automatic }) }).returning('id');
       runFields = { latest_run_id: run.id, analysis_summary: require('./runs').summary(checkedRun.value) };
     }
-    const saved = await analysisService.saveResult({ ...result, automatic_annotation: automatic, tag_scores: tagScores, ...runFields }, trx);
+    const saved = await analysisService.saveResult({ ...result, automatic_annotation: automatic, ...runFields }, trx);
     const row = {
       ...automatic, platform: job.platform, track_key: job.track_key, title: job.title,
       mood_tags: JSON.stringify(automatic.mood_tags), genre_tags: JSON.stringify(automatic.genre_tags),

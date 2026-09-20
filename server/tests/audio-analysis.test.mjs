@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import resultModule from '../src/features/audio-analysis/result.js';
+import runsModule from '../src/features/audio-analysis/runs.js';
 import authModule from '../src/middleware/auth.js';
 
 // 전체 테스트(`vitest run`)는 unit 전용 setup 파일을 읽지 않는다. CommonJS
@@ -9,6 +10,7 @@ vi.hoisted(() => {
 });
 
 const { validateAudioAnalysisResult } = resultModule;
+const { validateRun } = runsModule;
 const { requireAudioAnalysisWorker } = authModule;
 
 const validResult = {
@@ -72,6 +74,66 @@ describe('Essentia 분석 결과 검증', () => {
       ...validResult,
       suggested_annotation: { ...validResult.suggested_annotation, mood_tags: ['unknown'] },
     }).error).toBeTruthy();
+  });
+});
+
+describe('신청 시점 분석 실행 검증', () => {
+  const result = {
+    source_reference: 'https://www.youtube.com/watch?v=abcdefghijk',
+    features: { duration_seconds: 120, valence: 0.7, arousal: 0.7 },
+  };
+  const baseRun = {
+    schema_version: 1,
+    pipeline_mode: 'EMOTION_LLM',
+    sources_used: ['msd-musicnn-1', 'deam-msd-musicnn-2'],
+    audio_source_url: result.source_reference,
+    audio_local_path: null,
+    audio_sha256: 'a'.repeat(64),
+    audio_duration_sec: 120,
+    audio_sample_rate: 16000,
+    audio_llm_raw: null,
+    normalized: {
+      genre: [],
+      mood: {
+        valence: 0.7,
+        arousal: 0.7,
+        source: 'deam-msd-musicnn-2',
+        tags: ['joyful', 'uplifting'],
+      },
+    },
+  };
+
+  it('Audio LLM을 건너뛴 부분 성공을 허용한다', () => {
+    const checked = validateRun(baseRun, result);
+    expect(checked.error).toBeUndefined();
+    expect(checked.value.audio_llm_raw).toBeNull();
+    expect(checked.value.sources_used).toEqual(baseRun.sources_used);
+  });
+
+  it('Audio LLM 결과가 있으면 모델과 입력 해시를 함께 검증한다', () => {
+    const audioLlm = {
+      model_id: 'google/gemini-2.5-pro',
+      prompt_version: 'audio-llm-3',
+      input_sha256: baseRun.audio_sha256,
+      description: '잔잔한 피아노가 이어진다',
+      mood: ['차분함'],
+      instruments: ['피아노'],
+      vocal: ['보컬 없음'],
+      structure: ['중앙부에서 피아노가 이어진다'],
+      segments: [{ start_sec: 45, duration_sec: 10 }],
+    };
+    const checked = validateRun({
+      ...baseRun,
+      sources_used: [...baseRun.sources_used, audioLlm.model_id],
+      audio_llm_raw: audioLlm,
+    }, result);
+    expect(checked.error).toBeUndefined();
+
+    expect(validateRun({
+      ...baseRun,
+      sources_used: [...baseRun.sources_used, audioLlm.model_id],
+      audio_llm_raw: { ...audioLlm, input_sha256: 'b'.repeat(64) },
+    }, result).error).toBeTruthy();
   });
 });
 

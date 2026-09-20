@@ -10,9 +10,7 @@ const labels = (await import('../src/features/audio-analysis/labels.js')).defaul
 const analyses = (await import('../src/features/audio-analysis/service.js')).default;
 const recService = (await import('../src/services/recommendation.service.js')).default;
 const { issueAdminToken } = await import('../src/utils/jwt.js');
-const metadata = (await import('../src/constants/maest-metadata.json', { with: { type: 'json' } })).default;
 const contract = (await import('../src/constants/audio-pipeline.json', { with: { type: 'json' } })).default;
-const normalization = (await import('../src/features/audio-analysis/normalization.js')).default;
 let cafe;
 const annotation = { artist_name: 'artist', track_version: 'unknown', tempo_class: 'moderate',
   mood_tags: ['peaceful'], instrumentation_type: 'acoustic', rhythmic_character: 'steady',
@@ -28,49 +26,50 @@ async function seed(platform = 'youtube') {
     channelTitle: 'artist', platform, requesterIp: '127.0.0.1' });
 }
 const auth = () => ({ Authorization: `Bearer ${process.env.AUDIO_ANALYSIS_WORKER_TOKEN}` });
-function maestBody(job, count = 3, value = 0.3) {
-  const duration = count * 15.008;
-  const scores = Array(519).fill(value);
-  const classes = metadata.classes;
-  const output = { ...result(job), model_name: 'essentia-maest', model_version: `test+${contract.model_version}`,
+function analysisBody(job, { withEmotion = true, withLlm = true } = {}) {
+  const duration = 120;
+  const valence = 0.7;
+  const arousal = 0.7;
+  const output = {
+    ...result(job),
     source_reference: `https://www.youtube.com/watch?v=${job.track_key}`,
-    features: { duration_seconds: duration, sample_rate: 16000 } };
-  return { lease_token: job.lease_token, result: output, automatic_annotation: { ...annotation, genre_tags: normalization.genreTags(normalization.normalize({ classes, mean: scores })), mood_tags: ['unknown'], vocal_type: 'unknown', instrumentation_type: 'unknown' },
-    tag_scores: Object.fromEntries(classes.map((k) => [k, value])), maest_run: {
-      schema_version: 1, pipeline_mode: 'MAEST_ONLY', sources_used: ['discogs-maest-30s-pw-519l-2'],
-      maest_model_version: 'discogs-maest-30s-pw-519l-2', model_sha256: contract.model_sha256,
-      audio_source_url: output.source_reference, audio_local_path: null, audio_sha256: 'b'.repeat(64),
-      audio_duration_sec: duration, audio_sample_rate: 16000, audio_llm_raw: null,
-      normalized: normalization.normalize({ classes, mean: scores }),
-      maest_raw: { classes, mean: scores, max: scores, essentia_version: 'test',
-        segments: Array.from({ length: count }, (_, i) => ({ start_sec: i * 15.008,
-          end_sec: Math.min(duration, (i + 2) * 15.008), scores })),
-        settings: { sample_rate: 16000, patch_size: 1876, patch_hop_size: 938, frame_hop: 256,
-          last_patch_mode: 'repeat', resample_quality: 4, output: 'PartitionedCall/Identity_13', batch_size: 1 } },
-    } };
-}
-// 감정 모델까지 돌린 실행. features와 normalized.mood가 같은 값을 가리켜야 한다.
-function fullBody(job, valence = 0.7, arousal = 0.7) {
-  const body = maestBody(job);
-  body.result.features = { ...body.result.features, valence, arousal };
-  body.maest_run.pipeline_mode = 'MAEST_EMOTION';
-  body.maest_run.sources_used = ['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2'];
-  body.maest_run.normalized.mood = { valence, arousal, source: 'deam-msd-musicnn-2', tags: ['joyful', 'uplifting'] };
-  body.automatic_annotation = { ...body.automatic_annotation, mood_tags: ['joyful', 'uplifting'] };
-  return body;
-}
-// 2단까지 돈 실행. audio_llm_raw의 입력 해시가 1단과 같은 파일을 가리켜야 한다.
-function llmBody(job) {
-  const body = fullBody(job);
-  body.maest_run.pipeline_mode = 'FULL';
-  body.maest_run.sources_used = [...body.maest_run.sources_used, 'google/gemini-2.5-pro'];
-  body.maest_run.audio_llm_raw = {
+    features: { duration_seconds: duration, sample_rate: 16000,
+      ...(withEmotion ? { valence, arousal } : {}) },
+  };
+  const audioSha256 = 'b'.repeat(64);
+  const audioLlm = withLlm ? {
     model_id: 'google/gemini-2.5-pro', prompt_version: 'audio-llm-3',
-    input_sha256: body.maest_run.audio_sha256, description: '잔잔한 피아노가 이어진다',
+    input_sha256: audioSha256, description: '잔잔한 피아노가 이어진다',
     mood: ['차분함'], instruments: ['피아노'], vocal: ['보컬 없음'], structure: ['후반에 커진다'],
     segments: [{ start_sec: 0, duration_sec: 30 }, { start_sec: 15, duration_sec: 30 }],
+  } : null;
+  const mood = withEmotion
+    ? { valence, arousal, source: contract.emotion_models.regression, tags: ['joyful', 'uplifting'] }
+    : null;
+  return {
+    lease_token: job.lease_token,
+    result: output,
+    automatic_annotation: {
+      ...annotation,
+      genre_tags: ['unknown'],
+      mood_tags: mood?.tags || ['unknown'],
+      vocal_type: 'unknown',
+      instrumentation_type: 'unknown',
+    },
+    analysis_run: {
+      schema_version: 1,
+      pipeline_mode: 'EMOTION_LLM',
+      sources_used: [contract.emotion_models.embedding, contract.emotion_models.regression,
+        ...(audioLlm ? [audioLlm.model_id] : [])],
+      audio_source_url: output.source_reference,
+      audio_local_path: null,
+      audio_sha256: audioSha256,
+      audio_duration_sec: duration,
+      audio_sample_rate: contract.audio.sample_rate,
+      audio_llm_raw: audioLlm,
+      normalized: { genre: [], mood },
+    },
   };
-  return body;
 }
 beforeAll(async () => {
   [cafe] = await db('cafes').insert({ slug: `audio-${Date.now()}`, name: 'audio test', owner_email: 'audio@example.test' }).returning('*');
@@ -86,7 +85,7 @@ describe('자동 음향 분석 파이프라인', () => {
     await seed(); const old = await jobs.claim();
     await db('music_audio_jobs').where({ id: old.id }).update({ lease_until: new Date(0) });
     expect(await jobs.resume(old.id, old.lease_token)).toEqual({ status: 'processing' });
-    await jobs.complete(old.id, old.lease_token, result(old), annotation, {});
+    await jobs.complete(old.id, old.lease_token, result(old), annotation);
     expect(await jobs.resume(old.id, old.lease_token)).toEqual({ status: 'completed' });
     const next = await jobs.requeue(old.id, old.generation);
     await expect(jobs.resume(old.id, old.lease_token)).rejects.toMatchObject({ status: 409 });
@@ -108,43 +107,8 @@ describe('자동 음향 분석 파이프라인', () => {
     const retried = await jobs.claim();
     expect(await jobs.fail(job.id, retried.lease_token, 'SOURCE_UNAVAILABLE')).toEqual({ status: 'failed' });
   });
-  it('MAEST 중복 필드 불일치와 수동 결과 API 우회를 거절한다', async () => {
-    await seed(); const job = await jobs.claim();
-    const body = maestBody(job);
-    body.automatic_annotation.genre_tags = ['unknown'];
-    expect((await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body)).status).toBe(400);
-    const other = maestBody(job);
-    other.tag_scores[metadata.classes[0]] = 0.9;
-    expect((await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(other)).status).toBe(400);
-    expect((await request(app).post('/api/v1/audio-analysis/results').set(auth()).send(body.result)).status).toBe(400);
-    expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
-  });
-  it('현재 택소노미 재적용은 원본·사람 라벨을 보존하고 중복 호출은 변경하지 않는다', async () => {
-    await seed(); const job = await jobs.claim(); const body = llmBody(job);
-    const first = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
-    const runId = first.body.latest_run_id;
-    const original = await db('music_audio_runs').where({ id: runId }).first();
-    const { validateMusicAnnotation } = (await import('../src/features/music-labeling/annotation.js')).default;
-    await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: first.body.id, audio_analysis_revision: 1 },
-      validateMusicAnnotation({ ...annotation, genre_tags: ['jazz'] }).value);
-    await db('music_audio_analyses').where({ id: first.body.id }).update({ analysis_summary: JSON.stringify({ normalized: { taxonomy_version: 'old' } }) });
-    const input = { analysis_id: first.body.id, analysis_revision: 1, generation: job.generation };
-    const admin = { Authorization: `Bearer ${issueAdminToken()}` };
-    expect((await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).send(input)).status).toBe(401);
-    const updated = await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).set(admin).send(input);
-    expect(updated.status).toBe(200);
-    expect(updated.body.revision).toBe(2);
-    expect(updated.body.normalized.mood).toEqual(body.maest_run.normalized.mood);
-    expect((await db('music_audio_runs').where({ id: runId }).first()).payload).toEqual(original.payload);
-    expect((await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first()).genre_tags).toEqual(['jazz']);
-    expect((await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).set(admin).send(input)).status).toBe(409);
-    const again = await request(app).post(`/api/v1/admin/audio-labels/${job.id}/renormalize`).set(admin).send({ ...input, analysis_revision: 2 });
-    expect(again.body.unchanged).toBe(true);
-    expect((await request(app).post(`/api/v1/admin/audio-labels/${job.id}/requeue`).send({ generation: 1 })).status).toBe(401);
-  });
   it('빠른 확인은 미확정 필드와 아티스트를 정답으로 승격하지 않는다', async () => {
-    await seed(); const job = await jobs.claim(); const body = maestBody(job);
-    delete body.tag_scores; // 원시 점수 중복 제출 없이 서버가 파생한다.
+    await seed(); const job = await jobs.claim(); const body = analysisBody(job);
     const saved = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
     const reviewed = await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: saved.body.id, audio_analysis_revision: 1 }, null);
     expect(reviewed.track_annotation.artist_confirmed).toBe(false);
@@ -152,11 +116,9 @@ describe('자동 음향 분석 파이프라인', () => {
     expect(reviewed.track_annotation.reviewed_fields).not.toContain('mood_tags');
     expect(reviewed.track_annotation.reviewed_fields).not.toContain('vocal_type');
   });
-  it('MAEST 큰 원본은 인증 경로에서 저장하고 재분석해도 이전 이력을 보존한다', async () => {
+  it('분석 원본은 인증 경로에서 저장하고 재분석해도 이전 이력을 보존한다', async () => {
     await seed(); const job = await jobs.claim();
-    // 계약의 길이 한도(600초) 안에서 최대 구간 수. 64KB 본문 경로를 그대로 지난다.
-    const body = maestBody(job, 39, 0.3123456789);
-    expect(JSON.stringify(body).length).toBeGreaterThan(65536);
+    const body = analysisBody(job);
     const send = (j, b) => request(app).post(`/api/v1/audio-analysis/jobs/${j.id}/complete`).set(auth()).send(b);
     const first = await send(job, body);
     expect(first.status, JSON.stringify(first.body)).toBe(200);
@@ -164,10 +126,10 @@ describe('자동 음향 분석 파이프라인', () => {
     expect((await send(job, body)).body.replayed).toBe(true);
     await db('music_audio_jobs').where({ id: job.id }).update({ status: 'queued' });
     const second = await jobs.claim();
-    expect((await send(second, maestBody(second, 3, 0.6))).status).toBe(200);
+    expect((await send(second, analysisBody(second))).status).toBe(200);
     const records = await db('music_audio_runs').where({ platform: job.platform, track_key: job.track_key });
     expect(records).toHaveLength(2);
-    expect(records.find((v) => v.id === originalId).payload.maest_raw.mean[0]).toBe(0.3123456789);
+    expect(records.find((v) => v.id === originalId).payload.audio_llm_raw.description).toBeTruthy();
     await expect(db.transaction((trx) => trx('music_audio_runs').where({ id: originalId }).update({ payload: '{}' }))).rejects.toThrow('append-only');
     await expect(db.transaction((trx) => trx('music_audio_runs').where({ id: originalId }).del())).rejects.toThrow('append-only');
     expect((await request(app).get(`/api/v1/admin/audio-runs/${originalId}`)).status).toBe(401);
@@ -175,88 +137,77 @@ describe('자동 음향 분석 파이프라인', () => {
       .set({ Authorization: `Bearer ${issueAdminToken()}` });
     expect(read.status).toBe(200);
     expect(read.body).not.toHaveProperty('lease_token');
-    expect(read.body.payload.audio_llm_raw).toBeNull();
+    expect(read.body.payload.audio_llm_raw.description).toBeTruthy();
   });
-  it('감정 모델까지 돌린 MAEST_EMOTION 실행을 저장하고 무드를 함께 남긴다', async () => {
+  it('Audio LLM을 건너뛴 EMOTION_LLM 실행과 무드를 함께 저장한다', async () => {
     await seed(); const job = await jobs.claim();
+    const body = analysisBody(job, { withLlm: false });
     const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
-      .set(auth()).send(fullBody(job));
+      .set(auth()).send(body);
 
     expect(response.status, JSON.stringify(response.body)).toBe(200);
     const [run] = await db('music_audio_runs').where({ track_key: job.track_key });
-    expect(run.payload.pipeline_mode).toBe('MAEST_EMOTION');
-    expect(run.payload.sources_used).toEqual(['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1', 'deam-msd-musicnn-2']);
+    expect(run.payload.pipeline_mode).toBe('EMOTION_LLM');
+    expect(run.payload.sources_used).toEqual([
+      contract.emotion_models.embedding, contract.emotion_models.regression,
+    ]);
     expect(run.payload.normalized.mood.tags).toEqual(['joyful', 'uplifting']);
     expect(run.payload.audio_llm_raw).toBeNull();
   });
   it('무드와 features의 감정값이 어긋나면 거절한다', async () => {
     await seed(); const job = await jobs.claim();
-    const body = fullBody(job);
-    body.maest_run.normalized.mood.valence = 0.2;   // features는 0.7
+    const body = analysisBody(job);
+    body.analysis_run.normalized.mood.valence = 0.2;   // features는 0.7
 
     const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
 
     expect(response.status).toBe(400);
     expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
   });
-  it('감정 단계가 아닌 실행에 무드를 넣거나 모델 목록이 다르면 거절한다', async () => {
+  it('실행 모델 목록이 다르면 거절한다', async () => {
     await seed(); const job = await jobs.claim();
     const send = (b) => request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(b);
-    const withMood = maestBody(job);
-    withMood.maest_run.normalized.mood = { valence: 0.5, arousal: 0.5, source: 'deam-msd-musicnn-2', tags: [] };
-    expect((await send(withMood)).status).toBe(400);
-
-    const wrongSources = fullBody(job);
-    wrongSources.maest_run.sources_used = ['discogs-maest-30s-pw-519l-2'];
+    const wrongSources = analysisBody(job);
+    wrongSources.analysis_run.sources_used = [contract.emotion_models.embedding];
     expect((await send(wrongSources)).status).toBe(400);
   });
-  it('2단 Audio LLM 원본을 자유 서술 그대로 보존한다', async () => {
+  it('Audio LLM 원본을 자유 서술 그대로 보존한다', async () => {
     await seed(); const job = await jobs.claim();
     const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
-      .set(auth()).send(llmBody(job));
+      .set(auth()).send(analysisBody(job));
 
     expect(response.status, JSON.stringify(response.body)).toBe(200);
     const [run] = await db('music_audio_runs').where({ track_key: job.track_key });
-    expect(run.payload.pipeline_mode).toBe('FULL');
+    expect(run.payload.pipeline_mode).toBe('EMOTION_LLM');
     expect(run.payload.audio_llm_raw.description).toBe('잔잔한 피아노가 이어진다');
     expect(run.payload.audio_llm_raw.instruments).toEqual(['피아노']);
-    expect(run.payload.sources_used).toEqual(['discogs-maest-30s-pw-519l-2', 'msd-musicnn-1',
-      'deam-msd-musicnn-2', 'google/gemini-2.5-pro']);
+    expect(run.payload.sources_used).toEqual([
+      contract.emotion_models.embedding, contract.emotion_models.regression,
+      'google/gemini-2.5-pro',
+    ]);
   });
-  it('2단 원본의 입력 해시·모델·구간이 어긋나면 거절한다', async () => {
+  it('Audio LLM 원본의 입력 해시·모델·구간이 어긋나면 거절한다', async () => {
     await seed(); const job = await jobs.claim();
     const send = (b) => request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(b);
 
-    const wrongHash = llmBody(job);
-    wrongHash.maest_run.audio_llm_raw.input_sha256 = 'c'.repeat(64);
+    const wrongHash = analysisBody(job);
+    wrongHash.analysis_run.audio_llm_raw.input_sha256 = 'c'.repeat(64);
     expect((await send(wrongHash)).status).toBe(400);
 
-    const wrongModel = llmBody(job);
-    wrongModel.maest_run.sources_used.pop();
-    wrongModel.maest_run.sources_used.push('openai/gpt-4o-audio-preview');
+    const wrongModel = analysisBody(job);
+    wrongModel.analysis_run.sources_used.pop();
+    wrongModel.analysis_run.sources_used.push('openai/gpt-4o-audio-preview');
     expect((await send(wrongModel)).status).toBe(400);
 
-    const pastEnd = llmBody(job);
-    pastEnd.maest_run.audio_llm_raw.segments = [{ start_sec: 0, duration_sec: 99999 }];
+    const pastEnd = analysisBody(job);
+    pastEnd.analysis_run.audio_llm_raw.segments = [{ start_sec: 0, duration_sec: 99999 }];
     expect((await send(pastEnd)).status).toBe(400);
 
-    const emptyDescription = llmBody(job);
-    emptyDescription.maest_run.audio_llm_raw.description = '';
+    const emptyDescription = analysisBody(job);
+    emptyDescription.analysis_run.audio_llm_raw.description = '';
     expect((await send(emptyDescription)).status).toBe(400);
 
     expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
-  });
-  it('MAEST 구간 누락·집계 불일치는 완료와 원본 저장을 모두 거절한다', async () => {
-    await seed(); const job = await jobs.claim();
-    const body = maestBody(job);
-    body.maest_run.maest_raw.mean[0] = 0.9;
-    // 배열을 공유한 테스트 입력을 복제한 뒤 max도 변하므로 구간 값만 원복한다.
-    const malformed = JSON.parse(JSON.stringify(body));
-    malformed.maest_run.maest_raw.segments.forEach((s) => { s.scores[0] = 0.3; });
-    const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(malformed);
-    expect(response.status).toBe(400);
-    expect(await db('music_audio_runs').where({ track_key: job.track_key })).toHaveLength(0);
-    expect((await db('music_audio_jobs').where({ id: job.id }).first()).status).toBe('processing');
   });
   it('필터 OFF 신청도 자동 등록하고 동일 곡 재신청은 중복 작업을 만들지 않는다', async () => {
     const rec = await seed();
@@ -284,7 +235,7 @@ describe('자동 음향 분석 파이프라인', () => {
     const renewed = await jobs.claim();
     expect(renewed.id).toBe(old.id);
     expect(renewed.lease_token).not.toBe(old.lease_token);
-    await expect(jobs.complete(old.id, old.lease_token, result(old), annotation, {})).rejects.toMatchObject({ status: 409 });
+    await expect(jobs.complete(old.id, old.lease_token, result(old), annotation)).rejects.toMatchObject({ status: 409 });
   });
   it('세 번 중단된 작업은 실패로 남기고 다른 곡은 계속 처리한다', async () => {
     await seed();
@@ -295,7 +246,7 @@ describe('자동 음향 분석 파이프라인', () => {
   });
   it('자동 라벨을 즉시 저장하고 같은 완료 요청의 재전송은 revision을 올리지 않는다', async () => {
     await seed(); const job = await jobs.claim();
-    const body = { lease_token: job.lease_token, result: result(job), automatic_annotation: annotation, tag_scores: { jazz: 0.7 } };
+    const body = { lease_token: job.lease_token, result: result(job), automatic_annotation: annotation };
     const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
     expect(response.status).toBe(200);
     const again = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
@@ -312,13 +263,13 @@ describe('자동 음향 분석 파이프라인', () => {
   });
   it('다른 곡 결과와 잘못된 자동 라벨은 저장하지 않는다', async () => {
     await seed(); const job = await jobs.claim();
-    await expect(jobs.complete(job.id, job.lease_token, { ...result(job), track_key: 'wrong' }, annotation, {})).rejects.toMatchObject({ status: 409 });
-    await expect(jobs.complete(job.id, job.lease_token, result(job), { ...annotation, mood_tags: [] }, {})).rejects.toMatchObject({ status: 400 });
+    await expect(jobs.complete(job.id, job.lease_token, { ...result(job), track_key: 'wrong' }, annotation)).rejects.toMatchObject({ status: 409 });
+    await expect(jobs.complete(job.id, job.lease_token, result(job), { ...annotation, mood_tags: [] })).rejects.toMatchObject({ status: 400 });
     expect((await db('music_audio_jobs').where({ id: job.id }).first()).status).toBe('processing');
   });
   it('같은 ID의 재분석과 경쟁하는 오래된 검토는 전체 롤백한다', async () => {
     await seed(); const job = await jobs.claim();
-    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
+    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation);
     await analyses.saveResult(result(job));
     await expect(labels.review(job.id, { annotation_revision: 1, audio_analysis_id: saved.id, audio_analysis_revision: 1 }, null))
       .rejects.toMatchObject({ status: 409 });
@@ -328,8 +279,9 @@ describe('자동 음향 분석 파이프라인', () => {
     // 승격하면 label_source가 'automatic'이 아니게 되어 재분석과 정규화가 이 곡을
     // 건너뛴다. 틀렸다고 표시한 곡이 영영 갱신되지 않는 상태가 된다.
     await seed(); const job = await jobs.claim();
-    const body = llmBody(job);
-    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    const body = analysisBody(job);
+    const saved = await jobs.complete(job.id, job.lease_token, body.result,
+      body.automatic_annotation, body.analysis_run);
     const key = { platform: job.platform, track_key: job.track_key };
     const before = await db('music_track_annotations').where(key).first();
 
@@ -345,8 +297,9 @@ describe('자동 음향 분석 파이프라인', () => {
   });
   it('맞다고 판정한 라벨은 사람 라벨로 승격한다', async () => {
     await seed(); const job = await jobs.claim();
-    const body = llmBody(job);
-    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    const body = analysisBody(job);
+    const saved = await jobs.complete(job.id, job.lease_token, body.result,
+      body.automatic_annotation, body.analysis_run);
     await labels.review(job.id, { verdict: 'confirmed', annotation_revision: 1,
       audio_analysis_id: saved.id, audio_analysis_revision: 1 }, null);
     const after = await db('music_track_annotations')
@@ -357,10 +310,10 @@ describe('자동 음향 분석 파이프라인', () => {
   it('두 디코더가 잰 길이가 몇 밀리초 어긋나도 결과를 받는다', async () => {
     // audio_duration_sec은 16kHz wav 헤더에서, features.duration_seconds는 Essentia가
     // 44.1kHz로 다시 읽어 계산한다. 실측 2.93ms 차이로 정상 결과가 거절된 적이 있다.
-    await seed(); const job = await jobs.claim(); const body = maestBody(job);
-    // 구간 경계는 maest_run.audio_duration_sec 기준이라 그대로 두고, Essentia가
+    await seed(); const job = await jobs.claim(); const body = analysisBody(job);
+    // 구간 경계는 analysis_run.audio_duration_sec 기준이라 그대로 두고, Essentia가
     // 다시 잰 값만 어긋나게 한다 — 실제로 어긋나는 쪽이 이쪽이다.
-    body.result.features.duration_seconds = body.maest_run.audio_duration_sec + 0.003;
+    body.result.features.duration_seconds = body.analysis_run.audio_duration_sec + 0.003;
 
     const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
       .set(auth()).send(body);
@@ -369,8 +322,8 @@ describe('자동 음향 분석 파이프라인', () => {
   });
 
   it('길이가 통째로 다르면 여전히 거절한다', async () => {
-    await seed(); const job = await jobs.claim(); const body = maestBody(job);
-    body.result.features.duration_seconds = body.maest_run.audio_duration_sec + 5;
+    await seed(); const job = await jobs.claim(); const body = analysisBody(job);
+    body.result.features.duration_seconds = body.analysis_run.audio_duration_sec + 5;
 
     const response = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`)
       .set(auth()).send(body);
@@ -380,13 +333,13 @@ describe('자동 음향 분석 파이프라인', () => {
 
   it('사람이 수정한 라벨은 재분석해도 보존한다', async () => {
     await seed(); const job = await jobs.claim();
-    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
+    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation);
     const { validateMusicAnnotation } = (await import('../src/features/music-labeling/annotation.js')).default;
     const human = validateMusicAnnotation({ ...annotation, mood_tags: ['joyful'] }).value;
     await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: saved.id, audio_analysis_revision: 1 }, human);
     await db('music_audio_jobs').where({ id: job.id }).update({ status: 'queued' });
     const second = await jobs.claim();
-    await jobs.complete(second.id, second.lease_token, result(second), annotation, {});
+    await jobs.complete(second.id, second.lease_token, result(second), annotation);
     const current = await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first();
     expect(current.mood_tags).toEqual(['joyful']);
     expect(current.label_source).toBe('human');
@@ -395,7 +348,7 @@ describe('자동 음향 분석 파이프라인', () => {
   it('자동 라벨은 확인한 아티스트 참고 자료에 섞지 않는다', async () => {
     await seed(); const job = await jobs.claim();
     expect((await labels.list({ view: 'ready' })).decisions).toHaveLength(0);
-    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation, {});
+    const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation);
     const item = (await labels.list({ view: 'ready' })).decisions[0];
     const service = (await import('../src/features/music-labeling/review.service.js')).default;
     const options = { artistKey: 'artist', platform: job.platform, trackKey: 'different-track' };
@@ -414,13 +367,10 @@ describe('자동 음향 분석 파이프라인', () => {
 
 describe('분석 판정 회귀', () => {
   async function analyzed(withEmotion = true) {
-    await seed(); const job = await jobs.claim(); const body = llmBody(job);
-    if (!withEmotion) {
-      delete body.result.features.valence; delete body.result.features.arousal;
-      body.maest_run.normalized.mood = null; body.automatic_annotation.mood_tags = ['unknown'];
-      body.maest_run.sources_used = [contract.model_version, body.maest_run.audio_llm_raw.model_id];
-    }
-    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    await seed(); const job = await jobs.claim();
+    const body = analysisBody(job, { withEmotion });
+    const saved = await jobs.complete(job.id, job.lease_token, body.result,
+      body.automatic_annotation, body.analysis_run);
     return { job, body, saved };
   }
   it('감정 모델 없이도 Audio LLM 결과를 저장한다', async () => {
@@ -436,8 +386,10 @@ describe('분석 판정 회귀', () => {
     let current = await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first();
     expect(current.label_source).toBe('automatic'); expect(current.reviewed_fields).toEqual([]);
     expect(await findForTrack(job.platform, job.track_key)).toBeNull();
-    await jobs.requeue(job.id, job.generation); const next = await jobs.claim(); const body = llmBody(next);
-    await jobs.complete(next.id, next.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    await jobs.requeue(job.id, job.generation); const next = await jobs.claim();
+    const body = analysisBody(next);
+    await jobs.complete(next.id, next.lease_token, body.result,
+      body.automatic_annotation, body.analysis_run);
     expect(await findForTrack(job.platform, job.track_key)).not.toBeNull();
     current = await db('music_track_annotations').where({ platform: job.platform, track_key: job.track_key }).first();
     expect(current.human_review_status).toBe('unreviewed');
@@ -454,8 +406,10 @@ describe('분석 판정 회귀', () => {
     expect(current.genre_tags).toEqual(['jazz']);
   });
   it('서술 없는 분석의 판정은 API에서도 거절한다', async () => {
-    await seed(); const job = await jobs.claim(); const body = maestBody(job);
-    const saved = await jobs.complete(job.id, job.lease_token, body.result, body.automatic_annotation, body.tag_scores, body.maest_run);
+    await seed(); const job = await jobs.claim();
+    const body = analysisBody(job, { withLlm: false });
+    const saved = await jobs.complete(job.id, job.lease_token, body.result,
+      body.automatic_annotation, body.analysis_run);
     const response = await request(app).put(`/api/v1/admin/audio-labels/${job.id}/review`)
       .set({ Authorization: `Bearer ${issueAdminToken()}` }).send({ verdict: 'accurate', annotation_revision: 1,
         audio_analysis_id: saved.id, audio_analysis_revision: 1 });
