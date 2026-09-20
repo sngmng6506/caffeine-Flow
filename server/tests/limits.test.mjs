@@ -12,11 +12,19 @@ import {
   COMMENT_PAGE_MAX_SIZE,
   ADMIN_LOGIN_LIMIT,
   ADMIN_LOGIN_GLOBAL_LIMIT,
+  MUSIC_FILTER_TEST_LIMIT,
   QR_CUSTOMER_URL_MAX_LENGTH,
   QR_IMAGE_MAX_BYTES,
 } from '../src/constants/limits.js';
 
 describe('운영 한도 정책 상수', () => {
+  it('사장님 필터 테스트는 카페당 하루 10회다', () => {
+    // 한 번이 실제 LLM 호출이라 무제한으로 열 수 없다. 카페 단위로 세야
+    // IP를 바꿔도 같은 매장 몫이 늘지 않는다.
+    expect(MUSIC_FILTER_TEST_LIMIT.max).toBe(10);
+    expect(MUSIC_FILTER_TEST_LIMIT.windowMs).toBe(24 * 60 * ONE_MINUTE_MS);
+  });
+
   it('전역 API rate limit은 분당 120회다', () => {
     expect(GLOBAL_API_RATE_LIMIT).toEqual({ windowMs: ONE_MINUTE_MS, max: 120 });
   });

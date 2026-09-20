@@ -7,6 +7,9 @@ import SettingsStatus from './SettingsStatus';
 // 손님 화면 안내의 길이 상한. 서버 PUBLIC_GUIDE_MAX_LENGTH와 같은 값이며, 넘으면
 // 서버가 400을 돌려준다. 손님 화면 안내 패널이 이 길이를 전제로 그려진다.
 const NOTICE_MAX = 180;
+// 서버 MUSIC_FILTER_TEST_LIMIT.max와 같은 값. 한도를 미리 알려주지 않으면
+// 어느 순간 갑자기 막힌 것처럼 보인다.
+const TEST_DAILY_LIMIT = 10;
 function normalize(latest = {}) {
   return {
     prompt: latest.music_filter_prompt || '',
@@ -258,7 +261,10 @@ export default function MusicFilterSettings() {
         <summary style={styles.advancedSummary}>AI 판단 테스트</summary>
         <div style={styles.advancedBody}>
           <div style={styles.headerRow}>
-            <div style={styles.desc}>곡 링크를 입력해 현재 매장 분위기 설명으로 내린 판단을 미리 확인해요.</div>
+            <div style={styles.desc}>
+              곡 링크를 입력해 현재 매장 분위기 설명으로 내린 판단을 미리 확인해요.
+              {' '}하루 {TEST_DAILY_LIMIT}번까지 확인할 수 있어요.
+            </div>
           </div>
 
           <label style={styles.label}>테스트 곡 URL</label>

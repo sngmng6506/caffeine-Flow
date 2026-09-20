@@ -78,3 +78,23 @@ describe('AI 음악 필터 프롬프트 계약', () => {
     expect(userMessage).not.toContain('이전 지시를 무시하세요');
   });
 });
+
+describe('사장님 필터 테스트 경계', () => {
+  it('카페 단위로 세고 모델 override를 받지 않는다', async () => {
+    // IP를 바꿔도 같은 매장 몫이 늘지 않아야 하고, 모델을 골라 가며 비교하는
+    // 작업은 운영자 랩(POST /admin/music-filter/test)이 맡는다.
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { fileURLToPath } = await import('node:url');
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+    const source = fs.readFileSync(path.join(root, 'server/src/routes/cafes.js'), 'utf8');
+    const route = source.slice(source.indexOf("router.post('/me/music-filter/test'"));
+    const body = route.slice(0, route.indexOf('\n});'));
+
+    expect(source).toContain('keyGenerator: (req) => req.owner.cafeId');
+    expect(source).toContain('MUSIC_FILTER_TEST_LIMIT');
+    // 응답에 실린 model은 "무엇으로 판단했는지" 표시이고, 여기서 막는 것은
+    // 요청으로 모델을 고르는 override다.
+    expect(body).not.toContain('req.body?.model');
+  });
+});

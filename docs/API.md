@@ -30,6 +30,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | PUT | `/cafes/me` | 🔒 | 카페명 등 기본 정보 변경 |
 | PUT | `/cafes/me/platforms` | 🔒 | 허용 플랫폼 변경 |
 | PUT | `/cafes/me/music-filter` | 🔒 | AI 필터 사용 여부·매장 분위기 설명 설정 |
+| POST | `/cafes/me/music-filter/test` | 🔒 | 저장 없이 곡 하나를 시험. body는 `url`, `prompt`. 카페당 **하루 10회** |
 | PUT | `/cafes/me/music-filter/public-notice` | 🔒 | 손님 화면 안내를 직접 수정. 매장 분위기 설명을 바꿔 저장하면 AI 문구로 덮인다 |
 | PUT | `/cafes/me/address` | 🔒 | 지역·좌표 변경 |
 | PUT | `/cafes/me/slug` | 🔒 | QR slug 재발급·지정 |

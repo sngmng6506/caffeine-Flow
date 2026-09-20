@@ -17,6 +17,10 @@ const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
 const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
 const { logError, CAUSE } = require('../observability');
+const musicFilter = require('../features/music-filter');
+const { getTrackMetadata } = require('../services/track-metadata.service');
+const { FILTER_STATUS } = require('../constants/music-filter-status');
+const { MUSIC_FILTER_TEST_LIMIT } = require('../constants/limits');
 const {
   generatePublicMusicGuide,
   normalizePublicGuide,
@@ -203,6 +207,56 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
     music_filter_enabled: cafe.music_filter_enabled,
     music_filter_prompt: cafe.music_filter_prompt,
     music_filter_public_notice: cafe.music_filter_public_notice,
+  });
+});
+
+// POST /api/v1/cafes/me/music-filter/test  (저장 없이 곡 하나를 시험한다)
+//
+// 사장님이 설정이 제대로 도는지 확인하는 용도다. 한 번이 실제 LLM 호출이라
+// 하루 10회로 묶는다 — 프롬프트를 본격적으로 다듬는 작업은 운영자 필터 테스트
+// 랩(POST /admin/music-filter/test)이 맡는다. 모델 override도 그쪽에만 있다.
+const musicFilterTestLimiter = rateLimit({
+  ...MUSIC_FILTER_TEST_LIMIT,
+  keyGenerator: (req) => req.owner.cafeId,
+  message: { error: '오늘 테스트 횟수를 모두 썼어요. 내일 다시 시도해 주세요.' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
+router.post('/me/music-filter/test', requireAuth, musicFilterTestLimiter, async (req, res) => {
+  const urlCheck = validateString(req.body?.url, { max: 2000, name: '곡 URL' });
+  if (urlCheck.error) return res.status(400).json({ error: urlCheck.error });
+
+  const promptCheck = validateString(req.body?.prompt, { max: 1000, name: 'AI 필터 프롬프트' });
+  if (promptCheck.error) return res.status(400).json({ error: promptCheck.error });
+
+  let track;
+  try {
+    track = await getTrackMetadata(urlCheck.value);
+  } catch (error) {
+    return res.status(error.status || 400).json({
+      error: error.message || '트랙 정보를 가져올 수 없습니다',
+    });
+  }
+
+  const result = await musicFilter.evaluateTrack({
+    context: { route: 'POST /cafes/me/music-filter/test' },
+    cafePrompt: promptCheck.value,
+    track,
+  });
+
+  if (result.filterStatus === FILTER_STATUS.ERROR_REJECTED) {
+    return res.status(503).json({
+      error: 'OpenRouter가 곡을 판단하지 못했습니다. 잠시 후 다시 시도해주세요.',
+      errorCode: result.errorCode,
+    });
+  }
+
+  res.json({
+    decision: result.action,
+    confidence: result.confidence,
+    reason: result.reason,
+    model: result.model,
+    track,
   });
 });
 

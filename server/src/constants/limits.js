@@ -60,6 +60,14 @@ const ADMIN_LOGIN_GLOBAL_LIMIT = Object.freeze({
   max: 50,
 });
 
+// 사장님이 자기 매장 설명으로 곡 하나를 시험해 보는 기능. 한 번이 실제 LLM
+// 호출이라 무제한으로 열 수 없다. 기능이 도는지 확인하는 용도이므로 하루 10회면
+// 충분하고, 프롬프트를 본격적으로 다듬는 작업은 운영자 필터 테스트 랩을 쓴다.
+const MUSIC_FILTER_TEST_LIMIT = Object.freeze({
+  windowMs: 24 * 60 * ONE_MINUTE_MS,
+  max: 10,
+});
+
 module.exports = {
   ONE_MINUTE_MS,
   GLOBAL_API_RATE_LIMIT,
@@ -78,4 +86,5 @@ module.exports = {
   COMMENT_PAGE_MAX_SIZE,
   ADMIN_LOGIN_LIMIT,
   ADMIN_LOGIN_GLOBAL_LIMIT,
+  MUSIC_FILTER_TEST_LIMIT,
 };
