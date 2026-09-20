@@ -116,7 +116,8 @@ class PipelineModeTest(unittest.TestCase):
                  patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
                  patch.object(remote_analyze, 'describe', side_effect=describe):
                 remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
-                                           'artist_name': 'unknown'}, Path(directory) / 'result.json')
+                                           'artist_name': 'unknown', 'audio_llm_enabled': True},
+                                   Path(directory) / 'result.json')
 
         # 숫자를 척도와 함께 넘긴다. 밴드 이름으로 뭉개면 0.12와 0.34가 같아진다.
         self.assertIsNotNone(seen['va'], 'V/A가 3단 설정에 실리지 않았다')
@@ -153,7 +154,8 @@ class PipelineModeTest(unittest.TestCase):
                  patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
                  patch.object(remote_analyze, 'describe', side_effect=describe):
                 remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
-                                           'artist_name': 'unknown'}, Path(directory) / 'result.json')
+                                           'artist_name': 'unknown', 'audio_llm_enabled': True},
+                                   Path(directory) / 'result.json')
 
         self.assertTrue(seen['plan'], '구간 계획이 비었다')
         self.assertTrue(all(segment['duration_sec'] == 20 for segment in seen['plan']))
@@ -186,7 +188,7 @@ class PipelineModeTest(unittest.TestCase):
                  patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
                  patch.object(remote_analyze, 'describe', side_effect=describe):
                 result = remote_analyze.run(audio, {'platform': 'youtube', 'track_key': 'abcdefghijk',
-                    'artist_name': 'unknown'}, Path(directory) / 'result.json')
+                    'artist_name': 'unknown', 'audio_llm_enabled': True}, Path(directory) / 'result.json')
             self.assertIsNone(result['analysis_run']['audio_llm_raw'])
             self.assertEqual(result['analysis_run']['normalized']['mood']['tags'], ['joyful', 'uplifting'])
 
@@ -216,8 +218,9 @@ class PipelineModeTest(unittest.TestCase):
                     output.setparams((1, 2, 16000, 0, 'NONE', 'not compressed'))
                     output.writeframes(b'\0\0' * 16000 * 20)
                 with patch.dict(os.environ, {'OPENROUTER_API_KEY': key}), \
+                     patch.object(remote_analyze, 'load_audio', return_value=repeated_audio()), \
                      patch.object(remote_analyze, 'analyze_for_judgement', return_value=(features, 'test')), \
-                         patch.object(remote_analyze, 'describe',
+                     patch.object(remote_analyze, 'describe',
                                   side_effect=lambda *a, **k: calls.append(a) or {
                                       'model_id': 'm', 'description': 'x'}):
                     job = {'platform': 'youtube', 'track_key': 'abcdefghijk',

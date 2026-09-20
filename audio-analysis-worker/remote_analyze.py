@@ -49,6 +49,11 @@ def audio_llm_config(prompt=None):
     return config
 
 
+def audio_llm_requested(job):
+    """3단 실행 여부는 서버가 claim payload로 명시한 값만 따른다."""
+    return job.get('audio_llm_enabled') is True
+
+
 def run(audio, job, output, models=None, report=None):
     model_dir = os.environ.get('AUDIO_MODEL_DIR', '~/caffeine-audio/models')
     with wave.open(str(audio), 'rb') as source:
@@ -77,8 +82,14 @@ def run(audio, job, output, models=None, report=None):
         except AudioLLMError:
             return None
 
+    llm_requested = audio_llm_requested(job)
+    llm_available = bool(os.environ.get('OPENROUTER_API_KEY', '').strip())
     with measure(report, 'decode_16000'):
-        shared = load_audio(audio) if emotion is not None or models is not None else None
+        # 감정 모델이 없어도 Audio LLM을 요청했다면 구간 계획에 16kHz 배열이 필요하다.
+        needs_shared_audio = (
+            emotion is not None or models is not None or (llm_requested and llm_available)
+        )
+        shared = load_audio(audio) if needs_shared_audio else None
     # V/A는 3단이 듣는 구간에서만 구한다. 전곡을 돌리면 6초, 구간만이면 1.5초다.
     # 두 단계가 같은 곳을 들어야 프롬프트의 밝기·활력이 서술과 어긋나지 않는다.
     #
@@ -90,7 +101,7 @@ def run(audio, job, output, models=None, report=None):
         features, version = analyze_for_judgement(audio, emotion, audio_16k=shared,
                                                   segments=segments, report=report)
     audio_llm_raw = None
-    if segments and job.get('audio_llm_enabled', True) and os.environ.get('OPENROUTER_API_KEY', '').strip():
+    if segments and llm_requested and llm_available:
         audio_llm_raw = describe_independently(
             va_context(features.get('valence'), features.get('arousal')))
     normalized = normalize(features=features)
