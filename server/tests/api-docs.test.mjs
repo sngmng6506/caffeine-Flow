@@ -2,8 +2,9 @@
 // 문서화돼 있는지 CI에서 강제한다. 새 라우트를 추가하고 문서를 안 고치면
 // 이 테스트가 실패한다.
 //
-// 검사 방향은 코드 → 문서 한 방향이다. 문서에만 남은 삭제된 라우트는
-// 리뷰에서 드러나므로 여기서 다루지 않는다.
+// 양방향으로 검사한다. 코드에만 있는 라우트는 문서화 누락이고, 문서에만 남은
+// 행은 이미 지워진 라우트다 — 후자를 리뷰에 맡겼더니 renormalize 행이 삭제
+// 두 달 뒤까지 남아 있었다(git log -S renormalize).
 // 매칭 규칙: API.md의 표 행 중 같은 METHOD 셀을 가진 행에 라우트의
 // subpath 문자열이 포함돼 있으면 문서화된 것으로 본다.
 import { describe, it, expect } from 'vitest';
@@ -55,10 +56,28 @@ function isDocumented({ method, sub }) {
   return mdLines.some((line) => line.includes(`| ${method} |`) && line.includes(needle));
 }
 
+// 문서 표의 경로는 섹션마다 기준이 달라(`/`나 `/:id/cancel` 같은 상대 경로가 있다)
+// 절대 경로로 맞추지 않는다. 코드 쪽 subpath가 문서 경로에 들어 있으면 같은
+// 라우트로 본다 — 위 isDocumented와 같은 규칙을 반대로 적용한 것이다.
+const documentedRows = mdLines
+  .map((line) => line.match(/^\|\s*(GET|POST|PUT|DELETE)\s*\|\s*`([^`]+)`/))
+  .filter(Boolean)
+  .map(([, method, docPath]) => ({ method, docPath }));
+
+function isImplemented({ method, docPath }) {
+  return allRoutes.some((r) => r.method === method
+    && (r.sub === '/' ? docPath === '/' : docPath.includes(r.sub)));
+}
+
 describe('docs/API.md ↔ 라우트 코드 동기화', () => {
   it('코드의 모든 라우트가 문서화돼 있다', () => {
     const missing = allRoutes.filter((r) => !isDocumented(r));
     expect(missing, `문서화 누락: ${missing.map((m) => `${m.method} ${m.full}`).join(', ')} — docs/API.md에 추가할 것`).toEqual([]);
+  });
+
+  it('문서의 모든 행에 대응하는 라우트가 있다', () => {
+    const stale = documentedRows.filter((row) => !isImplemented(row));
+    expect(stale, `지워진 라우트가 문서에 남음: ${stale.map((r) => `${r.method} ${r.docPath}`).join(', ')} — docs/API.md에서 삭제할 것`).toEqual([]);
   });
 
   it('추출기가 실제로 라우트를 찾았다 (자기 검증)', () => {
