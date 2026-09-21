@@ -78,6 +78,8 @@ renderer에 노출하는 API 목록은 `owner/electron/preload.js`, 메인 IPC �
 - Electron renderer는 앱 실행 세션 동안 유지되는 UUID를 소켓 handshake에 보낸다.
 - 서버는 카페별 첫 재생 가능 세션을 리더로 선출하고 `playback_role`을 보낸다.
 - 리더 연결이 끊기면 같은 세션의 재연결을 `PLAYBACK_LEADER_GRACE_MS`(`time-policy.js`)만큼 기다린 뒤 follower를 승격한다.
+- 다른 실행 세션이 들어오면 유예 없이 리더를 넘긴다. 서버는 이전 리더 소켓에만 `playback_superseded`를 보내고, 받은 Electron은 리더 플래그를 내린 뒤 앱을 종료한다. 플래그를 먼저 내려야 종료 정리가 재생 중이던 곡을 종료 상태로 바꾸지 않고, 넘겨받은 리더가 남은 `playing`을 `accepted`로 복구할 수 있다.
+- 한 기기에서는 Electron을 하나만 띄운다. 두 번째 실행은 창을 만들지 않고 종료하며 먼저 뜬 앱이 자기 창을 앞으로 가져온다.
 - renderer reload로 같은 세션이 돌아오면 진행 중인 `playing`을 초기화하지 않는다. 완전히 새 리더가 선출된 경우에만 남은 `playing`을 `accepted`로 복구한다.
 - 서버 프로세스만 재시작된 경우 메인 프로세스의 실제 재생 모드를 확인한다. 같은 실행 세션에서 신청곡이 계속 재생 중이면 DB `playing`을 유지하고 registry만 ACK한다.
 - 복구 필요 상태는 DB 복구 성공 ACK 전까지 유지한다. API·소켓 오류로 ACK하지 못하면 같은 리더가 재시도한다.
