@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""실제 다운로드·MAEST 파이프라인을 서버 쓰기 없이 시험하는 CLI."""
+"""실제 다운로드·분석 파이프라인을 서버 쓰기 없이 시험하는 CLI."""
 import argparse
 import json
 import time

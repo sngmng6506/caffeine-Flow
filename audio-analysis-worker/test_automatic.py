@@ -48,7 +48,7 @@ class AutomaticTest(unittest.TestCase):
         def download(_platform, _key, directory):
             path = directory / 'audio.ogg'; path.write_bytes(b'audio'); paths.append(path); return path
         def runner(command, **kwargs):
-            Path(command[-1]).write_text(json.dumps({'result': {}, 'automatic_annotation': {'genre_tags': ['jazz']}, 'tag_scores': {}}))
+            Path(command[-1]).write_text(json.dumps({'result': {}, 'automatic_annotation': {'mood_tags': ['calm'], 'genre_tags': []}}))
             self.assertNotIn('shell', kwargs)
             return SimpleNamespace(returncode=0)
         def api(_config, url, body):
