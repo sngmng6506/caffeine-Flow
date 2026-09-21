@@ -35,8 +35,11 @@ npm run electron:dev --prefix owner
 각 dev 명령은 별도 터미널에서 실행한다.
 
 Claude Code 웹 세션은 매번 새로 클론돼 `node_modules`가 없다. `.claude/hooks/session-start.sh`가
-세션 시작 시 세 앱의 의존성을 설치하므로 lint·test를 바로 실행할 수 있다. 로컬에서는
-건너뛰며(`CLAUDE_CODE_REMOTE`로 판단), lockfile이 바뀐 브랜치를 받았을 때는 위 `npm ci`를 다시 실행한다.
+세션 시작 시 루트와 세 앱의 의존성을 설치하고(루트는 `lint:labs`가 쓴다), 컨테이너 안에
+통합 테스트용 PostgreSQL과 `caffeine_test` DB를 띄운 뒤 테스트용 루트 `.env`를 만든다 —
+아래 검증 명령을 인라인 환경변수 없이 그대로 실행할 수 있다. PostgreSQL이 없는 컨테이너에서는
+DB 준비만 건너뛰고 세션을 계속한다. 로컬에서는 전체를 건너뛰며(`CLAUDE_CODE_REMOTE`로 판단),
+lockfile이 바뀐 브랜치를 받았을 때는 위 `npm ci`를 다시 실행한다.
 
 ### 기동 로그로 설정 확인
 
