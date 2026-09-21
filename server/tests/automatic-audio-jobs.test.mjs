@@ -112,7 +112,10 @@ describe('자동 음향 분석 파이프라인', () => {
     const saved = await request(app).post(`/api/v1/audio-analysis/jobs/${job.id}/complete`).set(auth()).send(body);
     const reviewed = await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: saved.body.id, audio_analysis_revision: 1 }, null);
     expect(reviewed.track_annotation.artist_confirmed).toBe(false);
-    expect(reviewed.track_annotation.reviewed_fields).toContain('genre_tags');
+    expect(reviewed.track_annotation.reviewed_fields).toContain('tempo_class');
+    // 장르를 판단할 모델이 없어 자동 라벨의 genre_tags는 'unknown'이다. 빠른 확인의
+    // 기본 선택에 들어 있어도 미확정 값이므로 정답으로 승격하지 않는다.
+    expect(reviewed.track_annotation.reviewed_fields).not.toContain('genre_tags');
     expect(reviewed.track_annotation.reviewed_fields).not.toContain('mood_tags');
     expect(reviewed.track_annotation.reviewed_fields).not.toContain('vocal_type');
   });
