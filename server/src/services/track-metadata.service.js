@@ -24,9 +24,40 @@ function metadataError(message, code = 'TRACK_METADATA_ERROR', extra = {}) {
   return Object.assign(error, extra);
 }
 
+// IPv6를 통째로 막으면 dual-stack 호스트가 전부 막힌다. www.youtube.com과
+// open.spotify.com이 AAAA를 갖고 있어 두 곳의 페이지 fetch가 항상 거절됐다
+// (Spotify는 try/catch가 삼켜 아티스트가 늘 'Spotify'로 저장됐다).
+// 전역 유니캐스트만 통과시키고 나머지는 막는다.
+function isPrivateIPv6(address) {
+  const value = address.split('%')[0].toLowerCase(); // zone id 제거
+  // IPv4를 감싼 주소(::ffff:10.0.0.1, 64:ff9b::10.0.0.1)는 그 IPv4로 판정한다.
+  const embedded = value.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (embedded) return PRIVATE_IPV4_RE.test(embedded[1]);
+  if (value === '::' || value === '::1') return true;
+  if (/^f[cd]/.test(value)) return true;        // fc00::/7  unique local
+  if (/^fe[89a-f]/.test(value)) return true;    // fe80::/10 link local + 폐기된 site local
+  if (/^ff/.test(value)) return true;           // ff00::/8  multicast
+  // 6to4는 임의의 IPv4를 16진수로 품어 여기서 풀 수 없다. 막는다.
+  if (/^2002:/.test(value)) return true;
+  return false;
+}
+
+// safeAxiosGet이 내부 판정으로 던지는 코드. 문구에 우리 인프라 사정이 담겨 있어
+// 손님 응답에 그대로 싣지 않는다(Public Response Boundary). 대신 우리가 알아야
+// 할 신호이므로 upstream으로 올린다.
+const INTERNAL_FETCH_CODES = new Set([
+  'TRACK_PRIVATE_HOST',
+  'TRACK_HOST_NOT_ALLOWED',
+  'TRACK_REDIRECT_NOT_ALLOWED',
+  'TRACK_DNS_FAILED',
+]);
+
+const isInternalFetchError = (error) => INTERNAL_FETCH_CODES.has(error?.code);
+
 function isPrivateAddress(address) {
   if (!address) return true;
-  if (net.isIPv6(address)) return true;
+  if (net.isIPv6(address)) return isPrivateIPv6(address);
+  if (!net.isIPv4(address)) return true;
   return PRIVATE_IPV4_RE.test(address);
 }
 
@@ -75,21 +106,31 @@ function metaContent(html, attribute, key) {
   return (html.match(forward) || html.match(reverse) || [])[1];
 }
 
-// og 태그와 페이지 JSON은 각각 HTML 엔티티와 \uXXXX로 이스케이프돼 있다. 풀지
-// 않으면 손님 화면에 "Tom &amp; Jerry"가 그대로 보인다.
-const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" };
-function decodeText(value) {
+// og 태그는 HTML 엔티티로, 페이지 JSON은 \uXXXX로 이스케이프돼 있다. 출처가
+// 다르므로 각각 그 방식으로만 푼다 — og 값에 JSON 언이스케이프를 걸면 제목 안의
+// "\n" 같은 백슬래시 문자열이 조용히 줄바꿈으로 바뀐다.
+const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+
+function decodeHtml(value) {
   if (!value) return value;
-  let text = value;
-  try {
-    text = JSON.parse(`"${text.replace(/"/g, '\\"')}"`);
-  } catch {
-    // \uXXXX가 없으면 원문 그대로 쓴다
-  }
-  return text.replace(/&(#\d+|[a-z]+);/gi, (match, name) => {
-    if (name[0] === '#') return String.fromCharCode(Number(name.slice(1)));
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, name) => {
+    const hex = name[1] === 'x' || name[1] === 'X';
+    const code = name[0] === '#'
+      ? Number.parseInt(name.slice(hex ? 2 : 1), hex ? 16 : 10)
+      : NaN;
+    // 기본 다국어 평면 밖 문자까지 살리려면 fromCodePoint여야 한다.
+    if (Number.isFinite(code) && code >= 0 && code <= 0x10ffff) return String.fromCodePoint(code);
     return HTML_ENTITIES[name.toLowerCase()] ?? match;
   });
+}
+
+function decodeJsonString(value) {
+  if (!value) return value;
+  try {
+    return JSON.parse(`"${value.replace(/"/g, '\\"')}"`);
+  } catch {
+    return value;
+  }
 }
 
 function detectPlatform(url) {
@@ -163,6 +204,11 @@ async function getYoutubeMetadataFromPage(videoId) {
   if (!title) {
     throw metadataError('영상 정보를 가져올 수 없습니다 (페이지 형식 변경)', 'TRACK_YOUTUBE_PARSE_FAILED', { upstream: true });
   }
+  // 삭제·비공개 영상도 워치 페이지는 200을 준다. 그 자리 페이지의 og:title은
+  // 'YouTube'라 그대로 받으면 제목이 'YouTube'인 곡이 큐에 들어간다.
+  if (title.trim() === 'YouTube') {
+    throw metadataError(youtubeFailureMessage(404), 'TRACK_YOUTUBE_UNAVAILABLE', { upstream: false });
+  }
 
   const channel = (html.match(/"ownerChannelName":"([^"]+)"/)
     || html.match(/<link[^>]+itemprop=["']name["'][^>]+content=["']([^"']+)["']/)
@@ -171,9 +217,9 @@ async function getYoutubeMetadataFromPage(videoId) {
   return {
     platform: PLATFORM.YOUTUBE,
     videoId,
-    title: decodeText(title),
+    title: decodeHtml(title),
     // 채널명을 못 읽어도 제목이 있으면 신청을 막지 않는다.
-    channelTitle: decodeText(channel) || 'YouTube',
+    channelTitle: decodeJsonString(channel) || 'YouTube',
     thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
   };
 }
@@ -208,10 +254,17 @@ async function getYoutubeMetadata(rawUrl) {
     oembedStatus = error.response?.status;
   }
 
+  // 404는 없는 영상·비공개다. 워치 페이지도 자리 페이지를 200으로 줄 뿐이라 더
+  // 받아 올 것이 없다.
+  if (oembedStatus === 404) {
+    throw metadataError(youtubeFailureMessage(404), 'TRACK_YOUTUBE_FETCH_FAILED', { upstream: false, upstreamStatus: 404 });
+  }
+
   try {
     return await getYoutubeMetadataFromPage(videoId);
   } catch (error) {
-    if (error.code?.startsWith('TRACK_')) throw error;
+    // 손님에게 보여 줄 수 있는 문구만 그대로 올린다.
+    if (error.code?.startsWith('TRACK_') && !isInternalFetchError(error)) throw error;
     // 두 경로 중 하나라도 서버 IP 차단·한도 초과·5xx를 가리키면 우리가 알아야 할
     // 신호다. 없는 영상(404)처럼 양쪽이 손님 입력을 가리킬 때만 알리지 않는다.
     const pageStatus = error.response?.status;
@@ -219,7 +272,9 @@ async function getYoutubeMetadata(rawUrl) {
       youtubeFailureMessage(oembedStatus),
       'TRACK_YOUTUBE_FETCH_FAILED',
       {
-        upstream: isUpstreamTrackFailure(oembedStatus) || isUpstreamTrackFailure(pageStatus),
+        upstream: isInternalFetchError(error)
+          || isUpstreamTrackFailure(oembedStatus)
+          || isUpstreamTrackFailure(pageStatus),
         upstreamStatus: pageStatus ?? oembedStatus ?? null,
       },
     );
@@ -311,12 +366,13 @@ async function getSoundCloudMetadata(rawUrl) {
     return {
       platform: PLATFORM.SOUNDCLOUD,
       videoId: trackUrl,
-      title: decodeText(title),
-      channelTitle: decodeText(artist),
+      title: decodeHtml(title),
+      channelTitle: decodeHtml(artist),
       thumbnail: ogImage || null,
     };
   } catch (error) {
-    if (error.code?.startsWith('TRACK_')) throw error;
+    // 내부 fetch 실패(호스트 차단·DNS)는 우리 인프라 사정이라 문구를 감춘다.
+    if (error.code?.startsWith('TRACK_') && !isInternalFetchError(error)) throw error;
     const status = error.response?.status;
     let message = '트랙 정보를 가져올 수 없습니다';
     if (status === 404) message += ' (트랙이 비공개이거나 삭제됨)';
@@ -327,7 +383,7 @@ async function getSoundCloudMetadata(rawUrl) {
     // 404·410은 비공개·삭제된 곡이라 손님이 고를 수 있는 정상 범위다.
     // 403(서버 IP 차단)·429·5xx·네트워크 오류는 우리가 알아야 할 신호다.
     throw metadataError(message, 'TRACK_SOUNDCLOUD_FETCH_FAILED', {
-      upstream: !(status === 404 || status === 410),
+      upstream: isInternalFetchError(error) || !(status === 404 || status === 410),
       upstreamStatus: status ?? null,
     });
   }

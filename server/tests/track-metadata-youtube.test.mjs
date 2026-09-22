@@ -20,6 +20,7 @@ const realLookup = dns.lookup;
 
 /** 요청 URL별 응답. 값이 number면 그 status로 거절한다. */
 let routes;
+let dnsAddresses;
 
 function ok(data) {
   return { data, status: 200, statusText: 'OK', headers: {}, config: {} };
@@ -27,7 +28,13 @@ function ok(data) {
 
 beforeEach(() => {
   routes = {};
-  dns.lookup = (host, options, cb) => (cb || options)(null, [{ address: '142.251.153.4', family: 4 }]);
+  // 실제 www.youtube.com은 A와 AAAA를 함께 준다. IPv4만 주는 스텁을 쓰면
+  // assertPublicHost가 IPv6를 통째로 막던 버그를 가린다.
+  dnsAddresses = [
+    { address: '142.251.153.4', family: 4 },
+    { address: '2001:4860:4827:400::', family: 6 },
+  ];
+  dns.lookup = (host, options, cb) => (cb || options)(null, dnsAddresses);
   axios.defaults.adapter = async (config) => {
     const url = config.params?.url && config.url?.includes('/oembed') ? 'oembed' : 'page';
     const outcome = routes[url];
@@ -84,9 +91,11 @@ describe('YouTube 메타데이터', () => {
     expect((await getTrackMetadata(WATCH_URL)).channelTitle).toBe('YouTube');
   });
 
-  it('없는 영상은 손님이 링크를 고치도록 안내하고 플랫폼 신호로 올리지 않는다', async () => {
+  it('없는 영상은 워치 페이지를 보지 않고 바로 안내한다', async () => {
+    // 삭제된 영상도 워치 페이지는 200을 준다. 404에 fallback을 태우면 자리
+    // 페이지의 og:title('YouTube')이 곡 제목이 된다.
     routes.oembed = 404;
-    routes.page = 404;
+    routes.page = pageHtml('YouTube', null);
 
     await expect(getTrackMetadata(WATCH_URL)).rejects.toMatchObject({
       code: 'TRACK_YOUTUBE_FETCH_FAILED',
@@ -103,6 +112,47 @@ describe('YouTube 메타데이터', () => {
       code: 'TRACK_YOUTUBE_FETCH_FAILED',
       upstream: true,
     });
+  });
+
+  it('자리 페이지가 와도 곡으로 받지 않는다', async () => {
+    // oEmbed가 401을 내는 영상이 사실은 삭제된 경우다.
+    routes.oembed = 401;
+    routes.page = pageHtml('YouTube', null);
+
+    await expect(getTrackMetadata(WATCH_URL)).rejects.toMatchObject({
+      code: 'TRACK_YOUTUBE_UNAVAILABLE',
+      message: '영상 정보를 가져올 수 없습니다 (없는 영상이거나 비공개)',
+      upstream: false,
+    });
+  });
+
+  it('dual-stack 호스트를 IPv6 때문에 막지 않는다', async () => {
+    // isPrivateAddress가 IPv6를 통째로 막던 때는 이 경로가 항상 실패했다.
+    routes.oembed = 401;
+    routes.page = pageHtml('IPv6도 있는 곡', null);
+
+    expect((await getTrackMetadata(WATCH_URL)).title).toBe('IPv6도 있는 곡');
+  });
+
+  it('내부 IP로 해석되는 호스트는 막고, 그 사정을 손님에게 알리지 않는다', async () => {
+    routes.oembed = 401;
+    routes.page = pageHtml('막혀야 하는 곡', null);
+    dnsAddresses = [{ address: '127.0.0.1', family: 4 }];
+
+    // 손님에게는 일반 문구만 가고, 우리는 신호로 받는다.
+    await expect(getTrackMetadata(WATCH_URL)).rejects.toMatchObject({
+      code: 'TRACK_YOUTUBE_FETCH_FAILED',
+      message: '영상 정보를 가져올 수 없습니다 (잠시 후 다시 시도해 주세요)',
+      upstream: true,
+    });
+  });
+
+  it('제목의 백슬래시 문자열을 바꾸지 않는다', async () => {
+    // og:title은 HTML 속성이라 JSON 언이스케이프를 걸면 "\\n"이 줄바꿈이 된다.
+    routes.oembed = 401;
+    routes.page = pageHtml('C:&#x5c;n drive &#x27;24', null);
+
+    expect((await getTrackMetadata(WATCH_URL)).title).toBe("C:\\n drive '24");
   });
 
   it('페이지 형식이 바뀌어 제목을 못 읽으면 우리가 알아야 할 신호다', async () => {
