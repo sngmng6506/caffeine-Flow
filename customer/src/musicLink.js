@@ -57,6 +57,14 @@ function copyWithTextarea(text) {
   if (!copied) throw new Error('copy_failed');
 }
 
+// 두 경로가 모두 막히는 환경이 있다(iOS 인앱 WebView 등). 그때 손님이 직접
+// 복사할 수 있도록 실패해도 링크를 함께 넘긴다.
+function copyFailed(link) {
+  const error = new Error('copy_failed');
+  error.link = link;
+  return error;
+}
+
 export async function copyMusicLink(videoId) {
   const link = musicLinkFromVideoId(videoId);
   if (!link) throw new Error('missing_music_link');
@@ -71,9 +79,13 @@ export async function copyMusicLink(videoId) {
   }
 
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(link);
-    return link;
+    try {
+      await navigator.clipboard.writeText(link);
+      return link;
+    } catch {
+      // 쓰기 권한이 없으면 거부된다. 아래에서 링크를 손님에게 넘긴다.
+    }
   }
 
-  throw new Error('copy_failed');
+  throw copyFailed(link);
 }

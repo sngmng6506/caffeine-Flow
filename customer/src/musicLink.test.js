@@ -76,6 +76,32 @@ describe('copyMusicLink', () => {
     vi.unstubAllGlobals();
   });
 
+  it('복사가 막히면 손님이 직접 복사할 링크를 함께 넘긴다', async () => {
+    // iOS 인앱 WebView처럼 두 경로가 모두 막히는 환경이 있다. 거기서는 다시 눌러도
+    // 같은 결과라, 화면이 링크를 보여줄 수 있어야 한다.
+    document.execCommand = vi.fn(() => false);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: undefined });
+
+    await expect(copyMusicLink('vid')).rejects.toMatchObject({
+      message: 'copy_failed',
+      link: 'https://www.youtube.com/watch?v=vid',
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('Clipboard API가 권한으로 거부돼도 링크를 넘긴다', async () => {
+    // 쓰기 권한이 자동 허용되지 않는 환경에서 writeText는 NotAllowedError로 거부된다.
+    document.execCommand = vi.fn(() => false);
+    const writeText = vi.fn(async () => { throw new Error('NotAllowedError'); });
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+    await expect(copyMusicLink('vid')).rejects.toMatchObject({
+      link: 'https://www.youtube.com/watch?v=vid',
+    });
+    expect(writeText).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
   it('복사 후 임시 textarea를 남기지 않는다', async () => {
     document.execCommand = vi.fn(() => true);
     await copyMusicLink('vid');

@@ -5,6 +5,7 @@ import {
   Info,
   LoaderCircle,
   PauseCircle,
+  X,
 } from 'lucide-react';
 import { REC_STATUS } from '../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../constants/playbackState';
@@ -123,6 +124,8 @@ export default function CafePage({ slug }) {
   function handleCopyResult(result) {
     setCopyNotice(result);
     if (copyNoticeTimer.current) clearTimeout(copyNoticeTimer.current);
+    // 직접 복사해야 하는 안내는 자동으로 사라지면 쓸 수 없다. 손님이 닫을 때까지 둔다.
+    if (result?.link) return;
     copyNoticeTimer.current = setTimeout(() => setCopyNotice(null), 2500);
   }
 
@@ -430,11 +433,24 @@ export default function CafePage({ slug }) {
       </div>
 
       {copyNotice && (
-        <div className={`copy-toast copy-toast--${copyNotice.type}`} role={copyNotice.type === 'error' ? 'alert' : 'status'}>
+        <div className={`copy-toast copy-toast--${copyNotice.type}${copyNotice.link ? ' copy-toast--with-link' : ''}`} role={copyNotice.type === 'error' ? 'alert' : 'status'}>
           {copyNotice.type === 'error'
             ? <AlertTriangle size={18} aria-hidden='true' />
             : <CheckCircle2 size={18} aria-hidden='true' />}
-          <span>{copyNotice.message}</span>
+          <div className='copy-toast__body'>
+            <span>{copyNotice.message}</span>
+            {copyNotice.link && <span className='copy-toast__link'>{copyNotice.link}</span>}
+          </div>
+          {copyNotice.link && (
+            <button
+              type='button'
+              className='copy-toast__close'
+              onClick={() => setCopyNotice(null)}
+              aria-label='안내 닫기'
+            >
+              <X size={16} aria-hidden='true' />
+            </button>
+          )}
         </div>
       )}
 
