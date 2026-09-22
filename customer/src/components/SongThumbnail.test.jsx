@@ -56,7 +56,7 @@ describe('썸네일 대체 표시', () => {
     vi.useFakeTimers();
     try {
       const { container } = render(
-        <SongThumbnail src='https://i.ytimg.com/vi/abc/mqdefault.jpg' className='thumb' fallbackClassName='thumb--fallback' />,
+        <SongThumbnail src='https://i.ytimg.com/vi/retry/mqdefault.jpg' className='thumb' fallbackClassName='thumb--fallback' />,
       );
 
       fireEvent.error(container.querySelector('img'));
@@ -77,7 +77,7 @@ describe('썸네일 대체 표시', () => {
     vi.useFakeTimers();
     try {
       const { container } = render(
-        <SongThumbnail src='https://i.ytimg.com/vi/abc/mqdefault.jpg' className='thumb' fallbackClassName='thumb--fallback' />,
+        <SongThumbnail src='https://i.ytimg.com/vi/exhausted/mqdefault.jpg' className='thumb' fallbackClassName='thumb--fallback' />,
       );
 
       for (const delay of [500, 1600]) {
@@ -94,11 +94,47 @@ describe('썸네일 대체 표시', () => {
     }
   });
 
+  it('죽은 주소는 다시 마운트해도 받지 않는다', async () => {
+    // 탭을 오가면 컴포넌트가 다시 마운트된다. 기억해 두지 않으면 죽은 주소를
+    // 왕복할 때마다 다시 받는다(실측 3회 왕복 87회).
+    vi.useFakeTimers();
+    try {
+      const src = 'https://i.ytimg.com/vi/remount/mqdefault.jpg';
+      const first = render(<SongThumbnail src={src} className='thumb' fallbackClassName='thumb--fallback' />);
+
+      for (const delay of [500, 1600]) {
+        fireEvent.error(first.container.querySelector('img'));
+        await act(async () => { await vi.advanceTimersByTimeAsync(delay); });
+      }
+      fireEvent.error(first.container.querySelector('img'));
+      first.unmount();
+
+      // img가 잠깐이라도 붙으면 브라우저는 그 순간 요청을 보낸다. 붙은 적이 있는지까지 본다.
+      const seen = [];
+      const observer = new MutationObserver(records => {
+        for (const record of records) {
+          for (const node of record.addedNodes) if (node.tagName === 'IMG') seen.push(node);
+        }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      const second = render(<SongThumbnail src={src} className='thumb' fallbackClassName='thumb--fallback' />);
+      await act(async () => {});
+      observer.disconnect();
+
+      expect(seen).toHaveLength(0);
+      expect(second.container.querySelector('img')).toBeNull();
+      expect(second.container.querySelector('.song-thumbnail__fallback-pattern')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('연결이 돌아오면 다시 받아 본다', async () => {
     vi.useFakeTimers();
     try {
       const { container } = render(
-        <SongThumbnail src='https://i.ytimg.com/vi/abc/mqdefault.jpg' className='thumb' fallbackClassName='thumb--fallback' />,
+        <SongThumbnail src='https://i.ytimg.com/vi/online/mqdefault.jpg' className='thumb' fallbackClassName='thumb--fallback' />,
       );
 
       // 재시도를 다 써서 대체 표시로 굳은 상태를 만든다.
