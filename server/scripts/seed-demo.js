@@ -37,6 +37,16 @@ function assertSafeTarget() {
 
 const minutesAgo = (m) => new Date(Date.now() - m * 60_000);
 
+// 손님이 곡 링크를 복사해 다시 신청하는 경로가 데모에서도 돌아야 한다. 실재하지
+// 않는 video_id를 쓰면 복사된 링크가 형식만 맞는 YouTube 주소가 되고 신청에서
+// "영상 정보를 가져올 수 없습니다"로 막힌다. 그래서 실재하는 곡만 쓴다.
+//
+// SoundCloud·Spotify의 video_id는 운영에서 전체 URL이다(track-metadata.service의
+// videoId: trackUrl). 데모도 같은 모양이어야 복사·정규화가 운영과 같게 돈다.
+const ytThumb = (id) => `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+
+const SPOTIFY_REPEATED = 'https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b';
+
 function rec(cafeId, overrides) {
   return {
     cafe_id: cafeId,
@@ -53,56 +63,64 @@ async function seedMainCafe(trx, cafeId) {
   const rows = [
     // 재생 중 — 형광 패널 + 핑크 오프셋
     rec(cafeId, {
-      video_id: 'dQw4w9WgXcQ', title: '밤편지', channel_title: '아이유',
+      video_id: 'dQw4w9WgXcQ', title: 'Never Gonna Give You Up', channel_title: 'Rick Astley',
       status: REC_STATUS.PLAYING, requester_name: '따뜻한 라떼7',
-      thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg',
+      thumbnail: ytThumb('dQw4w9WgXcQ'),
       requested_at: minutesAgo(4), playing_started_at: minutesAgo(2),
     }),
     // 대기 중 — 자동수락으로 통과한 곡
     rec(cafeId, {
-      video_id: 'kJQP7kJhCSQ', title: 'Ditto', channel_title: 'NewJeans',
+      video_id: 'kJQP7kJhCSQ', title: 'Despacito', channel_title: 'Luis Fonsi',
       status: REC_STATUS.ACCEPTED, filter_status: FILTER_STATUS.ACCEPTED,
+      thumbnail: ytThumb('kJQP7kJhCSQ'),
       requester_name: '졸린 스콘42', vote_count: 3, requested_at: minutesAgo(9),
     }),
-    // 대기 중 — 썸네일 없음(아이콘 + 선 패턴 fallback)
+    // 대기 중 — 썸네일 없음(아이콘 + 선 패턴 fallback). SoundCloud oEmbed가
+    // thumbnail_url을 주지 않는 경우라 운영에서도 나오는 상태다.
     rec(cafeId, {
-      video_id: 'soundcloud-demo-track', title: 'Lo-fi 스터디 믹스',
-      channel_title: 'chill beats', platform: PLATFORM.SOUNDCLOUD,
+      video_id: 'https://soundcloud.com/forss/flickermood', title: 'Flickermood',
+      channel_title: 'Forss', platform: PLATFORM.SOUNDCLOUD,
       status: REC_STATUS.ACCEPTED, filter_status: FILTER_STATUS.ACCEPTED,
       requester_name: '포근한 모카3', requested_at: minutesAgo(14),
     }),
-    // 확인 중 — 아주 긴 제목(말줄임 확인)
+    // 확인 중 — 아주 긴 제목(말줄임 확인). 제목은 실제 트랙명이 아니라 말줄임을
+    // 보기 위한 값이다. 이 곡을 복사해 다시 신청하면 실제 제목으로 들어온다.
     rec(cafeId, {
-      video_id: 'spotify-demo-track', title: '아주 긴 제목의 곡 — 한 줄에 들어가지 않아 말줄임이 필요한 경우를 확인하기 위한 데모 트랙입니다',
+      video_id: 'https://open.spotify.com/track/4cOdK2wGLETKBW3PvgPWqT',
+      title: '아주 긴 제목의 곡 — 한 줄에 들어가지 않아 말줄임이 필요한 경우를 확인하기 위한 데모 트랙입니다',
       channel_title: '이름이 긴 아티스트 이름 확인용', platform: PLATFORM.SPOTIFY,
       status: REC_STATUS.PENDING, requester_name: '몽글몽글한 유자차19',
       requested_at: minutesAgo(2),
     }),
     // 확인 중 — 좋아요가 붙은 곡
     rec(cafeId, {
-      video_id: '9bZkp7q19f0', title: 'Super Shy', channel_title: 'NewJeans',
+      video_id: '9bZkp7q19f0', title: 'GANGNAM STYLE (강남스타일)', channel_title: 'officialpsy',
       status: REC_STATUS.PENDING, filter_status: FILTER_STATUS.ACCEPTED,
+      thumbnail: ytThumb('9bZkp7q19f0'),
       requester_name: '조용한 소금빵88', vote_count: 2, requested_at: minutesAgo(1),
     }),
     // 거절 — AI 필터가 막은 곡(손님 큐에는 안 보인다)
     rec(cafeId, {
-      video_id: 'rejected-demo-track', title: '분위기와 맞지 않는 곡',
-      channel_title: '데모', status: REC_STATUS.REJECTED,
+      video_id: 'fJ9rUzIMcZQ', title: 'Bohemian Rhapsody',
+      channel_title: 'Queen', status: REC_STATUS.REJECTED,
+      thumbnail: ytThumb('fJ9rUzIMcZQ'),
       filter_status: FILTER_STATUS.REJECTED, requested_at: minutesAgo(40),
     }),
   ];
 
   // 최근 재생 + TOP — 같은 곡을 두 번 재생해 TOP에서 한 행으로 묶이는 것을 본다.
-  // 두 번째는 추적 파라미터가 붙어 정규화가 필요하다.
+  // 두 번째는 추적 파라미터가 붙어 정규화가 필요하다. Spotify 공유 링크가 실제로
+  // ?si=를 달고 오므로 그 플랫폼에 둔다 — YouTube는 파서가 v 파라미터 값만 꺼내므로
+  // video_id에 ?가 섞일 수 없다.
   const played = [
-    ['JGwWNGJdvx8', 'Love Lee', 'AKMU', 70],
-    ['OPf0YbXqDm0', '사건의 지평선', '윤하', 120],
-    ['played-twice', '두 번 재생된 곡', '데모 아티스트', 180],
-    ['played-twice?si=tracking', '두 번 재생된 곡', '데모 아티스트', 240],
+    { video_id: 'OPf0YbXqDm0', title: 'Uptown Funk', channel_title: 'Mark Ronson', ago: 70, thumbnail: ytThumb('OPf0YbXqDm0') },
+    { video_id: 'RgKAFK5djSk', title: 'See You Again', channel_title: 'Wiz Khalifa', ago: 120, thumbnail: ytThumb('RgKAFK5djSk') },
+    { video_id: SPOTIFY_REPEATED, title: 'Blinding Lights', channel_title: 'The Weeknd', ago: 180, platform: PLATFORM.SPOTIFY },
+    { video_id: `${SPOTIFY_REPEATED}?si=tracking`, title: 'Blinding Lights', channel_title: 'The Weeknd', ago: 240, platform: PLATFORM.SPOTIFY },
   ];
-  for (const [video_id, title, channel_title, ago] of played) {
+  for (const { ago, ...song } of played) {
     rows.push(rec(cafeId, {
-      video_id, title, channel_title,
+      ...song,
       status: REC_STATUS.PLAYED, filter_status: FILTER_STATUS.ACCEPTED,
       requested_at: minutesAgo(ago + 5), played_at: minutesAgo(ago),
     }));
@@ -117,8 +135,9 @@ async function seedMainCafe(trx, cafeId) {
 async function seedOtherCafe(trx, cafeId) {
   await trx('recommendations').insert([
     rec(cafeId, {
-      video_id: 'only-elsewhere', title: '다른 매장에서만 나온 곡',
-      channel_title: '옆집 카페', status: REC_STATUS.PLAYED,
+      video_id: 'YQHsXMglC9A', title: 'Hello',
+      channel_title: 'Adele', thumbnail: ytThumb('YQHsXMglC9A'),
+      status: REC_STATUS.PLAYED,
       filter_status: FILTER_STATUS.ACCEPTED,
       requested_at: minutesAgo(300), played_at: minutesAgo(295),
     }),
@@ -130,13 +149,13 @@ async function seedVotes(trx, cafeId) {
   const voters = ['demo-visitor-a', 'demo-visitor-b', 'demo-visitor-c'];
   await trx('votes').insert(voters.map((visitor_id, i) => ({
     cafe_id: cafeId,
-    track_key: 'played-twice',
+    track_key: SPOTIFY_REPEATED,
     voter_ip: `203.0.113.${i + 1}`,
     visitor_id,
   })));
   await trx('recommendations')
     .where({ cafe_id: cafeId })
-    .whereIn('video_id', ['played-twice', 'played-twice?si=tracking'])
+    .whereIn('video_id', [SPOTIFY_REPEATED, `${SPOTIFY_REPEATED}?si=tracking`])
     .update({ vote_count: voters.length });
 }
 
