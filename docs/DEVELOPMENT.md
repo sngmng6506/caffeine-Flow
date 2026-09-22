@@ -69,6 +69,9 @@ YouTube 아닌 플랫폼, 같은 곡의 추적 파라미터 변형, 전체 TOP �
 운영 사고를 막기 위해 `NODE_ENV=production`이거나 DB 호스트가 localhost가
 아니면 중단하며, 후자는 `SEED_DEMO_ALLOW_REMOTE=true`로만 넘길 수 있다.
 
+이 데이터로 손님·사장님 화면을 실제로 띄우고 조작하는 절차는
+[.claude/skills/run-app/SKILL.md](../.claude/skills/run-app/SKILL.md)에 있다.
+
 ## 환경변수
 
 루트 `.env`를 서버가 읽고 배포에서는 Railway 환경변수를 사용한다. 전체 예시는 [.env.example](../.env.example), 기본값은 `server/src/config.js`가 기준이다.

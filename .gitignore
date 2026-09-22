@@ -1,10 +1,11 @@
 node_modules/
 .env
-# Claude Code 설정 — 팀이 공유하는 세션 시작 훅만 커밋하고
+# Claude Code 설정 — 팀이 공유하는 세션 시작 훅과 스킬만 커밋하고
 # 개인 설정(settings.local.json)과 세션 부산물은 계속 무시한다.
 .claude/*
 !.claude/settings.json
 !.claude/hooks/
+!.claude/skills/
 .claude/settings.local.json
 
 # 빌드 산출물 — 배포 때마다 재생성된다.
