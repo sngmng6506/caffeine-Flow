@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Heart, Link2, LoaderCircle } from 'lucide-react';
-import LongPressCopy from '../components/LongPressCopy';
 import { copyLinkForResult } from '../copyLinkAction';
 import SongThumbnail from '../components/SongThumbnail';
 import CafeComments from './CafeComments';
@@ -51,22 +50,20 @@ export default function Top10List({ items, hasMore, loading, slug, voteSlug, sor
           return (
             <li className='rank-list__item' key={rowKey}>
               <div className='rank-row-line'>
-                <LongPressCopy videoId={item.video_id} onResult={onCopyResult}>
-                  <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
-                    <span className='rank-row__number'>{index + 1}</span>
-                    <SongThumbnail
-                      src={item.thumbnail}
-                      className='rank-row__thumbnail'
-                      fallbackClassName='rank-row__thumbnail--empty'
-                      iconSize={18}
-                    />
-                    <span className='rank-row__info'>
-                      <strong>{item.title}</strong>
-                      <small>{item.channel_title} · {item.count}회 재생</small>
-                    </span>
-                    {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
-                  </button>
-                </LongPressCopy>
+                <button type='button' className='rank-row' aria-expanded={isExpanded} onClick={() => setExpanded(value => value === rowKey ? null : rowKey)}>
+                  <span className='rank-row__number'>{index + 1}</span>
+                  <SongThumbnail
+                    src={item.thumbnail}
+                    className='rank-row__thumbnail'
+                    fallbackClassName='rank-row__thumbnail--empty'
+                    iconSize={18}
+                  />
+                  <span className='rank-row__info'>
+                    <strong>{item.title}</strong>
+                    <small>{item.channel_title} · {item.count}회 재생</small>
+                  </span>
+                  {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
+                </button>
                 <button
                   type='button'
                   className='icon-button rank-row__copy'

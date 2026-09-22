@@ -750,11 +750,6 @@
   overscroll-behavior-x: contain;
 }
 
-.copyable-track {
-  touch-action: pan-y;
-  -webkit-touch-callout: none;
-}
-
 .tab-panel {
   min-height: 160px;
 }

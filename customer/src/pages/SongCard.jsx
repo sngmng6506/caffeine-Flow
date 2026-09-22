@@ -6,7 +6,6 @@ import { trackKeyOf } from '../trackKey';
 import { CANCELLABLE_STATUSES, REC_STATUS_LABELS } from '../constants/recommendationStatus';
 import { COMPACT_PLATFORM_BADGE, PLATFORM } from '../constants/platforms';
 import SongThumbnail from '../components/SongThumbnail';
-import LongPressCopy from '../components/LongPressCopy';
 import { copyLinkForResult } from '../copyLinkAction';
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLinkCopyResult, showDate, position, isMyRequest, hideStatus, expanded, compact }) {
@@ -17,8 +16,8 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
   const cancellable = isMyRequest && CANCELLABLE_STATUSES.includes(rec.status);
   const platformBadge = rec.platform && rec.platform !== PLATFORM.YOUTUBE ? COMPACT_PLATFORM_BADGE[rec.platform] : null;
 
-  // iOS는 길게 누르기로는 복사 API를 허용하지 않는다. 탭은 허용하므로 버튼이 기본
-  // 경로다(근거는 copyLinkAction.js).
+  // iOS는 길게 누르기로는 복사 API를 허용하지 않는다. 탭은 허용하므로 버튼이
+  // 유일한 경로다(근거는 copyLinkAction.js).
   async function handleCopyLink() {
     onLinkCopyResult?.(await copyLinkForResult(rec.video_id));
   }
@@ -52,8 +51,7 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
   }
 
   return (
-    <LongPressCopy videoId={rec.video_id} onResult={onLinkCopyResult} disabled={rec.link_available === false}>
-      <article className={`song-card${compact ? ' song-card--compact' : ''}`}>
+    <article className={`song-card${compact ? ' song-card--compact' : ''}`}>
       <div className='song-card__context'>
         <div className='song-card__details'>
           {position && <span className='song-card__position'>{position}번째</span>}
@@ -130,7 +128,6 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
       </div>
 
       {error && <div className='feedback feedback--error song-card__error' role='alert'>{error}</div>}
-      </article>
-    </LongPressCopy>
+    </article>
   );
 }
