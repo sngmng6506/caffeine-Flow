@@ -16,12 +16,17 @@ function copyWithTextarea(text) {
   const textarea = document.createElement('textarea');
   const activeElement = document.activeElement;
   textarea.value = text;
-  textarea.readOnly = true;
-  textarea.style.position = 'fixed';
-  textarea.style.top = '0';
-  textarea.style.left = '-9999px';
-  textarea.style.fontSize = '16px';
+  // iOS Safari는 readOnly 입력에서 선택 범위를 만들지 못해 execCommand가 false를 낸다.
+  // readOnly를 두지 않고 contentEditable을 켜는 조합이 iOS에서 통한다. 화면 밖으로
+  // 멀리 밀어낸 요소도 선택이 무시되므로 보이지 않는 1px로 화면 안에 둔다.
+  textarea.contentEditable = 'true';
+  textarea.readOnly = false;
+  textarea.tabIndex = -1;
+  textarea.setAttribute('aria-hidden', 'true');
+  textarea.style.cssText =
+    'position:fixed;top:0;left:0;width:1px;height:1px;padding:0;border:0;opacity:0;font-size:16px;';
   document.body.appendChild(textarea);
+  const selection = window.getSelection?.();
   let copied;
   try {
     try {
@@ -29,10 +34,19 @@ function copyWithTextarea(text) {
     } catch {
       textarea.focus();
     }
-    textarea.select();
-    textarea.setSelectionRange(0, text.length);
+    // setSelectionRange만으로는 iOS에서 선택이 잡히지 않아 Selection API를 함께 쓴다.
+    if (selection && document.createRange) {
+      const range = document.createRange();
+      range.selectNodeContents(textarea);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    textarea.select?.();
+    textarea.setSelectionRange?.(0, text.length);
     copied = document.execCommand?.('copy') === true;
   } finally {
+    // 선택을 남기면 iOS에서 하이라이트가 화면에 보인다.
+    selection?.removeAllRanges?.();
     textarea.remove();
     try {
       activeElement?.focus?.({ preventScroll: true });

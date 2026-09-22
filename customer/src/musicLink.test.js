@@ -81,4 +81,33 @@ describe('copyMusicLink', () => {
     await copyMusicLink('vid');
     expect(document.querySelectorAll('textarea')).toHaveLength(0);
   });
+
+  it('iOS에서 선택이 잡히도록 readOnly를 쓰지 않고 Selection까지 건다', async () => {
+    // iOS Safari는 readOnly 입력에서 선택 범위를 만들지 못해 execCommand가 false를 낸다.
+    // 그러면 Clipboard API로 넘어가는데 그쪽은 쓰기 권한이 없으면 거부돼 복사가 통째로
+    // 실패한다. 1차 시도의 조건을 여기서 고정한다.
+    const seen = {};
+    document.execCommand = vi.fn(() => {
+      const textarea = document.querySelector('textarea');
+      seen.readOnly = textarea.readOnly;
+      seen.contentEditable = textarea.contentEditable;
+      seen.rangeCount = window.getSelection().rangeCount;
+      return true;
+    });
+
+    await copyMusicLink('vid');
+
+    expect(seen.readOnly).toBe(false);
+    expect(seen.contentEditable).toBe('true');
+    expect(seen.rangeCount).toBeGreaterThan(0);
+  });
+
+  it('복사한 뒤 화면에 보이는 선택을 남기지 않는다', async () => {
+    // 선택이 남으면 iOS에서 곡 제목에 하이라이트가 보인다. 실제 브라우저는 포커스를
+    // 되돌린 자리에 빈 캐럿(collapsed range)을 남기므로 rangeCount가 아니라
+    // 선택된 문자열이 비었는지로 고정한다.
+    document.execCommand = vi.fn(() => true);
+    await copyMusicLink('vid');
+    expect(window.getSelection().toString()).toBe('');
+  });
 });
