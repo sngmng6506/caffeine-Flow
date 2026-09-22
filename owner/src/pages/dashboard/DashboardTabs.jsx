@@ -38,7 +38,7 @@ export default function DashboardTabs({ activeTab, recommendations, onChange }) 
           onKeyDown={event => handleKeyDown(event, value)}
           className={`owner-tab ${activeTab === value ? 'owner-tab--active' : ''}`}
         >
-          {label}
+          <span className="owner-tab__label">{label}</span>
           {value === 'queue' && pendingCount > 0 && (
             <span className="owner-count" aria-label={`새 신청 ${pendingCount}곡`}>{pendingCount}</span>
           )}

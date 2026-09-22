@@ -45,13 +45,17 @@
 | `--owner-text-strong`, `--owner-text`, `--owner-text-muted`, `--owner-text-disabled` | 제목·핵심 값 / 기본 본문 / 설명·보조 / 비활성의 4단계 위계 |
 | `--owner-stroke` | 구분선, 입력 테두리 |
 | `--owner-primary`, `--owner-primary-hover` | 주요 행동과 focus |
+| `--owner-primary-soft` | 기본 행동 강조의 옅은 배경(개수 뱃지, AI 필터 켜짐 표시) |
 | `--owner-success` | 정상 완료, 연결됨 |
+| `--owner-success-soft`, `--owner-success-soft-border`, `--owner-success-soft-text` | 성공 상태의 옅은 배경·테두리·텍스트 세트 |
 | `--owner-warning` | 확인이 필요한 상태 |
 | `--owner-danger` | 삭제, 실패, 중단 위험 |
+| `--owner-danger-soft`, `--owner-danger-soft-border`, `--owner-danger-soft-text` | 위험·오류 상태의 옅은 배경·테두리·텍스트 세트 |
 
 사용 규칙:
 
 - 새 색상을 역할 없이 추가하지 않는다. hex를 화면 코드에 직접 쓰지 않고 토큰을 참조한다.
+- 켜짐 상태를 색으로 구분해야 하는 두 토글(신청 접수·AI 필터)은 서로 다른 토큰(Success·Primary)을 쓴다. 접힌 상태 레일처럼 문구 없이 점만 보이는 자리에서 같은 색을 쓰면 두 상태가 구분되지 않는다.
 - 플랫폼 공식 색상은 작은 로고·점·배지에만 쓰고 버튼이나 카드 전체 배경으로 확장하지 않는다.
 - 색상만으로 상태를 전달하지 않고 문구나 아이콘을 함께 쓴다.
 - 장식용 그라데이션, glow, 강한 그림자를 쓰지 않는다.
