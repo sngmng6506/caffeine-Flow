@@ -7,7 +7,7 @@ import {
   PauseCircle,
   X,
 } from 'lucide-react';
-import { copyMusicLink } from '../musicLink';
+import { copyLinkForResult } from '../copyLinkAction';
 import { REC_STATUS } from '../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../constants/playbackState';
 import NowPlaying from './NowPlaying';
@@ -125,16 +125,7 @@ export default function CafePage({ slug }) {
   // iOS는 길게 누른 뒤의 pointerup에 사용자 활성화를 주지 않는 것으로 보인다.
   // 그래서 길게 눌러 복사가 막힌 환경에서도 버튼 탭으로는 복사가 될 수 있다.
   async function handleCopyRetry(link) {
-    try {
-      await copyMusicLink(link);
-      handleCopyResult({ type: 'success', message: '곡 링크를 복사했어요.' });
-    } catch {
-      handleCopyResult({
-        type: 'error',
-        message: '이 브라우저에서는 복사가 막혀 있어요. 주소를 직접 선택해 주세요.',
-        link,
-      });
-    }
+    handleCopyResult(await copyLinkForResult(link));
   }
 
   function handleCopyResult(result) {

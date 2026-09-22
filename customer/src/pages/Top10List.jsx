@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Heart, LoaderCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Heart, Link2, LoaderCircle } from 'lucide-react';
 import LongPressCopy from '../components/LongPressCopy';
+import { copyLinkForResult } from '../copyLinkAction';
 import SongThumbnail from '../components/SongThumbnail';
 import CafeComments from './CafeComments';
 import StatePanel from './StatePanel';
@@ -66,6 +67,14 @@ export default function Top10List({ items, hasMore, loading, slug, voteSlug, sor
                     {isExpanded ? <ChevronUp size={18} aria-hidden='true' /> : <ChevronDown size={18} aria-hidden='true' />}
                   </button>
                 </LongPressCopy>
+                <button
+                  type='button'
+                  className='icon-button rank-row__copy'
+                  onClick={async () => onCopyResult?.(await copyLinkForResult(item.video_id))}
+                  aria-label='곡 링크 복사'
+                >
+                  <Link2 size={16} aria-hidden='true' />
+                </button>
                 <button
                   type='button'
                   className={`pill-action rank-row__vote${voted ? ' pill-action--active' : ''}`}

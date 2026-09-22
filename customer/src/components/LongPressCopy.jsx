@@ -1,5 +1,5 @@
 import { Children, cloneElement, useEffect, useRef } from 'react';
-import { copyMusicLink } from '../musicLink';
+import { copyLinkForResult } from '../copyLinkAction';
 
 const LONG_PRESS_MS = 550;
 const MOVE_TOLERANCE_PX = 12;
@@ -55,16 +55,7 @@ export default function LongPressCopy({ videoId, onResult, disabled = false, chi
 
     suppressClickRef.current = true;
     resetTimerRef.current = setTimeout(() => { suppressClickRef.current = false; }, 800);
-    try {
-      await copyMusicLink(videoId);
-      onResult?.({ type: 'success', message: '곡 링크를 복사했어요.' });
-    } catch (caught) {
-      // 브라우저가 복사를 막는 환경이면 다시 눌러도 같은 결과다. 링크를 함께 올려
-      // 손님이 직접 복사할 수 있게 한다.
-      onResult?.(caught?.link
-        ? { type: 'error', message: '링크를 복사하지 못했어요. 아래에서 다시 복사해 주세요.', link: caught.link }
-        : { type: 'error', message: '링크를 복사하지 못했어요. 잠시 후 다시 시도해 주세요.' });
-    }
+    onResult?.(await copyLinkForResult(videoId));
     clearPress();
   }
 

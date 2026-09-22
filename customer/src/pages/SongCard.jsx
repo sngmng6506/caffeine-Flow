@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Heart, MessageCircle, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Heart, Link2, MessageCircle, X } from 'lucide-react';
 import { vote, unvote, cancelRecommendation } from '../api';
 import { hasVoted, markVoted, removeVote } from '../votedSongs';
 import { trackKeyOf } from '../trackKey';
@@ -7,6 +7,7 @@ import { CANCELLABLE_STATUSES, REC_STATUS_LABELS } from '../constants/recommenda
 import { COMPACT_PLATFORM_BADGE, PLATFORM } from '../constants/platforms';
 import SongThumbnail from '../components/SongThumbnail';
 import LongPressCopy from '../components/LongPressCopy';
+import { copyLinkForResult } from '../copyLinkAction';
 
 export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLinkCopyResult, showDate, position, isMyRequest, hideStatus, expanded, compact }) {
   const [error, setError] = useState('');
@@ -15,6 +16,12 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
   const voted = hasVoted(slug, trackKey);
   const cancellable = isMyRequest && CANCELLABLE_STATUSES.includes(rec.status);
   const platformBadge = rec.platform && rec.platform !== PLATFORM.YOUTUBE ? COMPACT_PLATFORM_BADGE[rec.platform] : null;
+
+  // iOS는 길게 누르기로는 복사 API를 허용하지 않는다. 탭은 허용하므로 버튼이 기본
+  // 경로다(근거는 copyLinkAction.js).
+  async function handleCopyLink() {
+    onLinkCopyResult?.(await copyLinkForResult(rec.video_id));
+  }
 
   async function handleCancel() {
     if (!window.confirm('이 신청곡을 취소할까요?\n대기열에서 사라지며 다시 들으려면 새로 신청해야 해요.')) return;
@@ -103,6 +110,17 @@ export default function SongCard({ slug, rec, onUpdate, onDelete, onToggle, onLi
             <><MessageCircle size={16} aria-hidden='true' /><span>댓글</span></>
           )}
         </button>
+        {rec.link_available !== false && (
+          <button
+            type='button'
+            onClick={handleCopyLink}
+            className={compact ? 'icon-button' : 'pill-action'}
+            aria-label={compact ? '곡 링크 복사' : undefined}
+          >
+            <Link2 size={16} aria-hidden='true' />
+            {!compact && <span>링크</span>}
+          </button>
+        )}
         {cancellable && (
           <button type='button' onClick={handleCancel} className='pill-action pill-action--danger'>
             <X size={16} aria-hidden='true' />
