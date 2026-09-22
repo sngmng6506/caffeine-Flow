@@ -2,10 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getHistory } from '../../api';
 import RecommendCard from '../RecommendCard';
 import OwnerCommentSection from './OwnerCommentSection';
-
-function todayKstString(date = new Date()) {
-  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
+import { kstTodayString } from '../../utils/kst';
 
 export default function HistoryTab({ active, slug, onUpdate, onDelete }) {
   const [history, setHistory] = useState([]);
@@ -51,7 +48,7 @@ export default function HistoryTab({ active, slug, onUpdate, onDelete }) {
 
   if (!active) return null;
 
-  const today = todayKstString();
+  const today = kstTodayString();
 
   return (
     <div id="owner-panel-history" role="tabpanel" aria-labelledby="owner-tab-history" className="owner-history">
