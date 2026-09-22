@@ -7,6 +7,7 @@ import {
   PauseCircle,
   X,
 } from 'lucide-react';
+import { copyMusicLink } from '../musicLink';
 import { REC_STATUS } from '../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../constants/playbackState';
 import NowPlaying from './NowPlaying';
@@ -119,6 +120,21 @@ export default function CafePage({ slug }) {
 
   function handleDelete(id) {
     removeRecommendation(id);
+  }
+
+  // iOS는 길게 누른 뒤의 pointerup에 사용자 활성화를 주지 않는 것으로 보인다.
+  // 그래서 길게 눌러 복사가 막힌 환경에서도 버튼 탭으로는 복사가 될 수 있다.
+  async function handleCopyRetry(link) {
+    try {
+      await copyMusicLink(link);
+      handleCopyResult({ type: 'success', message: '곡 링크를 복사했어요.' });
+    } catch {
+      handleCopyResult({
+        type: 'error',
+        message: '이 브라우저에서는 복사가 막혀 있어요. 주소를 직접 선택해 주세요.',
+        link,
+      });
+    }
   }
 
   function handleCopyResult(result) {
@@ -439,7 +455,18 @@ export default function CafePage({ slug }) {
             : <CheckCircle2 size={18} aria-hidden='true' />}
           <div className='copy-toast__body'>
             <span>{copyNotice.message}</span>
-            {copyNotice.link && <span className='copy-toast__link'>{copyNotice.link}</span>}
+            {copyNotice.link && (
+              <div className='copy-toast__link-row'>
+                <span className='copy-toast__link'>{copyNotice.link}</span>
+                <button
+                  type='button'
+                  className='copy-toast__retry'
+                  onClick={() => handleCopyRetry(copyNotice.link)}
+                >
+                  복사
+                </button>
+              </div>
+            )}
           </div>
           {copyNotice.link && (
             <button
