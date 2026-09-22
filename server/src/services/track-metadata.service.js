@@ -4,6 +4,7 @@ const net = require('net');
 const { PLATFORM } = require('../constants/platforms');
 
 const PRIVATE_IPV4_RE = /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|0\.|255\.)/;
+const YOUTUBE_ALLOWED_HOSTS = ['youtube.com', 'youtu.be'];
 const SOUNDCLOUD_ALLOWED_HOSTS = ['soundcloud.com', 'on.soundcloud.com', 'soundcloud.app.goo.gl', 'goo.gl'];
 const SPOTIFY_ALLOWED_HOSTS = ['open.spotify.com', 'spotify.com', 'spotify.link'];
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
@@ -67,6 +68,30 @@ async function safeAxiosGet(url, options = {}) {
   });
 }
 
+// og 메타 태그 하나를 읽는다. 속성 순서가 뒤집힌 마크업도 받는다.
+function metaContent(html, attribute, key) {
+  const forward = new RegExp(`<meta[^>]*${attribute}=["']${key}["'][^>]*content=["']([^"']+)["']`, 'i');
+  const reverse = new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*${attribute}=["']${key}["']`, 'i');
+  return (html.match(forward) || html.match(reverse) || [])[1];
+}
+
+// og 태그와 페이지 JSON은 각각 HTML 엔티티와 \uXXXX로 이스케이프돼 있다. 풀지
+// 않으면 손님 화면에 "Tom &amp; Jerry"가 그대로 보인다.
+const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" };
+function decodeText(value) {
+  if (!value) return value;
+  let text = value;
+  try {
+    text = JSON.parse(`"${text.replace(/"/g, '\\"')}"`);
+  } catch {
+    // \uXXXX가 없으면 원문 그대로 쓴다
+  }
+  return text.replace(/&(#\d+|[a-z]+);/gi, (match, name) => {
+    if (name[0] === '#') return String.fromCharCode(Number(name.slice(1)));
+    return HTML_ENTITIES[name.toLowerCase()] ?? match;
+  });
+}
+
 function detectPlatform(url) {
   try {
     const parsed = new URL(url);
@@ -114,10 +139,58 @@ function normalizeSpotifyUrl(url) {
   return null;
 }
 
+// 퍼가기(embed)가 꺼진 영상은 YouTube oEmbed가 401을 낸다. 하지만 우리는 임베드로
+// 틀지 않는다 — Electron이 youtube.com 워치 페이지를 그대로 연다
+// (owner/electron/navigation-policy.js). 그래서 oEmbed가 거절한 영상도 실제로는
+// 재생된다. 제목·채널만 워치 페이지에서 읽어 신청을 살린다. SoundCloud가 쓰는
+// 경로와 같다.
+//
+// 검증 한계: 이 fallback이 실제 YouTube 응답에서 도는지는 확인하지 못했다
+// (개발 환경에서 youtube.com 접근이 막혀 있다). 실패하면 oEmbed만 쓰던 이전과
+// 동작이 같다 — 거절이다.
+async function getYoutubeMetadataFromPage(videoId) {
+  const { data: html } = await safeAxiosGet(`https://www.youtube.com/watch?v=${videoId}`, {
+    allowedHosts: YOUTUBE_ALLOWED_HOSTS,
+    headers: {
+      'User-Agent': USER_AGENT,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+    },
+    timeout: 10000,
+  });
+
+  const title = metaContent(html, 'property', 'og:title') || metaContent(html, 'name', 'title');
+  if (!title) {
+    throw metadataError('영상 정보를 가져올 수 없습니다 (페이지 형식 변경)', 'TRACK_YOUTUBE_PARSE_FAILED', { upstream: true });
+  }
+
+  const channel = (html.match(/"ownerChannelName":"([^"]+)"/)
+    || html.match(/<link[^>]+itemprop=["']name["'][^>]+content=["']([^"']+)["']/)
+    || [])[1];
+
+  return {
+    platform: PLATFORM.YOUTUBE,
+    videoId,
+    title: decodeText(title),
+    // 채널명을 못 읽어도 제목이 있으면 신청을 막지 않는다.
+    channelTitle: decodeText(channel) || 'YouTube',
+    thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+  };
+}
+
+// oEmbed 404는 없는 영상·비공개라 손님이 링크를 고쳐야 한다. 나머지는 퍼가기
+// 설정이나 일시적 오류라 다시 시도할 여지가 있다. 내부 코드와 프롬프트는 싣지
+// 않는다(Public Response Boundary).
+function youtubeFailureMessage(oembedStatus) {
+  if (oembedStatus === 404) return '영상 정보를 가져올 수 없습니다 (없는 영상이거나 비공개)';
+  return '영상 정보를 가져올 수 없습니다 (잠시 후 다시 시도해 주세요)';
+}
+
 async function getYoutubeMetadata(rawUrl) {
   const videoId = extractYoutubeId(rawUrl);
   if (!videoId) throw metadataError('유효한 YouTube URL이 아닙니다', 'TRACK_INVALID_YOUTUBE_URL');
 
+  let oembedStatus;
   try {
     const { data } = await axios.get('https://www.youtube.com/oembed', {
       params: { url: `https://www.youtube.com/watch?v=${videoId}`, format: 'json' },
@@ -132,14 +205,23 @@ async function getYoutubeMetadata(rawUrl) {
       thumbnail: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
     };
   } catch (error) {
-    // oEmbed의 401·404는 "임베드 비활성화"이거나 없는 영상이라 손님이 고른 곡의
-    // 속성이다. 403·429는 서버 IP 차단·한도 초과라 전 카페 신청이 막히므로
-    // SoundCloud와 같은 기준으로 플랫폼 신호로 본다.
-    const status = error.response?.status;
+    oembedStatus = error.response?.status;
+  }
+
+  try {
+    return await getYoutubeMetadataFromPage(videoId);
+  } catch (error) {
+    if (error.code?.startsWith('TRACK_')) throw error;
+    // 두 경로 중 하나라도 서버 IP 차단·한도 초과·5xx를 가리키면 우리가 알아야 할
+    // 신호다. 없는 영상(404)처럼 양쪽이 손님 입력을 가리킬 때만 알리지 않는다.
+    const pageStatus = error.response?.status;
     throw metadataError(
-      '영상 정보를 가져올 수 없습니다 (임베드 비활성화 또는 잘못된 URL)',
+      youtubeFailureMessage(oembedStatus),
       'TRACK_YOUTUBE_FETCH_FAILED',
-      { upstream: isUpstreamTrackFailure(status), upstreamStatus: status ?? null },
+      {
+        upstream: isUpstreamTrackFailure(oembedStatus) || isUpstreamTrackFailure(pageStatus),
+        upstreamStatus: pageStatus ?? oembedStatus ?? null,
+      },
     );
   }
 }
@@ -212,14 +294,8 @@ async function getSoundCloudMetadata(rawUrl) {
       timeout: 10000,
     });
 
-    const metaContent = (attribute, key) => {
-      const forward = new RegExp(`<meta[^>]*${attribute}=["']${key}["'][^>]*content=["']([^"']+)["']`, 'i');
-      const reverse = new RegExp(`<meta[^>]*content=["']([^"']+)["'][^>]*${attribute}=["']${key}["']`, 'i');
-      return (html.match(forward) || html.match(reverse) || [])[1];
-    };
-
-    const ogTitle = metaContent('property', 'og:title') || metaContent('name', 'twitter:title');
-    const ogImage = metaContent('property', 'og:image') || metaContent('name', 'twitter:image');
+    const ogTitle = metaContent(html, 'property', 'og:title') || metaContent(html, 'name', 'twitter:title');
+    const ogImage = metaContent(html, 'property', 'og:image') || metaContent(html, 'name', 'twitter:image');
     if (!ogTitle) throw metadataError('트랙 정보를 가져올 수 없습니다 (페이지 형식 변경)', 'TRACK_SOUNDCLOUD_PARSE_FAILED', { upstream: true });
 
     let title = ogTitle
@@ -235,8 +311,8 @@ async function getSoundCloudMetadata(rawUrl) {
     return {
       platform: PLATFORM.SOUNDCLOUD,
       videoId: trackUrl,
-      title,
-      channelTitle: artist,
+      title: decodeText(title),
+      channelTitle: decodeText(artist),
       thumbnail: ogImage || null,
     };
   } catch (error) {

@@ -97,6 +97,9 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | --- | --- | :-: | --- |
 | GET | `/tracks/oembed?url=` | 🔓 | 음악 URL을 공통 트랙 메타데이터로 변환하고 5분 유효 `metadataToken` 발급 |
 
+- YouTube는 oEmbed가 실패하면 워치 페이지의 `og:title`로 한 번 더 시도한다. **퍼가기(embed)가 꺼진 영상은 oEmbed가 401을 내지만 이 앱은 임베드로 틀지 않으므로**(Electron이 워치 페이지를 그대로 연다) 재생 가능한 곡이다. 두 경로가 모두 실패할 때만 400이며, 404(없는 영상·비공개)와 나머지는 손님에게 다른 문구로 안내한다.
+- SoundCloud도 oEmbed 실패 시 같은 방식으로 페이지를 읽는다. 두 경로 모두 `safeAxiosGet`과 플랫폼별 host allowlist를 거친다.
+
 ## 운영자 — `/admin`
 
 | Method | Path | 인증 | 요약 |
