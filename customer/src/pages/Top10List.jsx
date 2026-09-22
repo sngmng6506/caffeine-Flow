@@ -85,7 +85,7 @@ export default function Top10List({ items, hasMore, loading, slug, voteSlug, sor
       </ol>
       {hasMore && (
         <button type='button' className='button button--secondary button--full' onClick={onLoadMore} disabled={loading}>
-          {loading ? '불러오는 중...' : '더 보기'}
+          {loading ? '불러오는 중…' : '더 보기'}
         </button>
       )}
     </section>

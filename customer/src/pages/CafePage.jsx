@@ -401,7 +401,7 @@ export default function CafePage({ slug }) {
               </div>
               {historyHasMore && (
                 <button type='button' className='button button--secondary button--full' onClick={loadMoreHistory} disabled={historyLoading}>
-                  {historyLoading ? '불러오는 중...' : '더 보기'}
+                  {historyLoading ? '불러오는 중…' : '더 보기'}
                 </button>
               )}
             </section>

@@ -104,7 +104,7 @@ export default function CafeComments({ videoId, slug }) {
       ))}
       {hasMore && (
         <button type='button' className='button button--secondary button--full' onClick={handleLoadMore} disabled={pageLoading}>
-          {pageLoading ? '댓글 불러오는 중...' : '댓글 더 보기'}
+          {pageLoading ? '댓글 불러오는 중…' : '댓글 더 보기'}
         </button>
       )}
     </section>
