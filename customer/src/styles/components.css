@@ -1383,64 +1383,6 @@
   flex: 0 0 auto;
 }
 
-/* 복사가 막힌 환경에서 링크를 직접 복사하게 하는 안내. 토스트 한 줄보다 길어져
-   본문을 세로로 쌓고, 링크는 탭 한 번에 전체가 선택되게 한다. */
-.copy-toast--with-link {
-  align-items: flex-start;
-}
-
-.copy-toast__body {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.copy-toast__link-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.copy-toast__link {
-  overflow-wrap: anywhere;
-  min-width: 0;
-  flex: 1;
-  font-weight: 400;
-  user-select: all;
-  -webkit-user-select: all;
-}
-
-/* 길게 누르기가 막힌 환경에서도 버튼 탭은 사용자 활성화가 확실하다. */
-.copy-toast__retry {
-  min-height: 32px;
-  flex: 0 0 auto;
-  padding: 6px 12px;
-  border: 1px solid currentColor;
-  border-radius: var(--cf-radius-control);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.copy-toast__close {
-  display: inline-flex;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  align-items: center;
-  justify-content: center;
-  margin: -12px -10px -12px 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--cf-on-dark);
-  cursor: pointer;
-}
-
 .copy-toast--error {
   color: var(--cf-destructive);
   background: var(--cf-destructive-soft);

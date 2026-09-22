@@ -5,9 +5,7 @@ import {
   Info,
   LoaderCircle,
   PauseCircle,
-  X,
 } from 'lucide-react';
-import { copyLinkForResult } from '../copyLinkAction';
 import { REC_STATUS } from '../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../constants/playbackState';
 import NowPlaying from './NowPlaying';
@@ -122,17 +120,9 @@ export default function CafePage({ slug }) {
     removeRecommendation(id);
   }
 
-  // iOS는 길게 누른 뒤의 pointerup에 사용자 활성화를 주지 않는 것으로 보인다.
-  // 그래서 길게 눌러 복사가 막힌 환경에서도 버튼 탭으로는 복사가 될 수 있다.
-  async function handleCopyRetry(link) {
-    handleCopyResult(await copyLinkForResult(link));
-  }
-
   function handleCopyResult(result) {
     setCopyNotice(result);
     if (copyNoticeTimer.current) clearTimeout(copyNoticeTimer.current);
-    // 직접 복사해야 하는 안내는 자동으로 사라지면 쓸 수 없다. 손님이 닫을 때까지 둔다.
-    if (result?.link) return;
     copyNoticeTimer.current = setTimeout(() => setCopyNotice(null), 2500);
   }
 
@@ -440,35 +430,11 @@ export default function CafePage({ slug }) {
       </div>
 
       {copyNotice && (
-        <div className={`copy-toast copy-toast--${copyNotice.type}${copyNotice.link ? ' copy-toast--with-link' : ''}`} role={copyNotice.type === 'error' ? 'alert' : 'status'}>
+        <div className={`copy-toast copy-toast--${copyNotice.type}`} role={copyNotice.type === 'error' ? 'alert' : 'status'}>
           {copyNotice.type === 'error'
             ? <AlertTriangle size={18} aria-hidden='true' />
             : <CheckCircle2 size={18} aria-hidden='true' />}
-          <div className='copy-toast__body'>
-            <span>{copyNotice.message}</span>
-            {copyNotice.link && (
-              <div className='copy-toast__link-row'>
-                <span className='copy-toast__link'>{copyNotice.link}</span>
-                <button
-                  type='button'
-                  className='copy-toast__retry'
-                  onClick={() => handleCopyRetry(copyNotice.link)}
-                >
-                  복사
-                </button>
-              </div>
-            )}
-          </div>
-          {copyNotice.link && (
-            <button
-              type='button'
-              className='copy-toast__close'
-              onClick={() => setCopyNotice(null)}
-              aria-label='안내 닫기'
-            >
-              <X size={16} aria-hidden='true' />
-            </button>
-          )}
+          <span>{copyNotice.message}</span>
         </div>
       )}
 

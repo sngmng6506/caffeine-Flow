@@ -9,14 +9,7 @@ export async function copyLinkForResult(videoId) {
   try {
     await copyMusicLink(videoId);
     return { type: 'success', message: '곡 링크를 복사했어요.' };
-  } catch (caught) {
-    if (!caught?.link) {
-      return { type: 'error', message: '링크를 복사하지 못했어요. 잠시 후 다시 시도해 주세요.' };
-    }
-    return {
-      type: 'error',
-      message: '이 브라우저에서는 복사가 막혀 있어요. 주소를 직접 선택해 주세요.',
-      link: caught.link,
-    };
+  } catch {
+    return { type: 'error', message: '링크를 복사하지 못했어요. 잠시 후 다시 시도해 주세요.' };
   }
 }
