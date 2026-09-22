@@ -53,6 +53,22 @@ node .claude/skills/run-app/drive.mjs /tmp/shots --accept      # 두 화면 + �
 토큰을 발급하고, 드라이버가 `localStorage`의 `token`·`cafe`에 넣는다. 둘 다 있어야 로그인
 화면을 지나간다.
 
+## 사장님 화면 폭 — 브라우저 창 폭이 아니라 패널 폭
+
+`owner/DESIGN_GUIDE.md`가 말하는 "420px, 560px, 720px"는 **`.owner-dashboard`(왼쪽
+운영 패널)의 실제 폭**이다. 이 패널은 `usePanelDivider.js`가 정하는 `panelRatio`(기본
+42%, 최대 85%)만큼만 창 너비를 차지한다 — 오른쪽은 Electron BrowserView가 들어가는
+자리다. Playwright 뷰포트를 그냥 420/560/720px로 주면 **패널은 그 42%인 176~302px에서
+렌더링되고, 가이드가 검증하라는 폭은 확인하지 못한다.**
+
+패널 폭을 정확히 맞추려면 로드 전에 비율을 최대로 고정하고, 목표 패널 폭을 그 비율로
+나눈 값을 뷰포트에 준다.
+
+```js
+await page.evaluate(() => localStorage.setItem('cf_panel_ratio', '1')); // clampRatio가 0.85로 고정
+// 목표 패널폭 420/560/720px -> 뷰포트 494/659/847px (÷0.85)
+```
+
 ## 안 되는 것
 
 - **Electron 재생 화면** — 외부 음악 플랫폼 접근 자체가 막힌다. 재생·종료 감지·BrowserView
