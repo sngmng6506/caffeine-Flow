@@ -58,7 +58,8 @@ function rec(cafeId, overrides) {
   };
 }
 
-async function seedMainCafe(trx, cafeId) {
+/** 곡 행만 만든다. DB를 건드리지 않아 테스트가 그대로 검사할 수 있다. */
+function mainCafeRows(cafeId) {
   // 활성 상태는 (cafe_id, video_id) 부분 유니크가 걸려 있어 곡이 겹치면 안 된다.
   const rows = [
     // 재생 중 — 형광 패널 + 핑크 오프셋
@@ -126,14 +127,18 @@ async function seedMainCafe(trx, cafeId) {
     }));
   }
 
-  const inserted = await trx('recommendations').insert(rows).returning(['id', 'status']);
+  return rows;
+}
+
+async function seedMainCafe(trx, cafeId) {
+  const inserted = await trx('recommendations').insert(mainCafeRows(cafeId)).returning(['id', 'status']);
   const playing = inserted.find(row => row.status === REC_STATUS.PLAYING);
   await trx('cafes').where({ id: cafeId }).update({ now_playing_id: playing.id });
 }
 
 /** 전체 TOP에만 나오는 곡 — 우리 매장에 기록이 없는 곡에도 좋아요를 누를 수 있어야 한다. */
-async function seedOtherCafe(trx, cafeId) {
-  await trx('recommendations').insert([
+function otherCafeRows(cafeId) {
+  return [
     rec(cafeId, {
       video_id: 'YQHsXMglC9A', title: 'Hello',
       channel_title: 'Adele', thumbnail: ytThumb('YQHsXMglC9A'),
@@ -141,7 +146,11 @@ async function seedOtherCafe(trx, cafeId) {
       filter_status: FILTER_STATUS.ACCEPTED,
       requested_at: minutesAgo(300), played_at: minutesAgo(295),
     }),
-  ]);
+  ];
+}
+
+async function seedOtherCafe(trx, cafeId) {
+  await trx('recommendations').insert(otherCafeRows(cafeId));
 }
 
 /** 표는 (카페, 곡, 방문자) 단위다. 같은 곡의 모든 행이 같은 vote_count를 본다. */
@@ -185,10 +194,15 @@ async function main() {
   console.log(`  전체 TOP 전용 곡은 /${OTHER_SLUG} 매장에 있다`);
 }
 
-main()
-  .then(() => db.destroy())
-  .catch(async (error) => {
-    console.error(`[seed:demo] ${error.message}`);
-    await db.destroy();
-    process.exitCode = 1;
-  });
+// 테스트가 곡 목록을 검사하려고 require할 때 시드가 돌면 안 된다.
+if (require.main === module) {
+  main()
+    .then(() => db.destroy())
+    .catch(async (error) => {
+      console.error(`[seed:demo] ${error.message}`);
+      await db.destroy();
+      process.exitCode = 1;
+    });
+}
+
+module.exports = { mainCafeRows, otherCafeRows };
