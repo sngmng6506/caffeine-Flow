@@ -25,6 +25,24 @@ def fake_child(connection):
 
 
 class AnalysisProcessTest(unittest.TestCase):
+    def test_model_validation_failure_prevents_ready_and_job_processing(self):
+        from analysis_process import serve
+        import remote_analyze
+        from emotion import EmotionModelError
+
+        for reason in ('모델 파일이 없습니다', '모델 파일 해시가 다릅니다', '감정 모델 초기화 실패'):
+            with self.subTest(reason=reason):
+                connection = Mock()
+                with patch.object(remote_analyze, 'load_emotion_predictor',
+                                  side_effect=EmotionModelError(reason)), \
+                     patch.object(remote_analyze, 'run') as run, \
+                     contextlib.redirect_stderr(io.StringIO()):
+                    serve(connection)
+                connection.send.assert_any_call(('error', 'MODEL_UNAVAILABLE'))
+                self.assertNotIn(unittest.mock.call(('ready', None)), connection.send.call_args_list)
+                connection.recv.assert_not_called()
+                run.assert_not_called()
+
     def test_server_initializes_models_once_for_two_jobs(self):
         from analysis_process import serve
         import remote_analyze

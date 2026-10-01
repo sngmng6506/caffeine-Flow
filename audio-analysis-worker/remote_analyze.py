@@ -25,10 +25,8 @@ def initialize_models():
     호출부가 `models[1]`로 감정 모델을 꺼내므로 자리를 비워 둔 튜플을 돌려준다.
     """
     directory = os.environ.get('AUDIO_MODEL_DIR', '~/caffeine-audio/models')
-    try:
-        emotion = load_emotion_predictor(directory)
-    except EmotionModelError:
-        emotion = None
+    # 모델 검증 실패는 자식의 MODEL_UNAVAILABLE로 전달해 새 claim을 막는다.
+    emotion = load_emotion_predictor(directory)
     return None, emotion
 
 
