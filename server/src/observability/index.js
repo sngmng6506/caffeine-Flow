@@ -1,17 +1,23 @@
 const { ALERT_WEBHOOK_URL } = require('../config');
 const { CAUSE, CAUSES, ALERT_TEST_CODE, isDbConnectionError, trackErrorCause, naverCallbackError } = require('./error-taxonomy');
 const { createAlertAggregator } = require('./alert-aggregator');
-const { createAlertChannel, SEND_TIMEOUT_MS } = require('./alert-channel');
+const { createAlertChannel, MAX_DELIVERY_MS } = require('./alert-channel');
 
-// 크래시 뒤 종료를 미루는 시간. 웹훅 전송 타임아웃보다 길어야 마지막 알림이
+// 크래시 뒤 종료를 미루는 시간. 웹훅 재시도 상한보다 길어야 마지막 알림이
 // 잘리지 않는다. 두 값이 따로 놀지 않도록 여기서 파생시킨다.
-const CRASH_EXIT_DELAY_MS = SEND_TIMEOUT_MS + 500;
+const CRASH_EXIT_DELAY_MS = MAX_DELIVERY_MS + 500;
 
 const aggregator = createAlertAggregator();
 const channel = createAlertChannel({ webhookUrl: ALERT_WEBHOOK_URL });
 
 // 테스트 환경에서는 네트워크로 나가지 않는다. 웹훅 URL이 없어도 마찬가지다.
 const alertsEnabled = channel.enabled && process.env.NODE_ENV !== 'test';
+
+async function deliver(summary) {
+  const success = await channel.deliver(summary);
+  aggregator.deliveryFinished(summary.code, success);
+  return success;
+}
 
 function normalizeCode(code, error) {
   if (code) return String(code).slice(0, 60);
@@ -64,7 +70,7 @@ function logError({ code, cause, cafe = null, route = null, error = null, messag
     route,
     message: resolvedMessage,
   });
-  if (summary) channel.deliver(summary);
+  if (summary) deliver(summary);
 }
 
 /**
@@ -88,7 +94,7 @@ async function sendTestAlert({ route = 'POST /api/v1/admin/alert-test' } = {}) {
   // 실제 알림과 다르게 동작해 확인의 의미가 줄어든다.
   if (!summary) return { sent: false, reason: 'cooldown' };
 
-  const delivered = await channel.deliver(summary);
+  const delivered = await deliver(summary);
   return { sent: delivered, reason: delivered ? null : 'delivery_failed' };
 }
 

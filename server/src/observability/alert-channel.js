@@ -3,6 +3,20 @@ const { ALERT_TIER } = require('./error-taxonomy');
 
 const SEND_TIMEOUT_MS = 3000;
 const MESSAGE_MAX_LENGTH = 300;
+const MAX_ATTEMPTS = 3;
+const MAX_RETRY_DELAY_MS = 30_000;
+const MAX_DELIVERY_MS = MAX_ATTEMPTS * SEND_TIMEOUT_MS + 2 * MAX_RETRY_DELAY_MS;
+
+function retryDelay(error, attempt) {
+  const status = error?.response?.status;
+  if (status && status !== 429 && status < 500) return null;
+  const seconds = Number(error?.response?.data?.retry_after ?? error?.response?.headers?.['retry-after']);
+  if (status === 429 && Number.isFinite(seconds) && seconds >= 0) {
+    // 지정 시간보다 일찍 재전송하지 않는다. 긴 제한은 다음 알림 시도로 넘긴다.
+    return seconds * 1000 <= MAX_RETRY_DELAY_MS ? seconds * 1000 : null;
+  }
+  return 1000 * (attempt + 1);
+}
 
 // Discord embed 색상
 const TIER_COLOR = Object.freeze({
@@ -82,24 +96,33 @@ function buildAlertMessage(summary) {
 }
 
 /**
- * 알림 전송은 요청 처리를 막지 않고, 실패해도 조용히 포기한다.
+ * 알림 전송은 요청 처리를 막지 않고 일시 오류를 최대 3회 시도한다.
  * 여기서 다시 logError를 부르면 알림 실패가 알림을 유발하는 무한 루프가 된다.
  */
-function createAlertChannel({ webhookUrl, send = axios.post }) {
+function createAlertChannel({ webhookUrl, send = axios.post, wait = (ms) => new Promise(resolve => setTimeout(resolve, ms)) }) {
   if (!webhookUrl) return { enabled: false, deliver: () => Promise.resolve(false) };
 
   return {
     enabled: true,
     async deliver(summary) {
-      try {
-        await send(webhookUrl, buildAlertMessage(summary), { timeout: SEND_TIMEOUT_MS });
-        return true;
-      } catch (error) {
-        console.error('[alert] 웹훅 전송 실패:', error?.response?.status || error?.code || error?.message);
-        return false;
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+        try {
+          await send(webhookUrl, buildAlertMessage(summary), { timeout: SEND_TIMEOUT_MS });
+          return true;
+        } catch (error) {
+          const delay = retryDelay(error, attempt);
+          if (attempt + 1 < MAX_ATTEMPTS && delay !== null) {
+            await wait(delay);
+            continue;
+          }
+          // 외부 오류 원문에는 웹훅 URL이 들어갈 수 있어 상태·코드만 기록한다.
+          console.error('[alert] 웹훅 전송 실패:', error?.response?.status || error?.code || 'DELIVERY_FAILED');
+          return false;
+        }
       }
+      return false;
     },
   };
 }
 
-module.exports = { createAlertChannel, buildAlertMessage, redact, SEND_TIMEOUT_MS };
+module.exports = { createAlertChannel, buildAlertMessage, redact, SEND_TIMEOUT_MS, MAX_DELIVERY_MS };

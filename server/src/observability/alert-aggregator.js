@@ -89,6 +89,13 @@ function createAlertAggregator({
       return summary;
     },
 
+    // 실패한 전송을 30분간 성공으로 취급하지 않는다. 반복 오류의 재전송 폭주는
+    // 1분 유예로 막고, 성공한 알림만 완료 시점부터 원래 쿨다운을 적용한다.
+    deliveryFinished(code, success) {
+      const bucket = bucketFor(code);
+      bucket.lastSentAt = success ? now() : now() - cooldownMs + Math.min(60_000, cooldownMs);
+    },
+
     // 테스트와 진단용. 운영 경로에서는 사용하지 않는다.
     pendingCount(code) {
       return buckets.get(code)?.events.length || 0;

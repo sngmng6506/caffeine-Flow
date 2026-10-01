@@ -112,6 +112,7 @@ describe('알림 페이로드', () => {
     const channel = createAlertChannel({
       webhookUrl: 'https://discord.test/webhook',
       send: () => Promise.reject(new Error('boom')),
+      wait: async () => {},
     });
     await expect(channel.deliver(summary)).resolves.toBe(false);
   });
@@ -126,5 +127,42 @@ describe('알림 페이로드', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0][0]).toBe('https://discord.test/webhook');
     expect(calls[0][1].embeds[0].title).toContain('LLM_TIMEOUT');
+  });
+});
+
+
+describe('웹훅 재전송', () => {
+  it('일시 오류 후 재시도해 성공하고 Discord 429 대기시간을 지킨다', async () => {
+    const waits = [];
+    let calls = 0;
+    const channel = createAlertChannel({ webhookUrl: 'https://discord.test/webhook',
+      wait: async ms => { waits.push(ms); },
+      send: async () => {
+        calls += 1;
+        if (calls === 1) throw { response: { status: 429, data: { retry_after: 2 } } };
+        if (calls === 2) throw { response: { status: 503 } };
+      },
+    });
+    expect(await channel.deliver(summary)).toBe(true);
+    expect(calls).toBe(3);
+    expect(waits).toEqual([2000, 2000]);
+  });
+  it('영구 거절과 긴 rate limit은 즉시 반복하지 않는다', async () => {
+    for (const error of [{ response: { status: 401 } }, { response: { status: 429, data: { retry_after: 60 } } }]) {
+      let calls = 0;
+      const channel = createAlertChannel({ webhookUrl: 'https://discord.test/webhook',
+        send: async () => { calls += 1; throw error; }, wait: async () => { throw new Error('must not wait'); },
+      });
+      expect(await channel.deliver(summary)).toBe(false);
+      expect(calls).toBe(1);
+    }
+  });
+  it('지속 네트워크 장애는 3회로 제한한다', async () => {
+    let calls = 0;
+    const channel = createAlertChannel({ webhookUrl: 'https://discord.test/webhook',
+      send: async () => { calls += 1; throw new Error('offline'); }, wait: async () => {},
+    });
+    expect(await channel.deliver(summary)).toBe(false);
+    expect(calls).toBe(3);
   });
 });

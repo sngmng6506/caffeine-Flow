@@ -136,3 +136,21 @@ describe('알림 집계', () => {
     expect(agg.pendingCount('LLM_TIMEOUT')).toBe(0);
   });
 });
+
+
+describe('전송 결과와 쿨다운', () => {
+  it('실패하면 30분 대신 1분 후 다시 알릴 수 있다', () => {
+    const clock = fixedClock();
+    const agg = createAlertAggregator({ now: clock.now });
+    const event = { code: 'DB_CONNECTION_FAILED', cause: CAUSE.PLATFORM };
+    expect(agg.record(event)).not.toBeNull();
+    agg.deliveryFinished(event.code, false);
+    clock.advance(59_999);
+    expect(agg.record(event)).toBeNull();
+    clock.advance(1);
+    expect(agg.record(event)).not.toBeNull();
+    agg.deliveryFinished(event.code, true);
+    clock.advance(60_000);
+    expect(agg.record(event)).toBeNull();
+  });
+});
