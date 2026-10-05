@@ -238,7 +238,9 @@ async function updateStatus(cafeId, id, status) {
     return rec;
   }
 
-  return db.transaction(async (trx) => {
+  // 건너뛰기·수락·거절도 카페 큐를 거친다. 곡 행만 잡고 들어오면 재생 전환과
+  // 동시에 같은 곡을 바꿀 수 있다(건너뛴 곡이 played로 덮어써지던 경합).
+  return withCafeQueue(cafeId, async (trx) => {
     const current = await requireForCafe(trx, cafeId, id, { forUpdate: true });
     return updateStatusRow(trx, current, status);
   });
