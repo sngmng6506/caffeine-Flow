@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidTransition, TERMINAL_STATUSES } from '../src/services/recommendation.service.js';
-import { OWNER_MUTABLE_STATUSES } from '../src/constants/recommendation-status.js';
+import { isValidTransition, TERMINAL_STATUSES, OWNER_MUTABLE_STATUSES } from '../src/constants/recommendation-status.js';
 
 describe('추천곡 상태 전이', () => {
   it('활성 상태 간 양방향 전이 허용 (드래그 UI)', () => {

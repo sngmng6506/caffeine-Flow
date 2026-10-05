@@ -1,5 +1,5 @@
 const db = require('../db/knex');
-const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES } = require('../constants/recommendation-status');
+const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES, isValidTransition } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM } = require('../constants/platforms');
 const { canonicalizeVideoId } = require('../utils/video-id');
@@ -152,14 +152,6 @@ async function addWithinQueueLimit(cafeId, payload, maxQueueSize) {
 
     return insertRecommendation(trx, cafeId, payload);
   });
-}
-
-// 종료 상태(played/skipped/rejected)에서는 어떤 전이도 불가.
-// pending↔accepted↔playing 사이는 사장님 드래그 UI가 양방향 이동을
-// 허용하므로 자유 전이. (playing→accepted 되돌리기 등)
-function isValidTransition(from, to) {
-  if (from === to) return true;
-  return !TERMINAL_STATUSES.includes(from);
 }
 
 async function updateStatusRow(dbOrTrx, current, status) {
@@ -374,7 +366,6 @@ module.exports = {
   voteSong,
   unvoteSong,
   addComment,
-  isValidTransition,
   ACTIVE_STATUSES,
   TERMINAL_STATUSES,
 };
