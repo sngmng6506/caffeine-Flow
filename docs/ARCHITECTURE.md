@@ -114,7 +114,7 @@ stateDiagram-v2
 
 ## 실시간 동기화
 
-카페별 공용 room과 인증된 사장님 전용 `owner:<slug>` room을 사용한다.
+카페 ID·접속 당시 slug로 구분한 공용 `cafe:<cafeId>:<slug>` room과 인증된 사장님 전용 `owner:cafe:<cafeId>:<slug>` room을 사용한다.
 
 ```text
 손님 추가·투표·취소

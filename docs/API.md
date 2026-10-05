@@ -45,7 +45,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | GET | `/cafes/me/stats/hourly-songs` | 🔒 | 특정 시간대 곡 `?hour=` |
 | GET | `/cafes/me/stats/weekday-songs` | 🔒 | 특정 요일 곡 `?day=` |
 
-- `GET /cafes/me`와 `PUT /cafes/me/slug` 응답은 최초 가입 slug를 `initial_slug`로 반환한다. slug 변경 응답에는 새 JWT가 포함되며 클라이언트가 즉시 교체해야 한다.
+- `GET /cafes/me`와 `PUT /cafes/me/slug` 응답은 최초 가입 slug를 `initial_slug`로 반환한다. slug 변경 응답에는 새 JWT가 포함되며 클라이언트가 즉시 교체해야 한다. 이전 주소의 소켓은 이동 안내 후 종료되므로 새 주소·토큰으로 다시 연결한다.
 
 ## 추천곡 — `/cafes/:slug/recommendations`
 

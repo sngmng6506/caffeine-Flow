@@ -107,12 +107,12 @@ router.post('/', requestLimiters, async (req, res) => {
   }
   if (filterResult.action === FILTER_ACTION.REJECT) {
     if (filterResult.filterStatus === FILTER_STATUS.ERROR_REJECTED) {
-      broadcastToOwners(req, req.params.slug, 'music_filter_error', { title, platform, reason: filterResult.reason, errorCode: filterResult.errorCode, occurredAt: new Date().toISOString() });
+      broadcastToOwners(req, cafe, 'music_filter_error', { title, platform, reason: filterResult.reason, errorCode: filterResult.errorCode, occurredAt: new Date().toISOString() });
       return res.status(503).json({ error: 'AI 필터 확인 중 문제가 발생해 신청할 수 없습니다. 잠시 후 다시 시도해주세요.' });
     }
     return res.status(403).json({ error: '이 곡은 매장 분위기와 맞지 않아 신청할 수 없습니다.' });
   }
-  broadcastRecommendation(req, req.params.slug, { action: 'add', rec });
+  broadcastRecommendation(req, cafe, { action: 'add', rec });
   res.status(201).json(publicRecommendation(rec, { visitorId }));
 });
 
@@ -127,7 +127,7 @@ router.delete('/:id/cancel', async (req, res) => {
   if (!isOwner) return res.status(403).json({ error: '본인이 신청한 곡만 취소할 수 있습니다' });
   const deleted = await recService.remove(cafe.id, rec.id);
   if (!deleted) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
-  broadcastRecommendation(req, req.params.slug, { action: 'delete', id: rec.id });
+  broadcastRecommendation(req, cafe, { action: 'delete', id: rec.id });
   res.json({ ok: true });
 });
 

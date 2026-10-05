@@ -171,7 +171,7 @@ server/src/observability/alert-channel.js
 
 - 공개 HTTP·Socket 응답에 DB row를 그대로 반환하지 않는다. 명시적 allowlist 직렬화만 사용한다.
 - `requester_ip`, `commenter_ip`, `visitor_id`, 모델명, confidence, 내부 오류 코드를 손님에게 노출하지 않는다. 사장님 응답에도 운영에 필요 없는 IP와 visitor ID를 노출하지 않는다.
-- AI 판단 상세와 필터 오류 실시간 이벤트는 JWT 검증 후 입장하는 `owner:<slug>` room으로만 보낸다.
+- AI 판단 상세와 필터 오류 실시간 이벤트는 JWT 검증 후 입장하는 `owner:cafe:<cafeId>:<slug>` room으로만 보낸다.
 - 손님 취소 권한은 공개 응답 값이 아니라 요청 헤더의 visitor ID와 저장된 visitor ID가 일치하는지로 판단한다.
 - 운영자 에러 알림(Discord webhook)도 같은 경계다. 외부로 나가는 페이로드는 allowlist로 구성하고 매장 분위기 설명 원문, visitor ID, IP, 신청자명, 스택 트레이스를 넣지 않는다. 상세는 운영자 콘솔과 서버 로그에서 확인한다.
 - 공개 필드를 추가할 때는 개인정보·내부 판단 정보 여부를 먼저 검토하고 통합 테스트로 비노출을 고정한다.
@@ -236,6 +236,7 @@ server/src/features/music-filter/public-guide.service.js
 - slug는 변경 가능하다. 변경 응답에는 새 JWT를 포함하고 클라이언트가 즉시 교체한다.
 - slug를 장기 캐시하거나 카페의 불변 ID로 사용하지 않는다.
 - 사장님 HTTP·Socket 인증은 JWT의 `cafeId`로 현재 카페를 조회하고 현재 slug 일치까지 검증한다. slug 변경 전 토큰은 거절한다.
+- 소켓 room과 재생 권한은 카페 ID·접속 당시 slug로 격리한다. 주소 변경 시 이전 room의 연결을 끊고, 인증과 join 사이의 변경도 join 이후 재검증으로 차단한다.
 - 정지 카페의 손님 HTTP·소켓 접근을 우회하지 않는다.
 
 ## Recommendation Tenant Isolation Contract

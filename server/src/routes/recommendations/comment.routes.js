@@ -31,7 +31,7 @@ router.post('/:id/comments', commentLimiters, async (req, res) => {
       body: bodyCheck.value,
     });
     const safeComment = recommendationComment(comment);
-    broadcast(req, req.params.slug, 'comment_added', { recommendationId: req.params.id, comment: safeComment });
+    broadcast(req, cafe, 'comment_added', { recommendationId: req.params.id, comment: safeComment });
     res.status(201).json(safeComment);
   } catch (error) {
     if (sendServiceError(res, error)) return;

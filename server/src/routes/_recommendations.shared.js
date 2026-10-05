@@ -6,16 +6,14 @@ const {
   ownerRecommendation,
 } = require('../utils/public-response');
 
-function ownerRoom(slug) {
-  return `owner:${slug}`;
+const { cafeRoom, ownerRoom } = require('../socket/rooms');
+
+function broadcast(req, cafe, event, data) {
+  req.app.get('io')?.of('/cafe').to(cafeRoom(cafe)).emit(event, data);
 }
 
-function broadcast(req, slug, event, data) {
-  req.app.get('io')?.of('/cafe').to(slug).emit(event, data);
-}
-
-function broadcastToOwners(req, slug, event, data) {
-  req.app.get('io')?.of('/cafe').to(ownerRoom(slug)).emit(event, data);
+function broadcastToOwners(req, cafe, event, data) {
+  req.app.get('io')?.of('/cafe').to(ownerRoom(cafe)).emit(event, data);
 }
 
 function serializeRecommendationEvent(data, serialize) {
@@ -23,9 +21,9 @@ function serializeRecommendationEvent(data, serialize) {
   return { ...data, rec: serialize(data.rec) };
 }
 
-function broadcastRecommendation(req, slug, data) {
-  broadcast(req, slug, 'recommendations_update', serializeRecommendationEvent(data, publicRecommendation));
-  broadcastToOwners(req, slug, 'owner_recommendations_update', serializeRecommendationEvent(data, ownerRecommendation));
+function broadcastRecommendation(req, cafe, data) {
+  broadcast(req, cafe, 'recommendations_update', serializeRecommendationEvent(data, publicRecommendation));
+  broadcastToOwners(req, cafe, 'owner_recommendations_update', serializeRecommendationEvent(data, ownerRecommendation));
 }
 
 // 클라이언트 IP는 반드시 req.ip 사용 — server.js에서 trust proxy 1을 설정했으므로
