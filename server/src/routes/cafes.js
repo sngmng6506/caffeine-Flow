@@ -19,6 +19,7 @@ const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
 const { logError, CAUSE } = require('../observability');
 const musicFilter = require('../features/music-filter');
+const publicGuideBudget = require('../features/music-filter/public-guide-budget');
 const { getTrackMetadata } = require('../services/track-metadata.service');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { MUSIC_FILTER_TEST_LIMIT } = require('../constants/limits');
@@ -172,44 +173,64 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
     || current.music_filter_public_notice
   );
 
-  let generated = null;
+  let ticket;
   if (shouldGeneratePublicNotice) {
     try {
-      const generator = req.app.get('publicMusicGuideGenerator') || generatePublicMusicGuide;
-      generated = await generator({ cafePrompt: promptCheck.value });
-      generated = {
-        notice: normalizePublicGuide(generated),
-        model: generated?.model ? String(generated.model).slice(0, 100) : null,
-      };
+      ticket = await publicGuideBudget.reserve(req.owner.cafeId);
     } catch (error) {
-      logError({
-        code: error?.code || 'PUBLIC_GUIDE_FAILED',
-        cause: CAUSE.EXTERNAL,
-        cafe: { id: req.owner.cafeId, slug: req.owner.slug },
-        route: 'PUT /cafes/me/music-filter',
-        error,
-      });
-      return res.status(503).json({
-        error: '손님용 신청곡 안내를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
-      });
+      if (error.status) return res.status(error.status).json({ error: error.message });
+      throw error; // 예산 확인 실패 시 유료 호출을 시작하지 않는다.
     }
   }
+  let response;
+  try {
+    let generated = null;
+    if (shouldGeneratePublicNotice) {
+      try {
+        const generator = req.app.get('publicMusicGuideGenerator') || generatePublicMusicGuide;
+        generated = await generator({ cafePrompt: promptCheck.value });
+        generated = {
+          notice: normalizePublicGuide(generated),
+          model: generated?.model ? String(generated.model).slice(0, 100) : null,
+        };
+      } catch (error) {
+        logError({
+          code: error?.code || 'PUBLIC_GUIDE_FAILED',
+          cause: CAUSE.EXTERNAL,
+          cafe: { id: req.owner.cafeId, slug: req.owner.slug },
+          route: 'PUT /cafes/me/music-filter',
+          error,
+        });
+        return res.status(503).json({
+          error: '손님용 신청곡 안내를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+        });
+      }
+    }
 
-  const cafe = await cafeService.updateMusicFilterSettings(req.owner.cafeId, {
-    enabled: enabledCheck.value,
-    prompt: promptCheck.value,
-    replacePublicNotice: shouldGeneratePublicNotice || shouldClearPublicNotice,
-    publicNotice: generated?.notice || null,
-    publicNoticeModel: generated?.model || null,
-  });
+    const cafe = await cafeService.updateMusicFilterSettings(req.owner.cafeId, {
+      enabled: enabledCheck.value,
+      prompt: promptCheck.value,
+      replacePublicNotice: shouldGeneratePublicNotice || shouldClearPublicNotice,
+      publicNotice: generated?.notice || null,
+      publicNoticeModel: generated?.model || null,
+    });
 
-  emitNoticeUpdate(req, current, cafe);
+    emitNoticeUpdate(req, current, cafe);
 
-  res.json({
-    music_filter_enabled: cafe.music_filter_enabled,
-    music_filter_prompt: cafe.music_filter_prompt,
-    music_filter_public_notice: cafe.music_filter_public_notice,
-  });
+    response = {
+      music_filter_enabled: cafe.music_filter_enabled,
+      music_filter_prompt: cafe.music_filter_prompt,
+      music_filter_public_notice: cafe.music_filter_public_notice,
+    };
+  } finally {
+    try {
+      await publicGuideBudget.release(ticket);
+    } catch (error) {
+      // 응답·저장 결과는 유지한다. 잠금은 lease 만료 후 복구된다.
+      logError({ code: 'PUBLIC_GUIDE_BUDGET_RELEASE_FAILED', cause: CAUSE.PLATFORM, error });
+    }
+  }
+  res.json(response);
 });
 
 // POST /api/v1/cafes/me/music-filter/test  (저장 없이 곡 하나를 시험한다)

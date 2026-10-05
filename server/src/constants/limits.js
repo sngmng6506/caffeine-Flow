@@ -68,7 +68,16 @@ const MUSIC_FILTER_TEST_LIMIT = Object.freeze({
   max: 10,
 });
 
+// 유료 손님 안내 생성의 영속 한도. KST 하루, 실패한 시도도 포함한다.
+const PUBLIC_GUIDE_LIMIT = Object.freeze({
+  cafeDaily: 10,
+  globalDaily: 1000,
+  maxOutputTokens: 256,
+  leaseGraceMs: 60_000,
+});
+
 module.exports = {
+  PUBLIC_GUIDE_LIMIT,
   ONE_MINUTE_MS,
   GLOBAL_API_RATE_LIMIT,
   QUEUE_MAX_SIZE,
