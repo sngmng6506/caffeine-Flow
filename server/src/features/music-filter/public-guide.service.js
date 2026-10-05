@@ -1,3 +1,4 @@
+const { PUBLIC_GUIDE_LIMIT } = require('../../constants/limits');
 const { renderPrompt } = require('./prompt.renderer');
 const { callStructuredLlm } = require('./llm.client');
 
@@ -46,6 +47,7 @@ async function generatePublicMusicGuide({ cafePrompt }) {
     toolName: 'public_music_guide',
     toolDescription: '매장 분위기 설명을 정리한 손님용 신청곡 안내',
     schema: PUBLIC_GUIDE_SCHEMA,
+    maxOutputTokens: PUBLIC_GUIDE_LIMIT.maxOutputTokens,
   });
   return { notice: normalizePublicGuide(result), model };
 }

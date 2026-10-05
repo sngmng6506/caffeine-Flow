@@ -20,9 +20,9 @@ function songVotePayload(result) {
   return { track_key: result.trackKey, vote_count: result.voteCount };
 }
 
-function broadcastSongVote(req, slug, result) {
-  broadcast(req, slug, 'song_vote', songVotePayload(result));
-  for (const rec of result.recommendations) broadcastRecommendation(req, slug, { action: 'vote', rec });
+function broadcastSongVote(req, cafe, result) {
+  broadcast(req, cafe, 'song_vote', songVotePayload(result));
+  for (const rec of result.recommendations) broadcastRecommendation(req, cafe, { action: 'vote', rec });
 }
 
 router.param('id', validateRecommendationId);
@@ -32,7 +32,7 @@ router.post('/songs/:trackKey/vote', voteLimiters, async (req, res) => {
   if (!cafe) return;
   try {
     const result = await recService.voteSong(cafe.id, req.params.trackKey, getClientIp(req), safeVisitorId(req));
-    broadcastSongVote(req, req.params.slug, result);
+    broadcastSongVote(req, cafe, result);
     res.json(songVotePayload(result));
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: '이미 투표했습니다' });
@@ -46,7 +46,7 @@ router.delete('/songs/:trackKey/vote', voteLimiters, async (req, res) => {
   if (!cafe) return;
   try {
     const result = await recService.unvoteSong(cafe.id, req.params.trackKey, getClientIp(req), safeVisitorId(req));
-    broadcastSongVote(req, req.params.slug, result);
+    broadcastSongVote(req, cafe, result);
     res.json(songVotePayload(result));
   } catch (error) {
     if (sendServiceError(res, error)) return;
@@ -61,7 +61,7 @@ router.post('/:id/vote', voteLimiters, async (req, res) => {
   const visitorId = safeVisitorId(req);
   try {
     const rec = await recService.vote(cafe.id, req.params.id, ip, visitorId);
-    broadcastRecommendation(req, req.params.slug, { action: 'vote', rec });
+    broadcastRecommendation(req, cafe, { action: 'vote', rec });
     res.json(publicRecommendation(rec, { visitorId }));
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ error: '이미 투표했습니다' });
@@ -76,7 +76,7 @@ router.delete('/:id/vote', voteLimiters, async (req, res) => {
   const visitorId = safeVisitorId(req);
   try {
     const rec = await recService.unvote(cafe.id, req.params.id, getClientIp(req), visitorId);
-    broadcastRecommendation(req, req.params.slug, { action: 'vote', rec });
+    broadcastRecommendation(req, cafe, { action: 'vote', rec });
     res.json(publicRecommendation(rec, { visitorId }));
   } catch (error) {
     if (sendServiceError(res, error)) return;

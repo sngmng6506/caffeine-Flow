@@ -7,6 +7,7 @@ const playbackHistoryService = require('../services/playback-history.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { issueToken } = require('../utils/jwt');
 const { APP_URL } = require('../config');
+const { cafeRoom, disconnectCafe } = require('../socket/rooms');
 const { validateString, validateBool, validateInEnum, validateDateString, validateCoordinate, isUuid } = require('../utils/validate');
 const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
@@ -18,6 +19,7 @@ const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
 const { logError, CAUSE } = require('../observability');
 const musicFilter = require('../features/music-filter');
+const publicGuideBudget = require('../features/music-filter/public-guide-budget');
 const { getTrackMetadata } = require('../services/track-metadata.service');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { MUSIC_FILTER_TEST_LIMIT } = require('../constants/limits');
@@ -30,7 +32,7 @@ const {
 // 손님 화면은 소켓으로 즉시 바뀐다. 값이 실제로 달라졌을 때만 발행한다.
 function emitNoticeUpdate(req, before, after) {
   if (before.music_filter_public_notice === after.music_filter_public_notice) return;
-  req.app.get('io')?.of('/cafe').to(after.slug).emit('notice_updated', {
+  req.app.get('io')?.of('/cafe').to(cafeRoom(after)).emit('notice_updated', {
     notice: after.music_filter_public_notice,
   });
 }
@@ -72,7 +74,7 @@ router.put('/me', requireAuth, async (req, res) => {
   const nameCheck = validateString(req.body?.name, { max: 100, name: '카페명' });
   if (nameCheck.error) return res.status(400).json({ error: nameCheck.error });
   const cafe = await cafeService.update(req.owner.cafeId, { name: nameCheck.value });
-  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('cafe_updated', { cafe_name: cafe.name });
+  req.app.get('io')?.of('/cafe').to(cafeRoom(cafe)).emit('cafe_updated', { cafe_name: cafe.name });
   res.json(safeCafe(cafe));
 });
 
@@ -102,7 +104,7 @@ router.put('/me/slug', requireAuth, slugChangeLimiter, async (req, res) => {
   }
 
   let cafe;
-  const oldSlug = req.owner.slug;
+  const previousCafe = req.cafe;
   try {
     cafe = await cafeService.changeSlug(req.owner.cafeId, newSlug);
   } catch (err) {
@@ -112,7 +114,8 @@ router.put('/me/slug', requireAuth, slugChangeLimiter, async (req, res) => {
 
   // 옛 slug room에 연결돼 있던 손님들에게 이동을 알린다. 통보를 못 받으면
   // 다음 신청 때 404를 맞고서야 알게 되므로, 즉시 새 주소로 안내한다.
-  req.app.get('io')?.of('/cafe').to(oldSlug).emit('cafe_moved', { movedTo: cafe.slug });
+  req.app.get('io')?.of('/cafe').to(cafeRoom(previousCafe)).emit('cafe_moved', { movedTo: cafe.slug });
+  disconnectCafe(req.app.get('io'), previousCafe);
 
   const initialSlug = await cafeService.findInitialSlug(cafe.id) || cafe.slug;
   const baseUrl = APP_URL || req.app.get('baseUrl') || `${req.protocol}://${req.get('host')}`;
@@ -136,7 +139,7 @@ router.put('/me/platforms', requireAuth, async (req, res) => {
   const cafe = await cafeService.update(req.owner.cafeId, {
     allowed_platforms: formatAllowedPlatforms(filtered),
   });
-  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('platforms_updated', {
+  req.app.get('io')?.of('/cafe').to(cafeRoom(cafe)).emit('platforms_updated', {
     allowed_platforms: filtered,
   });
   res.json({ allowed_platforms: filtered });
@@ -170,44 +173,64 @@ router.put('/me/music-filter', requireAuth, async (req, res) => {
     || current.music_filter_public_notice
   );
 
-  let generated = null;
+  let ticket;
   if (shouldGeneratePublicNotice) {
     try {
-      const generator = req.app.get('publicMusicGuideGenerator') || generatePublicMusicGuide;
-      generated = await generator({ cafePrompt: promptCheck.value });
-      generated = {
-        notice: normalizePublicGuide(generated),
-        model: generated?.model ? String(generated.model).slice(0, 100) : null,
-      };
+      ticket = await publicGuideBudget.reserve(req.owner.cafeId);
     } catch (error) {
-      logError({
-        code: error?.code || 'PUBLIC_GUIDE_FAILED',
-        cause: CAUSE.EXTERNAL,
-        cafe: { id: req.owner.cafeId, slug: req.owner.slug },
-        route: 'PUT /cafes/me/music-filter',
-        error,
-      });
-      return res.status(503).json({
-        error: '손님용 신청곡 안내를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
-      });
+      if (error.status) return res.status(error.status).json({ error: error.message });
+      throw error; // 예산 확인 실패 시 유료 호출을 시작하지 않는다.
     }
   }
+  let response;
+  try {
+    let generated = null;
+    if (shouldGeneratePublicNotice) {
+      try {
+        const generator = req.app.get('publicMusicGuideGenerator') || generatePublicMusicGuide;
+        generated = await generator({ cafePrompt: promptCheck.value });
+        generated = {
+          notice: normalizePublicGuide(generated),
+          model: generated?.model ? String(generated.model).slice(0, 100) : null,
+        };
+      } catch (error) {
+        logError({
+          code: error?.code || 'PUBLIC_GUIDE_FAILED',
+          cause: CAUSE.EXTERNAL,
+          cafe: { id: req.owner.cafeId, slug: req.owner.slug },
+          route: 'PUT /cafes/me/music-filter',
+          error,
+        });
+        return res.status(503).json({
+          error: '손님용 신청곡 안내를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+        });
+      }
+    }
 
-  const cafe = await cafeService.updateMusicFilterSettings(req.owner.cafeId, {
-    enabled: enabledCheck.value,
-    prompt: promptCheck.value,
-    replacePublicNotice: shouldGeneratePublicNotice || shouldClearPublicNotice,
-    publicNotice: generated?.notice || null,
-    publicNoticeModel: generated?.model || null,
-  });
+    const cafe = await cafeService.updateMusicFilterSettings(req.owner.cafeId, {
+      enabled: enabledCheck.value,
+      prompt: promptCheck.value,
+      replacePublicNotice: shouldGeneratePublicNotice || shouldClearPublicNotice,
+      publicNotice: generated?.notice || null,
+      publicNoticeModel: generated?.model || null,
+    });
 
-  emitNoticeUpdate(req, current, cafe);
+    emitNoticeUpdate(req, current, cafe);
 
-  res.json({
-    music_filter_enabled: cafe.music_filter_enabled,
-    music_filter_prompt: cafe.music_filter_prompt,
-    music_filter_public_notice: cafe.music_filter_public_notice,
-  });
+    response = {
+      music_filter_enabled: cafe.music_filter_enabled,
+      music_filter_prompt: cafe.music_filter_prompt,
+      music_filter_public_notice: cafe.music_filter_public_notice,
+    };
+  } finally {
+    try {
+      await publicGuideBudget.release(ticket);
+    } catch (error) {
+      // 응답·저장 결과는 유지한다. 잠금은 lease 만료 후 복구된다.
+      logError({ code: 'PUBLIC_GUIDE_BUDGET_RELEASE_FAILED', cause: CAUSE.PLATFORM, error });
+    }
+  }
+  res.json(response);
 });
 
 // POST /api/v1/cafes/me/music-filter/test  (저장 없이 곡 하나를 시험한다)
@@ -323,7 +346,7 @@ router.put('/me/status', requireAuth, async (req, res) => {
   const check = validateBool(req.body?.is_accepting, { name: 'is_accepting' });
   if (check.error) return res.status(400).json({ error: check.error });
   const cafe = await cafeService.update(req.owner.cafeId, { is_accepting: check.value });
-  req.app.get('io')?.of('/cafe').to(cafe.slug).emit('system_toggled', {
+  req.app.get('io')?.of('/cafe').to(cafeRoom(cafe)).emit('system_toggled', {
     is_accepting: cafe.is_accepting,
   });
   res.json({ is_accepting: cafe.is_accepting });

@@ -57,14 +57,14 @@ router.post('/owner', ownerOnly, async (req, res) => {
   if (recStatus === REC_STATUS.PLAYING) {
     const result = await recService.setPlaying(cafe.id, rec.id);
     for (const cleared of result.cleared) {
-      broadcastRecommendation(req, req.params.slug, { action: 'update', rec: cleared });
+      broadcastRecommendation(req, req.cafe, { action: 'update', rec: cleared });
     }
     updated = result.rec;
   } else if (recStatus !== REC_STATUS.PENDING) {
     updated = await recService.updateStatus(cafe.id, rec.id, recStatus);
   }
 
-  broadcastRecommendation(req, req.params.slug, { action: 'add', rec: updated });
+  broadcastRecommendation(req, req.cafe, { action: 'add', rec: updated });
   res.status(201).json(ownerRecommendation(updated));
 });
 
@@ -83,7 +83,7 @@ router.put('/:id', ownerOnly, async (req, res) => {
     if (status === REC_STATUS.PLAYING) {
       const result = await recService.setPlaying(req.owner.cafeId, req.params.id);
       for (const cleared of result.cleared) {
-        broadcastRecommendation(req, req.params.slug, { action: 'update', rec: cleared });
+        broadcastRecommendation(req, req.cafe, { action: 'update', rec: cleared });
       }
       rec = result.rec;
     } else {
@@ -93,14 +93,14 @@ router.put('/:id', ownerOnly, async (req, res) => {
     if (err.status) return res.status(err.status).json({ error: err.message });
     throw err;
   }
-  broadcastRecommendation(req, req.params.slug, { action: 'update', rec });
+  broadcastRecommendation(req, req.cafe, { action: 'update', rec });
   res.json(ownerRecommendation(rec));
 });
 
 router.delete('/:id', ownerOnly, async (req, res) => {
   const deleted = await recService.remove(req.owner.cafeId, req.params.id);
   if (!deleted) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
-  broadcastRecommendation(req, req.params.slug, { action: 'delete', id: req.params.id });
+  broadcastRecommendation(req, req.cafe, { action: 'delete', id: req.params.id });
   res.json({ ok: true });
 });
 

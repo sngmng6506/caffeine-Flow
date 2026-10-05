@@ -171,7 +171,7 @@ server/src/observability/alert-channel.js
 
 - 공개 HTTP·Socket 응답에 DB row를 그대로 반환하지 않는다. 명시적 allowlist 직렬화만 사용한다.
 - `requester_ip`, `commenter_ip`, `visitor_id`, 모델명, confidence, 내부 오류 코드를 손님에게 노출하지 않는다. 사장님 응답에도 운영에 필요 없는 IP와 visitor ID를 노출하지 않는다.
-- AI 판단 상세와 필터 오류 실시간 이벤트는 JWT 검증 후 입장하는 `owner:<slug>` room으로만 보낸다.
+- AI 판단 상세와 필터 오류 실시간 이벤트는 JWT 검증 후 입장하는 `owner:cafe:<cafeId>:<slug>` room으로만 보낸다.
 - 손님 취소 권한은 공개 응답 값이 아니라 요청 헤더의 visitor ID와 저장된 visitor ID가 일치하는지로 판단한다.
 - 운영자 에러 알림(Discord webhook)도 같은 경계다. 외부로 나가는 페이로드는 allowlist로 구성하고 매장 분위기 설명 원문, visitor ID, IP, 신청자명, 스택 트레이스를 넣지 않는다. 상세는 운영자 콘솔과 서버 로그에서 확인한다.
 - 공개 필드를 추가할 때는 개인정보·내부 판단 정보 여부를 먼저 검토하고 통합 테스트로 비노출을 고정한다.
@@ -228,6 +228,7 @@ server/src/features/music-filter/public-guide.service.js
 - 사장님이 작성한 원본 매장 분위기 설명을 공개 응답이나 공용 소켓에 포함하지 않는다.
 - 손님용 신청곡 안내는 원본 설명 변경 또는 저장 안내 누락 시에만 생성하고 DB 결과를 재사용한다. 생성 실패 시 원문을 fallback으로 노출하지 않으며 새 설명도 저장하지 않는다.
 - 사장님이 안내를 직접 고칠 수 있다. 직접 쓴 문구도 AI가 만든 것과 같은 길이 상한(`PUBLIC_GUIDE_MAX_LENGTH`)을 서버에서 확인한다 — 손님 화면 패널이 그 길이를 전제로 그려진다. 매장 분위기 설명을 바꿔 저장하면 AI 문구로 덮인다(운영자 판단). 손으로 쓴 문구가 옛 정책을 계속 설명하는 상태를 남기지 않기 위해서다.
+- 손님 안내 생성은 영속 카페별·전체 일일 예산을 먼저 예약하고 실패도 차감한다. 동시 생성 lease는 호출·설정 저장 후 해제한다. 서버 재시작이나 IP 변경으로 예산을 우회하지 않는다.
 - 공개 문구는 서버에서 길이와 구조를 검증한 뒤 `notice` 공개 필드로만 전달한다.
 
 ## Authentication and Slug Contract
@@ -236,6 +237,7 @@ server/src/features/music-filter/public-guide.service.js
 - slug는 변경 가능하다. 변경 응답에는 새 JWT를 포함하고 클라이언트가 즉시 교체한다.
 - slug를 장기 캐시하거나 카페의 불변 ID로 사용하지 않는다.
 - 사장님 HTTP·Socket 인증은 JWT의 `cafeId`로 현재 카페를 조회하고 현재 slug 일치까지 검증한다. slug 변경 전 토큰은 거절한다.
+- 소켓 room과 재생 권한은 카페 ID·접속 당시 slug로 격리한다. 주소 변경 시 이전 room의 연결을 끊고, 인증과 join 사이의 변경도 join 이후 재검증으로 차단한다.
 - 정지 카페의 손님 HTTP·소켓 접근을 우회하지 않는다.
 
 ## Recommendation Tenant Isolation Contract

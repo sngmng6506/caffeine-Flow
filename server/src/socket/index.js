@@ -9,7 +9,7 @@ const {
 } = require('../constants/time-policy');
 const { PLAYBACK_STATE, PLAYBACK_STATES } = require('../constants/playback-state');
 const cafeService = require('../services/cafe.service');
-const { ownerRoom } = require('../routes/_recommendations.shared');
+const { cafeRoom, ownerRoom } = require('./rooms');
 const { createPlaybackLeaderRegistry } = require('./playback-leader-registry');
 const { sanitizePlaybackTrack } = require('./playback-payload');
 
@@ -47,9 +47,9 @@ async function touchHeartbeat(cafeId) {
 function initSocket(io) {
   const cafeNsp = io.of('/cafe');
 
-  // slug별 사장님 소켓 ID 집합 — peak concurrent에서 차감
-  const ownerSockets = new Map(); // slug -> Set<socketId>
-  const playbackPublishers = new Map(); // slug -> { socketId, timer, payload }
+  // room별 사장님 소켓 ID 집합 — peak concurrent에서 차감
+  const ownerSockets = new Map(); // room -> Set<socketId>
+  const playbackPublishers = new Map(); // room -> { socketId, timer, payload }
   const playbackLeaders = createPlaybackLeaderRegistry({
     graceMs: PLAYBACK_LEADER_GRACE_MS,
     onRoleChange: (socketId, isLeader) => {
@@ -63,12 +63,12 @@ function initSocket(io) {
     },
   });
 
-  function clearPlaybackState(slug, socketId = null) {
-    const current = playbackPublishers.get(slug);
+  function clearPlaybackState(room, socketId = null) {
+    const current = playbackPublishers.get(room);
     if (!current || (socketId && current.socketId !== socketId)) return;
     clearTimeout(current.timer);
-    playbackPublishers.delete(slug);
-    cafeNsp.to(slug).emit('playback_state', {
+    playbackPublishers.delete(room);
+    cafeNsp.to(room).emit('playback_state', {
       state: PLAYBACK_STATE.UNKNOWN,
       recommendationId: null,
       track: null,
@@ -77,34 +77,37 @@ function initSocket(io) {
 
   cafeNsp.on('connection', async (socket) => {
     const { slug, role } = socket.handshake.query;
-    if (!slug) return socket.disconnect();
+    if (typeof slug !== 'string' || !cafeService.isValidSlugFormat(slug)) return socket.disconnect();
 
     const ownerPayload = role === 'owner' ? await verifyOwner(socket, slug) : null;
 
-    // 손님은 정지·미존재 카페 room에 붙지 못하게 막는다 — HTTP findActiveBySlug와
-    // 동일 경계. 붙게 두면 정지 카페의 큐 변경 브로드캐스트를 엿볼 수 있다.
-    // 검증된 사장님은 오조치 복구를 위해 정지 중에도 접속 가능해야 하므로 예외.
-    if (!ownerPayload) {
-      let active;
-      try {
-        active = await cafeService.findActiveBySlug(slug);
-      } catch {
-        return socket.disconnect(); // 조회 실패 시 fail-closed — 손님 입장 거부
-      }
-      if (!active) return socket.disconnect();
+    let cafe;
+    try {
+      cafe = ownerPayload
+        ? { id: ownerPayload.cafeId, slug }
+        : await cafeService.findActiveBySlug(slug);
+      if (!cafe || !socket.connected) return socket.disconnect();
+      const room = cafeRoom(cafe);
+      await socket.join(room);
+      if (ownerPayload) await socket.join(ownerRoom(cafe));
+      // 인증 조회와 join 사이에 주소가 바뀌어 강제 종료를 놓친 연결도 막는다.
+      // join 이후 검증하므로 검증 중 변경된 연결은 변경 라우트가 끊는다.
+      const current = await cafeService.findById(cafe.id);
+      if (!current || current.slug !== slug || (!ownerPayload && current.is_suspended)
+          || !socket.connected) return socket.disconnect();
+    } catch {
+      return socket.disconnect();
     }
-
-    socket.join(slug);
-    const currentPlayback = playbackPublishers.get(slug);
+    const room = cafeRoom(cafe);
+    const currentPlayback = playbackPublishers.get(room);
     if (currentPlayback) socket.emit('playback_state', currentPlayback.payload);
 
     // 연결 유지 중 주기 갱신 타이머 — disconnect에서 반드시 해제(누수 방지)
     let heartbeatTimer = null;
 
     if (ownerPayload) {
-      socket.join(ownerRoom(slug));
-      if (!ownerSockets.has(slug)) ownerSockets.set(slug, new Set());
-      ownerSockets.get(slug).add(socket.id);
+      if (!ownerSockets.has(room)) ownerSockets.set(room, new Set());
+      ownerSockets.get(room).add(socket.id);
 
       // 매장이 지금 켜져 있음 — 연결 즉시 + 주기적으로 갱신.
       // owner 앱 코드 변경 없이 기존 소켓 연결을 그대로 생존 신호로 쓴다.
@@ -115,70 +118,68 @@ function initSocket(io) {
       const playbackSessionId = typeof rawSessionId === 'string' && isUuid(rawSessionId)
         ? rawSessionId
         : null;
-      if (playbackSessionId) playbackLeaders.add(slug, socket.id, playbackSessionId);
+      if (playbackSessionId) playbackLeaders.add(room, socket.id, playbackSessionId);
       else socket.emit('playback_role', { isLeader: false });
 
       socket.on('request_playback_role', () => {
-        const isLeader = !!playbackSessionId && playbackLeaders.isLeader(slug, socket.id);
+        const isLeader = !!playbackSessionId && playbackLeaders.isLeader(room, socket.id);
         socket.emit('playback_role', {
           isLeader,
           // 복구 권한은 renderer가 DB 복구를 끝내고 ACK할 때까지 유지한다.
           // 네트워크/API 오류로 복구가 중단돼도 다음 요청에서 재시도할 수 있다.
-          shouldRecover: isLeader && playbackLeaders.needsRecovery(slug, socket.id),
+          shouldRecover: isLeader && playbackLeaders.needsRecovery(room, socket.id),
         });
       });
 
       socket.on('playback_recovery_complete', (ack) => {
-        const ok = !!playbackSessionId && playbackLeaders.completeRecovery(slug, socket.id);
+        const ok = !!playbackSessionId && playbackLeaders.completeRecovery(room, socket.id);
         if (typeof ack === 'function') ack({ ok });
       });
 
       socket.on('playback_state', (payload = {}) => {
         // 인증된 사장님이라도 실제 재생을 맡은 Electron 한 대만 상태를
         // 발행한다. 브라우저나 follower가 손님 화면을 덮어쓰지 못한다.
-        if (!playbackLeaders.isLeader(slug, socket.id)) return;
+        if (!playbackLeaders.isLeader(room, socket.id)) return;
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
         if (!PLAYBACK_STATES.includes(payload.state)) return;
         const recommendationId = isUuid(payload.recommendationId)
           ? payload.recommendationId
           : null;
 
-        const previous = playbackPublishers.get(slug);
+        const previous = playbackPublishers.get(room);
         if (previous) clearTimeout(previous.timer);
-        const timer = setTimeout(() => clearPlaybackState(slug, socket.id), PLAYBACK_STATE_TTL_MS);
+        const timer = setTimeout(() => clearPlaybackState(room, socket.id), PLAYBACK_STATE_TTL_MS);
         const nextPlayback = {
           state: payload.state,
           recommendationId,
           track: sanitizePlaybackTrack(payload.track),
         };
-        playbackPublishers.set(slug, { socketId: socket.id, timer, payload: nextPlayback });
-        cafeNsp.to(slug).emit('playback_state', nextPlayback);
+        playbackPublishers.set(room, { socketId: socket.id, timer, payload: nextPlayback });
+        cafeNsp.to(room).emit('playback_state', nextPlayback);
       });
     } else {
       // 손님 입장 시에만 피크 갱신 의미가 있음
-      updatePeakConcurrent(cafeNsp, slug, ownerSockets);
+      updatePeakConcurrent(cafeNsp, cafe, ownerSockets);
     }
 
     socket.on('disconnect', () => {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
-      clearPlaybackState(slug, socket.id);
-      playbackLeaders.remove(slug, socket.id);
-      ownerSockets.get(slug)?.delete(socket.id);
-      if (ownerSockets.get(slug)?.size === 0) ownerSockets.delete(slug);
+      clearPlaybackState(room, socket.id);
+      playbackLeaders.remove(room, socket.id);
+      ownerSockets.get(room)?.delete(socket.id);
+      if (ownerSockets.get(room)?.size === 0) ownerSockets.delete(room);
     });
   });
 }
 
-async function updatePeakConcurrent(nsp, slug, ownerSockets) {
+async function updatePeakConcurrent(nsp, cafe, ownerSockets) {
+  const roomKey = cafeRoom(cafe);
   try {
-    const room = nsp.adapter.rooms.get(slug);
+    const room = nsp.adapter.rooms.get(roomKey);
     const total = room ? room.size : 0;
-    const owners = ownerSockets.get(slug)?.size || 0;
+    const owners = ownerSockets.get(roomKey)?.size || 0;
     const customers = total - owners;
     if (customers < 1) return;
-
-    const cafeService = require('../services/cafe.service');
-    const cafe = await cafeService.findBySlug(slug);
-    if (!cafe) return;
 
     // 방문/이력 통계와 동일하게 KST 기준 날짜 사용 (UTC면 오전 9시 전 피크가 전날로 기록됨)
     const today = kstTodayString();

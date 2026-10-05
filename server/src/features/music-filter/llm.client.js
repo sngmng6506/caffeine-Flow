@@ -57,6 +57,7 @@ async function callStructuredLlm({
   toolDescription,
   schema,
   temperature = 0,
+  maxOutputTokens,
 }) {
   if (!OPENROUTER_API_KEY) {
     throw withCode(new Error('OPENROUTER_API_KEY 누락'), 'LLM_API_KEY_MISSING');
@@ -70,6 +71,7 @@ async function callStructuredLlm({
         model,
         messages,
         temperature,
+        ...(maxOutputTokens ? { max_tokens: maxOutputTokens } : {}),
         // response_format(json_schema)는 OpenAI 계열만 지원해 Anthropic 등에서
         // 404가 났다. tool(function) calling은 프로바이더 공통이라 강제 호출로
         // 동일한 구조화 출력을 받는다.
