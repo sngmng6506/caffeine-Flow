@@ -60,6 +60,20 @@ async function requireForCafe(dbOrTrx, cafeId, id, { forUpdate = false } = {}) {
   return rec;
 }
 
+// 카페 재생 큐 애그리거트의 루트. 한 카페의 신청곡 상태·큐 구성·좋아요 수를
+// 바꾸는 쓰기는 모두 이 안에서 한다. 카페 행은 카페마다 하나뿐이라, 이 잠금을
+// 거친 작업은 같은 카페에 대해 한 번에 하나씩만 진행된다.
+//
+// 잠금 순서는 카페 → 곡이다. 곡 행을 먼저 잡고 카페 행을 잡으면 이 함수를 거친
+// 다른 작업과 교착한다.
+async function withCafeQueue(cafeId, work) {
+  return db.transaction(async (trx) => {
+    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
+    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+    return work(trx);
+  });
+}
+
 async function findActiveByVideoId(cafeId, videoId) {
   return db('recommendations')
     .where({ cafe_id: cafeId, video_id: canonicalizeVideoId(videoId) })
@@ -129,10 +143,7 @@ async function add(cafeId, payload) {
 // 라우트의 사전 체크는 불필요한 LLM 호출을 줄일 뿐, 동시 요청에 대한 최종
 // 일관성은 이 트랜잭션이 보장한다.
 async function addWithinQueueLimit(cafeId, payload, maxQueueSize) {
-  return db.transaction(async (trx) => {
-    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
-    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
-
+  return withCafeQueue(cafeId, async (trx) => {
     const duplicate = await trx('recommendations')
       .where({ cafe_id: cafeId, video_id: canonicalizeVideoId(payload.videoId) })
       .whereIn('status', ACTIVE_STATUSES)
@@ -206,10 +217,7 @@ async function clearPlayingRows(dbOrTrx, cafeId, exceptId) {
 // owner 소켓 이벤트가 동시에 들어와도 카페마다 마지막 요청 한 곡만
 // playing으로 남고, 유효하지 않은 target은 기존 곡을 건드리기 전에 차단한다.
 async function setPlaying(cafeId, id) {
-  return db.transaction(async (trx) => {
-    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
-    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
-
+  return withCafeQueue(cafeId, async (trx) => {
     const current = await requireForCafe(trx, cafeId, id, { forUpdate: true });
     if (!isValidTransition(current.status, REC_STATUS.PLAYING)) {
       throw Object.assign(
@@ -237,9 +245,7 @@ async function updateStatus(cafeId, id, status) {
 }
 
 async function clearPlaying(cafeId, exceptId) {
-  return db.transaction(async (trx) => {
-    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
-    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+  return withCafeQueue(cafeId, async (trx) => {
     return clearPlayingRows(trx, cafeId, exceptId);
   });
 }
@@ -276,10 +282,8 @@ async function songVoteResult(trx, cafeId, trackKey, total) {
 
 async function voteSong(cafeId, trackKey, voterIp, visitorId, { recommendationId = null } = {}) {
   if (!trackKey) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
-  return db.transaction(async (trx) => {
-    // 카페 잠금으로 같은 곡의 동시 투표가 카운트를 어긋나게 하지 않는다.
-    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
-    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
+  // 카페 잠금으로 같은 곡의 동시 투표가 카운트를 어긋나게 하지 않는다.
+  return withCafeQueue(cafeId, async (trx) => {
     // 전체 TOP에는 우리 매장에서 재생된 적 없는 곡도 나온다. 그 곡에도 좋아요를
     // 남길 수 있어야 하므로 존재 확인은 전역으로 한다 — 임의 문자열은 막되
     // "어딘가에서 실제로 재생된 곡"이면 받는다.
@@ -307,10 +311,7 @@ async function voteSong(cafeId, trackKey, voterIp, visitorId, { recommendationId
 
 async function unvoteSong(cafeId, trackKey, voterIp, visitorId) {
   if (!trackKey) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
-  return db.transaction(async (trx) => {
-    const cafe = await trx('cafes').where({ id: cafeId }).select('id').forUpdate().first();
-    if (!cafe) throw Object.assign(new Error('카페를 찾을 수 없습니다'), { status: 404 });
-
+  return withCafeQueue(cafeId, async (trx) => {
     let query = trx('votes').where({ cafe_id: cafeId, track_key: trackKey });
     query = visitorId
       ? query.where({ visitor_id: visitorId })
