@@ -137,6 +137,7 @@ function initSocket(io) {
         // 인증된 사장님이라도 실제 재생을 맡은 Electron 한 대만 상태를
         // 발행한다. 브라우저나 follower가 손님 화면을 덮어쓰지 못한다.
         if (!playbackLeaders.isLeader(slug, socket.id)) return;
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
         if (!PLAYBACK_STATES.includes(payload.state)) return;
         const recommendationId = isUuid(payload.recommendationId)
           ? payload.recommendationId

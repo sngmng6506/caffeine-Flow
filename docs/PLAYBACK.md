@@ -83,7 +83,7 @@ renderer에 노출하는 API 목록은 `owner/electron/preload.js`, 메인 IPC �
 - renderer reload로 같은 세션이 돌아오면 진행 중인 `playing`을 초기화하지 않는다. 완전히 새 리더가 선출된 경우에만 남은 `playing`을 `accepted`로 복구한다.
 - 서버 프로세스만 재시작된 경우 메인 프로세스의 실제 재생 모드를 확인한다. 같은 실행 세션에서 신청곡이 계속 재생 중이면 DB `playing`을 유지하고 registry만 ACK한다.
 - 복구 필요 상태는 DB 복구 성공 ACK 전까지 유지한다. API·소켓 오류로 ACK하지 못하면 같은 리더가 재시도한다.
-- 브라우저나 follower가 보낸 `playback_state`는 서버가 무시한다.
+- 브라우저나 follower가 보낸 `playback_state`는 서버가 무시한다. 기형 본문(null·배열·비객체)이나 알 수 없는 상태도 무시하며 연결과 서버 프로세스를 종료하지 않는다.
 
 재생 시작은 `playRec` 확인 응답이 먼저다. `{ ok: true }`는 음원이 이미 소리 난다는 뜻이 아니라 URL 검증과 navigation을 Electron이 수락했다는 뜻이다. 이 응답 뒤에만 renderer가 DB를 `playing`으로 바꾸고, DB 갱신이 실패하면 `endRec`으로 되돌린다. `supportsPlayRecAck`가 없는 기존 설치본은 기존 send 방식으로 동작한다.
 

@@ -45,6 +45,7 @@ export default defineConfig({
       'tests/qr-image.test.mjs',
       'tests/seed-demo.test.mjs',
       'tests/security-headers.test.mjs',
+      'tests/socket-boundaries.test.mjs',
       'tests/time-policy.test.mjs',
       'tests/track-error-cause.test.mjs',
       'tests/track-metadata-youtube.test.mjs',
