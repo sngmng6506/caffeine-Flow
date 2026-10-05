@@ -191,23 +191,21 @@ async function updateStatusRow(dbOrTrx, current, status) {
   return rec;
 }
 
+// playing 곡을 잠가 읽는다. 건너뛰기(updateStatus)는 카페 행이 아니라 곡 행만
+// 잠그므로, 잠그지 않고 읽으면 그사이 skipped로 확정된 곡을 played로 덮어쓴다.
+// 잠그면 PostgreSQL이 그 잠금을 기다린 뒤 status 조건을 다시 평가해 이미 끝난
+// 곡을 뺀다. 강도는 UPDATE가 어차피 잡는 NO KEY UPDATE다 — FOR UPDATE는 댓글
+// INSERT의 외래키 잠금(KEY SHARE)까지 막는다.
+//
+// 상태 변경은 updateStatusRow 한 곳을 거쳐 전이 규칙과 종료 시각 계산을 공유한다.
 async function clearPlayingRows(dbOrTrx, cafeId, exceptId) {
-  const now = new Date();
   let query = dbOrTrx('recommendations').where({ cafe_id: cafeId, status: REC_STATUS.PLAYING });
   if (exceptId) query = query.whereNot({ id: exceptId });
 
-  const playingRecs = await query.clone().select('id', 'playing_started_at');
+  const playingRecs = await query.forNoKeyUpdate();
   const results = [];
-  for (const r of playingRecs) {
-    const updates = { status: REC_STATUS.PLAYED, played_at: now };
-    if (r.playing_started_at) {
-      updates.play_duration_seconds = Math.round((now - new Date(r.playing_started_at)) / 1000);
-    }
-    const [updated] = await dbOrTrx('recommendations')
-      .where({ id: r.id, cafe_id: cafeId })
-      .update(updates)
-      .returning('*');
-    results.push(updated);
+  for (const current of playingRecs) {
+    results.push(await updateStatusRow(dbOrTrx, current, REC_STATUS.PLAYED));
   }
   return results;
 }
