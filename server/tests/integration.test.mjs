@@ -473,33 +473,6 @@ describe('운영자 AI 프롬프트 감사', () => {
       filter_checked_at: new Date(),
     }).returning('*');
 
-    const excludedDecisions = await db('recommendations').insert([
-      {
-        cafe_id: cafe.id,
-        video_id: 'audit_playlist_en',
-        title: 'Evening Playlist for Cafe',
-        channel_title: '테스트 채널',
-        platform: 'youtube',
-        status: 'rejected',
-        filter_status: 'rejected',
-        filter_reason: '플레이리스트형 콘텐츠',
-        filter_model: 'test-model',
-        filter_checked_at: new Date(),
-      },
-      {
-        cafe_id: cafe.id,
-        video_id: 'audit_playlist_ko',
-        title: '저녁 카페 플리 모음',
-        channel_title: '테스트 채널',
-        platform: 'youtube',
-        status: 'rejected',
-        filter_status: 'rejected',
-        filter_reason: '플레이리스트형 콘텐츠',
-        filter_model: 'test-model',
-        filter_checked_at: new Date(),
-      },
-    ]).returning('*');
-
     const adminToken = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' });
     const response = await request(app)
       .get(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit`)
@@ -516,23 +489,6 @@ describe('운영자 AI 프롬프트 감사', () => {
       filter_prompt_snapshot: prompt,
       human_decision: null,
     }));
-
-    const unreviewedQueue = await request(app)
-      .get('/api/v1/admin/music-filter-reviews?view=unreviewed')
-      .set({ Authorization: `Bearer ${adminToken}` });
-    expect(unreviewedQueue.status).toBe(200);
-    expect(unreviewedQueue.body.summary.unreviewed).toBeGreaterThanOrEqual(1);
-    expect(unreviewedQueue.body.decisions).toContainEqual(expect.objectContaining({
-      id: decision.id,
-      cafe_id: cafe.id,
-      cafe_name: cafe.name,
-      human_decision: null,
-    }));
-    for (const excluded of excludedDecisions) {
-      expect(unreviewedQueue.body.decisions).not.toContainEqual(
-        expect.objectContaining({ id: excluded.id }),
-      );
-    }
 
     const reviewPath = `/api/v1/admin/cafes/${cafe.id}/music-filter-audit/${decision.id}/review`;
     const firstReview = await request(app)
@@ -574,32 +530,6 @@ describe('운영자 AI 프롬프트 감사', () => {
       usage_scope: 'operational',
     });
 
-    const [repeatedDecision] = await db('recommendations').insert({
-      cafe_id: cafe.id,
-      video_id: 'audit_rejected',
-      title: '감사 대상 곡 재신청',
-      channel_title: '테스트 채널',
-      platform: 'youtube',
-      status: 'rejected',
-      filter_status: 'rejected',
-      filter_reason: '매장 분위기와 맞지 않습니다.',
-      filter_model: 'test-model',
-      filter_prompt_snapshot: prompt,
-      filter_checked_at: new Date(),
-    }).returning('*');
-    const repeatedQueue = await request(app)
-      .get('/api/v1/admin/music-filter-reviews?view=unreviewed')
-      .set({ Authorization: `Bearer ${adminToken}` });
-    expect(repeatedQueue.body.decisions).toContainEqual(expect.objectContaining({
-      id: repeatedDecision.id,
-      human_decision: null,
-      track_annotation: expect.objectContaining({
-        artist_name: '테스트 아티스트',
-        tempo_class: 'moderate',
-        mood_tags: ['peaceful', 'nostalgic'],
-      }),
-    }));
-
     const updatedReview = await request(app)
       .put(reviewPath)
       .set({ Authorization: `Bearer ${adminToken}` })
@@ -627,19 +557,6 @@ describe('운영자 AI 프롬프트 감사', () => {
       human_reason_code: 'policy_mismatch',
       metadata_sufficient: true,
     }));
-
-    const reviewedQueue = await request(app)
-      .get('/api/v1/admin/music-filter-reviews?view=reviewed')
-      .set({ Authorization: `Bearer ${adminToken}` });
-    expect(reviewedQueue.status).toBe(200);
-    expect(reviewedQueue.body.decisions).toContainEqual(expect.objectContaining({
-      id: decision.id,
-      human_decision: 'reject',
-      track_annotation: expect.objectContaining({ artist_name: '테스트 아티스트' }),
-    }));
-    expect((await request(app)
-      .get('/api/v1/admin/music-filter-reviews?view=invalid')
-      .set({ Authorization: `Bearer ${adminToken}` })).status).toBe(400);
 
     expect((await request(app)
       .put(reviewPath)
@@ -686,12 +603,6 @@ describe('운영자 AI 프롬프트 감사', () => {
       .get(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit`)
       .set({ Authorization: `Bearer ${ownerToken}` });
     expect(response.status).toBe(403);
-    expect((await request(app)
-      .get('/api/v1/admin/music-filter-reviews')
-      .set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
-    expect((await request(app)
-      .get('/api/v1/admin/music-filter-artist-labels?artist=test')
-      .set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
     expect((await request(app)
       .get('/api/v1/admin/music-filter/models')
       .set({ Authorization: `Bearer ${ownerToken}` })).status).toBe(403);
@@ -1106,17 +1017,6 @@ describe('Essentia 분석 결과와 라벨링 검수', () => {
     expect(analysisResponse.body.review_status).toBe('pending');
 
     const adminToken = issueAdminToken();
-    const queueResponse = await request(app)
-      .get('/api/v1/admin/music-filter-reviews?view=unreviewed')
-      .set({ Authorization: `Bearer ${adminToken}` });
-    expect(queueResponse.status).toBe(200);
-    const queueItem = queueResponse.body.decisions.find(item => item.id === recommendation.id);
-    expect(queueItem.audio_analysis).toEqual(expect.objectContaining({
-      id: analysisResponse.body.id,
-      review_status: 'pending',
-      features: expect.objectContaining({ bpm: 96 }),
-    }));
-
     const reviewResponse = await request(app)
       .put(`/api/v1/admin/cafes/${cafe.id}/music-filter-audit/${recommendation.id}/review`)
       .set({ Authorization: `Bearer ${adminToken}` })

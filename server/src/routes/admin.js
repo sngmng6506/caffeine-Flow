@@ -24,9 +24,8 @@ const { isUuid, validateString } = require('../utils/validate');
 const { parseOffset } = require('../utils/pagination');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { HUMAN_DECISIONS, HUMAN_REASON_CODES } = require('../constants/music-filter-review');
-const { normalizeArtistKey, validateMusicAnnotation } = require('../features/music-labeling/annotation');
+const { validateMusicAnnotation } = require('../features/music-labeling/annotation');
 const labelingReview = require('../features/music-labeling/review.service');
-const { LABELING_VIEWS } = labelingReview;
 
 const MUSIC_FILTER_MODELS_CACHE_MS = 10 * 60 * 1000;
 let musicFilterModelsCache = { at: 0, ids: null };
@@ -184,40 +183,6 @@ router.get('/music-filter/models', requireAdmin, async (_req, res) => {
   } catch {
     res.status(502).json({ error: 'OpenRouter 모델 목록을 불러오지 못했습니다', models: [] });
   }
-});
-
-// GET /api/v1/admin/music-filter-reviews
-// 카페 구분 없이 AI 처리 이력을 모아 운영자가 한 큐에서 골드 라벨을 기록하게 한다.
-router.get('/music-filter-reviews', requireAdmin, async (req, res) => {
-  const offset = parseOffset(req.query.offset);
-  if (offset.error) return res.status(400).json({ error: offset.error });
-
-  const view = req.query.view || 'unreviewed';
-  if (!LABELING_VIEWS.includes(view)) {
-    return res.status(400).json({ error: 'view는 unreviewed, reviewed 또는 all이어야 합니다' });
-  }
-
-  res.json(await labelingReview.fetchLabelingQueue({ view, offset: offset.value }));
-});
-
-// GET /api/v1/admin/music-filter-artist-labels?artist=...
-// 현재 곡과 동일하다고 운영자가 확인한 아티스트의 다른 곡 라벨을 최대 3건 제공한다.
-router.get('/music-filter-artist-labels', requireAdmin, async (req, res) => {
-  const artistCheck = validateString(req.query.artist, { max: 200, name: '아티스트명' });
-  if (artistCheck.error) return res.status(400).json({ error: artistCheck.error });
-  const platformCheck = validateString(req.query.platform, { max: 20, allowNull: true, name: '플랫폼' });
-  if (platformCheck.error) return res.status(400).json({ error: platformCheck.error });
-  const trackKeyCheck = validateString(req.query.track_key, { max: 2000, allowNull: true, name: '곡 식별자' });
-  if (trackKeyCheck.error) return res.status(400).json({ error: trackKeyCheck.error });
-  if (Boolean(platformCheck.value) !== Boolean(trackKeyCheck.value)) {
-    return res.status(400).json({ error: '플랫폼과 곡 식별자는 함께 전달해야 합니다' });
-  }
-  const labels = await labelingReview.fetchArtistLabels({
-    artistKey: normalizeArtistKey(artistCheck.value),
-    platform: platformCheck.value,
-    trackKey: trackKeyCheck.value,
-  });
-  res.json({ artist_name: artistCheck.value, labels });
 });
 
 // GET /api/v1/admin/cafes → 전체 카페 + 상태 + 오늘 도달/신청

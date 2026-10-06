@@ -348,18 +348,20 @@ describe('자동 음향 분석 파이프라인', () => {
     expect(current.label_source).toBe('human');
     expect((await labels.list({ view: 'unreviewed' })).decisions).toHaveLength(1);
   });
-  it('자동 라벨은 확인한 아티스트 참고 자료에 섞지 않는다', async () => {
+  // 가드레일: 곡 검토 완료에서 아티스트 확인을 추정하지 않는다. 자동 라벨은
+  // 확인되지 않은 상태로 들어오고, 검토를 마쳐도 사람이 명시해야만 확인이 된다.
+  it('아티스트 확인은 사람이 명시할 때만 참이 된다', async () => {
     await seed(); const job = await jobs.claim();
     expect((await labels.list({ view: 'ready' })).decisions).toHaveLength(0);
     const saved = await jobs.complete(job.id, job.lease_token, result(job), annotation);
     const item = (await labels.list({ view: 'ready' })).decisions[0];
-    const service = (await import('../src/features/music-labeling/review.service.js')).default;
-    const options = { artistKey: 'artist', platform: job.platform, trackKey: 'different-track' };
-    expect((await service.fetchArtistLabels(options)).some((row) => row.id === item.track_annotation.id)).toBe(false);
+    const artistConfirmed = async () => (await db('music_track_annotations')
+      .where({ id: item.track_annotation.id }).first('artist_confirmed')).artist_confirmed;
+    expect(await artistConfirmed()).toBe(false);
     await labels.review(job.id, { annotation_revision: 1, audio_analysis_id: saved.id, audio_analysis_revision: 1 }, null);
-    expect((await service.fetchArtistLabels(options)).some((row) => row.id === item.track_annotation.id)).toBe(false);
+    expect(await artistConfirmed()).toBe(false);
     await labels.review(job.id, { annotation_revision: 2, audio_analysis_id: saved.id, audio_analysis_revision: 1, artist_confirmed: true }, null);
-    expect((await service.fetchArtistLabels(options)).some((row) => row.id === item.track_annotation.id)).toBe(true);
+    expect(await artistConfirmed()).toBe(true);
     expect((await labels.list({ view: 'ready' })).decisions).toHaveLength(0);
   });
   it('익명은 작업을 가져오거나 검토할 수 없다', async () => {

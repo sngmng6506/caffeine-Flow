@@ -1,4 +1,4 @@
-// 운영자 골드 라벨링의 조회·저장 로직.
+// 운영자 콘솔의 카페별 AI 판단 기록 조회와 사람 검수 저장.
 //
 // 라우트(routes/admin.js)에는 인증·입력 검증·응답만 남기고, DB 질의와 조립은
 // 여기에 둔다. music-filter가 feature로 분리된 것과 같은 경계다.
@@ -8,123 +8,7 @@
 const db = require('../../db/knex');
 const { FILTER_PROCESSED_STATUSES } = require('../../constants/music-filter-status');
 
-const LABELING_QUEUE_PAGE_SIZE = 50;
 const CAFE_AUDIT_PAGE_SIZE = 50;
-
-const LABELING_VIEWS = Object.freeze(['unreviewed', 'reviewed', 'all']);
-
-// 큐와 집계에서 제외할 제목. 재생목록은 곡 단위 라벨링 대상이 아니다.
-function excludePlaylists(query) {
-  return query
-    .whereNot((builder) => builder.whereILike('recommendation.title', '%playlist%'))
-    .whereNot((builder) => builder.whereLike('recommendation.title', '%플리%'));
-}
-
-// 곡 라벨은 (platform, track_key) join으로 붙여오므로 결과 row에 annotation_*
-// 컬럼이 평평하게 섞여 있다. 이를 중첩 객체로 되돌린다.
-function attachLabelingContext(row) {
-  const decision = { ...row };
-  for (const key of Object.keys(row)) {
-    if (key.startsWith('annotation_') || key.startsWith('analysis_')) delete decision[key];
-  }
-  const result = {
-    ...decision,
-    track_annotation: row.annotation_id ? {
-      id: row.annotation_id,
-      artist_name: row.annotation_artist_name,
-      track_version: row.annotation_track_version,
-      tempo_class: row.annotation_tempo_class,
-      mood_tags: row.annotation_mood_tags,
-      instrumentation_type: row.annotation_instrumentation_type,
-      rhythmic_character: row.annotation_rhythmic_character,
-      vocal_type: row.annotation_vocal_type,
-      genre_tags: row.annotation_genre_tags,
-      note: row.annotation_note,
-      usage_scope: row.annotation_usage_scope,
-      schema_version: row.annotation_schema_version,
-      updated_at: row.annotation_updated_at,
-    } : null,
-    audio_analysis: row.analysis_id ? {
-      id: row.analysis_id,
-      revision: row.analysis_revision,
-      model_name: row.analysis_model_name,
-      model_version: row.analysis_model_version,
-      feature_schema_version: row.analysis_feature_schema_version,
-      rights_basis: row.analysis_rights_basis,
-      source_reference: row.analysis_source_reference,
-      features: row.analysis_features,
-      suggested_annotation: row.analysis_suggested_annotation,
-      review_status: row.analysis_review_status,
-      analyzed_at: row.analysis_analyzed_at,
-      reviewed_at: row.analysis_reviewed_at,
-    } : null,
-  };
-  return result;
-}
-
-function joinTrackAnnotation() {
-  this.on('annotation.platform', '=', 'recommendation.platform')
-    .andOn('annotation.track_key', '=', 'recommendation.video_id');
-}
-
-// 모델을 여러 번 비교할 수 있으므로 곡별 최신 분석 한 건만 라벨링 큐에 붙인다.
-// DISTINCT ON의 선두 정렬은 식별자와 같아야 하며, 같은 시각이면 UUID로 결정한다.
-function latestAudioAnalysisQuery() {
-  return db({ audio: 'music_audio_analyses' })
-    .distinctOn('audio.platform', 'audio.track_key')
-    .select(
-      'audio.platform', 'audio.track_key', 'audio.id', 'audio.revision',
-      'audio.model_name', 'audio.model_version', 'audio.feature_schema_version',
-      'audio.rights_basis', 'audio.source_reference', 'audio.features',
-      'audio.suggested_annotation', 'audio.review_status',
-      'audio.analyzed_at', 'audio.reviewed_at',
-    )
-    .orderBy('audio.platform')
-    .orderBy('audio.track_key')
-    .orderBy('audio.analyzed_at', 'desc')
-    .orderBy('audio.id', 'desc')
-    .as('analysis');
-}
-
-function joinAudioAnalysis() {
-  this.on('analysis.platform', '=', 'recommendation.platform')
-    .andOn('analysis.track_key', '=', 'recommendation.video_id');
-}
-
-const QUEUE_COLUMNS = [
-  'recommendation.id', 'recommendation.cafe_id', 'cafe.name as cafe_name',
-  'recommendation.video_id', 'recommendation.title', 'recommendation.channel_title',
-  'recommendation.platform', 'recommendation.filter_status', 'recommendation.filter_reason',
-  'recommendation.filter_confidence', 'recommendation.filter_model',
-  'recommendation.filter_error_code', 'recommendation.filter_prompt_snapshot',
-  'recommendation.filter_checked_at', 'review.human_decision',
-  'review.human_reason_code', 'review.metadata_sufficient', 'review.reviewed_at',
-  'annotation.id as annotation_id',
-  'annotation.artist_name as annotation_artist_name',
-  'annotation.track_version as annotation_track_version',
-  'annotation.tempo_class as annotation_tempo_class',
-  'annotation.mood_tags as annotation_mood_tags',
-  'annotation.instrumentation_type as annotation_instrumentation_type',
-  'annotation.rhythmic_character as annotation_rhythmic_character',
-  'annotation.vocal_type as annotation_vocal_type',
-  'annotation.genre_tags as annotation_genre_tags',
-  'annotation.note as annotation_note',
-  'annotation.usage_scope as annotation_usage_scope',
-  'annotation.schema_version as annotation_schema_version',
-  'annotation.updated_at as annotation_updated_at',
-  'analysis.id as analysis_id',
-  'analysis.revision as analysis_revision',
-  'analysis.model_name as analysis_model_name',
-  'analysis.model_version as analysis_model_version',
-  'analysis.feature_schema_version as analysis_feature_schema_version',
-  'analysis.rights_basis as analysis_rights_basis',
-  'analysis.source_reference as analysis_source_reference',
-  'analysis.features as analysis_features',
-  'analysis.suggested_annotation as analysis_suggested_annotation',
-  'analysis.review_status as analysis_review_status',
-  'analysis.analyzed_at as analysis_analyzed_at',
-  'analysis.reviewed_at as analysis_reviewed_at',
-];
 
 const CAFE_AUDIT_COLUMNS = [
   'recommendation.id', 'recommendation.video_id', 'recommendation.title',
@@ -152,92 +36,6 @@ function paginate(rows, pageSize, offset) {
  * 완료의 정의는 "정책 검수와 곡 라벨이 있고 최신 자동 분석도 검수됨"이다.
  * 자동 분석이 없는 곡은 기존처럼 정책 검수와 곡 라벨만으로 완료다.
  */
-async function fetchLabelingQueue({ view, offset }) {
-  const processed = excludePlaylists(
-    db({ recommendation: 'recommendations' })
-      .whereIn('recommendation.filter_status', FILTER_PROCESSED_STATUSES),
-  );
-
-  const decisionsQuery = processed.clone()
-    .leftJoin({ cafe: 'cafes' }, 'cafe.id', 'recommendation.cafe_id')
-    .leftJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
-    .leftJoin({ annotation: 'music_track_annotations' }, joinTrackAnnotation)
-    .leftJoin(latestAudioAnalysisQuery(), joinAudioAnalysis);
-
-  if (view === 'unreviewed') {
-    decisionsQuery.where((builder) => {
-      builder
-        .whereNull('review.recommendation_id')
-        .orWhereNull('annotation.id')
-        .orWhere('analysis.review_status', 'pending');
-    });
-  }
-  if (view === 'reviewed') {
-    decisionsQuery
-      .whereNotNull('review.recommendation_id')
-      .whereNotNull('annotation.id')
-      .where((builder) => {
-        builder.whereNull('analysis.id').orWhere('analysis.review_status', 'reviewed');
-      });
-  }
-
-  const [totalRow, reviewedRow, decisionRows] = await Promise.all([
-    processed.clone().count('recommendation.id as count').first(),
-    processed.clone()
-      .innerJoin({ review: 'music_filter_reviews' }, 'review.recommendation_id', 'recommendation.id')
-      .innerJoin({ annotation: 'music_track_annotations' }, joinTrackAnnotation)
-      .leftJoin(latestAudioAnalysisQuery(), joinAudioAnalysis)
-      .where((builder) => {
-        builder.whereNull('analysis.id').orWhere('analysis.review_status', 'reviewed');
-      })
-      .count('recommendation.id as count')
-      .first(),
-    decisionsQuery
-      .select(QUEUE_COLUMNS)
-      .orderBy('recommendation.filter_checked_at', 'desc')
-      .orderBy('recommendation.id', 'desc')
-      .offset(offset)
-      .limit(LABELING_QUEUE_PAGE_SIZE + 1),
-  ]);
-
-  const total = Number(totalRow?.count || 0);
-  const reviewed = Number(reviewedRow?.count || 0);
-  const { page, has_more: hasMore, next_offset: nextOffset } =
-    paginate(decisionRows, LABELING_QUEUE_PAGE_SIZE, offset);
-
-  return {
-    summary: { total, reviewed, unreviewed: Math.max(0, total - reviewed) },
-    decisions: page.map(attachLabelingContext),
-    view,
-    offset,
-    has_more: hasMore,
-    next_offset: nextOffset,
-  };
-}
-
-/**
- * 운영자가 확인한 아티스트의 다른 곡 라벨.
- *
- * 자동 동일인 판정이 아니라 참고 자료다. 현재 곡은 결과에서 제외한다.
- */
-function fetchArtistLabels({ artistKey, platform, trackKey }) {
-  return db('music_track_annotations')
-    .where({ artist_key: artistKey, label_source: 'human', artist_confirmed: true })
-    .modify((query) => {
-      if (platform && trackKey) {
-        query.whereNot((builder) => builder.where({ platform, track_key: trackKey }));
-      }
-    })
-    .select(
-      'id', 'title', 'artist_name', 'track_version', 'tempo_class', 'mood_tags',
-      'instrumentation_type', 'rhythmic_character', 'vocal_type', 'genre_tags',
-      'note', 'usage_scope', 'updated_at',
-    )
-    .orderBy('updated_at', 'desc')
-    .limit(3);
-}
-
-/** 특정 카페의 AI 판단 이력과 프롬프트 변경 이력. */
 async function fetchCafeAudit({ cafeId, offset }) {
   const [promptHistory, decisionRows] = await Promise.all([
     db('music_filter_prompt_history')
@@ -382,12 +180,6 @@ function findTrackAudioAnalysis({ audioAnalysisId, platform, trackKey }) {
 }
 
 module.exports = {
-  LABELING_VIEWS,
-  LABELING_QUEUE_PAGE_SIZE,
-  CAFE_AUDIT_PAGE_SIZE,
-  attachLabelingContext,
-  fetchLabelingQueue,
-  fetchArtistLabels,
   fetchCafeAudit,
   saveReview,
   findReviewableRecommendation,

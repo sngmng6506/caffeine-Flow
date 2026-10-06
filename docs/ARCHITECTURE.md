@@ -152,7 +152,7 @@ stateDiagram-v2
 | `recommendations` | 신청곡, 일반 상태, AI 판단, 신청·재생 시각 |
 | `music_filter_prompt_history` | 매장 분위기 설명 변경 이력. `baseline`과 `changed`를 구분 |
 | `music_filter_reviews` | AI 판단과 분리된 운영자 골드 라벨, 사유 코드, 선택적 메타데이터 충분 여부 |
-| `music_track_annotations` | 플랫폼 원본 곡별 자동·사람 최종 라벨과 검토 상태. 정규화 아티스트 키로 참고 조회 |
+| `music_track_annotations` | 플랫폼 원본 곡별 자동·사람 최종 라벨과 검토 상태 |
 | `music_audio_jobs` | 플랫폼·곡별 자동 분석 작업과 lease·재시도 상태 |
 | `music_audio_runs` | 실행별 추가 전용 분석 원본과 입력·모델 정보 |
 | `music_audio_analyses` | 곡·모델 버전별 자동 음향 특징, 권리 근거, 추천 라벨과 검수 상태 |
