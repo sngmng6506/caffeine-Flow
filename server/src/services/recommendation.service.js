@@ -4,7 +4,7 @@ const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM } = require('../constants/platforms');
 const { trackKeyOf } = require('../utils/track-key');
 const { kstStartOfDay } = require('../utils/kst');
-const { HISTORY_SORT_AT_SQL, TRACK_KEY_SQL } = require('../db/sql-fragments');
+const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { RECENT_HISTORY_LOOKBACK_DAYS } = require('../constants/time-policy');
 const playbackHistoryService = require('./playback-history.service');
 
@@ -287,7 +287,11 @@ async function remove(cafeId, id) {
 // 여러 개지만 표는 (카페, 곡, 방문자)당 하나이고, 그 카페의 같은 곡 행들은
 // 모두 같은 vote_count를 본다.
 //
-// 계약: docs/AI_CHANGE_GUARDRAILS.md#anonymous-visitor-identity-contract
+// 저장된 video_id는 이미 곡 키다(utils/track-key 참고). 그래서 곡 키로 행을 찾을
+// 때 SQL에서 다시 자르지 않고 그대로 비교한다 — 그래야 (cafe_id, video_id)
+// 인덱스를 쓴다.
+//
+// 계약: docs/AI_CHANGE_GUARDRAILS.md#song-vote-contract
 
 /** 카페 안의 한 곡에 달린 표를 세어 그 곡의 모든 행에 반영한다. */
 async function syncSongVoteCount(trx, cafeId, trackKey) {
@@ -295,7 +299,7 @@ async function syncSongVoteCount(trx, cafeId, trackKey) {
   const total = Number(count);
   await trx('recommendations')
     .where({ cafe_id: cafeId })
-    .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
+    .where({ video_id: trackKey })
     .update({ vote_count: total });
   return total;
 }
@@ -304,7 +308,7 @@ async function syncSongVoteCount(trx, cafeId, trackKey) {
 async function songVoteResult(trx, cafeId, trackKey, total) {
   const rows = await trx('recommendations')
     .where({ cafe_id: cafeId })
-    .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
+    .where({ video_id: trackKey })
     .select('*');
   return { trackKey, voteCount: total, recommendations: rows };
 }
@@ -317,13 +321,13 @@ async function voteSong(cafeId, trackKey, voterIp, visitorId, { recommendationId
     // 남길 수 있어야 하므로 존재 확인은 전역으로 한다 — 임의 문자열은 막되
     // "어딘가에서 실제로 재생된 곡"이면 받는다.
     const known = await trx('recommendations')
-      .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
+      .where({ video_id: trackKey })
       .first('id');
     if (!known) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
     // 표는 이 매장에 남는다. 우리 매장에 그 곡의 행이 있으면 함께 연결한다.
     const local = await trx('recommendations')
       .where({ cafe_id: cafeId })
-      .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
+      .where({ video_id: trackKey })
       .first('id');
 
     await trx('votes').insert({
