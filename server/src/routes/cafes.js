@@ -19,7 +19,6 @@ const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
 const { logError, CAUSE } = require('../observability');
 const musicFilter = require('../features/music-filter');
-const publicGuideBudget = require('../features/music-filter/public-guide-budget');
 const { getTrackMetadata } = require('../services/track-metadata.service');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { MUSIC_FILTER_TEST_LIMIT } = require('../constants/limits');
@@ -27,7 +26,8 @@ const {
   generatePublicMusicGuide,
   normalizePublicGuide,
   PUBLIC_GUIDE_MAX_LENGTH,
-} = require('../features/music-filter/public-guide.service');
+  publicGuideBudget,
+} = musicFilter;
 
 // 손님 화면은 소켓으로 즉시 바뀐다. 값이 실제로 달라졌을 때만 발행한다.
 function emitNoticeUpdate(req, before, after) {

@@ -8,7 +8,7 @@ export default defineConfig({
       'tests/admin-ai-labs.test.mjs',
       'tests/alert-aggregator.test.mjs',
       'tests/alert-channel.test.mjs',
-      'tests/audio-analysis-entry.test.mjs',
+      'tests/feature-entry.test.mjs',
       'tests/audio-analysis.test.mjs',
       'tests/audio-suspicion.test.mjs',
       'tests/audio-worker-constants.test.mjs',

@@ -3,7 +3,7 @@
 // 여기에 적힌 함수가 이 모듈이 바깥에 약속하는 전부다. 적히지 않은 함수와 파일
 // (normalization, suspicion, discovery-window, runs.summary 등)은 모듈 내부
 // 사정이라 바깥 호출부를 찾지 않고 고쳐도 된다. 바깥에서 새 함수가 필요하면
-// 내부 파일을 직접 부르지 말고 여기에 추가한다 — audio-analysis-entry.test.mjs가
+// 내부 파일을 직접 부르지 말고 여기에 추가한다 — feature-entry.test.mjs가
 // 우회를 잡는다.
 const service = require('./service');
 const result = require('./result');
