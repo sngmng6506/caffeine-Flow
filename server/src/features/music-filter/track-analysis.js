@@ -1,5 +1,7 @@
-const db = require('../../db/knex');
-const { canonicalizeVideoId } = require('../../utils/video-id');
+// 분석 결과는 음향 분석 모듈의 데이터다. 테이블을 직접 읽지 않고 그 입구로 받는다 —
+// 어떤 분석이 최신이고 어떤 사람 판정을 빼야 하는지는 그 모듈이 안다. 여기서는
+// 받은 분석을 프롬프트에 넣을 모양으로 다듬기만 한다.
+const audioAnalysis = require('../audio-analysis');
 
 // 분석이 없는 곡이 대부분이다. 조회 한 번이 실시간 신청 경로에 붙으므로 실패해도
 // 필터를 멈추지 않는다 — 분석은 판단을 돕는 재료이지 판단의 전제가 아니다.
@@ -45,22 +47,8 @@ function shape(row) {
   };
 }
 
-// 같은 곡의 분석은 (platform, track_key, model_name, model_version) upsert라
-// 모델이 바뀌면 여러 줄이 생긴다. 가장 최근에 분석한 것을 쓴다.
 async function findForTrack(platform, trackKey) {
-  if (!platform || !trackKey) return null;
-  // 분석 작업의 track_key는 저장될 때 정규화된 값이다(recommendation.service가
-  // canonicalizeVideoId를 거쳐 넣는다). 필터는 신청 URL에서 막 뽑은 원본 ID를
-  // 들고 있으므로, 같은 규칙을 적용하지 않으면 항상 못 찾는다.
-  const row = await db('music_audio_analyses')
-    .where({ platform, track_key: canonicalizeVideoId(trackKey) })
-    .orderBy('analyzed_at', 'desc').first()
-    // cancel은 취소 질의를 보내려고 커넥션을 하나 더 잡는다. 풀이 붐비면 타임아웃
-    // 처리가 도리어 막히므로 쓰지 않는다. 여기서는 요청을 붙잡지 않는 것으로 충분하다.
-    .timeout(LOOKUP_TIMEOUT_MS);
-  // 판정은 이 분석의 현재 실행에 붙는다. 옛 모델의 분석으로 우회하지 않는다.
-  if (['inaccurate', 'unclear'].includes(row?.human_verdict)) return null;
-  return shape(row);
+  return shape(await audioAnalysis.findLatestForTrack(platform, trackKey, { timeoutMs: LOOKUP_TIMEOUT_MS }));
 }
 
 module.exports = { findForTrack, shape, DESCRIPTION_MAX };

@@ -18,6 +18,9 @@ module.exports = {
   validateAudioAnalysisResult: result.validateAudioAnalysisResult,
   saveResult: service.saveResult,
 
+  // 한 곡의 최신 분석(틀림·애매 판정 제외). 음악 필터가 프롬프트 재료로 읽는다.
+  findLatestForTrack: service.findLatestForTrack,
+
   // 분석 작업 큐. enqueue는 신청곡 저장과 같은 트랜잭션에서 부른다.
   jobs: {
     enqueue: jobs.enqueue,
