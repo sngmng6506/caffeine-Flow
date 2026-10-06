@@ -23,12 +23,16 @@ describe('음악 수동 라벨 검증', () => {
     expect(validateMusicAnnotation(validAnnotation)).toEqual({
       value: expect.objectContaining({
         artist_name: '검정치마 - Topic',
-        artist_key: '검정치마',
         mood_tags: ['peaceful', 'nostalgic'],
         genre_tags: ['rock_metal'],
         schema_version: 1,
       }),
     });
+    // 정규화 키는 읽는 곳이 없어 저장하지 않는다.
+    expect(validateMusicAnnotation(validAnnotation).value).not.toHaveProperty('artist_key');
+    // 다듬고 나면 비는 이름은 확인한 아티스트명이 아니다.
+    expect(validateMusicAnnotation({ ...validAnnotation, artist_name: 'VEVO' }))
+      .toEqual({ error: '확인한 아티스트명이 필요합니다' });
   });
 
   it('주요 분위기는 최대 두 개만 허용한다', () => {

@@ -126,7 +126,6 @@ function saveReview({
         source_recommendation_id: row.source_recommendation_id,
         title: row.title,
         artist_name: row.artist_name,
-        artist_key: row.artist_key,
         track_version: row.track_version,
         tempo_class: row.tempo_class,
         mood_tags: row.mood_tags,

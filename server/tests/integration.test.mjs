@@ -526,7 +526,6 @@ describe('운영자 AI 프롬프트 감사', () => {
       .where({ platform: 'youtube', track_key: 'audit_rejected' })
       .first()).toMatchObject({
       artist_name: '테스트 아티스트',
-      artist_key: '테스트 아티스트',
       usage_scope: 'operational',
     });
 

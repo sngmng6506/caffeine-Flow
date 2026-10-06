@@ -73,7 +73,7 @@ server/src/routes/admin.js
 - `human_decision`과 `human_reason_code`는 상수에 정의된 값만 사용한다. `metadata_sufficient`는 곡의 정답과 독립된 nullable 품질 표식이며 `null`은 미확인이다. 질문하지 않은 값을 `false`로 만들지 않는다.
 - 곡 특성 라벨은 정책 일치 여부와 분리해 `(platform, track_key)`당 한 건으로 저장한다. 선택값과 최대 개수는 상수와 DB 제약을 함께 유지하며, 한국어는 화면 표시용이고 저장 코드는 바꾸지 않는다.
 - 곡 라벨 검토는 자동 서술이 곡과 맞는지만 묻는다. 판정은 `accurate`와 `inaccurate` 둘이며 늘리지 않는다(이유는 [Lab README](../music-labeling-lab/README.md#사람이-하는-일)). `unclear`는 이미 저장된 옛 판정을 읽기 위해 조회에만 남기고 새로 만들지 않는다. 자동 라벨은 그대로 저장되고 판정은 최종 라벨의 `human_review_status`와 해당 분석의 `human_verdict`에 남는다. 직접 수정 이력은 `human_edited`로 구분한다. 매장 정책 검수는 곡 라벨과 달리 추천곡별로 유지하고 다른 매장·신청에 자동 복사하지 않는다.
-- 아티스트 확인(`artist_confirmed`)은 사람이 명시한 경우에만 참이다. 곡 검토 완료에서 아티스트 확인을 추정하지 않는다. 아티스트명의 정규화 키(`artist_key`)를 자동 동일인 판정이나 라벨 복사 근거로 사용하지 않는다.
+- 아티스트 확인(`artist_confirmed`)은 사람이 명시한 경우에만 참이다. 곡 검토 완료에서 아티스트 확인을 추정하지 않는다. 확인한 아티스트명을 자동 동일인 판정이나 라벨 복사 근거로 사용하지 않는다.
 - 사람 라벨은 `usage_scope`와 무관하게 라이브 판단의 Exact 재사용·프롬프트·동일 아티스트 참고·자동수락에 연결하지 않는다. 연결하려면 별도 평가와 계약 변경이 필요하다.
 - 운영자 인증과 `(cafe_id, recommendation_id)` 범위를 모두 확인한 AI 처리 이력만 검수한다.
 - 필터 테스트는 두 경로다. 사장님용(`POST /cafes/me/music-filter/test`)은 자기 매장 설명으로 기능이 도는지 확인하는 용도이며 **카페당 하루 10회**로 묶고 모델 override를 받지 않는다 — 한 번이 실제 LLM 호출이다. 모델을 바꿔 가며 비교하는 운영자용(`POST /admin/music-filter/test`)은 `requireAdmin`을 유지한다. 한도는 `constants/limits.js`가 단일 기준이다.

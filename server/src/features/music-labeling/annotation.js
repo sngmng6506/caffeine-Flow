@@ -69,13 +69,13 @@ function validateMusicAnnotation(input) {
     if (result.error) return result;
   }
 
-  const artistKey = normalizeArtistKey(artist.value);
-  if (!artistKey) return { error: '확인한 아티스트명이 필요합니다' };
+  // 다듬고 나면 비는 이름('VEVO'만, '- Topic'만 등)은 확인한 아티스트명으로 받지 않는다.
+  // 정규화 키 자체는 저장하지 않는다 — 읽는 곳이 없다(artist_key 제거).
+  if (!normalizeArtistKey(artist.value)) return { error: '확인한 아티스트명이 필요합니다' };
 
   return {
     value: {
       artist_name: artist.value,
-      artist_key: artistKey,
       track_version: checks.track_version.value,
       tempo_class: checks.tempo_class.value,
       mood_tags: checks.mood_tags.value,
