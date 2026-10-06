@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getRecommendations } from '../../api';
 import { getSocket, disconnectSocket } from '../../socket';
 import { trackKeyOf } from '../../trackKey';
+import { byQueuePriority } from '../../queueOrder';
 import { VALID_PLATFORMS } from '../../constants/platforms';
 import { ACTIVE_STATUSES, HISTORY_STATUSES, REC_STATUS } from '../../constants/recommendationStatus';
 import { PLAYBACK_STATE } from '../../constants/playbackState';
@@ -122,10 +123,10 @@ export default function useCafeQueue({
   const nowPlaying = useMemo(() => recommendations.find(item => item.status === REC_STATUS.PLAYING) || null, [recommendations]);
   const waitingQueue = useMemo(() => recommendations
     .filter(item => item.status === REC_STATUS.ACCEPTED)
-    .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at)), [recommendations]);
+    .sort(byQueuePriority), [recommendations]);
   const pendingQueue = useMemo(() => recommendations
     .filter(item => item.status === REC_STATUS.PENDING)
-    .sort((a, b) => b.vote_count - a.vote_count || new Date(a.requested_at) - new Date(b.requested_at)), [recommendations]);
+    .sort(byQueuePriority), [recommendations]);
   const activeVideoIds = useMemo(() => recommendations
     .filter(item => ACTIVE_STATUSES.includes(item.status))
     .map(item => item.video_id), [recommendations]);
