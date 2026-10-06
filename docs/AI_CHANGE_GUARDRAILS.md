@@ -289,6 +289,7 @@ customer/src/votedSongs.js
 - `server/app.js`와 `server/server.js` 분리를 유지한다. 테스트는 `app.js`를 import한다.
 - 라우트(`routes/`)와 소켓(`socket/`)은 DB 연결(`db/knex`)과 SQL 조각(`db/sql-fragments`)을 직접 불러오지 않는다. 라우트는 입력 확인 → 서비스 호출 → 응답만 하고, 쿼리는 `services/`나 `features/`에 둔다. 라우트에서 쿼리를 쓰면 서비스의 규칙(카페 잠금, 이력 합치기, KST 날짜)을 두 벌로 들게 된다. 읽기도 예외가 아니다. `layer-boundary.test.mjs`가 검사한다.
 - 입구(`index.js`)가 있는 기능 모듈(`features/audio-analysis`, `features/music-filter`)은 모듈 밖에서 입구로만 부른다. 입구에 적힌 것이 그 모듈이 바깥에 약속하는 전부이고, 나머지 파일은 바깥 호출부를 찾지 않고 고쳐도 되는 내부 사정이다. 바깥에서 새 함수가 필요하면 내부 파일을 직접 부르지 말고 입구에 추가한다. 테스트와 `scripts/`의 측정 도구는 부품을 직접 재는 것이 목적이라 대상이 아니다. 새 모듈에 입구를 두면 `feature-entry.test.mjs`의 모듈 목록에 넣는다.
+- 테이블마다 쓰는 컨텍스트가 하나다. 다른 컨텍스트의 테이블에 새로 쓰기를 추가하지 않고, 읽기는 소유자의 입구나 서비스 함수로 한다. 소유와 지금 있는 예외는 [ARCHITECTURE.md](ARCHITECTURE.md#컨텍스트와-데이터-소유)가 기준이다.
 - DB 상태가 단일 원천이며 소켓 이벤트만으로 영구 상태를 만들지 않는다.
 - Electron 재생 상태와 서버 큐 상태가 충돌하지 않도록 한 곡만 `playing`으로 유지한다.
 - 브라우저 직접 재생곡은 신청곡 `playing`으로 만들지 않고 UUID 재생 세션과 `playback_history`로 분리한다. 정상 종료 또는 60초 이상 재생만 이력에 저장한다.

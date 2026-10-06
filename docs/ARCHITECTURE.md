@@ -167,6 +167,32 @@ stateDiagram-v2
 
 `recommendations.id`는 UUID다. 순서를 가정한 `MIN/MAX(id)` 집계는 사용하지 않는다.
 
+## 컨텍스트와 데이터 소유
+
+서버는 아래 컨텍스트로 나뉜다. 각 테이블은 쓰는 컨텍스트 하나가 소유한다. 다른 컨텍스트는 소유자의 입구(`features/*/index.js`)나 서비스 함수로 읽고, 직접 쓰지 않는다. 아래 "건너가는 접근"이 지금 이 원칙의 예외 전부다 — 새 예외를 만들지 않는다.
+
+| 컨텍스트 | 코드 | 소유 테이블 |
+| --- | --- | --- |
+| 카페 | `services/cafe.service.js` | `cafes`, `cafe_slug_history`, `cafe_visits`, `music_filter_prompt_history` |
+| 신청곡 큐 | `services/recommendation.service.js` | `recommendations`, `votes`, `comments` |
+| 재생 이력 | `services/playback-history.service.js` | `playback_history` |
+| 곡 댓글 | `services/song_comments.service.js` | `song_comments` |
+| 음악 필터 | `features/music-filter` | `public_guide_usage` |
+| 음향 분석 | `features/audio-analysis` | `music_audio_jobs`, `music_audio_runs`, `music_audio_analyses`, `music_track_annotations`, `audio_pipeline_settings`, `audio_prompt_revisions`, `music_source_cursors`, `music_source_discoveries` |
+| 라벨링 | `features/music-labeling` | `music_filter_reviews` |
+
+건너가는 접근:
+
+| 누가 | 무엇을 | 방식 | 왜 |
+| --- | --- | --- | --- |
+| 신청곡 큐 → 카페 | `cafes` 행 잠금 | `withCafeQueue`의 `FOR UPDATE`. 값은 바꾸지 않는다 | 한 카페의 활성 큐를 하나의 일관성 단위로 묶는 루트다([가드레일](AI_CHANGE_GUARDRAILS.md#recommendation-status-contract)) |
+| 신청곡 큐 → 음향 분석 | 분석 작업 등록 | 입구(`jobs.enqueue`), 신청곡 저장과 같은 트랜잭션 | 곡은 저장됐는데 분석 작업만 빠지는 일을 막는다 |
+| 음악 필터 → 음향 분석 | 곡의 최신 분석 | 입구(`findLatestForTrack`) 읽기 | 어떤 분석이 최신이고 어떤 사람 판정을 빼는지는 음향 분석이 안다 |
+| 라벨링 → 음향 분석 | `music_audio_analyses`의 검토 상태, `music_track_annotations` | **직접 쓰기** | 정책 검수·곡 라벨·분석 검토를 한 트랜잭션으로 저장한다. 두 컨텍스트의 경계가 흐린 곳이다 — 곡 라벨 검토는 이미 음향 분석의 `labels`가 맡고 있어, 사실상 한 컨텍스트를 둘로 나눈 상태다 |
+| 라벨링 → 신청곡 큐·카페 | `recommendations`, `music_filter_prompt_history` | 직접 읽기 | 카페별 AI 판단 기록 화면 |
+| 재생 이력 → 곡 댓글 | `song_comments`의 키 병합 | **직접 쓰기** | 직접 재생곡의 세션 댓글 키를 실제 곡 ID로 바꾸는 일을 이력 저장과 같은 트랜잭션에서 한다([가드레일](AI_CHANGE_GUARDRAILS.md#app-boundary-contract)) |
+| 통계·카페 → 신청곡 큐 | `recommendations`, `votes` | 직접 읽기 | 사장님 통계와 운영자 카페 목록의 집계. 쓰지 않는다 |
+
 ## 시간 기준
 
 사용자에게 보이는 날짜·이력·통계의 하루 경계는 KST다. 서버와 사장님 UI는 공통 KST 유틸을 사용하며 UTC 자정을 직접 계산하지 않는다.
