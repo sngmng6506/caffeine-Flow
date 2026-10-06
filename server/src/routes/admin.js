@@ -412,7 +412,8 @@ router.delete('/cafes/:id', requireAdmin, async (req, res) => {
 
 
 // 곡 자동 라벨 검토는 매장 정책의 골드 판단을 요구하지 않는다.
-const audioLabels = require('../features/audio-analysis/labels');
+const audioAnalysis = require('../features/audio-analysis');
+const audioLabels = audioAnalysis.labels;
 router.get('/audio-labels', requireAdmin, async (req, res) => {
   const view = req.query.view || 'unreviewed';
   const offset = Number(req.query.offset || 0);
@@ -449,10 +450,10 @@ router.put('/audio-labels/:id/review', requireAdmin, async (req, res) => {
 // GET /api/v1/admin/audio-settings, PUT — 3단 Audio LLM 스위치
 // 운영자가 Lab에서 끄고 켠다. 워커는 claim 응답으로 현재 값을 받는다.
 router.get('/audio-settings', requireAdmin, async (_req, res) => {
-  res.json(await require('../features/audio-analysis/settings').get());
+  res.json(await audioAnalysis.settings.get());
 });
 router.put('/audio-settings', requireAdmin, async (req, res) => {
-  const result = await require('../features/audio-analysis/settings').update(req.body || {});
+  const result = await audioAnalysis.settings.update(req.body || {});
   if (result.error) return res.status(400).json({ error: result.error });
   res.json(result.value);
 });
@@ -460,18 +461,18 @@ router.put('/audio-settings', requireAdmin, async (req, res) => {
 // 틀림으로 표시한 곡을 한 번에 재분석 큐에 넣는다. 프롬프트를 고친 뒤 쓰는 경로다.
 router.post('/audio-labels/requeue-rejected', requireAdmin, async (req, res) => {
   const dryRun = req.body?.dry_run === true;
-  res.json(await require('../features/audio-analysis/jobs').requeueRejected({ dryRun }));
+  res.json(await audioAnalysis.jobs.requeueRejected({ dryRun }));
 });
 router.get('/audio-prompt-revisions', requireAdmin, async (_req, res) => {
-  res.json({ revisions: await require('../features/audio-analysis/settings').revisions() });
+  res.json({ revisions: await audioAnalysis.settings.revisions() });
 });
 
 // GET·POST /api/v1/admin/audio-discoveries — 최신곡 수집 요청
 router.get('/audio-discoveries', requireAdmin, async (_req, res) => {
-  res.json({ discoveries: await require('../features/audio-analysis/discovery').recent() });
+  res.json({ discoveries: await audioAnalysis.discovery.recent() });
 });
 router.post('/audio-discoveries', requireAdmin, async (req, res) => {
-  const result = await require('../features/audio-analysis/discovery').request(req.body || {});
+  const result = await audioAnalysis.discovery.request(req.body || {});
   if (result.error) return res.status(400).json({ error: result.error });
   res.status(result.already ? 200 : 201).json({ discovery: result.value, already: Boolean(result.already) });
 });
@@ -482,7 +483,7 @@ module.exports.CAFE_STATUS = CAFE_STATUS;
 // 원본은 이력별 읽기만 제공한다. 사용자 검토로 수정하지 않는다.
 router.get('/audio-labels/:id/runs', requireAdmin, async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(400).json({ error: '곡 식별자가 올바르지 않습니다' });
-  try { res.json(await require('../features/audio-analysis/runs').history(req.params.id)); }
+  try { res.json(await audioAnalysis.runs.history(req.params.id)); }
   catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
 });
 router.get('/audio-runs/:id', requireAdmin, async (req, res) => {
@@ -494,6 +495,6 @@ router.get('/audio-runs/:id', requireAdmin, async (req, res) => {
 
 router.post('/audio-labels/:id/requeue', requireAdmin, async (req, res) => {
   if (!isUuid(req.params.id) || !Number.isSafeInteger(req.body?.generation)) return res.status(400).json({ error: '작업 버전이 필요합니다' });
-  try { res.json(await require('../features/audio-analysis/jobs').requeue(req.params.id, req.body.generation)); }
+  try { res.json(await audioAnalysis.jobs.requeue(req.params.id, req.body.generation)); }
   catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
 });

@@ -1,7 +1,8 @@
 const router = require('express').Router();
 const { requireAudioAnalysisWorker } = require('../middleware/auth');
-const { validateAudioAnalysisResult } = require('../features/audio-analysis/result');
-const audioAnalysis = require('../features/audio-analysis/service');
+const audioAnalysis = require('../features/audio-analysis');
+
+const { validateAudioAnalysisResult, jobs, runs, discovery } = audioAnalysis;
 
 // POST /api/v1/audio-analysis/results
 // 권리가 확인된 로컬 파일을 분석한 워커가 특징값만 제출한다. 오디오 업로드는 받지 않는다.
@@ -13,7 +14,6 @@ router.post('/results', requireAudioAnalysisWorker, async (req, res) => {
 });
 
 
-const jobs = require('../features/audio-analysis/jobs');
 const { isUuid } = require('../utils/validate');
 
 router.post('/jobs/claim', requireAudioAnalysisWorker, async (_req, res) => {
@@ -28,7 +28,7 @@ router.post('/jobs/:id/complete', requireAudioAnalysisWorker, async (req, res) =
   if (result.error) return res.status(400).json({ error: result.error });
   const run = req.body?.analysis_run;
   if (run) {
-    const checked = require('../features/audio-analysis/runs').validateRun(run, result.value);
+    const checked = runs.validateRun(run, result.value);
     if (checked.error) return res.status(400).json({ error: checked.error });
   }
   try {
@@ -56,7 +56,6 @@ router.post('/jobs/:id/resume', requireAudioAnalysisWorker, async (req, res) => 
   try { res.json(await jobs.resume(req.params.id, req.body.lease_token)); }
   catch (error) { if (error.status) return res.status(error.status).json({ error: error.message }); throw error; }
 });
-const discovery = require('../features/audio-analysis/discovery');
 const TRACK_KEY_MAX = 2000;
 
 function validTracks(input) {

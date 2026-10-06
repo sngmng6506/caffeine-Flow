@@ -131,7 +131,7 @@ async function insertRecommendation(dbOrTrx, cafeId, {
       filter_checked_at: hasFilterResult ? db.fn.now() : null,
     })
     .returning('*');
-  await require('../features/audio-analysis/jobs').enqueue(rec, dbOrTrx);
+  await require('../features/audio-analysis').jobs.enqueue(rec, dbOrTrx);
   return rec;
 }
 
