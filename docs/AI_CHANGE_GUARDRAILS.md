@@ -14,13 +14,17 @@
 server/src/constants/recommendation-status.js     isValidTransition
 owner/src/constants/recommendationStatus.js
 customer/src/constants/recommendationStatus.js
-server/src/services/recommendation.service.js     withCafeQueue
+server/src/services/recommendation.service.js     withCafeQueue / getRecommendations
+owner/src/pages/dashboard/queuePolicy.js          byPriority
+customer/src/queueOrder.js                        byQueuePriority
 server/tests/cafe-queue-root.test.mjs
+server/tests/queue-order-parity.test.mjs
 ```
 
 - 허용 상태는 `pending`, `accepted`, `playing`, `played`, `skipped`, `rejected`이고 활성 상태는 앞의 셋이다.
 - 종료 상태는 바꾸지 않는다. 활성 상태로 되돌리는 것도, 다른 종료 상태로 덮어쓰는 것(`skipped` → `played`)도 막는다. 같은 상태 재설정만 허용한다.
 - **한 카페의 활성 큐는 하나의 일관성 단위다.** playing은 한 곡뿐·큐 한도·활성 중복 금지는 곡 하나만 봐서는 지킬 수 없다. 그 카페의 신청곡 상태·큐 구성·좋아요 수를 바꾸는 쓰기는 `withCafeQueue`(카페 행 잠금) 안에서만 하고, 잠금 순서는 카페 → 곡이다. 곡 행만 잠그고 들어오는 경로가 하나라도 있으면 재생 전환과 동시에 같은 곡을 바꿔 종료 상태가 덮어써진다. 새 쓰기 경로를 만들면 `cafe-queue-root.test.mjs`의 경로 목록에 넣는다.
+- 대기열 순서는 좋아요 많은 순, 같으면 먼저 신청한 순이다. 이 규칙이 세 곳에 있다 — 서버 `getRecommendations`, 사장님 화면 `byPriority`(다음에 틀 곡과 자동수락할 곡을 실제로 고른다), 손님 화면 `byQueuePriority`(N번째로 보여 준다). 한쪽만 바꾸면 손님에게 1번째로 보이는 곡이 다른 순서로 재생된다. 바꿀 때는 세 곳과 `queue-order-parity.test.mjs`를 함께 고친다.
 - 손님 큐에는 활성 상태만 노출하고, 활성 상태를 신청 시각으로 숨기지 않는다. 목록·개수·중복 제약이 같은 active 범위를 사용한다.
 - 동일 카페·동일 곡의 활성 중복은 DB 제약으로도 막는다.
 - 상태 문자열을 라우트나 UI에 새로 직접 작성하지 않는다.
