@@ -54,12 +54,14 @@ flowchart LR
 | `customer/src/pages/cafe/useCafeQueue.js` | 활성 큐 스냅샷, Socket.IO 동기화, 재생 상태 |
 | `customer/src/pages/cafe/useCafeHistory.js` | 최근 재생 조회·페이지네이션·곡 투표값 반영 |
 | `customer/src/pages/cafe/useTopSongs.js` | 매장·전체 TOP 조회, 정렬·페이지네이션·곡 좋아요 |
+| `customer/src/queueOrder.js` | 대기열 표시 순서. 서버·사장님 화면과 같은 규칙이어야 한다 ([가드레일](AI_CHANGE_GUARDRAILS.md#recommendation-status-contract)) |
 | `server/src/routes/recommendations.js` | 손님 추천곡 하위 라우터 조립. 엔드포인트 로직을 두지 않음 |
 | `server/src/routes/recommendations/queue.routes.js` | 활성 큐 조회, 신청, 본인 취소 |
 | `server/src/routes/recommendations/history.routes.js` | 최근 재생과 매장 TOP 조회 |
 | `server/src/routes/recommendations/vote.routes.js` | 신청 건·곡 단위 좋아요와 실시간 전파 |
 | `server/src/routes/recommendations/comment.routes.js` | 신청곡 댓글 작성 |
 | `server/src/routes/recommendations/shared.js` | 손님 mutation의 카페·오류·UUID 공통 처리 |
+| `server/src/services/recommendation.service.js` | 신청 저장, 상태 전이, 카페 큐 잠금(`withCafeQueue`), 좋아요, 최근 재생·사장님 이력 합치기. 라우트는 DB를 직접 다루지 않고 여기를 부른다 |
 
 사장님 추천곡 API는 계속 `server/src/routes/recommendations.owner.js`가 담당한다. 공개 응답 직렬화, 실시간 전파, 제한 정책처럼 손님·사장님 경계를 함께 쓰는 기능은 `server/src/routes/_recommendations.shared.js`와 가드레일을 먼저 확인한다.
 

@@ -135,7 +135,7 @@ npm run build --prefix owner
 
 **포맷터는 두지 않는다.** 기존 스타일이 이미 일관되고, 한 번 돌리면 전 파일이 diff로 뒤집혀 리뷰가 불가능해진다. 린트 규칙은 포맷팅이 아니라 "실행해봐야 아는 실수"만 다룬다. 기존 effect 의도를 검토하며 도입할 수 있도록 `react-hooks/exhaustive-deps`만 경고이고 나머지 버그성 규칙은 오류다. `admin`은 아직 린트 대상이 아니다.
 
-`test:unit`은 `vitest.unit.config.mjs`에 명시된 테스트만 실행하며 PostgreSQL에 연결하지 않는다.
+`test:unit`은 `vitest.unit.config.mjs`에 명시된 테스트만 실행하며 PostgreSQL에 연결하지 않는다. DB 없이 도는 테스트를 새로 만들면 이 목록에 추가한다 — 빠지면 `npm test`에서만 돌고 `test:unit`에서는 조용히 빠지므로, `unit-config.test.mjs`가 목록에 없는 DB 비의존 테스트를 잡는다. DB를 쓰는 테스트인지는 그 테스트의 `NEEDS_DB` 기준(파일이 `db/knex`나 `supertest`를 부르는지 등)으로 가른다.
 
 ```bash
 NODE_ENV=test \
