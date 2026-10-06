@@ -401,7 +401,7 @@ router.put('/cafes/:id/suspend', requireAdmin, async (req, res) => {
 });
 
 // DELETE /api/v1/admin/cafes/:id
-// cafes의 onDelete('CASCADE')로 recommendations·votes·cafe_visits·daily_stats까지
+// cafes의 onDelete('CASCADE')로 recommendations·votes·cafe_visits까지
 // 함께 소멸한다. 되돌릴 수 없으므로 UI에서 카페명 확인 후에만 호출한다.
 router.delete('/cafes/:id', requireAdmin, async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
