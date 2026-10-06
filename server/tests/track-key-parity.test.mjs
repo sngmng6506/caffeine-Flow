@@ -16,7 +16,11 @@ const db = require('../src/db/knex');
 const { trackKeyOf } = require('../src/utils/track-key');
 const { TRACK_KEY_SQL } = require('../src/db/sql-fragments');
 
-// 운영에 실제로 들어오는 곡 참조 모양과 추적 파라미터가 붙은 변형.
+// 세 곳에 똑같이 넣어 볼 입력.
+// - 플랫폼별 곡 참조 모양(YouTube 영상 ID, SoundCloud·Spotify URL)과, 같은 곡에
+//   추적 파라미터가 붙은 변형. 둘이 같은 곡 키가 되는지가 핵심이다.
+// - 규칙이 갈라지기 쉬운 경계값: '?'가 두 번(첫 '?'에서 자르는지), '?'로 시작,
+//   빈 문자열. 운영에 들어오는 값은 아니지만 구현마다 처리가 달라지기 쉬운 곳이다.
 const REFS = [
   'dQw4w9WgXcQ',
   'dQw4w9WgXcQ?t=42',
