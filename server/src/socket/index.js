@@ -1,6 +1,5 @@
 const db = require('../db/knex');
 const jwt = require('jsonwebtoken');
-const { kstTodayString } = require('../utils/kst');
 const { isUuid } = require('../utils/validate');
 const {
   HEARTBEAT_REFRESH_MS,
@@ -15,8 +14,8 @@ const { sanitizePlaybackTrack } = require('./playback-payload');
 
 const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
 
-// role=owner는 handshake query만으로 신뢰할 수 없음 (손님이 위조해서
-// 붙으면 peak concurrent 통계에서 자기 자신을 owner로 차감시켜 왜곡 가능).
+// role=owner는 handshake query만으로 신뢰할 수 없음 (손님이 위조해서 붙으면
+// 사장님 room의 AI 판단 상세를 받고 재생 리더 권한까지 얻는다).
 // auth.token의 JWT를 검증하고 slug 일치까지 확인 — 실패 시 손님으로 취급.
 async function verifyOwner(socket, slug) {
   try {
@@ -47,8 +46,6 @@ async function touchHeartbeat(cafeId) {
 function initSocket(io) {
   const cafeNsp = io.of('/cafe');
 
-  // room별 사장님 소켓 ID 집합 — peak concurrent에서 차감
-  const ownerSockets = new Map(); // room -> Set<socketId>
   const playbackPublishers = new Map(); // room -> { socketId, timer, payload }
   const playbackLeaders = createPlaybackLeaderRegistry({
     graceMs: PLAYBACK_LEADER_GRACE_MS,
@@ -106,9 +103,6 @@ function initSocket(io) {
     let heartbeatTimer = null;
 
     if (ownerPayload) {
-      if (!ownerSockets.has(room)) ownerSockets.set(room, new Set());
-      ownerSockets.get(room).add(socket.id);
-
       // 매장이 지금 켜져 있음 — 연결 즉시 + 주기적으로 갱신.
       // owner 앱 코드 변경 없이 기존 소켓 연결을 그대로 생존 신호로 쓴다.
       touchHeartbeat(ownerPayload.cafeId);
@@ -157,51 +151,14 @@ function initSocket(io) {
         playbackPublishers.set(room, { socketId: socket.id, timer, payload: nextPlayback });
         cafeNsp.to(room).emit('playback_state', nextPlayback);
       });
-    } else {
-      // 손님 입장 시에만 피크 갱신 의미가 있음
-      updatePeakConcurrent(cafeNsp, cafe, ownerSockets);
     }
 
     socket.on('disconnect', () => {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       clearPlaybackState(room, socket.id);
       playbackLeaders.remove(room, socket.id);
-      ownerSockets.get(room)?.delete(socket.id);
-      if (ownerSockets.get(room)?.size === 0) ownerSockets.delete(room);
     });
   });
-}
-
-async function updatePeakConcurrent(nsp, cafe, ownerSockets) {
-  const roomKey = cafeRoom(cafe);
-  try {
-    const room = nsp.adapter.rooms.get(roomKey);
-    const total = room ? room.size : 0;
-    const owners = ownerSockets.get(roomKey)?.size || 0;
-    const customers = total - owners;
-    if (customers < 1) return;
-
-    // 방문/이력 통계와 동일하게 KST 기준 날짜 사용 (UTC면 오전 9시 전 피크가 전날로 기록됨)
-    const today = kstTodayString();
-    const existing = await db('daily_stats')
-      .where({ cafe_id: cafe.id, date: today })
-      .first();
-
-    if (existing) {
-      if (customers > (existing.peak_concurrent || 0)) {
-        await db('daily_stats')
-          .where({ id: existing.id })
-          .update({ peak_concurrent: customers });
-      }
-    } else {
-      await db('daily_stats')
-        .insert({ cafe_id: cafe.id, date: today, peak_concurrent: customers })
-        .onConflict(['cafe_id', 'date'])
-        .merge({ peak_concurrent: customers });
-    }
-  } catch (err) {
-    // 통계 실패는 무시
-  }
 }
 
 module.exports = initSocket;

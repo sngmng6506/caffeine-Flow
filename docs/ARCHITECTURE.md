@@ -161,7 +161,7 @@ stateDiagram-v2
 | `song_comments` | 같은 곡을 카페 간 공유하는 댓글과 답글 |
 | `playback_history` | 사장님이 브라우저에서 직접 재생한 유효 곡 이력. 신청곡 통계와 분리 |
 | `cafe_visits` | 카페·visitor ID·KST 날짜 기준 익명 브라우저 집계 |
-| `daily_stats` | KST 기준 운영 통계와 피크 동시접속 |
+| `daily_stats` | 쓰는 코드 없음. 옛 운영 통계·피크 동시접속 값만 남아 있다. 사장님 통계는 `recommendations`를, 방문 수는 `cafe_visits`를 직접 집계한다 |
 | `cafe_slug_history` | QR slug 변경 이력과 이전 주소 이동 안내 |
 
 `recommendations.id`는 UUID다. 순서를 가정한 `MIN/MAX(id)` 집계는 사용하지 않는다.
