@@ -3,7 +3,7 @@ const { kstStartOfDateString, kstEndOfDateString, kstStartOfDay, getKstHour } = 
 const { REC_STATUS } = require('../constants/recommendation-status');
 const { FILTER_STATUS, FILTER_REJECT_STATUSES } = require('../constants/music-filter-status');
 const { MUSIC_FILTER_STATS_LOOKBACK_DAYS, STATS_PATTERN_LOOKBACK_DAYS } = require('../constants/time-policy');
-const { CANONICAL_VIDEO_ID_SQL, KST_HOUR_SQL, KST_DOW_SQL } = require('../db/sql-fragments');
+const { TRACK_KEY_SQL, KST_HOUR_SQL, KST_DOW_SQL } = require('../db/sql-fragments');
 const { ownerRecommendation } = require('../utils/public-response');
 
 async function getStats(cafeId) {
@@ -15,12 +15,12 @@ async function getStats(cafeId) {
 
   const topSongs = await db('recommendations')
     .where({ cafe_id: cafeId, status: REC_STATUS.PLAYED })
-    .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
+    .select(db.raw(`${TRACK_KEY_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
     .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
-    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL))
+    .groupBy(db.raw(TRACK_KEY_SQL))
     .orderBy('count', 'desc')
     .limit(10);
 
@@ -68,12 +68,12 @@ function topQuery(builder, offset, sort = 'count', voteScope = () => {}) {
   const secondary = sort === 'votes' ? 'count' : 'total_votes';
   const played = builder
     .where({ status: REC_STATUS.PLAYED })
-    .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
+    .select(db.raw(`${TRACK_KEY_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
     .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
-    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL));
+    .groupBy(db.raw(TRACK_KEY_SQL));
 
   const votes = db('votes')
     .select('track_key')
@@ -235,12 +235,12 @@ async function songsByKstField(cafeId, fieldSql, value, offset, limit) {
     .where({ cafe_id: cafeId })
     .where('requested_at', '>=', since30Days())
     .whereRaw(`${fieldSql} = ?`, [value])
-    .select(db.raw(`${CANONICAL_VIDEO_ID_SQL} as video_id`))
+    .select(db.raw(`${TRACK_KEY_SQL} as video_id`))
     .select(db.raw('MAX(title) as title'))
     .select(db.raw('MAX(channel_title) as channel_title'))
     .select(db.raw('MAX(thumbnail) as thumbnail'))
     .count('id as count')
-    .groupBy(db.raw(CANONICAL_VIDEO_ID_SQL))
+    .groupBy(db.raw(TRACK_KEY_SQL))
     .orderBy('count', 'desc')
     .limit(limit + 1)
     .offset(offset);

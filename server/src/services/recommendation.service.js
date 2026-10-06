@@ -2,9 +2,9 @@ const db = require('../db/knex');
 const { REC_STATUS, ACTIVE_STATUSES, TERMINAL_STATUSES, isValidTransition } = require('../constants/recommendation-status');
 const { FILTER_STATUS } = require('../constants/music-filter-status');
 const { PLATFORM } = require('../constants/platforms');
-const { canonicalizeVideoId } = require('../utils/video-id');
+const { trackKeyOf } = require('../utils/track-key');
 const { kstStartOfDay } = require('../utils/kst');
-const { HISTORY_SORT_AT_SQL, CANONICAL_VIDEO_ID_SQL } = require('../db/sql-fragments');
+const { HISTORY_SORT_AT_SQL, TRACK_KEY_SQL } = require('../db/sql-fragments');
 const { RECENT_HISTORY_LOOKBACK_DAYS } = require('../constants/time-policy');
 const playbackHistoryService = require('./playback-history.service');
 
@@ -103,7 +103,7 @@ async function withCafeQueue(cafeId, work) {
 
 async function findActiveByVideoId(cafeId, videoId) {
   return db('recommendations')
-    .where({ cafe_id: cafeId, video_id: canonicalizeVideoId(videoId) })
+    .where({ cafe_id: cafeId, video_id: trackKeyOf(videoId) })
     .whereIn('status', ACTIVE_STATUSES)
     .first();
 }
@@ -139,7 +139,7 @@ async function insertRecommendation(dbOrTrx, cafeId, {
   const [rec] = await dbOrTrx('recommendations')
     .insert({
       cafe_id:        cafeId,
-      video_id:       canonicalizeVideoId(videoId),
+      video_id:       trackKeyOf(videoId),
       title,
       channel_title:  channelTitle,
       thumbnail,
@@ -172,7 +172,7 @@ async function add(cafeId, payload) {
 async function addWithinQueueLimit(cafeId, payload, maxQueueSize) {
   return withCafeQueue(cafeId, async (trx) => {
     const duplicate = await trx('recommendations')
-      .where({ cafe_id: cafeId, video_id: canonicalizeVideoId(payload.videoId) })
+      .where({ cafe_id: cafeId, video_id: trackKeyOf(payload.videoId) })
       .whereIn('status', ACTIVE_STATUSES)
       .first();
     if (duplicate) {
@@ -295,7 +295,7 @@ async function syncSongVoteCount(trx, cafeId, trackKey) {
   const total = Number(count);
   await trx('recommendations')
     .where({ cafe_id: cafeId })
-    .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+    .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
     .update({ vote_count: total });
   return total;
 }
@@ -304,7 +304,7 @@ async function syncSongVoteCount(trx, cafeId, trackKey) {
 async function songVoteResult(trx, cafeId, trackKey, total) {
   const rows = await trx('recommendations')
     .where({ cafe_id: cafeId })
-    .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+    .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
     .select('*');
   return { trackKey, voteCount: total, recommendations: rows };
 }
@@ -317,13 +317,13 @@ async function voteSong(cafeId, trackKey, voterIp, visitorId, { recommendationId
     // 남길 수 있어야 하므로 존재 확인은 전역으로 한다 — 임의 문자열은 막되
     // "어딘가에서 실제로 재생된 곡"이면 받는다.
     const known = await trx('recommendations')
-      .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+      .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
       .first('id');
     if (!known) throw Object.assign(new Error('곡을 찾을 수 없습니다'), { status: 404 });
     // 표는 이 매장에 남는다. 우리 매장에 그 곡의 행이 있으면 함께 연결한다.
     const local = await trx('recommendations')
       .where({ cafe_id: cafeId })
-      .whereRaw(`${CANONICAL_VIDEO_ID_SQL} = ?`, [trackKey])
+      .whereRaw(`${TRACK_KEY_SQL} = ?`, [trackKey])
       .first('id');
 
     await trx('votes').insert({
@@ -357,14 +357,14 @@ async function unvoteSong(cafeId, trackKey, voterIp, visitorId) {
 async function vote(cafeId, recommendationId, voterIp, visitorId) {
   const rec = await findByIdForCafe(cafeId, recommendationId);
   if (!rec) throw Object.assign(new Error('추천곡을 찾을 수 없습니다'), { status: 404 });
-  const result = await voteSong(cafeId, canonicalizeVideoId(rec.video_id), voterIp, visitorId, { recommendationId });
+  const result = await voteSong(cafeId, trackKeyOf(rec.video_id), voterIp, visitorId, { recommendationId });
   return result.recommendations.find(row => row.id === recommendationId) || rec;
 }
 
 async function unvote(cafeId, recommendationId, voterIp, visitorId) {
   const rec = await findByIdForCafe(cafeId, recommendationId);
   if (!rec) throw Object.assign(new Error('추천곡을 찾을 수 없습니다'), { status: 404 });
-  const result = await unvoteSong(cafeId, canonicalizeVideoId(rec.video_id), voterIp, visitorId);
+  const result = await unvoteSong(cafeId, trackKeyOf(rec.video_id), voterIp, visitorId);
   return result.recommendations.find(row => row.id === recommendationId) || rec;
 }
 

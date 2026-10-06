@@ -193,6 +193,8 @@ stateDiagram-v2
 | 재생 이력 → 곡 댓글 | `song_comments`의 키 병합 | **직접 쓰기** | 직접 재생곡의 세션 댓글 키를 실제 곡 ID로 바꾸는 일을 이력 저장과 같은 트랜잭션에서 한다([가드레일](AI_CHANGE_GUARDRAILS.md#app-boundary-contract)) |
 | 통계·카페 → 신청곡 큐 | `recommendations`, `votes` | 직접 읽기 | 사장님 통계와 운영자 카페 목록의 집계. 쓰지 않는다 |
 
+컨텍스트 사이에서 곡은 곡 키(`track_key`) 하나로 가리킨다. 곡 참조와 곡 키의 정의, `video_id` 칸에 영상 ID가 아닌 URL도 들어가는 이유는 `server/src/utils/track-key.js`가 기준이다.
+
 ## 시간 기준
 
 사용자에게 보이는 날짜·이력·통계의 하루 경계는 KST다. 서버와 사장님 UI는 공통 KST 유틸을 사용하며 UTC 자정을 직접 계산하지 않는다.

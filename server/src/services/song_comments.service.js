@@ -1,5 +1,5 @@
 const db = require('../db/knex');
-const { canonicalizeVideoId } = require('../utils/video-id');
+const { trackKeyOf } = require('../utils/track-key');
 const { songComment } = require('../utils/public-response');
 
 function withCafeName(query) {
@@ -12,10 +12,10 @@ function withCafeName(query) {
 // 답글을 한 번에 조회한다. 과거 데이터는 canonicalize migration으로 보정돼
 // 있어 exact match가 가능하고, 복합 인덱스를 그대로 사용할 수 있다.
 async function getComments(videoId, { offset, limit }) {
-  const canonicalVideoId = canonicalizeVideoId(videoId);
+  const trackKey = trackKeyOf(videoId);
   const rows = await withCafeName(
     db('song_comments')
-      .where('song_comments.video_id', canonicalVideoId)
+      .where('song_comments.video_id', trackKey)
       .whereNull('song_comments.parent_id'),
   )
     .orderBy('song_comments.created_at', 'desc')
@@ -30,7 +30,7 @@ async function getComments(videoId, { offset, limit }) {
   if (parentIds.length > 0) {
     const replies = await withCafeName(
       db('song_comments')
-        .where('song_comments.video_id', canonicalVideoId)
+        .where('song_comments.video_id', trackKey)
         .whereIn('song_comments.parent_id', parentIds),
     )
       .orderBy('song_comments.created_at', 'asc')
@@ -52,7 +52,7 @@ async function getComments(videoId, { offset, limit }) {
 
 async function addComment(videoId, cafeId = null, { commenterIp, commenterName, body, visitorId }) {
   const [comment] = await db('song_comments')
-    .insert({ video_id: canonicalizeVideoId(videoId), cafe_id: cafeId, commenter_ip: commenterIp, commenter_name: commenterName, body, visitor_id: visitorId || null })
+    .insert({ video_id: trackKeyOf(videoId), cafe_id: cafeId, commenter_ip: commenterIp, commenter_name: commenterName, body, visitor_id: visitorId || null })
     .returning('*');
   return songComment({ ...comment, cafe_name: null, replies: [] });
 }
@@ -62,7 +62,7 @@ async function addReply(videoId, parentId, cafeId = null, { commenterIp, comment
   if (
     !parent
     || parent.parent_id !== null
-    || canonicalizeVideoId(parent.video_id) !== canonicalizeVideoId(videoId)
+    || trackKeyOf(parent.video_id) !== trackKeyOf(videoId)
   ) {
     throw Object.assign(new Error('유효하지 않은 댓글'), { status: 400 });
   }

@@ -7,7 +7,7 @@
 // 같은 vote_count를 공유한다.
 //
 // 계약: docs/AI_CHANGE_GUARDRAILS.md#anonymous-visitor-identity-contract
-const { CANONICAL_VIDEO_ID_SQL } = require('../sql-fragments');
+const { TRACK_KEY_SQL } = require('../sql-fragments');
 
 exports.up = async function (knex) {
   await knex.schema.alterTable('votes', (t) => {
@@ -19,7 +19,7 @@ exports.up = async function (knex) {
   await knex.raw(`
     UPDATE votes v
     SET cafe_id = r.cafe_id,
-        track_key = ${CANONICAL_VIDEO_ID_SQL.replace('video_id', 'r.video_id')}
+        track_key = ${TRACK_KEY_SQL.replace('video_id', 'r.video_id')}
     FROM recommendations r
     WHERE v.recommendation_id = r.id
   `);
@@ -90,14 +90,14 @@ exports.up = async function (knex) {
       FROM votes GROUP BY cafe_id, track_key
     ) counted
     WHERE r.cafe_id = counted.cafe_id
-      AND ${CANONICAL_VIDEO_ID_SQL.replace('video_id', 'r.video_id')} = counted.track_key
+      AND ${TRACK_KEY_SQL.replace('video_id', 'r.video_id')} = counted.track_key
   `);
   await knex.raw(`
     UPDATE recommendations r SET vote_count = 0
     WHERE vote_count <> 0 AND NOT EXISTS (
       SELECT 1 FROM votes v
       WHERE v.cafe_id = r.cafe_id
-        AND v.track_key = ${CANONICAL_VIDEO_ID_SQL.replace('video_id', 'r.video_id')}
+        AND v.track_key = ${TRACK_KEY_SQL.replace('video_id', 'r.video_id')}
     )
   `);
 };

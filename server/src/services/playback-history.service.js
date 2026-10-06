@@ -1,5 +1,5 @@
 const db = require('../db/knex');
-const { canonicalizeVideoId } = require('../utils/video-id');
+const { trackKeyOf } = require('../utils/track-key');
 const { shouldStorePlayback } = require('./playback-history-policy');
 
 function toHistoryItem(row) {
@@ -22,8 +22,8 @@ function toHistoryItem(row) {
 }
 
 async function finalize(cafeId, payload) {
-  const videoId = payload.videoId ? canonicalizeVideoId(payload.videoId) : null;
-  const commentKey = canonicalizeVideoId(payload.commentKey);
+  const videoId = payload.videoId ? trackKeyOf(payload.videoId) : null;
+  const commentKey = trackKeyOf(payload.commentKey);
   const durationSeconds = Math.max(0, Math.floor(payload.durationSeconds));
   const shouldStoreHistory = shouldStorePlayback({
     endReason: payload.endReason,

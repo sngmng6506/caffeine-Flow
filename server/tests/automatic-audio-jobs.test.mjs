@@ -384,7 +384,7 @@ describe('분석 판정 회귀', () => {
   });
   it('신청 URL의 추적 파라미터가 붙어도 같은 곡의 분석을 찾는다', async () => {
     // 분석은 정규화된 track_key로 저장되고, 필터는 신청 URL에서 막 뽑은 원본 ID를
-    // 들고 온다(가드레일: 조회 키는 canonicalizeVideoId를 거친다). 정규화를 빠뜨리면
+    // 들고 온다(가드레일: 조회 키는 trackKeyOf를 거친다). 정규화를 빠뜨리면
     // 공유 링크로 신청한 곡은 분석이 있어도 늘 못 찾아 프롬프트에서 조용히 빠진다.
     const audioAnalysis = (await import('../src/features/audio-analysis/index.js')).default;
     const { job, saved } = await analyzed();

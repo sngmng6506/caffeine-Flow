@@ -101,7 +101,7 @@ server/src/routes/audio-analysis.js
 - **영원히 성공할 수 없는 소스는 영구 실패로 분류한다.** 길이 한도 밖·라이브·DRM은 `SOURCE_UNSUPPORTED`/`SOURCE_UNAVAILABLE`이다. `DOWNLOAD_FAILED`는 재시도가 끝나지 않는 코드라 6시간마다 같은 곡이 돌아온다.
 - `platform_stream`은 다운로드 출처 기록이며 권리 허가를 뜻하지 않는다. Spotify·DRM 우회는 지원하지 않고 로컬 CLI의 명시적 권리 근거는 별도 유지한다.
 - 일괄 재분석은 작업 행만 잠근다(`FOR UPDATE OF "job"`). 조인한 `music_track_annotations`까지 잠그면 재분석이 도는 동안 사람 판정 저장이 막힌다.
-- 자동 분석은 실시간 필터 프롬프트에 들어가지만 **판단의 전제가 아니다** — 분석이 없거나 조회에 실패해도 제목·아티스트만으로 판단하며 조회 실패를 fail-closed 거절로 만들지 않는다. 조회 키는 `canonicalizeVideoId`를 거친다. 틀림 판정한 분석은 제외하되 이전 분석을 대신 쓰지 않는다.
+- 자동 분석은 실시간 필터 프롬프트에 들어가지만 **판단의 전제가 아니다** — 분석이 없거나 조회에 실패해도 제목·아티스트만으로 판단하며 조회 실패를 fail-closed 거절로 만들지 않는다. 조회 키는 `trackKeyOf`를 거친다. 틀림 판정한 분석은 제외하되 이전 분석을 대신 쓰지 않는다.
 - 필터 프롬프트에 장르 후보를 넣지 않는다. 판단할 모델이 없으므로 넣을 값 자체가 없고, 제목·아티스트에서 장르를 추측해 채우지 않는다.
 - 자동 분석을 라이브 입력에 연결한 사실만으로 품질 향상을 주장하지 않는다. 골드 라벨·false accept 평가는 [ROADMAP](ROADMAP.md)에 남긴다.
 - 수집 소스·진도 규칙은 [워커 README](../audio-analysis-worker/README.md#최신곡-수집)가 기준이다. 소스별 진도는 `music_source_cursors`가 단일 기준이다.
@@ -273,12 +273,14 @@ server/tests/auth-boundary.test.mjs
 server/src/services/recommendation.service.js   voteSong / unvoteSong
 server/src/services/stats.service.js            topQuery
 server/src/db/migrations/20260902090000_song_scoped_votes.js
+server/src/utils/track-key.js                   trackKeyOf
 customer/src/trackKey.js
+server/tests/track-key-parity.test.mjs
 customer/src/votedSongs.js
 ```
 
 - 좋아요는 신청 건이 아니라 **곡**에 붙는다. 표의 단위는 `(cafe_id, track_key, visitor_id)`이고 visitor ID가 없는 레거시 요청만 IP로 막는다. 같은 곡이 여러 번 신청돼도 한 사람은 한 표다.
-- `track_key`는 `CANONICAL_VIDEO_ID_SQL`(`?` 앞부분)로 만든다. 서버의 `canonicalizeVideoId`와 손님 화면의 `trackKeyOf`가 같은 규칙이어야 한다. 한쪽만 바꾸면 화면은 눌린 것으로 보이는데 서버는 다른 곡으로 센다.
+- `track_key`는 곡 참조(`video_id`)의 `?` 앞부분이다. 서버 `trackKeyOf`(`utils/track-key.js`)·SQL `TRACK_KEY_SQL`·손님 화면 `trackKeyOf`가 같은 규칙이어야 하고 `track-key-parity.test.mjs`가 셋을 맞춰 본다. 한쪽만 바꾸면 화면은 눌린 것으로 보이는데 서버는 다른 곡으로 센다.
 - TOP 집계의 좋아요는 `votes`를 직접 센다. `recommendations.vote_count`는 큐 정렬용 비정규화 값이라 같은 카페·같은 곡의 행이 모두 같은 값을 갖는다 — SUM 하면 신청 횟수만큼 곱해진다.
 - 표는 손님이 보고 있는 매장에 남는다. 전체 TOP에서 우리 매장 기록이 없는 곡에 좋아요를 눌러도 되지만, 어딘가에서 실제로 재생된 곡인지 확인한 뒤에만 받는다.
 - 신청곡이 취소·삭제돼도 곡 좋아요는 남는다(`recommendation_id`는 `ON DELETE SET NULL`).

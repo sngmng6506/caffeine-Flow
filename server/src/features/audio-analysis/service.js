@@ -1,6 +1,6 @@
 const db = require('../../db/knex');
 const { AUDIO_REVIEW_STATUS } = require('../../constants/audio-analysis');
-const { canonicalizeVideoId } = require('../../utils/video-id');
+const { trackKeyOf } = require('../../utils/track-key');
 
 function saveResult(result, connection = db) {
   const now = new Date();
@@ -47,7 +47,7 @@ function saveResult(result, connection = db) {
 // - 같은 곡의 분석은 (platform, track_key, model_name, model_version) upsert라 모델이
 //   바뀌면 여러 줄이 생긴다. 가장 최근에 분석한 것을 쓴다.
 // - track_key는 저장될 때 정규화된 값이다(recommendation.service가
-//   canonicalizeVideoId를 거쳐 넣는다). 신청 URL에서 막 뽑은 원본 ID로 찾으면 같은
+//   trackKeyOf를 거쳐 넣는다). 신청 URL에서 막 뽑은 원본 ID로 찾으면 같은
 //   규칙을 적용하지 않는 한 항상 못 찾는다.
 // - 사람이 틀림·애매로 판정한 분석은 돌려주지 않는다. 판정은 이 분석의 현재 실행에
 //   붙으므로 옛 모델의 분석으로 우회하지도 않는다.
@@ -56,7 +56,7 @@ function saveResult(result, connection = db) {
 async function findLatestForTrack(platform, trackKey, { timeoutMs } = {}) {
   if (!platform || !trackKey) return null;
   let query = db('music_audio_analyses')
-    .where({ platform, track_key: canonicalizeVideoId(trackKey) })
+    .where({ platform, track_key: trackKeyOf(trackKey) })
     .orderBy('analyzed_at', 'desc')
     .first();
   if (timeoutMs) query = query.timeout(timeoutMs);
