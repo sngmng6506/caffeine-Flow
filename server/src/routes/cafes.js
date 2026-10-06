@@ -4,16 +4,14 @@ const { requireAuth } = require('../middleware/auth');
 const cafeService = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
 const playbackHistoryService = require('../services/playback-history.service');
+const recService = require('../services/recommendation.service');
 const { safeCafe } = require('../utils/cafe-sanitize');
 const { issueToken } = require('../utils/jwt');
 const { APP_URL } = require('../config');
 const { cafeRoom, disconnectCafe } = require('../socket/rooms');
 const { validateString, validateBool, validateInEnum, validateDateString, validateCoordinate, isUuid } = require('../utils/validate');
-const db = require('../db/knex');
 const { kstStartOfDateString, kstEndOfDateString, kstTodayString } = require('../utils/kst');
 const { VALID_PLATFORMS, formatAllowedPlatforms } = require('../constants/platforms');
-const { TERMINAL_STATUSES } = require('../constants/recommendation-status');
-const { HISTORY_SORT_AT_SQL } = require('../db/sql-fragments');
 const { parseBoundedInteger, parseOffset } = require('../utils/pagination');
 const { ownerRecommendation } = require('../utils/public-response');
 const { getQrImage } = require('../services/qr-image.service');
@@ -356,47 +354,18 @@ router.put('/me/status', requireAuth, async (req, res) => {
 router.get('/me/history', requireAuth, async (req, res) => {
   const offset = parseOffset(req.query.offset);
   if (offset.error) return res.status(400).json({ error: offset.error });
-  const limit = 20;
-  let recommendationQuery = db('recommendations')
-    .where({ cafe_id: req.owner.cafeId })
-    .whereIn('status', TERMINAL_STATUSES)
-    .orderByRaw(`${HISTORY_SORT_AT_SQL} DESC`)
-    .orderBy('requested_at', 'desc')
-    .orderBy('id', 'desc');
-  let manualQuery = db('playback_history')
-    .where({ cafe_id: req.owner.cafeId })
-    .orderBy('ended_at', 'desc')
-    .orderBy('id', 'desc');
 
+  let range = {};
   if (req.query.date) {
     const dateCheck = validateDateString(req.query.date);
     if (dateCheck.error) return res.status(400).json({ error: dateCheck.error });
     // KST 경계 사용 — UTC 자정 기준이면 KST 09:00~다음날 08:59가 잡혀
     // 통계 탭(KST 기준)과 이력 날짜 필터가 서로 다른 하루를 보게 됨
-    const start = kstStartOfDateString(req.query.date);
-    const end = kstEndOfDateString(req.query.date);
-    recommendationQuery = recommendationQuery.whereRaw(`${HISTORY_SORT_AT_SQL} BETWEEN ? AND ?`, [start, end]);
-    manualQuery = manualQuery.whereBetween('ended_at', [start, end]);
+    range = { start: kstStartOfDateString(req.query.date), end: kstEndOfDateString(req.query.date) };
   }
 
-  const fetchLimit = offset.value + limit + 1;
-  const [recommendations, manualRows] = await Promise.all([
-    recommendationQuery.limit(fetchLimit),
-    manualQuery.limit(fetchLimit),
-  ]);
-  const items = [
-    ...recommendations.map(ownerRecommendation),
-    ...manualRows.map(row => ownerRecommendation(playbackHistoryService.toHistoryItem(row))),
-  ].sort((left, right) => {
-    const leftAt = new Date(left.played_at || left.requested_at).getTime();
-    const rightAt = new Date(right.played_at || right.requested_at).getTime();
-    if (leftAt !== rightAt) return rightAt - leftAt;
-    return String(right.id).localeCompare(String(left.id));
-  });
-  res.json({
-    items: items.slice(offset.value, offset.value + limit),
-    hasMore: items.length > offset.value + limit,
-  });
+  const page = await recService.getOwnerHistory(req.owner.cafeId, { offset: offset.value, ...range });
+  res.json({ items: page.items.map(ownerRecommendation), hasMore: page.hasMore });
 });
 
 // POST /api/v1/cafes/me/playback-history

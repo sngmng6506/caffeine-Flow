@@ -1,4 +1,3 @@
-const db = require('../db/knex');
 const jwt = require('jsonwebtoken');
 const { isUuid } = require('../utils/validate');
 const {
@@ -37,7 +36,7 @@ async function verifyOwner(socket, slug) {
 // 불변식), 연결 시점 slug로 계속 update하면 변경 후 0행 갱신이 된다.
 async function touchHeartbeat(cafeId) {
   try {
-    await db('cafes').where({ id: cafeId }).update({ last_heartbeat_at: db.fn.now() });
+    await cafeService.touchHeartbeat(cafeId);
   } catch {
     // 하트비트 실패는 서비스 동작에 영향 없음 — 통계와 동일하게 무시
   }

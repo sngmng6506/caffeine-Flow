@@ -21,6 +21,7 @@ export default defineConfig({
       'tests/electron-panel-layout.test.mjs',
       'tests/electron-playback-controller.test.mjs',
       'tests/electron-current-track.test.mjs',
+      'tests/layer-boundary.test.mjs',
       'tests/kst.test.mjs',
       'tests/limits.test.mjs',
       'tests/music-filter.test.mjs',

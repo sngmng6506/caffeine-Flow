@@ -32,7 +32,14 @@ async function getRecentHistory(cafeId, offset = 0, limit = 20) {
     offset: 0,
     limit: fetchLimit,
   });
-  const rows = [...recommendationRows, ...manualPage.items].sort((left, right) => {
+  return mergeHistoryPage(recommendationRows, manualPage.items, offset, limit);
+}
+
+// 신청곡 이력과 사장님이 직접 재생한 이력을 한 목록으로 합쳐 한 쪽을 자른다.
+// 손님 "최근 재생"과 사장님 이력이 이 규칙을 같이 써야 두 화면의 순서가 같다.
+// 두 출처에서 각각 offset + limit + 1개까지 받아 와야 합친 뒤에도 쪽이 맞는다.
+function mergeHistoryPage(recommendationRows, manualItems, offset, limit) {
+  const rows = [...recommendationRows, ...manualItems].sort((left, right) => {
     const leftAt = new Date(left.played_at || left.requested_at).getTime();
     const rightAt = new Date(right.played_at || right.requested_at).getTime();
     if (leftAt !== rightAt) return rightAt - leftAt;
@@ -42,6 +49,26 @@ async function getRecentHistory(cafeId, offset = 0, limit = 20) {
     items: rows.slice(offset, offset + limit),
     hasMore: rows.length > offset + limit,
   };
+}
+
+// 사장님 이력. 손님 "최근 재생"과 달리 거절된 곡도 보이고(TERMINAL_STATUSES),
+// 기간 제한 없이 보거나 start·end로 한 KST 하루를 고른다.
+async function getOwnerHistory(cafeId, { offset = 0, limit = 20, start = null, end = null } = {}) {
+  const fetchLimit = offset + limit + 1;
+  let recommendationQuery = db('recommendations')
+    .where({ cafe_id: cafeId })
+    .whereIn('status', TERMINAL_STATUSES)
+    .orderByRaw(`${HISTORY_SORT_AT_SQL} DESC`)
+    .orderBy('requested_at', 'desc')
+    .orderBy('id', 'desc');
+  if (start) {
+    recommendationQuery = recommendationQuery.whereRaw(`${HISTORY_SORT_AT_SQL} BETWEEN ? AND ?`, [start, end]);
+  }
+  const [recommendationRows, manualItems] = await Promise.all([
+    recommendationQuery.limit(fetchLimit),
+    playbackHistoryService.getForOwner(cafeId, { start, end, limit: fetchLimit }),
+  ]);
+  return mergeHistoryPage(recommendationRows, manualItems, offset, limit);
 }
 
 async function findById(id) {
@@ -354,6 +381,7 @@ async function addComment(cafeId, recommendationId, { commenterIp, commenterName
 module.exports = {
   getRecommendations,
   getRecentHistory,
+  getOwnerHistory,
   findById,
   findByIdForCafe,
   findActiveByVideoId,

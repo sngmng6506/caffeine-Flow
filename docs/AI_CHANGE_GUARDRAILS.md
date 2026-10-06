@@ -287,6 +287,7 @@ customer/src/votedSongs.js
 ## App Boundary Contract
 
 - `server/app.js`와 `server/server.js` 분리를 유지한다. 테스트는 `app.js`를 import한다.
+- 라우트(`routes/`)와 소켓(`socket/`)은 DB 연결(`db/knex`)과 SQL 조각(`db/sql-fragments`)을 직접 불러오지 않는다. 라우트는 입력 확인 → 서비스 호출 → 응답만 하고, 쿼리는 `services/`나 `features/`에 둔다. 라우트에서 쿼리를 쓰면 서비스의 규칙(카페 잠금, 이력 합치기, KST 날짜)을 두 벌로 들게 된다. 읽기도 예외가 아니다. `layer-boundary.test.mjs`가 검사한다.
 - DB 상태가 단일 원천이며 소켓 이벤트만으로 영구 상태를 만들지 않는다.
 - Electron 재생 상태와 서버 큐 상태가 충돌하지 않도록 한 곡만 `playing`으로 유지한다.
 - 브라우저 직접 재생곡은 신청곡 `playing`으로 만들지 않고 UUID 재생 세션과 `playback_history`로 분리한다. 정상 종료 또는 60초 이상 재생만 이력에 저장한다.

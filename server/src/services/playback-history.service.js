@@ -82,4 +82,15 @@ async function getRecent(cafeId, { since, offset = 0, limit = 20 }) {
   return { items: rows.slice(0, limit).map(toHistoryItem), hasMore: rows.length > limit };
 }
 
-module.exports = { finalize, getRecent, toHistoryItem };
+// 사장님 이력. start·end를 주면 그 구간(ended_at 기준)만 본다.
+async function getForOwner(cafeId, { start = null, end = null, limit }) {
+  let query = db('playback_history').where({ cafe_id: cafeId });
+  if (start) query = query.whereBetween('ended_at', [start, end]);
+  const rows = await query
+    .orderBy('ended_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(limit);
+  return rows.map(toHistoryItem);
+}
+
+module.exports = { finalize, getRecent, getForOwner, toHistoryItem };

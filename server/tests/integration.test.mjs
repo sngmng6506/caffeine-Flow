@@ -421,6 +421,67 @@ describe('방문자 집계 식별자', () => {
     const item = res.body.find(row => row.id === cafe.id);
     expect(item).toHaveProperty('today_unique_browsers');
     expect(item).not.toHaveProperty('today_unique_visitors');
+
+    // 집계 두 건을 카페별로 합친 값이 실제 기록과 같아야 한다. 방문은 여기서 직접
+    // 남긴다 — 다른 테스트가 남긴 방문에 기대면 이 테스트만 돌릴 때 0이 된다.
+    await request(app).get(`/api/v1/cafes/${cafe.slug}/recommendations`).set(guestHeaders('admin-count-visitor'));
+    const [todayRequest] = await db('recommendations').insert({
+      cafe_id: cafe.id, video_id: 'admin_count_req', title: '오늘 신청 집계 확인', platform: 'youtube', status: 'played',
+    }).returning('id');
+    const recount = await request(app).get('/api/v1/admin/cafes').set({ Authorization: `Bearer ${adminToken}` });
+    const counted = recount.body.find(row => row.id === cafe.id);
+    const { kstTodayString, kstStartOfDay } = await import('../src/utils/kst.js');
+    const [{ n: browsers }] = await db('cafe_visits').where({ cafe_id: cafe.id, visit_date: kstTodayString() }).count('id as n');
+    const [{ n: requests }] = await db('recommendations').where({ cafe_id: cafe.id }).where('requested_at', '>=', kstStartOfDay(0)).count('id as n');
+    expect(Number(browsers)).toBeGreaterThan(0);
+    expect(Number(requests)).toBeGreaterThan(0);
+    expect(counted.today_unique_browsers).toBe(Number(browsers));
+    expect(counted.today_requests).toBe(Number(requests));
+    await db('recommendations').where({ id: todayRequest.id }).del();
+  });
+});
+
+describe('운영자 카페 관리', () => {
+  const adminAuth = () => ({ Authorization: `Bearer ${jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '1h' })}` });
+
+  it('매장 통계 응답의 카페 정보는 ID와 이름뿐이다', async () => {
+    // 응답에 카페 행을 그대로 실으면 사장님 이메일·로그인 식별자가 함께 나간다.
+    const res = await request(app).get(`/api/v1/admin/cafes/${cafe.id}/stats`).set(adminAuth());
+    expect(res.status).toBe(200);
+    expect(res.body.cafe).toEqual({ id: cafe.id, name: cafe.name });
+  });
+
+  it('정지하면 손님 접근이 막히고 해제하면 돌아온다', async () => {
+    const [target] = await db('cafes')
+      .insert({ name: '정지 확인 카페', slug: 'suspendchk1', owner_email: 'suspend-check@t.com' })
+      .returning('*');
+    const queue = () => request(app).get(`/api/v1/cafes/${target.slug}/recommendations`);
+    try {
+      expect((await queue()).status).toBe(200);
+
+      const suspended = await request(app).put(`/api/v1/admin/cafes/${target.id}/suspend`).set(adminAuth()).send({ is_suspended: true });
+      expect(suspended.status).toBe(200);
+      expect(suspended.body).toEqual({ id: target.id, slug: target.slug, is_suspended: true });
+      expect((await queue()).status).toBe(404);
+
+      const resumed = await request(app).put(`/api/v1/admin/cafes/${target.id}/suspend`).set(adminAuth()).send({ is_suspended: false });
+      expect(resumed.body.is_suspended).toBe(false);
+      expect((await queue()).status).toBe(200);
+
+      expect((await request(app).put(`/api/v1/admin/cafes/${target.id}/suspend`).set(adminAuth()).send({ is_suspended: 'yes' })).status).toBe(400);
+      expect((await request(app).put('/api/v1/admin/cafes/00000000-0000-4000-8000-000000000000/suspend').set(adminAuth()).send({ is_suspended: true })).status).toBe(404);
+    } finally {
+      await db('cafes').where({ id: target.id }).del();
+    }
+  });
+
+  it('하트비트는 카페 ID로 생존 시각을 갱신한다', async () => {
+    const cafeService = (await import('../src/services/cafe.service.js')).default;
+    await db('cafes').where({ id: cafe.id }).update({ last_heartbeat_at: null });
+    await cafeService.touchHeartbeat(cafe.id);
+    const { last_heartbeat_at: beat } = await db('cafes').where({ id: cafe.id }).first('last_heartbeat_at');
+    expect(beat).not.toBeNull();
+    expect(Date.now() - new Date(beat).getTime()).toBeLessThan(60_000);
   });
 });
 

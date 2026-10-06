@@ -9,7 +9,7 @@
 const router = require('express').Router();
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
-const db = require('../db/knex');
+const cafeService = require('../services/cafe.service');
 const statsService = require('../services/stats.service');
 const musicFilter = require('../features/music-filter');
 const { getTrackMetadata } = require('../services/track-metadata.service');
@@ -194,30 +194,7 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
   const today = kstTodayString();
   const todayStart = kstStartOfDay(0);
 
-  const cafes = await db('cafes')
-    .select(
-      'id', 'name', 'slug', 'owner_email', 'created_at', 'last_login_at',
-      'last_heartbeat_at', 'is_suspended',
-      'region', 'district', 'dong', 'latitude', 'longitude',
-    )
-    .orderBy('created_at', 'desc');
-
-  // cafe_visits는 localStorage의 visitor_id 우선, 레거시 요청은 IP fallback으로
-  // 하루 단위 중복이 제거된다. 계정·사람 수가 아니라 익명 브라우저 프로필 수다.
-  const visits = await db('cafe_visits')
-    .select('cafe_id')
-    .count('id as unique_browsers')
-    .where('visit_date', today)
-    .groupBy('cafe_id');
-
-  const requests = await db('recommendations')
-    .select('cafe_id')
-    .count('id as requests')
-    .where('requested_at', '>=', todayStart)
-    .groupBy('cafe_id');
-
-  const visitMap = new Map(visits.map((v) => [v.cafe_id, Number(v.unique_browsers)]));
-  const requestMap = new Map(requests.map((r) => [r.cafe_id, Number(r.requests)]));
+  const cafes = await cafeService.listForAdmin({ today, todayStart });
 
   const now = Date.now();
   const todayStartMs = todayStart.getTime();
@@ -225,8 +202,6 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
   res.json(cafes.map((c) => ({
     ...c,
     status: cafeStatus(c.last_heartbeat_at, now, todayStartMs),
-    today_unique_browsers: visitMap.get(c.id) || 0,
-    today_requests: requestMap.get(c.id) || 0,
   })));
 });
 
@@ -235,7 +210,7 @@ router.get('/cafes', requireAdmin, async (_req, res) => {
 router.get('/cafes/:id/stats', requireAdmin, async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
 
-  const cafe = await db('cafes').where({ id: req.params.id }).select('id', 'name').first();
+  const cafe = await cafeService.findNameById(req.params.id);
   if (!cafe) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
 
   const todayDate = kstTodayString();
@@ -270,10 +245,7 @@ router.get('/cafes/:id/music-filter-audit', requireAdmin, async (req, res) => {
   const offset = parseOffset(req.query.offset);
   if (offset.error) return res.status(400).json({ error: offset.error });
 
-  const cafe = await db('cafes')
-    .where({ id: req.params.id })
-    .select('id', 'name', 'music_filter_enabled', 'music_filter_prompt')
-    .first();
+  const cafe = await cafeService.findById(req.params.id);
   if (!cafe) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
 
   const audit = await labelingReview.fetchCafeAudit({ cafeId: cafe.id, offset: offset.value });
@@ -357,10 +329,7 @@ router.put('/cafes/:id/suspend', requireAdmin, async (req, res) => {
   if (typeof value !== 'boolean') {
     return res.status(400).json({ error: 'is_suspended는 boolean이어야 합니다' });
   }
-  const [cafe] = await db('cafes')
-    .where({ id: req.params.id })
-    .update({ is_suspended: value })
-    .returning(['id', 'slug', 'is_suspended']);
+  const cafe = await cafeService.setSuspended(req.params.id, value);
   if (!cafe) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
   res.json(cafe);
 });
@@ -370,7 +339,7 @@ router.put('/cafes/:id/suspend', requireAdmin, async (req, res) => {
 // 함께 소멸한다. 되돌릴 수 없으므로 UI에서 카페명 확인 후에만 호출한다.
 router.delete('/cafes/:id', requireAdmin, async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
-  const deleted = await db('cafes').where({ id: req.params.id }).del();
+  const deleted = await cafeService.remove(req.params.id);
   if (!deleted) return res.status(404).json({ error: '카페를 찾을 수 없습니다' });
   res.json({ id: req.params.id, deleted: true });
 });
@@ -453,7 +422,7 @@ router.get('/audio-labels/:id/runs', requireAdmin, async (req, res) => {
 });
 router.get('/audio-runs/:id', requireAdmin, async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(400).json({ error: '분석 식별자가 올바르지 않습니다' });
-  const run = await db('music_audio_runs').where({ id: req.params.id }).select('id', 'platform', 'track_key', 'payload', 'created_at').first();
+  const run = await audioAnalysis.runs.find(req.params.id);
   if (!run) return res.status(404).json({ error: '분석을 찾을 수 없습니다' });
   res.json(run);
 });

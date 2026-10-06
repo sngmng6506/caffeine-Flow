@@ -19,6 +19,7 @@ function harness() {
     isValidSlugFormat: value => /^[a-z0-9]{4,20}$/.test(value),
     findById: vi.fn(async () => ({ ...cafe })),
     findActiveBySlug: vi.fn(async slug => slug === cafe.slug ? { ...cafe } : null),
+    touchHeartbeat: vi.fn(async () => {}),
   };
   let connect;
   const sockets = new Map();
@@ -62,6 +63,33 @@ function harness() {
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
+describe('사장님 앱 생존 신호', () => {
+  // 운영자 콘솔의 "영업 중" 표시가 last_heartbeat_at으로 정해진다. 갱신이 멈추면
+  // 켜져 있는 매장이 꺼진 것으로 보인다.
+  it('사장님 연결은 카페 ID로 하트비트를 남기고 주기적으로 갱신한다', async () => {
+    const { open, service } = harness();
+    await open();
+    expect(service.touchHeartbeat).toHaveBeenCalledWith(cafeId);
+    const calls = service.touchHeartbeat.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    expect(service.touchHeartbeat.mock.calls.length).toBeGreaterThan(calls);
+  });
+
+  it('손님 연결은 하트비트를 남기지 않는다', async () => {
+    const { open, service } = harness();
+    await open({ id: 'customer', owner: false });
+    expect(service.touchHeartbeat).not.toHaveBeenCalled();
+  });
+
+  it('하트비트 저장이 실패해도 연결을 끊지 않는다', async () => {
+    const { open, service } = harness();
+    service.touchHeartbeat.mockRejectedValue(new Error('db down'));
+    const { socket } = await open();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(socket.connected).toBe(true);
+  });
+});
 
 describe('재생 소켓 입력 경계', () => {
   it('기형 메시지는 무시하고 다음 정상 메시지를 처리한다', async () => {

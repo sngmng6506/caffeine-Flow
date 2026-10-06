@@ -3,7 +3,6 @@ const cafeService = require('../../services/cafe.service');
 const recService = require('../../services/recommendation.service');
 const musicFilter = require('../../features/music-filter');
 const { verifyTrackMetadataToken } = require('../../services/track-metadata-token.service');
-const db = require('../../db/knex');
 const {
   MAX_QUEUE_SIZE,
   broadcastToOwners,
@@ -17,7 +16,6 @@ const { REC_STATUS } = require('../../constants/recommendation-status');
 const { FILTER_ACTION, FILTER_STATUS } = require('../../constants/music-filter-status');
 const { parseAllowedPlatforms, platformLabel } = require('../../constants/platforms');
 const { RECOMMENDATION_REQUEST_LIMIT } = require('../../constants/limits');
-const { KST_VISIT_DATE_SQL } = require('../../db/sql-fragments');
 const { publicRecommendation } = require('../../utils/public-response');
 const { findCafeForMutation, sendServiceError, validateRecommendationId } = require('./shared');
 
@@ -50,10 +48,7 @@ router.get('/', async (req, res) => {
   const ip = getClientIp(req);
   const visitorId = safeVisitorId(req);
   try {
-    await db('cafe_visits')
-      .insert({ cafe_id: cafe.id, visitor_ip: ip, visitor_id: visitorId, visit_date: db.raw(KST_VISIT_DATE_SQL) })
-      .onConflict()
-      .ignore();
+    await cafeService.recordVisit({ cafeId: cafe.id, visitorIp: ip, visitorId });
   } catch {
     // 방문 통계 실패가 큐 조회를 막아서는 안 된다.
   }

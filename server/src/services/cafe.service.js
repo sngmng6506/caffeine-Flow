@@ -1,4 +1,5 @@
 const db = require('../db/knex');
+const { KST_VISIT_DATE_SQL } = require('../db/sql-fragments');
 
 const crypto = require('crypto');
 
@@ -201,7 +202,86 @@ async function findMovedSlug(oldSlug) {
   return cafe.slug;
 }
 
+// 운영자 콘솔 카페 목록. 오늘(KST) 방문 브라우저 수와 신청 수를 붙인다.
+//
+// 카페마다 따로 세면 N+1이라 집계 두 건을 받아 메모리에서 합친다. today는
+// cafe_visits.visit_date와 같은 KST 날짜 문자열, todayStart는 그날 0시(KST)다 —
+// 어드민 수치와 사장님 통계가 같은 하루를 봐야 한다.
+async function listForAdmin({ today, todayStart }) {
+  const cafes = await db('cafes')
+    .select(
+      'id', 'name', 'slug', 'owner_email', 'created_at', 'last_login_at',
+      'last_heartbeat_at', 'is_suspended',
+      'region', 'district', 'dong', 'latitude', 'longitude',
+    )
+    .orderBy('created_at', 'desc');
+
+  // cafe_visits는 localStorage의 visitor_id 우선, 레거시 요청은 IP fallback으로
+  // 하루 단위 중복이 제거된다. 계정·사람 수가 아니라 익명 브라우저 프로필 수다.
+  const visits = await db('cafe_visits')
+    .select('cafe_id')
+    .count('id as unique_browsers')
+    .where('visit_date', today)
+    .groupBy('cafe_id');
+
+  const requests = await db('recommendations')
+    .select('cafe_id')
+    .count('id as requests')
+    .where('requested_at', '>=', todayStart)
+    .groupBy('cafe_id');
+
+  const visitMap = new Map(visits.map((v) => [v.cafe_id, Number(v.unique_browsers)]));
+  const requestMap = new Map(requests.map((r) => [r.cafe_id, Number(r.requests)]));
+  return cafes.map((cafe) => ({
+    ...cafe,
+    today_unique_browsers: visitMap.get(cafe.id) || 0,
+    today_requests: requestMap.get(cafe.id) || 0,
+  }));
+}
+
+// 운영자 매장 통계 응답에 그대로 실리는 카페 정보. 응답에 나가므로 열을 좁혀 둔다 —
+// findById는 사장님 이메일·로그인 식별자까지 돌려준다.
+async function findNameById(id) {
+  return db('cafes').where({ id }).select('id', 'name').first();
+}
+
+// 정지는 되돌릴 수 있는 1차 조치다 — 손님 접근만 차단하고 데이터는 보존한다.
+async function setSuspended(id, isSuspended) {
+  const [cafe] = await db('cafes')
+    .where({ id })
+    .update({ is_suspended: isSuspended })
+    .returning(['id', 'slug', 'is_suspended']);
+  return cafe || null;
+}
+
+// cafes의 onDelete('CASCADE')로 recommendations·votes·cafe_visits까지 함께
+// 소멸한다. 되돌릴 수 없다. 카페 행을 지우면서 그 행을 잠그므로 withCafeQueue를
+// 거치는 신청곡 쓰기와는 순서대로 처리된다.
+async function remove(id) {
+  return db('cafes').where({ id }).del();
+}
+
+// 손님 방문을 KST 하루·visitor 단위로 한 번만 남긴다.
+async function recordVisit({ cafeId, visitorIp, visitorId }) {
+  await db('cafe_visits')
+    .insert({ cafe_id: cafeId, visitor_ip: visitorIp, visitor_id: visitorId, visit_date: db.raw(KST_VISIT_DATE_SQL) })
+    .onConflict()
+    .ignore();
+}
+
+// 사장님 앱이 지금 켜져 있다는 생존 신호. cafeId 기준이다 — slug는 QR 재발급으로
+// 바뀔 수 있어 연결 시점 slug로 갱신하면 변경 후 0행이 된다.
+async function touchHeartbeat(cafeId) {
+  await db('cafes').where({ id: cafeId }).update({ last_heartbeat_at: db.fn.now() });
+}
+
 module.exports = {
+  listForAdmin,
+  findNameById,
+  setSuspended,
+  remove,
+  recordVisit,
+  touchHeartbeat,
   findById,
   findBySlug,
   findActiveBySlug,

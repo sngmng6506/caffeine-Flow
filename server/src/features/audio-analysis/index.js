@@ -33,6 +33,7 @@ module.exports = {
   runs: {
     validateRun: runs.validateRun,
     history: runs.history,
+    find: runs.find,
   },
 
   // 최신곡 수집

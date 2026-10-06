@@ -110,4 +110,12 @@ async function history(jobId) {
     .select('id', 'created_at').orderBy('created_at', 'desc').limit(100);
 }
 
-module.exports = { validateRun, summary, history };
+// 원본 한 건. 운영자가 분석 원문을 열어 볼 때 쓴다.
+async function find(id) {
+  return db('music_audio_runs')
+    .where({ id })
+    .select('id', 'platform', 'track_key', 'payload', 'created_at')
+    .first();
+}
+
+module.exports = { validateRun, summary, history, find };
