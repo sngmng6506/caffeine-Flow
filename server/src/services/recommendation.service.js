@@ -283,6 +283,20 @@ async function remove(cafeId, id) {
   return db('recommendations').where({ id, cafe_id: cafeId }).delete();
 }
 
+// 손님 취소는 재생 전환과 같은 잠금 안에서 상태·소유권 확인부터 삭제까지 끝낸다.
+async function cancel(cafeId, id, visitorId) {
+  return withCafeQueue(cafeId, async (trx) => {
+    const rec = await requireForCafe(trx, cafeId, id, { forUpdate: true });
+    if (![REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(rec.status)) {
+      throw Object.assign(new Error('이미 처리된 추천곡은 취소할 수 없습니다'), { status: 409 });
+    }
+    if (!rec.visitor_id || !visitorId || rec.visitor_id !== visitorId) {
+      throw Object.assign(new Error('본인이 신청한 곡만 취소할 수 있습니다'), { status: 403 });
+    }
+    return trx('recommendations').where({ id, cafe_id: cafeId }).delete();
+  });
+}
+
 // 좋아요는 신청 건이 아니라 곡에 붙는다. 같은 곡이 여러 번 신청되면 행은
 // 여러 개지만 표는 (카페, 곡, 방문자)당 하나이고, 그 카페의 같은 곡 행들은
 // 모두 같은 vote_count를 본다.
@@ -392,6 +406,7 @@ module.exports = {
   setPlaying,
   clearPlaying,
   remove,
+  cancel,
   vote,
   unvote,
   voteSong,
