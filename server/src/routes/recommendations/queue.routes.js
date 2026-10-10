@@ -114,15 +114,13 @@ router.post('/', requestLimiters, async (req, res) => {
 router.delete('/:id/cancel', async (req, res) => {
   const cafe = await findCafeForMutation(req, res);
   if (!cafe) return;
-  const rec = await recService.findByIdForCafe(cafe.id, req.params.id);
-  if (!rec) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
-  if (![REC_STATUS.PENDING, REC_STATUS.ACCEPTED].includes(rec.status)) return res.status(409).json({ error: '이미 처리된 추천곡은 취소할 수 없습니다' });
-  const visitorId = safeVisitorId(req);
-  const isOwner = Boolean(rec.visitor_id && visitorId && rec.visitor_id === visitorId);
-  if (!isOwner) return res.status(403).json({ error: '본인이 신청한 곡만 취소할 수 있습니다' });
-  const deleted = await recService.remove(cafe.id, rec.id);
-  if (!deleted) return res.status(404).json({ error: '추천곡을 찾을 수 없습니다' });
-  broadcastRecommendation(req, cafe, { action: 'delete', id: rec.id });
+  try {
+    await recService.cancel(cafe.id, req.params.id, safeVisitorId(req));
+  } catch (error) {
+    if (sendServiceError(res, error)) return;
+    throw error;
+  }
+  broadcastRecommendation(req, cafe, { action: 'delete', id: req.params.id });
   res.json({ ok: true });
 });
 

@@ -74,6 +74,7 @@ Base URL은 `/api/v1`이고 응답은 JSON이다. 인증 엔드포인트는 `Aut
 | DELETE | `/:id` | 🏪 | 신청곡 삭제 |
 
 - `is_mine`은 요청의 `X-Visitor-Id`와 저장값을 서버가 비교한 boolean이다. 손님 취소도 이 값이 일치할 때만 허용한다.
+- 손님 취소는 `pending`·`accepted`에서만 가능하다. 재생 전환과 같은 카페 큐 잠금 안에서 상태·소유권을 확인하고 삭제하므로, 재생이 먼저 시작되면 409를 반환하고 곡을 보존한다. 타인 신청은 403, 없거나 다른 카페의 신청은 404다.
 - `metadataToken`은 `GET /tracks/oembed`가 확인한 곡 정보에 5분 서명을 붙인 값이다. body의 `videoId`, `title`, `platform`은 신뢰하지 않고 만료·변조 토큰은 400이다.
 
 ## 곡 댓글 — `/songs/:videoId/comments`

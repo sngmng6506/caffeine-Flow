@@ -51,6 +51,7 @@ describe('카페 큐의 입구', () => {
   it('상태를 바꾸는 모든 경로가 카페 행을 가장 먼저 잠근다', async () => {
     const rec = await recService.add(cafe.id, payload());
     const voted = await recService.add(cafe.id, payload());
+    const cancellable = await recService.add(cafe.id, { ...payload(), visitorId: 'root-visitor' });
     const trackKey = voted.video_id;
 
     const paths = {
@@ -58,6 +59,7 @@ describe('카페 큐의 입구', () => {
       updateStatus: () => recService.updateStatus(cafe.id, rec.id, REC_STATUS.ACCEPTED),
       setPlaying: () => recService.setPlaying(cafe.id, rec.id),
       clearPlaying: () => recService.clearPlaying(cafe.id),
+      cancel: () => recService.cancel(cafe.id, cancellable.id, 'root-visitor'),
       voteSong: () => recService.voteSong(cafe.id, trackKey, '127.0.0.1', 'root-visitor'),
       unvoteSong: () => recService.unvoteSong(cafe.id, trackKey, '127.0.0.1', 'root-visitor'),
     };
